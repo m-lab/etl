@@ -1,0 +1,7 @@
+total_storage_limit: 100M
+queue:
+- name: etl-parser-queue
+  target: etl-parser
+  rate: 20/s
+  bucket_size: 200
+  max_concurrent_requests: 10
