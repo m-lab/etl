@@ -1,0 +1,56 @@
+# Travis configuration for etl-worker.
+#
+# etl-worker is a Go project supporting release automation to mlab-sandbox
+# for a single branch in the m-lab/etl repository. The steps it takes are:
+#
+#  * decrypt service account credentials
+#  * install the Google Cloud SDK command line tools (gcloud)
+#  * cache the gcloud installation and setup
+#  * test and build the go code
+#  * on success, deploy the result when the origin branch matches a supported
+#    deployment target.
+#
+language: go
+
+before_install:
+# NB: Encrypted values are not defined in forks or pull requests.
+# Decrypt the tar archive containing the GCP service account key files.
+#
+# After unpacking, there should be one service account key file for every GCP
+# project referenced in the "deploy" section. These keys authenticate the
+# gcloud deploy operations.
+
+# TODO: Update the IV and KEY values for your repository.
+- travis/decrypt.sh $encrypted_ee3c81e2a61e_iv $encrypted_ee3c81e2a61e_key
+  keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
+
+
+# These directories will be cached on successful "script" builds, and restored,
+# if available, to save time on future builds.
+cache:
+  directories:
+    - "$HOME/google-cloud-sdk/"
+
+
+script:
+- go test -v ./...
+- cd $TRAVIS_BUILD_DIR/cmd/etl_worker && go build
+- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
+
+
+# Deploy steps never trigger on a new Pull Request. Deploy steps will trigger
+# after a merge with matching "on:" conditions.
+deploy:
+# SANDBOX: before code review for development code in a specific branch.
+- provider: script
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker
+  skip_cleanup: true
+  on:
+    # TODO: update repo
+    repo: m-lab/etl
+    # Consider all branches and match using the condition. By default
+    # "all_branches" is false, and the condition is ignored.
+    all_branches: true
+    # A bash-style 'if' condition, matching branches with a "sandbox-" prefix.
+    condition: $TRAVIS_BRANCH == sandbox-*
