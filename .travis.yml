@@ -54,4 +54,6 @@ deploy:
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
     # A bash-style 'if' condition, matching branches with a "sandbox-" prefix.
-    condition: $TRAVIS_BRANCH == sandbox-*
+    # Sandbox branches will be deployed to personalized service names.
+    # Integration branch will not use decorated service names.
+    condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
