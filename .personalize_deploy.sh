@@ -13,7 +13,7 @@ BASEDIR=${4:?Please provide the base directory containing app.yaml}
 
 if [[ -f ${BASEDIR}/app.yaml ]] ; then
   if [[ -n "${TRAVIS_BRANCH}" ]] ; then
-    if [[ condition: $TRAVIS_BRANCH == sandbox-* ]] ; then
+    if [[ ${TRAVIS_BRANCH} == sandbox-* ]] ; then
       user=${TRAVIS_BRANCH##sandbox-}
       sed -i -e 's/^service: \(.*\)/service: \1-'${user}'/' \
           cmd/etl_worker/app.yaml
