@@ -5,3 +5,9 @@ queue:
   rate: 20/s
   bucket_size: 200
   max_concurrent_requests: 10
+
+- name: etl-pull-queue
+  mode: pull
+  acl:
+  - user_email: 581276032543-compute@developer.gserviceaccount.com
+  - writer_email: 581276032543-compute@developer.gserviceaccount.com
