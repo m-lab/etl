@@ -9,5 +9,7 @@ queue:
 - name: etl-pull-queue
   mode: pull
   acl:
+  # Provide full access to the taskqueue by the mlab-sandbox default GCE service account.
+  # This should apply to default GCE VMs and AppEngine Flex VMs.
   - user_email: 581276032543-compute@developer.gserviceaccount.com
   - writer_email: 581276032543-compute@developer.gserviceaccount.com
