@@ -4,6 +4,9 @@ package main
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/m-lab/etl/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	//	"google.golang.org/appengine"
 	//	"google.golang.org/appengine/datastore"
 	//	"google.golang.org/appengine/log"
@@ -16,7 +19,7 @@ import (
 // Track reqeusts that last longer than 24 hrs.
 // Is task handling idempotent?
 
-// Useful headers added by AppEngine when sending Tasks.
+// Useful headers added by AppEngine when sending Tasks via Push.
 //   X-AppEngine-QueueName
 //   X-AppEngine-TaskETA
 //   X-AppEngine-TaskName
@@ -36,12 +39,16 @@ func worker(w http.ResponseWriter, r *http.Request) {
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO(soltesz): provide a real health check.
 	fmt.Fprint(w, "ok")
 }
 
 func main() {
 	http.HandleFunc("/", handler)
-	http.HandleFunc("/worker", worker)
+	http.HandleFunc("/worker", metrics.DurationHandler("generic", worker))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
+
+	// Assign the default prometheus handler to the standard exporter path.
+	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":8080", nil)
 }
