@@ -22,11 +22,12 @@ exports.queueForFile = function (filename) {
 };
 
 
-exports.enqueueFileTask = function (filename, queue) {
+exports.enqueueFileTask = function (bucket, filename, queue) {
+    var gsFilename = "gs://" + bucket + "/" + filename;
     var params = {
         "project": "mlab-sandbox",
         "queue": "etl-parser-queue",
-        "payloadBase64": new Buffer(filename).toString("base64")
+        "payloadBase64": new Buffer(gsFilename).toString("base64")
     };
     taskqueue.tasks.insert(params, function (err, response) {
         if (err) {
@@ -49,7 +50,7 @@ exports.fileNotification = function fileNotification (event, callback) {
     const queue = exports.queueForFile(file.name);
 
     if (exports.fileIsProcessable(file) && queue) {
-        exports.enqueueFileTask(file.name, queue);
+        exports.enqueueFileTask(file.bucket, file.name, queue);
     }
     callback();
 };
