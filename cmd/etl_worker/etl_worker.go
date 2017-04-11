@@ -4,10 +4,13 @@ package main
 import (
 	"fmt"
 	"net/http"
-	//	"google.golang.org/appengine"
-	//	"google.golang.org/appengine/datastore"
-	//	"google.golang.org/appengine/log"
-	//	"google.golang.org/appengine/taskqueue"
+
+	"github.com/m-lab/etl/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	// Enable profiling. For more background and usage information, see:
+	//   https://blog.golang.org/profiling-go-programs
+	_ "net/http/pprof"
 )
 
 // Task Queue can always submit to an admin restricted URL.
@@ -16,7 +19,7 @@ import (
 // Track reqeusts that last longer than 24 hrs.
 // Is task handling idempotent?
 
-// Useful headers added by AppEngine when sending Tasks.
+// Useful headers added by AppEngine when sending Tasks via Push.
 //   X-AppEngine-QueueName
 //   X-AppEngine-TaskETA
 //   X-AppEngine-TaskName
@@ -36,12 +39,16 @@ func worker(w http.ResponseWriter, r *http.Request) {
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO(soltesz): provide a real health check.
 	fmt.Fprint(w, "ok")
 }
 
 func main() {
 	http.HandleFunc("/", handler)
-	http.HandleFunc("/worker", worker)
+	http.HandleFunc("/worker", metrics.DurationHandler("generic", worker))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
+
+	// Assign the default prometheus handler to the standard exporter path.
+	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":8080", nil)
 }
