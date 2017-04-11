@@ -70,7 +70,7 @@ var (
 			Name: "etl_worker_duration_seconds",
 			Help: "Worker execution time distributions.",
 			Buckets: []float64{
-				1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0,
+				0.001, 0.01, 0.1, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0,
 				600.0, 1800.0, 3600.0, 7200.0, math.Inf(+1),
 			},
 		},
