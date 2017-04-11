@@ -1,3 +1,5 @@
+// TODO(dev) add test overview
+//
 package task_test
 
 import (
@@ -21,6 +23,7 @@ func TestPlumbing(t *testing.T) {
 	}
 }
 
+// Create a tar.Reader with simple test contents.
 func MakeTestTar(t *testing.T) *tar.Reader {
 	b := new(bytes.Buffer)
 	tw := tar.NewWriter(b)
@@ -52,11 +55,12 @@ func (tp *TestParser) HandleTest(fn string, table string, test []byte) (bigquery
 	return nil, nil
 }
 
+// TODO(dev) - add good comments
 func TestTarFileInput(t *testing.T) {
 	rdr := MakeTestTar(t)
 
 	var prsr TestParser
-	tt := task.NewTask(rdr, &prsr)
+	tt := task.NewTask(rdr, &prsr, "test_table")
 	fn, bb, err := tt.Next()
 	if err != nil {
 		t.Error(err)
@@ -80,7 +84,7 @@ func TestTarFileInput(t *testing.T) {
 	}
 
 	rdr = MakeTestTar(t)
-	tt = task.NewTask(rdr, &prsr)
+	tt = task.NewTask(rdr, &prsr, "test_table")
 	tt.ProcessAllTests()
 
 	if len(prsr.files) != 2 {
