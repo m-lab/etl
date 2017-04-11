@@ -83,6 +83,7 @@ func TestTarFileInput(t *testing.T) {
 		t.Error("Expected butter milk but got ", string(bb))
 	}
 
+	// Reset the tar reader and create new task, to test the ProcessAllTests behavior.
 	rdr = MakeTestTar(t)
 	tt = task.NewTask(rdr, &prsr, "test_table")
 	tt.ProcessAllTests()
