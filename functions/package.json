@@ -1,5 +1,5 @@
 {
-  "name": "parser-queuer",
+  "name": "etl-parser-queuer",
   "description": "Listens for file events and adds files to the right queue",
   "main": "enqueue.js",
   "repository": {

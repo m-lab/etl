@@ -1,6 +1,8 @@
 var google = require("googleapis");
 
 exports.fileIsProcessable = function (file) {
+  // TODO: make this better. I am sure this is not the only reason to not
+  // process a file.
     return (file.resourceState !== "not_exists");
 };
 
@@ -34,12 +36,15 @@ exports.enqueueFileTask = function (bucket, filename, queue, callback) {
                });
       });
   /* 
-    // If you want things to be authenticated, 
+    // If you want things to be authenticated, then put them inside the callback
+    // here.
     google.auth.getApplicationDefault(function (err, authClient, projectId) {
         if (err) {
             throw err;
         }
 
+        // push taskqueues are currently non-functional for the REST API
+        // TODO: complain about this
         var taskqueue = google.taskqueue({"version": "v1beta2", "auth": authClient})
         var storage = google.storage({"version": "v1", "auth": authClient});
         console.log(storage.buckets.list({"project": "mlab-sandbox"}));
