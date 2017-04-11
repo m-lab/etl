@@ -24,7 +24,7 @@ exports.queueForFile = function (filename) {
 
 exports.enqueueFileTask = function (filename, queue) {
     var params = {
-        "project": "mlab-sanbox",
+        "project": "mlab-sandbox",
         "queue": "etl-parser-queue",
         "payloadBase64": new Buffer(filename).toString("base64")
     };
