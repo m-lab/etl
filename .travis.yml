@@ -21,7 +21,7 @@ before_install:
 # gcloud deploy operations.
 
 # TODO: Update the IV and KEY values for your repository.
-- travis/decrypt.sh $encrypted_ee3c81e2a61e_iv $encrypted_ee3c81e2a61e_key
+- travis/decrypt.sh "$encrypted_ee3c81e2a61e_iv" "$encrypted_ee3c81e2a61e_key"
   keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
 
 
