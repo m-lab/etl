@@ -7,10 +7,10 @@ import (
 
 	"github.com/m-lab/etl/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	//	"google.golang.org/appengine"
-	//	"google.golang.org/appengine/datastore"
-	//	"google.golang.org/appengine/log"
-	//	"google.golang.org/appengine/taskqueue"
+
+	// Enable profiling. For more background and usage information, see:
+	//   https://blog.golang.org/profiling-go-programs
+	_ "net/http/pprof"
 )
 
 // Task Queue can always submit to an admin restricted URL.
