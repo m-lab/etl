@@ -80,7 +80,7 @@ var (
 	)
 )
 
-// DurationHandler wraps the call of an http.HandlerFunc to record the runtime of the
+// DurationHandler wraps the call of an inner http.HandlerFunc and records the runtime.
 func DurationHandler(name string, inner http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()
