@@ -24,3 +24,9 @@ describe("queueForFile", function () {
     assert.isOk(enqueue.queueForFile("paris-traceroute/2008/07/12/blah.tgz"));
   });
 });
+
+describe("fileIsProcessable", function() {
+  it("won't be processable if it does not exist"), function() {
+    assert.isNotOk(enque.fileIsProcessable({{"resourceState": "not_exists"});
+  });
+});
