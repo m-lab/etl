@@ -15,24 +15,24 @@ import (
 )
 
 type Task struct {
-	table string        // The table to insert rows into, INCLUDING the partition!
-	rdr   *tar.Reader   // Tar reader from which to read tests.
-	prsr  parser.Parser // Parser to parse the tests.
+	table         string // The table to insert rows into, INCLUDING the partition!
+	*tar.Reader          // Tar reader from which to read tests.
+	parser.Parser        // Parser to parse the tests.
 }
 
 // NewTask constructs a task, injecting the tar reader and the parser.
 func NewTask(rdr *tar.Reader, prsr parser.Parser, table string) *Task {
 	t := new(Task)
 	t.table = table
-	t.rdr = rdr
-	t.prsr = prsr
+	t.Reader = rdr
+	t.Parser = prsr
 	return t
 }
 
 // Next reads the next test object from the tar file.
 // Returns io.EOF when there are no more tests.
 func (tt *Task) Next() (string, []byte, error) {
-	h, err := tt.rdr.Next()
+	h, err := tt.Reader.Next()
 	if err != nil {
 		return "", nil, err
 	}
@@ -42,14 +42,14 @@ func (tt *Task) Next() (string, []byte, error) {
 	var data []byte
 	if strings.HasSuffix(strings.ToLower(h.Name), ".gz") {
 		// TODO add unit test
-		zipReader, err := gzip.NewReader(tt.rdr)
+		zipReader, err := gzip.NewReader(tt.Reader)
 		if err != nil {
 			return h.Name, nil, err
 		}
 		defer zipReader.Close()
 		data, err = ioutil.ReadAll(zipReader)
 	} else {
-		data, err = ioutil.ReadAll(tt.rdr)
+		data, err = ioutil.ReadAll(tt.Reader)
 	}
 	if err != nil {
 		return h.Name, nil, err
@@ -75,7 +75,7 @@ func (tt *Task) ProcessAllTests() {
 		}
 
 		// TODO update table name
-		_, err := tt.prsr.HandleTest(fn, tt.table, data)
+		_, err := tt.Parser.HandleTest(fn, tt.table, data)
 		// TODO handle insertion into BQ.
 		if err != nil {
 			continue
