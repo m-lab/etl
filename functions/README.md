@@ -3,11 +3,20 @@ build the initial version and then moved to the [storage triggers
 tutorial](https://cloud.google.com/functions/docs/tutorials/storage) to refine
 things.
 
-To deploy a cloud function, try:
-
+To deploy this cloud function to mlab-sandbox, try:
 ```bash
-gcloud beta functions deploy helloGCS --stage-bucket [YOUR_STAGING_BUCKET_NAME]
---trigger-bucket [YOUR_UPLOAD_BUCKET_NAME]
+gcloud beta functions deploy parserNotifier \
+    --stage-bucket=parser-functions-sandbox \
+    --trigger-bucket=m-lab-sandbox \
+    --project=mlab-sandbox
 ```
 
-where `helloGCS` needs to match the name of the function exported in `index.js`.
+To install all the dependencies:
+```bash
+npm install .
+```
+
+To run the unit tests:
+```bash
+npm test
+```
