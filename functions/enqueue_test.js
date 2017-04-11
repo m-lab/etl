@@ -26,7 +26,7 @@ describe("queueForFile", function () {
 });
 
 describe("fileIsProcessable", function() {
-  it("won't be processable if it does not exist"), function() {
-    assert.isNotOk(enque.fileIsProcessable({{"resourceState": "not_exists"});
+  it("won't be processable if it does not exist", function() {
+    assert.isNotOk(enqueue.fileIsProcessable({"resourceState": "not_exists"}));
   });
 });
