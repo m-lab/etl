@@ -1,5 +1,4 @@
 var google = require("googleapis");
-var taskqueue = google.taskqueue("v1beta2")
 
 exports.fileIsProcessable = function (file) {
     return (file.resourceState !== "not_exists");
@@ -22,20 +21,46 @@ exports.queueForFile = function (filename) {
 };
 
 
-exports.enqueueFileTask = function (bucket, filename, queue) {
-    var gsFilename = "gs://" + bucket + "/" + filename;
-    var params = {
-        "project": "mlab-sandbox",
-        "queue": "etl-parser-queue",
-        "payloadBase64": new Buffer(gsFilename).toString("base64")
-    };
-    taskqueue.tasks.insert(params, function (err, response) {
+exports.enqueueFileTask = function (bucket, filename, queue, callback) {
+  var http = require('http');
+  var gsFilename = "gs://" + bucket + "/" + filename;
+  var safeFilename = new Buffer(gsFilename).toString("base64");
+  http.get('http://etl-parser-dot-mlab-sandbox.appspot.com/worker?filename=' + safeFilename,
+      function (res) {
+        res.on('end',
+               function() {
+                 console.log('Enqueue GET done', gsFilename);
+                 callback();
+               });
+      });
+  /* 
+    // If you want things to be authenticated, 
+    google.auth.getApplicationDefault(function (err, authClient, projectId) {
         if (err) {
-            console.log("Failed to enqueue", filename, "error was", err);
-        } else {
-            console.log("Enqueued", filename);
+            throw err;
         }
+
+        var taskqueue = google.taskqueue({"version": "v1beta2", "auth": authClient})
+        var storage = google.storage({"version": "v1", "auth": authClient});
+        console.log(storage.buckets.list({"project": "mlab-sandbox"}));
+        console.log(storage.buckets.list({"project": "mlab-sandbox"}));
+
+        var gsFilename = "gs://" + bucket + "/" + filename;
+        var params = {
+            "project": "mlab-sandbox",
+            "taskqueue": "etl-parser-queue",
+            "payloadBase64": new Buffer(gsFilename).toString("base64")
+        };
+        taskqueue.tasks.insert(params, function (err, response) {
+            if (err) {
+                console.log("Failed to enqueue", filename, "error was", err);
+            } else {
+                console.log("Enqueued", filename);
+            }
+            callback();
+        });
     });
+    */
 };
 
 /**
@@ -50,7 +75,8 @@ exports.fileNotification = function fileNotification (event, callback) {
     const queue = exports.queueForFile(file.name);
 
     if (exports.fileIsProcessable(file) && queue) {
-        exports.enqueueFileTask(file.bucket, file.name, queue);
+        exports.enqueueFileTask(file.bucket, file.name, queue, callback);
+    } else {
+      callback();
     }
-    callback();
 };

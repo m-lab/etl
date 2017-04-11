@@ -5,7 +5,7 @@ things.
 
 To deploy this cloud function to mlab-sandbox, try:
 ```bash
-gcloud beta functions deploy parserNotifier \
+gcloud beta functions deploy fileNotification \
     --stage-bucket=parser-functions-sandbox \
     --trigger-bucket=m-lab-sandbox \
     --project=mlab-sandbox
