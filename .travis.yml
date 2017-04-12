@@ -61,8 +61,9 @@ deploy:
 #    condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
 
 - provider: script
-  script: bash -c "$TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher"
+  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
   on:
     # TODO: update repo
