@@ -1,3 +1,17 @@
+// Package bq includes all code related to BigQuery.
+//
+// NB: NOTES ON MEMORY USE AND HTTP SIZE
+// The bigquery library uses JSON encoding of data, which appears to be the only
+// option at this time.  Furthermore, it uses intermediate data representations,
+// eventually creating a map[string]Value (unless you pass that in to begin with).
+// In general, when we start pumping large volumes of data, both the map and the
+// JSON will cause some memory pressure, and likely pretty severe limits on the size
+// of the insert we can send, likely on the order of a couple MB of actual row footprint
+// in BQ.
+//
+// Passing in slice of structs makes memory pressure a bit worse, but probably isn't
+// worth worrying about.
+
 package bq
 
 import (
