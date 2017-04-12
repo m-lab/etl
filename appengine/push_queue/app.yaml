@@ -1,6 +1,6 @@
 runtime: go
 api_version: go1
-service: push-queue
+service: queue-pusher
 
 handlers:
 - url: /.*
