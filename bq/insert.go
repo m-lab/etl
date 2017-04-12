@@ -32,6 +32,7 @@ type BQInserter struct {
 	uploader *bigquery.Uploader
 }
 
+// TODO - Consider injecting the Client here, to allow broader unit testing options.
 func NewInserter(project string, dataset string, table string) (Inserter, error) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	// Heavyweight!
