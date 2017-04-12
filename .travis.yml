@@ -31,9 +31,11 @@ cache:
   directories:
     - "$HOME/google-cloud-sdk/"
 
-
 script:
-- go test -v ./...
+# Currently skipping bq tests, because they depend on bigquery, and there is
+# no emulator
+- go test -v github.com/m-lab/etl/parser
+- go test -v github.com/m-lab/etl/task
 - cd $TRAVIS_BUILD_DIR/cmd/etl_worker && go build
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
 
