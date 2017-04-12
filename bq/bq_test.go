@@ -7,7 +7,17 @@ import (
 	"time"
 )
 
-// Bad - has side effects.
+// Item represents a row item.
+type Item struct {
+	Name   string
+	Count  int
+	Foobar int `json:"foobar"`
+}
+
+// NB: This test has side effects and depends on BigQuery service and
+// test table.
+// Do not run this test from travis.
+// TODO - use emulator when available.
 func TestInsert(t *testing.T) {
 	tag := "new"
 	items := []*Item{
