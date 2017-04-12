@@ -48,7 +48,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): Remove fake delay.
 	t := 10 * rand.ExpFloat64()
 	log.Printf("Simulating work by sleeping for %f seconds\n", t)
-	time.Sleep(t)
+	time.Sleep(time.Duration(t))
 
 	fmt.Fprintf(w, `{"message": "Success"}`)
 }
