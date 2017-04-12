@@ -79,16 +79,12 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filename := r.FormValue("filename")
-	queuename := r.FormValue("queuename")
 
-	if filename == "" || queuename == "" {
+	// TODO(dev): determine correct queue based on file type.
+	queuename := "etl-parser-queue"
+
+	if filename == "" {
 		http.Error(w, `{"message": "Bad request parameters"}`, http.StatusBadRequest)
-		return
-	}
-
-	if _, ok := queueWhitelist[queuename]; !ok {
-		// TODO(dev): return the queueWhitelist to client.
-		http.Error(w, `{"message": "Given queue name is not acceptable"}`, http.StatusNotAcceptable)
 		return
 	}
 
