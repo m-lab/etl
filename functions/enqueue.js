@@ -27,7 +27,7 @@ exports.enqueueFileTask = function (bucket, filename, queue, callback) {
   var http = require('http');
   var gsFilename = "gs://" + bucket + "/" + filename;
   var safeFilename = new Buffer(gsFilename).toString("base64");
-  http.get('http://push-queue-dot-mlab-sandbox.appspot.com/receiver?queuename=etl-parser-queue&filename=' + safeFilename,
+  http.get('http://push-queue-dot-mlab-sandbox.appspot.com/receiver?filename=' + safeFilename,
       function (res) {
         res.on('data', function (data) {});
         res.on('end',
