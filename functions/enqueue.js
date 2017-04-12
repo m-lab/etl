@@ -27,7 +27,7 @@ exports.enqueueFileTask = function (bucket, filename, queue, callback) {
   var http = require('http');
   var gsFilename = "gs://" + bucket + "/" + filename;
   var safeFilename = new Buffer(gsFilename).toString("base64");
-  http.get('http://etl-parser-dot-mlab-sandbox.appspot.com/worker?filename=' + safeFilename,
+  http.get('http://push-queue-dot-mlab-sandbox.appspot.com/receiver?filename=' + safeFilename,
       function (res) {
         res.on('data', function (data) {});
         res.on('end',
@@ -36,7 +36,7 @@ exports.enqueueFileTask = function (bucket, filename, queue, callback) {
                  callback();
                });
       });
-  /* 
+  /*
     // If you want things to be authenticated, then put them inside the callback
     // here.
     google.auth.getApplicationDefault(function (err, authClient, projectId) {

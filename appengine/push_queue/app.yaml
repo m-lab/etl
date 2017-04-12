@@ -1,0 +1,7 @@
+runtime: go
+api_version: go1
+service: queue-pusher
+
+handlers:
+- url: /.*
+  script: _go_app

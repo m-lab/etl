@@ -3,7 +3,10 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/m-lab/etl/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -35,7 +38,25 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func worker(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, `{"message": "Hello world!"}`)
+	r.ParseForm()
+	// Log request data.
+	for key, value := range r.Form {
+		log.Printf("Form:   %q == %q\n", key, value)
+	}
+	// Log headers.
+	for key, value := range r.Header {
+		log.Printf("Header: %q == %q\n", key, value)
+	}
+
+	// TODO(dev): log the originating task queue name from headers.
+	log.Printf("Received filename: %q\n", r.FormValue("filename"))
+
+	// TODO(dev): Remove fake delay.
+	t := 10 * rand.ExpFloat64()
+	log.Printf("Simulating work by sleeping for %f seconds\n", t)
+	time.Sleep(time.Duration(t) * time.Second)
+
+	fmt.Fprintf(w, `{"message": "Success"}`)
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
