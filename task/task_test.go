@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"cloud.google.com/go/bigquery"
 	"fmt"
+	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/task"
 	"reflect"
@@ -60,7 +61,8 @@ func TestTarFileInput(t *testing.T) {
 	rdr := MakeTestTar(t)
 
 	var prsr TestParser
-	tt := task.NewTask(rdr, &prsr, "test_table")
+	in := bq.NullInserter{}
+	tt := task.NewTask(rdr, &prsr, &in, "test_table")
 	fn, bb, err := tt.Next()
 	if err != nil {
 		t.Error(err)
@@ -85,7 +87,7 @@ func TestTarFileInput(t *testing.T) {
 
 	// Reset the tar reader and create new task, to test the ProcessAllTests behavior.
 	rdr = MakeTestTar(t)
-	tt = task.NewTask(rdr, &prsr, "test_table")
+	tt = task.NewTask(rdr, &prsr, &in, "test_table")
 	tt.ProcessAllTests()
 
 	if len(prsr.files) != 2 {
