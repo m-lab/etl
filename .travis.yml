@@ -20,7 +20,6 @@ before_install:
 # project referenced in the "deploy" section. These keys authenticate the
 # gcloud deploy operations.
 
-# TODO: Update the IV and KEY values for your repository.
 - travis/decrypt.sh "$encrypted_ee3c81e2a61e_iv" "$encrypted_ee3c81e2a61e_key"
   keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
 
@@ -51,7 +50,6 @@ deploy:
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker
   skip_cleanup: true
   on:
-    # TODO: update repo
     repo: m-lab/etl
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
@@ -68,7 +66,6 @@ deploy:
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
   on:
-    # TODO: update repo
     repo: m-lab/etl
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
