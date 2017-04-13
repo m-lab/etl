@@ -20,7 +20,6 @@ before_install:
 # project referenced in the "deploy" section. These keys authenticate the
 # gcloud deploy operations.
 
-# TODO: Update the IV and KEY values for your repository.
 - travis/decrypt.sh "$encrypted_ee3c81e2a61e_iv" "$encrypted_ee3c81e2a61e_key"
   keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
 
@@ -44,13 +43,13 @@ script:
 # after a merge with matching "on:" conditions.
 deploy:
 # SANDBOX: before code review for development code in a specific branch.
+## Service: etl-parser -- AppEngine Flexible Environment.
 - provider: script
   script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker
   skip_cleanup: true
   on:
-    # TODO: update repo
     repo: m-lab/etl
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
@@ -59,3 +58,21 @@ deploy:
     # Sandbox branches will be deployed to personalized service names.
     # Integration branch will not use decorated service names.
     condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
+
+## Service: queue-pusher -- AppEngine Standard Environment.
+- provider: script
+  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    # Consider all branches and match using the condition. By default
+    # "all_branches" is false, and the condition is ignored.
+    all_branches: true
+    condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
+
+# NOTE: Cloud functions only support primitive IAM roles: Owner, Editor, Viewer.
+# See: https://cloud.google.com/functions/docs/concepts/iam
+# TODO(soltesz): Add deployment automation when fine-grained permissions are
+# possible.
