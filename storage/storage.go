@@ -1,3 +1,9 @@
+// GCS related utility functions to fetch and wrap objects with tar.Reader.
+//
+// Testing:
+//   This has been manually tested, but test automation is probably not
+//   worthwhile until there is an emulator for GCS.
+
 package storage
 
 import (
@@ -23,9 +29,12 @@ func (trc *TarReaderCloser) Close() {
 	trc.closer()
 }
 
-// TODO - is gensupport.URLParams useful?
 // Create a tar.Reader suitable for injecting into Task.
-func newGCSTarReader(uri string) (*TarReaderCloser, error) {
+// Caller is responsible for calling Close on the returned object.
+//
+// uri should be of form gs://bucket/filename.tar or gs://bucket/filename.tgz
+// FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
+func NewGCSTarReader(client *http.Client, uri string) (*TarReaderCloser, error) {
 	// For now only handle gcs paths.
 	if !strings.HasPrefix(uri, "gs://") {
 		return nil, errors.New("invalid file path: " + uri)
@@ -37,11 +46,10 @@ func newGCSTarReader(uri string) (*TarReaderCloser, error) {
 	bucket := parts[2]
 	fn := parts[3]
 
-	// TODO reuse client.
-	client, err := getClient()
-	if err != nil {
-		return nil, err
+	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar")) {
+		return nil, errors.New("not tar or tgz: " + uri)
 	}
+
 	obj, err := getObject(client, bucket, fn, 60*time.Second)
 	if err != nil {
 		return nil, err
@@ -52,16 +60,17 @@ func newGCSTarReader(uri string) (*TarReaderCloser, error) {
 	closer := obj.Body.Close
 
 	// Is it a tar or tgz file?
-	if strings.HasSuffix(strings.ToLower(fn), ".gz") {
+	if strings.HasSuffix(strings.ToLower(fn), ".tgz") {
 		// TODO add unit test
 		rdr, err := gzip.NewReader(obj.Body)
 		if err != nil {
 			closer()
 			return nil, err
 		}
+		tmp := closer
 		c := func() error {
-			defer closer()
 			rdr.Close()
+			tmp()
 			// TODO handle errors?
 			return nil
 		}
@@ -73,9 +82,18 @@ func newGCSTarReader(uri string) (*TarReaderCloser, error) {
 	return &TarReaderCloser{tarReader, closer}, nil
 }
 
-func getClient() (*http.Client, error) {
+//---------------------------------------------------------------------------------
+//          Local functions
+//---------------------------------------------------------------------------------
+
+// Create a storage reader client.
+func getStorageClient(write_access bool) (*http.Client, error) {
 	// TODO - is this the scope we want?
-	scope := storage.DevstorageFullControlScope
+	var scope string
+	if scope = storage.DevstorageReadOnlyScope; write_access {
+		scope = storage.DevstorageReadWriteScope
+	}
+
 	// Use a short timeout, so we get an error quickly if there is a problem.
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	client, err := google.DefaultClient(ctx, scope)
@@ -86,7 +104,7 @@ func getClient() (*http.Client, error) {
 	return client, nil
 }
 
-// Caller responsible for closing response body.
+// Caller is responsible for closing response body.
 func getObject(client *http.Client, bucket string, fn string, timeout time.Duration) (*http.Response, error) {
 	// Lightweight, error only if client is nil.
 	service, err := storage.New(client)
@@ -94,6 +112,7 @@ func getObject(client *http.Client, bucket string, fn string, timeout time.Durat
 		return nil, err
 	}
 
+	// Lightweight - only setting up the local object.
 	call := service.Objects.Get(bucket, fn)
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	call = call.Context(ctx)
