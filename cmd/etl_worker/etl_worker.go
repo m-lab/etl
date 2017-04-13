@@ -4,11 +4,13 @@ package main
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
-	"time"
 
+	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/etl/task"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
@@ -51,10 +53,24 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): log the originating task queue name from headers.
 	log.Printf("Received filename: %q\n", r.FormValue("filename"))
 
-	// TODO(dev): Remove fake delay.
-	t := 10 * rand.ExpFloat64()
-	log.Printf("Simulating work by sleeping for %f seconds\n", t)
-	time.Sleep(time.Duration(t) * time.Second)
+	// TODO(dev) Create reusable Client.
+	tr, err := storage.NewGCSTarReader(nil, r.FormValue("filename"))
+	if err != nil {
+		log.Printf("%v", err)
+		// TODO - something better.
+		panic(err)
+	}
+	parser := new(parser.NullParser)
+	ins, err := bq.NewInserter("mlab-sandbox", "mlab_sandbox", "test3")
+	if err != nil {
+		log.Printf("%v", err)
+		// TODO - something better.
+		panic(err)
+	}
+	tsk := task.NewTask(tr, parser, ins, "test3")
+
+	tsk.ProcessAllTests()
+	tr.Close()
 
 	fmt.Fprintf(w, `{"message": "Success"}`)
 }
