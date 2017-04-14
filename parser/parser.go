@@ -16,7 +16,7 @@ type Parser interface {
 	// fn - Name of test file
 	// table - biq query table name (for error logging only)
 	// test - binary test data
-	HandleTest(fn string, table string, test []byte) (interface{}, error)
+	Parse(fn string, table string, test []byte) (interface{}, error)
 }
 
 //------------------------------------------------------------------------------------
@@ -24,14 +24,14 @@ type NullParser struct {
 	Parser
 }
 
-// TODO rename to Parse or ParseTest
-func (np *NullParser) HandleTest(fn string, table string, test []byte) (interface{}, error) {
+func (np *NullParser) Parse(fn string, table string, test []byte) (interface{}, error) {
 	test_count.With(prometheus.Labels{"table": table}).Inc()
 	return nil, nil
 }
 
 //------------------------------------------------------------------------------------
-// TestParser ignores the content, returns a map[string]Value "filename":"..."
+// TestParser ignores the content, returns a ValueSaver with map[string]Value
+// underneath, containing "filename":"..."
 // TODO add tests
 type TestParser struct {
 	Parser
@@ -42,11 +42,11 @@ type FileNameSaver struct {
 	Values map[string]bigquery.Value
 }
 
-func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
+func (fns *FileNameSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
 	return fns.Values, "", nil
 }
 
-func (np *TestParser) HandleTest(fn string, table string, test []byte) (interface{}, error) {
+func (np *TestParser) Parse(fn string, table string, test []byte) (interface{}, error) {
 	test_count.With(prometheus.Labels{"table": table}).Inc()
 	log.Printf("Parsing %s", fn)
 	return FileNameSaver{map[string]bigquery.Value{"filename": fn}}, nil
