@@ -15,7 +15,6 @@
 package bq
 
 import (
-	"log"
 	"time"
 
 	"cloud.google.com/go/bigquery"
