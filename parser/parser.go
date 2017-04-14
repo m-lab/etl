@@ -42,7 +42,8 @@ type FileNameSaver struct {
 	Values map[string]bigquery.Value
 }
 
-func (fns *FileNameSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
+// TODO(dev) - Figure out if this can use a pointer receiver.
+func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
 	return fns.Values, "", nil
 }
 
