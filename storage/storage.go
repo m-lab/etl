@@ -10,7 +10,6 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"errors"
-	"fmt"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
@@ -97,12 +96,8 @@ func NewGCSTarReader(client *http.Client, uri string) (*TarReaderCloser, error) 
 	return &TarReaderCloser{tarReader, zc, obj.Body}, nil
 }
 
-//---------------------------------------------------------------------------------
-//          Local functions
-//---------------------------------------------------------------------------------
-
 // Create a storage reader client.
-func getStorageClient(writeAccess bool) (*http.Client, error) {
+func GetStorageClient(writeAccess bool) (*http.Client, error) {
 	var scope string
 	if writeAccess {
 		scope = storage.DevstorageReadWriteScope
@@ -114,11 +109,14 @@ func getStorageClient(writeAccess bool) (*http.Client, error) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	client, err := google.DefaultClient(ctx, scope)
 	if err != nil {
-		fmt.Printf("Unable to create client: %v\n", err)
 		return nil, err
 	}
 	return client, nil
 }
+
+//---------------------------------------------------------------------------------
+//          Local functions
+//---------------------------------------------------------------------------------
 
 // Caller is responsible for closing response body.
 func getObject(client *http.Client, bucket string, fn string, timeout time.Duration) (*http.Response, error) {
