@@ -94,7 +94,7 @@ var client *http.Client
 
 func init() {
 	var err error
-	client, err = getStorageClient(false)
+	client, err = GetStorageClient(false)
 	if err != nil {
 		panic(err)
 	}
