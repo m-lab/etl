@@ -53,12 +53,20 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): log the originating task queue name from headers.
 	log.Printf("Received filename: %q\n", r.FormValue("filename"))
 
+	client, err := storage.GetStorageClient(false)
+	if err != nil {
+		fmt.Fprintf(w, `{"message": "Could not create client."}`)
+		w.WriteHeader(503) // Service Unavailable
+		return
+	}
+
 	// TODO(dev) Create reusable Client.
-	tr, err := storage.NewGCSTarReader(nil, r.FormValue("filename"))
+	tr, err := storage.NewGCSTarReader(client, r.FormValue("filename"))
 	if err != nil {
 		log.Printf("%v", err)
 		log.Printf("Bailing out")
 		fmt.Fprintf(w, `{"message": "Bailing out"}`)
+		return
 		// TODO - something better.
 	}
 	parser := new(parser.TestParser)
@@ -67,6 +75,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%v", err)
 		log.Printf("Bailing out")
 		fmt.Fprintf(w, `{"message": "Bailing out"}`)
+		return
 		// TODO - something better.
 	}
 	tsk := task.NewTask(tr, parser, ins, "test3")
@@ -76,6 +85,8 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Done")
 	tr.Close()
 
+	// TODO - if there are any errors, consider sending back a meaningful response
+	// for web browser and queue-pusher debugging.
 	fmt.Fprintf(w, `{"message": "Success"}`)
 }
 
