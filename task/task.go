@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/storage"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -17,22 +18,22 @@ import (
 )
 
 type Task struct {
-	table         string // The table to insert rows into, INCLUDING the partition!
-	*tar.Reader          // Tar reader from which to read tests.
-	parser.Parser        // Parser to parse the tests.
-	bq.Inserter          // provides InsertRows(...)
+	storage.TarReader        // Tar reader from which to read tests.
+	parser.Parser            // Parser to parse the tests.
+	bq.Inserter              // provides InsertRows(...)
+	table             string // The table to insert rows into, INCLUDING the partition!
 }
 
 // NewTask constructs a task, injecting the tar reader and the parser.
-func NewTask(rdr *tar.Reader, prsr parser.Parser, inserter bq.Inserter, table string) *Task {
-	t := Task{table, rdr, prsr, inserter}
+func NewTask(rdr storage.TarReader, prsr parser.Parser, inserter bq.Inserter, table string) *Task {
+	t := Task{rdr, prsr, inserter, table}
 	return &t
 }
 
 // Next reads the next test object from the tar file.
 // Returns io.EOF when there are no more tests.
-func (tt *Task) Next() (string, []byte, error) {
-	h, err := tt.Reader.Next()
+func (tt *Task) NextTest() (string, []byte, error) {
+	h, err := tt.Next()
 	if err != nil {
 		return "", nil, err
 	}
@@ -42,14 +43,14 @@ func (tt *Task) Next() (string, []byte, error) {
 	var data []byte
 	if strings.HasSuffix(strings.ToLower(h.Name), ".gz") {
 		// TODO add unit test
-		zipReader, err := gzip.NewReader(tt.Reader)
+		zipReader, err := gzip.NewReader(tt)
 		if err != nil {
 			return h.Name, nil, err
 		}
 		defer zipReader.Close()
 		data, err = ioutil.ReadAll(zipReader)
 	} else {
-		data, err = ioutil.ReadAll(tt.Reader)
+		data, err = ioutil.ReadAll(tt)
 	}
 	if err != nil {
 		return h.Name, nil, err
@@ -61,7 +62,7 @@ func (tt *Task) Next() (string, []byte, error) {
 // injected parser to parse them, and inserts them into bigquery (not yet implemented).
 func (tt *Task) ProcessAllTests() {
 	// Read each file from the tar
-	for fn, data, err := tt.Next(); err != io.EOF; fn, data, err = tt.Next() {
+	for fn, data, err := tt.NextTest(); err != io.EOF; fn, data, err = tt.NextTest() {
 		if err != nil {
 			if err == io.EOF {
 				return

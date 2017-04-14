@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/storage" // TODO - would be better not to have this.
 	"github.com/m-lab/etl/task"
 	"reflect"
 	"testing"
@@ -24,8 +25,9 @@ func TestPlumbing(t *testing.T) {
 	}
 }
 
-// Create a tar.Reader with simple test contents.
-func MakeTestTar(t *testing.T) *tar.Reader {
+// Create a TarReader with simple test contents.
+// TODO - could we break the dependency on storage here?
+func MakeTestTar(t *testing.T) storage.TarReader {
 	b := new(bytes.Buffer)
 	tw := tar.NewWriter(b)
 	hdr := tar.Header{Name: "foo", Mode: 0666, Typeflag: tar.TypeReg, Size: int64(8)}
@@ -63,7 +65,7 @@ func TestTarFileInput(t *testing.T) {
 	var prsr TestParser
 	in := bq.NullInserter{}
 	tt := task.NewTask(rdr, &prsr, &in, "test_table")
-	fn, bb, err := tt.Next()
+	fn, bb, err := tt.NextTest()
 	if err != nil {
 		t.Error(err)
 	}
@@ -74,7 +76,7 @@ func TestTarFileInput(t *testing.T) {
 		t.Error("Expected biscuits but got ", string(bb))
 	}
 
-	fn, bb, err = tt.Next()
+	fn, bb, err = tt.NextTest()
 	if err != nil {
 		t.Error(err)
 	}
