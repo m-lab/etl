@@ -46,9 +46,9 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Form:   %q == %q\n", key, value)
 	}
 	// Log headers.
-	for key, value := range r.Header {
-		log.Printf("Header: %q == %q\n", key, value)
-	}
+	//for key, value := range r.Header {
+	//	log.Printf("Header: %q == %q\n", key, value)
+	//}
 
 	// TODO(dev): log the originating task queue name from headers.
 	log.Printf("Received filename: %q\n", r.FormValue("filename"))

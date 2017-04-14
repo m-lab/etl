@@ -43,7 +43,7 @@ func (tt *Task) NextTest() (string, []byte, error) {
 		return h.Name, nil, nil
 	}
 	var data []byte
-	if strings.HasSuffix(strings.ToLower(h.Name), ".gz") {
+	if strings.HasSuffix(strings.ToLower(h.Name), "gz") {
 		// TODO add unit test
 		zipReader, err := gzip.NewReader(tt)
 		if err != nil {
@@ -63,8 +63,11 @@ func (tt *Task) NextTest() (string, []byte, error) {
 // ProcessAllTests loops through all the tests in a tar file, calls the
 // injected parser to parse them, and inserts them into bigquery (not yet implemented).
 func (tt *Task) ProcessAllTests() {
+	tests := 0
+	inserts := 0
 	// Read each file from the tar
 	for fn, data, err := tt.NextTest(); err != io.EOF; fn, data, err = tt.NextTest() {
+		tests += 1
 		if err != nil {
 			if err == io.EOF {
 				return
@@ -86,11 +89,13 @@ func (tt *Task) ProcessAllTests() {
 		}
 		// TODO(dev) Aggregate rows into single insert request, here
 		// or in Inserter.
+		inserts += 1
 		err = tt.InsertRows(test, 5*time.Second)
 		if err != nil {
 			log.Printf("%v", err)
 			// Handle this error properly!
 		}
 	}
+	log.Printf("%d tests, %d inserts", tests, inserts)
 	return
 }
