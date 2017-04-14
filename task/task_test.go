@@ -58,6 +58,7 @@ func (tp *TestParser) HandleTest(fn string, table string, test []byte) (bigquery
 	return nil, nil
 }
 
+// TODO(dev) - add unit tests for tgz and tar.gz files
 // TODO(dev) - add good comments
 func TestTarFileInput(t *testing.T) {
 	rdr := MakeTestTar(t)
