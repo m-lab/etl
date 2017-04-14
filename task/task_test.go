@@ -5,7 +5,6 @@ package task_test
 import (
 	"archive/tar"
 	"bytes"
-	"cloud.google.com/go/bigquery"
 	"fmt"
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
@@ -52,7 +51,7 @@ type TestParser struct {
 	files []string
 }
 
-func (tp *TestParser) HandleTest(fn string, table string, test []byte) (bigquery.ValueSaver, error) {
+func (tp *TestParser) HandleTest(fn string, table string, test []byte) (interface{}, error) {
 	// TODO - pass filename through to BQ inserter
 	tp.files = append(tp.files, fn)
 	return nil, nil
