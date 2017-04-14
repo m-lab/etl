@@ -45,10 +45,6 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	for key, value := range r.Form {
 		log.Printf("Form:   %q == %q\n", key, value)
 	}
-	// Log headers.
-	//for key, value := range r.Header {
-	//	log.Printf("Header: %q == %q\n", key, value)
-	//}
 
 	// TODO(dev): log the originating task queue name from headers.
 	log.Printf("Received filename: %q\n", r.FormValue("filename"))
@@ -80,9 +76,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 	tsk := task.NewTask(tr, parser, ins, "test3")
 
-	log.Printf("Calling ProcessAllTests")
 	tsk.ProcessAllTests()
-	log.Printf("Done")
 	tr.Close()
 
 	// TODO - if there are any errors, consider sending back a meaningful response

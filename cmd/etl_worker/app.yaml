@@ -1,3 +1,3 @@
 runtime: custom
 env: flex
-service: etl-parser-demo1
+service: etl-parser
