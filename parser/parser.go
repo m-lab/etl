@@ -3,9 +3,9 @@
 package parser
 
 import (
-	"cloud.google.com/go/bigquery"
 	"log"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -19,15 +19,18 @@ type Parser interface {
 	HandleTest(fn string, table string, test []byte) (interface{}, error)
 }
 
+//------------------------------------------------------------------------------------
 type NullParser struct {
 	Parser
 }
 
+// TODO rename to Parse or ParseTest
 func (np *NullParser) HandleTest(fn string, table string, test []byte) (interface{}, error) {
 	test_count.With(prometheus.Labels{"table": table}).Inc()
 	return nil, nil
 }
 
+//------------------------------------------------------------------------------------
 // TestParser ignores the content, returns a map[string]Value "filename":"..."
 // TODO add tests
 type TestParser struct {
@@ -36,19 +39,17 @@ type TestParser struct {
 
 // TODO - use or delete this struct
 type FileNameSaver struct {
-	values map[string]bigquery.Value
-	bigquery.ValueSaver
+	Values map[string]bigquery.Value
 }
 
-func (fns *FileNameSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
-	return fns.values, "", nil
+func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
+	return fns.Values, "", nil
 }
 
 func (np *TestParser) HandleTest(fn string, table string, test []byte) (interface{}, error) {
 	test_count.With(prometheus.Labels{"table": table}).Inc()
 	log.Printf("Parsing %s", fn)
-	return struct{ Filename string }{fn}, nil
-	//	return FileNameSaver{map[string]bigquery.Value{"filename": fn}, nil}, nil
+	return FileNameSaver{map[string]bigquery.Value{"filename": fn}}, nil
 }
 
 //=====================================================================================
