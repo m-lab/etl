@@ -21,9 +21,10 @@ func TestGetObject(t *testing.T) {
 	obj.Body.Close()
 }
 
+// test utility, based on similar implementation in task.go
 // Next reads the next test object from the tar file.
 // Returns io.EOF when there are no more tests.
-func NextTest(tt TarReader) (string, []byte, error) {
+func next(tt TarReader) (string, []byte, error) {
 	h, err := tt.Next()
 	if err != nil {
 		return "", nil, err
@@ -56,7 +57,7 @@ func TestNewTarReader(t *testing.T) {
 		return
 	}
 	count := 0
-	for _, _, err := NextTest(reader); err != io.EOF; _, _, err = NextTest(reader) {
+	for _, _, err := next(reader); err != io.EOF; _, _, err = next(reader) {
 		if err != nil {
 			t.Fatal(err)
 			return
@@ -76,7 +77,7 @@ func TestNewTarReaderGzip(t *testing.T) {
 		return
 	}
 	count := 0
-	for _, _, err := NextTest(reader); err != io.EOF; _, _, err = NextTest(reader) {
+	for _, _, err := next(reader); err != io.EOF; _, _, err = next(reader) {
 		if err != nil {
 			t.Fatal(err)
 			return

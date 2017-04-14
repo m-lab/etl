@@ -34,6 +34,7 @@ func NewTask(rdr storage.TarReader, prsr parser.Parser, inserter bq.Inserter, ta
 
 // Next reads the next test object from the tar file.
 // Returns io.EOF when there are no more tests.
+// TODO - probably should move this to storage.go.
 func (tt *Task) NextTest() (string, []byte, error) {
 	h, err := tt.Next()
 	if err != nil {
@@ -72,7 +73,7 @@ func (tt *Task) ProcessAllTests() {
 			if err == io.EOF {
 				return
 			}
-			// TODO(dev) add error handling
+			// TODO(dev) Handle this error properly!
 			log.Printf("%v", err)
 			continue
 		}
@@ -81,10 +82,10 @@ func (tt *Task) ProcessAllTests() {
 			continue
 		}
 
-		test, err := tt.Parser.HandleTest(fn, tt.table, data)
+		test, err := tt.Parser.Parse(fn, tt.table, data)
 		if err != nil {
 			log.Printf("%v", err)
-			// Handle this error properly!
+			// TODO(dev) Handle this error properly!
 			continue
 		}
 		// TODO(dev) Aggregate rows into single insert request, here
