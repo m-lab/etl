@@ -83,7 +83,6 @@ func NewGCSTarReader(client *http.Client, uri string) (*TarReaderCloser, error) 
 	// Is it a tar.gz or tgz file?
 	if strings.HasSuffix(strings.ToLower(fn), "gz") {
 		// TODO add unit test
-		var err error
 		// NB: This must not be :=, or it creates local rdr.
 		rdr, err = gzip.NewReader(obj.Body)
 		if err != nil {
