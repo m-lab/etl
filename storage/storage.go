@@ -27,15 +27,23 @@ type TarReader interface {
 
 type TarReaderCloser struct {
 	TarReader
-	io.Closer
-}
-
-type C struct {
-	closer func() error
+	zipper io.Closer // Must be non-null
+	body   io.Closer // Must be non-null
 }
 
 // Implement io.Closer
-func (c *C) Close() error { return c.closer() }
+func (t *TarReaderCloser) Close() error {
+	err := t.zipper.Close()
+	t.body.Close()
+	return err
+}
+
+type NullCloser struct{}
+
+func (c *NullCloser) Close() error { return nil }
+
+var errNoClient = errors.New("client should be non-null")
+var nullCloser io.Closer = new(NullCloser)
 
 // Create a tar.Reader suitable for injecting into Task.
 // Caller is responsible for calling Close on the returned object.
@@ -44,11 +52,7 @@ func (c *C) Close() error { return c.closer() }
 // FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
 func NewGCSTarReader(client *http.Client, uri string) (*TarReaderCloser, error) {
 	if client == nil {
-		var err error
-		client, err = getStorageClient(false)
-		if err != nil {
-			return nil, err
-		}
+		return nil, errNoClient
 	}
 	// For now only handle gcs paths.
 	if !strings.HasPrefix(uri, "gs://") {
@@ -61,6 +65,7 @@ func NewGCSTarReader(client *http.Client, uri string) (*TarReaderCloser, error) 
 	bucket := parts[2]
 	fn := parts[3]
 
+	// TODO - consider just always testing for valid gzip file.
 	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
 		strings.HasSuffix(fn, ".tar.gz")) {
 		return nil, errors.New("not tar or tgz: " + uri)
@@ -71,29 +76,26 @@ func NewGCSTarReader(client *http.Client, uri string) (*TarReaderCloser, error) 
 		return nil, err
 	}
 
-	// Wrap with a tar.Reader that also has a response closer.
-	rdr := obj.Body
-	closer := obj.Body.Close
+	// Default nullCloser, if we don't need a gzip reader.
+	zc := nullCloser
 
+	rdr := obj.Body
 	// Is it a tar.gz or tgz file?
 	if strings.HasSuffix(strings.ToLower(fn), "gz") {
 		// TODO add unit test
-		rdr, err := gzip.NewReader(obj.Body)
+		var err error
+		// NB: This must not be :=, or it creates local rdr.
+		rdr, err = gzip.NewReader(obj.Body)
 		if err != nil {
 			obj.Body.Close()
 			return nil, err
 		}
-		closer = func() error {
-			rdr.Close()
-			obj.Body.Close()
-			// TODO handle errors?
-			return nil
-		}
+
+		zc = rdr
 	}
 	tarReader := tar.NewReader(rdr)
-	// No closer needed for tar.Reader
 
-	return &TarReaderCloser{tarReader, &C{closer}}, nil
+	return &TarReaderCloser{tarReader, zc, obj.Body}, nil
 }
 
 //---------------------------------------------------------------------------------
