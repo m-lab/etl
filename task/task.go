@@ -96,6 +96,7 @@ func (tt *Task) ProcessAllTests() {
 			// Handle this error properly!
 		}
 	}
+	// TODO - make this debug or remove
 	log.Printf("%d tests, %d inserts", tests, inserts)
 	return
 }
