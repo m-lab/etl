@@ -3,7 +3,8 @@
 package parser
 
 import (
-	"cloud.google.com/go/bigquery"
+	"log"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -14,16 +15,27 @@ type Parser interface {
 	// fn - Name of test file
 	// table - biq query table name (for error logging only)
 	// test - binary test data
-	HandleTest(fn string, table string, test []byte) (bigquery.ValueSaver, error)
+	HandleTest(fn string, table string, test []byte) (interface{}, error)
 }
 
 type NullParser struct {
 	Parser
 }
 
-func (np *NullParser) HandleTest(fn string, table string, test []byte) (bigquery.ValueSaver, error) {
+func (np *NullParser) HandleTest(fn string, table string, test []byte) (interface{}, error) {
 	test_count.With(prometheus.Labels{"table": table}).Inc()
 	return nil, nil
+}
+
+// TestParser ignores the content, returns a map[string]string "filename":"..."
+type TestParser struct {
+	Parser
+}
+
+func (np *TestParser) HandleTest(fn string, table string, test []byte) (interface{}, error) {
+	test_count.With(prometheus.Labels{"table": table}).Inc()
+	log.Printf("Parsing %s", fn)
+	return map[string]string{"filename": fn}, nil
 }
 
 //=====================================================================================

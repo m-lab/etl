@@ -8,13 +8,15 @@ package task
 import (
 	"archive/tar"
 	"compress/gzip"
+	"io"
+	"io/ioutil"
+	"log"
+	"strings"
+	"time"
+
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage"
-	"io"
-	"io/ioutil"
-	"strings"
-	"time"
 )
 
 type Task struct {
@@ -68,6 +70,7 @@ func (tt *Task) ProcessAllTests() {
 				return
 			}
 			// TODO(dev) add error handling
+			log.Printf("%v", err)
 			continue
 		}
 		if data == nil {
@@ -77,6 +80,7 @@ func (tt *Task) ProcessAllTests() {
 
 		test, err := tt.Parser.HandleTest(fn, tt.table, data)
 		if err != nil {
+			log.Printf("%v", err)
 			// Handle this error properly!
 			continue
 		}
@@ -84,6 +88,7 @@ func (tt *Task) ProcessAllTests() {
 		// or in Inserter.
 		err = tt.InsertRows(test, 5*time.Second)
 		if err != nil {
+			log.Printf("%v", err)
 			// Handle this error properly!
 		}
 	}
