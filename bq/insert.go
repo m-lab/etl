@@ -15,6 +15,7 @@
 package bq
 
 import (
+	"log"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -47,6 +48,7 @@ func NewInserter(project string, dataset string, table string) (Inserter, error)
 }
 
 func (in *BQInserter) InsertRows(data interface{}, timeout time.Duration) error {
+	log.Printf("Inserting")
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	// This is heavyweight, and may run forever without a context deadline.
 	return in.uploader.Put(ctx, data)

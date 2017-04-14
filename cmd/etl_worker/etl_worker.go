@@ -57,19 +57,23 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	tr, err := storage.NewGCSTarReader(nil, r.FormValue("filename"))
 	if err != nil {
 		log.Printf("%v", err)
+		log.Printf("Bailing out")
+		fmt.Fprintf(w, `{"message": "Bailing out"}`)
 		// TODO - something better.
-		panic(err)
 	}
-	parser := new(parser.NullParser)
+	parser := new(parser.TestParser)
 	ins, err := bq.NewInserter("mlab-sandbox", "mlab_sandbox", "test3")
 	if err != nil {
 		log.Printf("%v", err)
+		log.Printf("Bailing out")
+		fmt.Fprintf(w, `{"message": "Bailing out"}`)
 		// TODO - something better.
-		panic(err)
 	}
 	tsk := task.NewTask(tr, parser, ins, "test3")
 
+	log.Printf("Calling ProcessAllTests")
 	tsk.ProcessAllTests()
+	log.Printf("Done")
 	tr.Close()
 
 	fmt.Fprintf(w, `{"message": "Success"}`)
