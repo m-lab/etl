@@ -534,10 +534,7 @@ web100_group_find(web100_agent *agent, const char *name)
         return NULL;
     }
     
-    fprintf(stderr, "agent->info\n"); fflush(stderr);
-    fprintf(stderr, "agent->info.local.group_head: 0x%x\n", agent->info.local.group_head); fflush(stderr);
     gp = agent->info.local.group_head;
-    fprintf(stderr, "group head: 0x%x\n", gp); fflush(stderr);
     while (gp) {
         if (strcmp(gp->name, name) == 0)
             break;
@@ -710,7 +707,8 @@ web100_connection_find_v6(web100_agent *agent,
     
     cp = agent->info.local.connection_head;
     while (cp) {
-        if (memcmp(&cp->spec_v6, spec_v6, sizeof (spec_v6)) == 0)
+        // if (memcmp(&cp->spec_v6, spec_v6, sizeof (spec_v6)) == 0)
+        if (memcmp(&cp->spec_v6, spec_v6, sizeof (struct web100_connection_spec_v6)) == 0)
             break;
         cp = cp->info.local.next;
     }
@@ -902,24 +900,16 @@ web100_snapshot_alloc_from_log(web100_log *log)
 {
     web100_snapshot *snap;
     
-    fprintf(stderr, "log->group->agent\n"); fflush(stderr);
-    fprintf(stderr, "log: 0x%x\n", log); fflush(stderr);
-    fprintf(stderr, "log->group: 0x%x\n", log->group); fflush(stderr);
-    fprintf(stderr, "log->group->agent: 0x%x\n", log->group->agent); fflush(stderr);
     if (log->group->agent != log->connection->agent) {
         web100_errno = WEB100_ERR_INVAL;
         return NULL;
     }
     
-    fprintf(stderr, "snap malloc\n");
-    fflush(stderr);
     if ((snap = (web100_snapshot *)malloc(sizeof (web100_snapshot))) == NULL) {
         web100_errno = WEB100_ERR_NOMEM;
         return NULL;
     }
     
-    fprintf(stderr, "log->group->size\n");
-    fflush(stderr);
     if ((snap->data = (void *)malloc(log->group->size)) == NULL) {
         free(snap);
         web100_errno = WEB100_ERR_NOMEM;
@@ -927,8 +917,6 @@ web100_snapshot_alloc_from_log(web100_log *log)
     }
     
     snap->group = log->group;
-    fprintf(stderr, "log->connection\n");
-    fflush(stderr);
     snap->connection = log->connection;
     
     return snap;
@@ -1182,7 +1170,7 @@ web100_value_to_textn(char* dest, size_t size, WEB100_TYPE type, void* buf)
     case WEB100_TYPE_TIME_TICKS:
         return snprintf(dest, size, "%u", *(u_int32_t *) buf);
     case WEB100_TYPE_COUNTER64:
-        return snprintf(dest, size, "%lu", *(u_int64_t *) buf);
+        return snprintf(dest, size, "%llu", *(u_int64_t *) buf);
     case WEB100_TYPE_INET_PORT_NUMBER:
         return snprintf(dest, size, "%u", *(u_int16_t *) buf);
     case WEB100_TYPE_INET_ADDRESS_IPV6:
@@ -1379,7 +1367,7 @@ web100_log_open_write(char *logname, web100_connection *conn,
 {
     FILE      *header;
     int       c; 
-    time_t    timep;
+    // time_t    timep;
 
     web100_log *log = NULL;
 
@@ -1427,7 +1415,8 @@ web100_log_open_write(char *logname, web100_connection *conn,
     //
     log->time = time(NULL);
 
-    if(fwrite(&log->time, sizeof(time_t), 1, log->fp) != 1) {
+    // if(fwrite(&log->time, sizeof(time_t), 1, log->fp) != 1) {
+    if(fwrite(&log->time, sizeof(uint32_t), 1, log->fp) != 1) {
 	web100_errno = WEB100_ERR_FILE;
 	goto Cleanup;
     } 
@@ -1517,7 +1506,6 @@ web100_log_open_read(char *logname)
     
     web100_log *log = NULL;
 
-    fprintf(stderr, "malloc log\n"); fflush(stderr);
     if ((log = (web100_log *)malloc(sizeof (web100_log))) == NULL) {
         web100_errno = WEB100_ERR_NOMEM; 
 	goto Cleanup;
@@ -1533,14 +1521,12 @@ web100_log_open_read(char *logname)
 	goto Cleanup; 
     }
 
-    fprintf(stderr, "read header\n"); fflush(stderr);
     while ((c = fgetc(log->fp)) != '\0') {
        	fputc(c, header);
     }
 
     rewind(header);
 
-    fprintf(stderr, "attach log\n"); fflush(stderr);
     agent = _web100_agent_attach_log(header);
 
     if (fgets(tmpbuf, MAX_TMP_BUF_SIZE, log->fp) == NULL ) {
@@ -1553,13 +1539,12 @@ web100_log_open_read(char *logname)
        	goto Cleanup;
     }
 
-    fprintf(stderr, "read time\n"); fflush(stderr);
-    if(fread(&log->time, sizeof(time_t), 1, log->fp) != 1) {
+    // if(fread(&log->time, sizeof(time_t), 1, log->fp) != 1) {
+    if(fread(&log->time, sizeof(uint32_t), 1, log->fp) != 1) {
        	web100_errno = WEB100_ERR_FILE;
        	goto Cleanup;
     }
 
-    fprintf(stderr, "read groupname\n"); fflush(stderr);
     if(fread(group_name, WEB100_GROUPNAME_LEN_MAX, 1, log->fp) != 1) {
 	web100_errno = WEB100_ERR_FILE;
        	goto Cleanup;
@@ -1568,7 +1553,6 @@ web100_log_open_read(char *logname)
     //
     // Define (dummy) connection with logged spec
     //
-    fprintf(stderr, "malloc connection\n"); fflush(stderr);
     if ((cp = (web100_connection *)malloc(sizeof (web100_connection))) == NULL) {
         web100_errno = WEB100_ERR_NOMEM;
 	goto Cleanup;
@@ -1576,7 +1560,6 @@ web100_log_open_read(char *logname)
 
     cp->agent    = agent;
     cp->cid      = WEB100_LOG_CID; //dummy
-    fprintf(stderr, "malloc connection spec\n"); fflush(stderr);
     if(fread(&(cp->spec), sizeof(struct web100_connection_spec), 1, log->fp) != 1) {
 	web100_errno = WEB100_ERR_FILE;
        	goto Cleanup;
@@ -1586,10 +1569,7 @@ web100_log_open_read(char *logname)
     agent->info.local.connection_head = cp;
 
     log->agent = agent;
-    fprintf(stderr, "find group\n"); fflush(stderr);
     log->group = web100_group_find(agent, group_name);
-    fprintf(stderr, "group err: %d\n", web100_errno); fflush(stderr);
-    fprintf(stderr, "group: 0x%x\n", log->group); fflush(stderr);
     log->connection = cp;
 
     web100_errno = WEB100_ERR_SUCCESS;
@@ -1608,11 +1588,9 @@ web100_log_open_read(char *logname)
 	if(agent) web100_detach(agent);
        	if(cp) free(cp); 
 
-        fprintf(stderr, "broken\n"); fflush(stderr);
 	return NULL;
     }
     
-    fprintf(stderr, "okay?\n"); fflush(stderr);
     return log;
 }
 
@@ -1687,7 +1665,7 @@ web100_get_log_connection(web100_log *log)
 time_t
 web100_get_log_time(web100_log *log)
 {
-    return log->time;
+    return (time_t)(log->time);
 }
 
 int
