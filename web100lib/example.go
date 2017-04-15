@@ -24,8 +24,13 @@ web100_log *get_null_log() {
 import "C"
 
 import (
+	"flag"
 	"fmt"
 	"unsafe"
+)
+
+var (
+	filename = flag.String("filename", "", "Trace filename.")
 )
 
 // Necessary web100 functions:
@@ -133,12 +138,14 @@ func LookupError(errnum int) string {
 }
 
 func main() {
+	flag.Parse()
+
 	fmt.Println(LookupError(0))
 	// fmt.Println(LookupError(1))
 	// fmt.Println(LookupError(2))
 	// fmt.Println(LookupError(3))
 	// w, err := Open("logs/20170413T01:05:24.133980000Z_c-68-80-50-142.hsd1.pa.comcast.net:53301.s2c_snaplog")
-	w, err := Open("logs/20170413T01:05:56.356778000Z_c-76-19-153-197.hsd1.ma.comcast.net:54741.c2s_snaplog")
+	w, err := Open(*filename)
 	if err != nil {
 		panic(err)
 	}
