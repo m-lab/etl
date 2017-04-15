@@ -707,7 +707,6 @@ web100_connection_find_v6(web100_agent *agent,
     
     cp = agent->info.local.connection_head;
     while (cp) {
-        // if (memcmp(&cp->spec_v6, spec_v6, sizeof (spec_v6)) == 0)
         if (memcmp(&cp->spec_v6, spec_v6, sizeof (struct web100_connection_spec_v6)) == 0)
             break;
         cp = cp->info.local.next;
@@ -1415,7 +1414,6 @@ web100_log_open_write(char *logname, web100_connection *conn,
     //
     log->time = time(NULL);
 
-    // if(fwrite(&log->time, sizeof(time_t), 1, log->fp) != 1) {
     if(fwrite(&log->time, sizeof(uint32_t), 1, log->fp) != 1) {
 	web100_errno = WEB100_ERR_FILE;
 	goto Cleanup;
@@ -1539,7 +1537,6 @@ web100_log_open_read(char *logname)
        	goto Cleanup;
     }
 
-    // if(fread(&log->time, sizeof(time_t), 1, log->fp) != 1) {
     if(fread(&log->time, sizeof(unsigned int), 1, log->fp) != 1) {
        	web100_errno = WEB100_ERR_FILE;
        	goto Cleanup;

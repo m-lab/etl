@@ -132,7 +132,6 @@ struct web100_log {
     struct web100_agent*           agent;
     struct web100_group*           group;
     struct web100_connection*      connection; 
-    // time_t                         time;
     unsigned int                   time;
     FILE*                          fp;
 };
