@@ -1,14 +1,7 @@
+// web100lib provides Go bindings to some functions in the web100 library.
 package main
 
-// The Cgo directives must immediately preceed 'import "C"' below.
-// Example:
-//   $ wget http://.../web100_userland-1.8.tar.gz
-//   $ tar -xvf web100_userland-1.8.tar.gz
-//   $ pushd web100_userland
-//   $ ./configure --prefix=$PWD/build
-//   $ make && make install
-//   $ popd
-//   $ go build
+// Cgo directives must immediately preceed 'import "C"' below.
 
 /*
 #include <stdio.h>
@@ -17,9 +10,7 @@ package main
 #include <web100.h>
 #include <web100-int.h>
 
-web100_log *get_null_log() {
-	return NULL;
-}
+#include <arpa/inet.h>
 */
 import "C"
 
@@ -89,20 +80,65 @@ func Open(filename string) (*Web100, error) {
 
 // Next iterates through the web100 log file and returns the next snapshot
 // record in the form of a map.
-func (w *Web100) Next() (map[string]string, error) {
-	results := make(map[string]string)
-
+func (w *Web100) Next() error {
 	log := (*C.web100_log)(w.log)
 	snap := (*C.web100_snapshot)(w.snap)
 
 	// Read the next web100_snaplog data from underlying file.
 	err := C.web100_snap_from_log(snap, log)
 	if err == C.EOF {
-		return nil, io.EOF
+		return io.EOF
 	}
 	if err != C.WEB100_ERR_SUCCESS {
-		return nil, fmt.Errorf(C.GoString(C.web100_strerror(err)))
+		return fmt.Errorf(C.GoString(C.web100_strerror(err)))
 	}
+	return nil
+}
+
+// LogValues returns a map of values from the web100 log. IPv6 address
+// connection information is not available.
+func (w *Web100) LogValues() (map[string]string, error) {
+	log := (*C.web100_log)(w.log)
+
+	agent := C.web100_get_log_agent(log)
+
+	results := make(map[string]string)
+	results["web100_log_entry.version"] = C.GoString(C.web100_get_agent_version(agent))
+
+	time := C.web100_get_log_time(log)
+	results["web100_log_entry.log_time"] = fmt.Sprintf("%d", int64(time))
+
+	conn := C.web100_get_log_connection(log)
+	// NOTE: web100_connection_spec_v6 is not filled in by the web100 library.
+	// NOTE: addrtype is always WEB100_ADDRTYPE_UNKNOWN.
+	results["web100_log_entry.connection_spec.local_af"] = ""
+	var spec C.struct_web100_connection_spec
+	C.web100_get_connection_spec(conn, &spec)
+
+	addr := C.struct_in_addr{C.in_addr_t(spec.src_addr)}
+	results["web100_log_entry.connection_spec.local_ip"] = C.GoString(C.inet_ntoa(addr))
+	results["web100_log_entry.connection_spec.local_port"] = fmt.Sprintf("%d", spec.src_port)
+
+	addr = C.struct_in_addr{C.in_addr_t(spec.dst_addr)}
+	results["web100_log_entry.connection_spec.remote_ip"] = C.GoString(C.inet_ntoa(addr))
+	results["web100_log_entry.connection_spec.remote_port"] = fmt.Sprintf("%d", spec.dst_port)
+
+	return results, nil
+}
+
+// SnapValues converts all variables in the latest snap record into a results
+// map.
+func (w *Web100) SnapValues() (map[string]string, error) {
+	log := (*C.web100_log)(w.log)
+	snap := (*C.web100_snapshot)(w.snap)
+
+	results := make(map[string]string)
+
+	var_text := C.malloc(2 * C.WEB100_VALUE_LEN_MAX) // Use a better size.
+	defer C.free(var_text)
+
+	var_data := C.malloc(C.WEB100_VALUE_LEN_MAX)
+	defer C.free(var_data)
 
 	// Parses variables from most recent web100_snapshot data.
 	group := C.web100_get_log_group(log)
@@ -111,12 +147,6 @@ func (w *Web100) Next() (map[string]string, error) {
 		name := C.web100_get_var_name(v)
 		var_size := C.web100_get_var_size(v)
 		var_type := C.web100_get_var_type(v)
-
-		var_data := C.malloc(var_size)
-		defer C.free(var_data)
-
-		var_text := C.malloc(2 * C.WEB100_VALUE_LEN_MAX) // Use a better size.
-		defer C.free(var_text)
 
 		// Read the raw variable data from the snapshot data.
 		err := C.web100_snap_read(v, snap, var_data)
@@ -153,7 +183,7 @@ func LookupError(errnum int) string {
 	return C.GoString(C.web100_strerror(C.int(errnum)))
 }
 
-func Pprint(results map[string]string) {
+func PrettyPrint(results map[string]string) {
 	b, err := json.MarshalIndent(results, "", "  ")
 	if err != nil {
 		fmt.Println("error:", err)
@@ -171,20 +201,27 @@ func main() {
 	}
 	fmt.Printf("%#v\n", w)
 
+	results, err := w.LogValues()
+	if err != nil {
+		panic(err)
+	}
+	PrettyPrint(results)
+
 	// Find and print the last web100 snapshot record.
-	var results map[string]string
-	var current map[string]string
 	for {
-		current, err = w.Next()
+		err = w.Next()
 		if err != nil {
 			break
 		}
-		results = current
 	}
 	if err != io.EOF {
 		panic(err)
 	}
-	Pprint(results)
+	results, err = w.SnapValues()
+	if err != nil {
+		panic(err)
+	}
+	PrettyPrint(results)
 	w.Close()
 	fmt.Printf("%#v\n", w)
 }
