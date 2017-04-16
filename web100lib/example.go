@@ -6,7 +6,6 @@ package main
 /*
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
 #include <web100.h>
 #include <web100-int.h>
 
