@@ -1540,7 +1540,7 @@ web100_log_open_read(char *logname)
     }
 
     // if(fread(&log->time, sizeof(time_t), 1, log->fp) != 1) {
-    if(fread(&log->time, sizeof(uint32_t), 1, log->fp) != 1) {
+    if(fread(&log->time, sizeof(unsigned int), 1, log->fp) != 1) {
        	web100_errno = WEB100_ERR_FILE;
        	goto Cleanup;
     }
