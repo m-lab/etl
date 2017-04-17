@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/metrics"
