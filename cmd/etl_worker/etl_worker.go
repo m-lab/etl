@@ -52,7 +52,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
 		fmt.Fprintf(w, `{"message": "Could not create client."}`)
-		w.WriteHeader(503) // Service Unavailable
+		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
 
@@ -60,24 +60,25 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	tr, err := storage.NewGCSTarReader(client, r.FormValue("filename"))
 	if err != nil {
 		log.Printf("%v", err)
-		log.Printf("Bailing out")
-		fmt.Fprintf(w, `{"message": "Bailing out"}`)
+		fmt.Fprintf(w, `{"message": "Problem opening file."}`)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
-		// TODO - something better.
+		// TODO - anything better we could do here?
 	}
+	defer tr.Close()
+
 	parser := new(parser.TestParser)
-	ins, err := bq.NewInserter("mlab-sandbox", "mlab_sandbox", "test3")
+	ins, err := bq.NewInserter(os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "test3")
 	if err != nil {
 		log.Printf("%v", err)
-		log.Printf("Bailing out")
-		fmt.Fprintf(w, `{"message": "Bailing out"}`)
+		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
-		// TODO - something better.
+		// TODO - anything better we could do here?
 	}
 	tsk := task.NewTask(tr, parser, ins, "test3")
 
 	tsk.ProcessAllTests()
-	tr.Close()
 
 	// TODO - if there are any errors, consider sending back a meaningful response
 	// for web browser and queue-pusher debugging.

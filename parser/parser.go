@@ -14,7 +14,7 @@ import (
 //=====================================================================================
 type Parser interface {
 	// fn - Name of test file
-	// table - biq query table name (for error logging only)
+	// table - biq query table name (for metrics and error logging only)
 	// test - binary test data
 	Parse(fn string, table string, test []byte) (interface{}, error)
 }
@@ -25,7 +25,7 @@ type NullParser struct {
 }
 
 func (np *NullParser) Parse(fn string, table string, test []byte) (interface{}, error) {
-	test_count.With(prometheus.Labels{"table": table}).Inc()
+	testCount.With(prometheus.Labels{"table": table}).Inc()
 	return nil, nil
 }
 
@@ -48,7 +48,7 @@ func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string,
 }
 
 func (np *TestParser) Parse(fn string, table string, test []byte) (interface{}, error) {
-	test_count.With(prometheus.Labels{"table": table}).Inc()
+	testCount.With(prometheus.Labels{"table": table}).Inc()
 	log.Printf("Parsing %s", fn)
 	return FileNameSaver{map[string]bigquery.Value{"filename": fn}}, nil
 }
@@ -58,18 +58,18 @@ func (np *TestParser) Parse(fn string, table string, test []byte) (interface{}, 
 //=====================================================================================
 
 var (
-	test_count = prometheus.NewCounterVec(prometheus.CounterOpts{
+	testCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "etl_parser_test_count",
 		Help: "Number of tests processed.",
 	}, []string{"table"})
 
-	failure_count = prometheus.NewCounterVec(prometheus.CounterOpts{
+	failureCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "etl_parser_failure_count",
 		Help: "Number of test processing failures.",
 	}, []string{"table", "failure_type"})
 )
 
 func init() {
-	prometheus.MustRegister(test_count)
-	prometheus.MustRegister(failure_count)
+	prometheus.MustRegister(testCount)
+	prometheus.MustRegister(failureCount)
 }

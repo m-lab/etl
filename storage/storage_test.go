@@ -16,7 +16,6 @@ func TestGetObject(t *testing.T) {
 	obj, err := getObject(client, "m-lab-sandbox", "testfile", 10*time.Second)
 	if err != nil {
 		t.Fatal(err)
-		return
 	}
 	obj.Body.Close()
 }
@@ -54,13 +53,11 @@ func TestNewTarReader(t *testing.T) {
 	reader, err := NewGCSTarReader(client, "gs://m-lab-sandbox/test.tar")
 	if err != nil {
 		t.Fatal(err)
-		return
 	}
 	count := 0
 	for _, _, err := next(reader); err != io.EOF; _, _, err = next(reader) {
 		if err != nil {
 			t.Fatal(err)
-			return
 		}
 		count += 1
 	}
@@ -74,13 +71,11 @@ func TestNewTarReaderGzip(t *testing.T) {
 	reader, err := NewGCSTarReader(client, "gs://m-lab-sandbox/test.tgz")
 	if err != nil {
 		t.Fatal(err)
-		return
 	}
 	count := 0
 	for _, _, err := next(reader); err != io.EOF; _, _, err = next(reader) {
 		if err != nil {
 			t.Fatal(err)
-			return
 		}
 		count += 1
 	}

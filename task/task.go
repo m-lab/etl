@@ -82,7 +82,7 @@ func (tt *Task) ProcessAllTests() {
 			continue
 		}
 
-		test, err := tt.Parser.Parse(fn, tt.table, data)
+		row, err := tt.Parser.Parse(fn, tt.table, data)
 		if err != nil {
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
@@ -91,7 +91,7 @@ func (tt *Task) ProcessAllTests() {
 		// TODO(dev) Aggregate rows into single insert request, here
 		// or in Inserter.
 		inserts += 1
-		err = tt.InsertRows(test, 5*time.Second)
+		err = tt.InsertRows(row, 5*time.Second)
 		if err != nil {
 			log.Printf("%v", err)
 			// Handle this error properly!
