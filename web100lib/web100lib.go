@@ -26,16 +26,9 @@ import "C"
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"unsafe"
-	//"github.com/kr/pretty"
-)
-
-var (
-	filename = flag.String("filename", "", "Trace filename.")
-	tcpKis   = flag.String("tcp-kis", "tcp-kis.txt", "tcp-kis.txt filename.")
 )
 
 // Necessary web100 functions:
