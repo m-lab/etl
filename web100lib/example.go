@@ -10,6 +10,17 @@ package main
 #include <web100-int.h>
 
 #include <arpa/inet.h>
+
+
+void print_bytes(size_t var_size, void *var_data) {
+	unsigned char *data = (unsigned char *)var_data;
+	int i = 0;
+	fflush(stdout);
+	for (i = 0; i < var_size; i++ ) {
+		fprintf(stdout, "%02x ", data[i]);
+	}
+	fflush(stdout);
+}
 */
 import "C"
 
@@ -133,10 +144,10 @@ func (w *Web100) SnapValues() (map[string]string, error) {
 
 	results := make(map[string]string)
 
-	var_text := C.malloc(2 * C.WEB100_VALUE_LEN_MAX) // Use a better size.
+	var_text := C.calloc(2*C.WEB100_VALUE_LEN_MAX, 1) // Use a better size.
 	defer C.free(var_text)
 
-	var_data := C.malloc(C.WEB100_VALUE_LEN_MAX)
+	var_data := C.calloc(C.WEB100_VALUE_LEN_MAX, 1)
 	defer C.free(var_data)
 
 	// Parses variables from most recent web100_snapshot data.
@@ -154,11 +165,13 @@ func (w *Web100) SnapValues() (map[string]string, error) {
 		}
 
 		// Convert raw var_data into a string based on var_type.
-		C.web100_value_to_textn((*C.char)(var_text), var_size, (C.WEB100_TYPE)(var_type), var_data)
+		C.web100_value_to_textn((*C.char)(var_text), C.WEB100_VALUE_LEN_MAX, (C.WEB100_TYPE)(var_type), var_data)
 		results[fmt.Sprintf("web100_log_entry.snap.%s", C.GoString(name))] = C.GoString((*C.char)(var_text))
 
-		fmt.Printf("name: %-20s type: %d %d size %d: %s\n", C.GoString(name), C.WEB100_TYPE_INTEGER32, var_type, var_size,
+		fmt.Printf("name: %-20s type: %d %d size %d: %-30s ", C.GoString(name), C.WEB100_TYPE_INTEGER32, var_type, var_size,
 			C.GoString((*C.char)(var_text)))
+		C.print_bytes(var_size, var_data)
+		fmt.Printf("\n")
 	}
 
 	return results, nil
