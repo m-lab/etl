@@ -3,6 +3,8 @@
 package parser
 
 import (
+	"log"
+
 	"cloud.google.com/go/bigquery"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -12,18 +14,43 @@ import (
 //=====================================================================================
 type Parser interface {
 	// fn - Name of test file
-	// table - biq query table name (for error logging only)
+	// table - biq query table name (for metrics and error logging only)
 	// test - binary test data
-	HandleTest(fn string, table string, test []byte) (bigquery.ValueSaver, error)
+	Parse(fn string, table string, test []byte) (interface{}, error)
 }
 
+//------------------------------------------------------------------------------------
 type NullParser struct {
 	Parser
 }
 
-func (np *NullParser) HandleTest(fn string, table string, test []byte) (bigquery.ValueSaver, error) {
-	test_count.With(prometheus.Labels{"table": table}).Inc()
+func (np *NullParser) Parse(fn string, table string, test []byte) (interface{}, error) {
+	testCount.With(prometheus.Labels{"table": table}).Inc()
 	return nil, nil
+}
+
+//------------------------------------------------------------------------------------
+// TestParser ignores the content, returns a ValueSaver with map[string]Value
+// underneath, containing "filename":"..."
+// TODO add tests
+type TestParser struct {
+	Parser
+}
+
+// TODO - use or delete this struct
+type FileNameSaver struct {
+	Values map[string]bigquery.Value
+}
+
+// TODO(dev) - Figure out if this can use a pointer receiver.
+func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
+	return fns.Values, "", nil
+}
+
+func (np *TestParser) Parse(fn string, table string, test []byte) (interface{}, error) {
+	testCount.With(prometheus.Labels{"table": table}).Inc()
+	log.Printf("Parsing %s", fn)
+	return FileNameSaver{map[string]bigquery.Value{"filename": fn}}, nil
 }
 
 //=====================================================================================
@@ -31,18 +58,18 @@ func (np *NullParser) HandleTest(fn string, table string, test []byte) (bigquery
 //=====================================================================================
 
 var (
-	test_count = prometheus.NewCounterVec(prometheus.CounterOpts{
+	testCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "etl_parser_test_count",
 		Help: "Number of tests processed.",
 	}, []string{"table"})
 
-	failure_count = prometheus.NewCounterVec(prometheus.CounterOpts{
+	failureCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "etl_parser_failure_count",
 		Help: "Number of test processing failures.",
 	}, []string{"table", "failure_type"})
 )
 
 func init() {
-	prometheus.MustRegister(test_count)
-	prometheus.MustRegister(failure_count)
+	prometheus.MustRegister(testCount)
+	prometheus.MustRegister(failureCount)
 }

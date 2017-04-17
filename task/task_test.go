@@ -5,7 +5,6 @@ package task_test
 import (
 	"archive/tar"
 	"bytes"
-	"cloud.google.com/go/bigquery"
 	"fmt"
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
@@ -15,11 +14,11 @@ import (
 	"testing"
 )
 
-// Just test call to NullParser.HandleTest
+// Just test call to NullParser.Parse
 func TestPlumbing(t *testing.T) {
 	foo := [10]byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
 	p := parser.NullParser{}
-	_, err := p.HandleTest("foo", "table", foo[:])
+	_, err := p.Parse("foo", "table", foo[:])
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -52,12 +51,13 @@ type TestParser struct {
 	files []string
 }
 
-func (tp *TestParser) HandleTest(fn string, table string, test []byte) (bigquery.ValueSaver, error) {
+func (tp *TestParser) Parse(fn string, table string, test []byte) (interface{}, error) {
 	// TODO - pass filename through to BQ inserter
 	tp.files = append(tp.files, fn)
 	return nil, nil
 }
 
+// TODO(dev) - add unit tests for tgz and tar.gz files
 // TODO(dev) - add good comments
 func TestTarFileInput(t *testing.T) {
 	rdr := MakeTestTar(t)

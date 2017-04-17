@@ -4,11 +4,13 @@ package main
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
-	"time"
 
+	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/etl/task"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
@@ -43,19 +45,43 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	for key, value := range r.Form {
 		log.Printf("Form:   %q == %q\n", key, value)
 	}
-	// Log headers.
-	for key, value := range r.Header {
-		log.Printf("Header: %q == %q\n", key, value)
-	}
 
 	// TODO(dev): log the originating task queue name from headers.
 	log.Printf("Received filename: %q\n", r.FormValue("filename"))
 
-	// TODO(dev): Remove fake delay.
-	t := 10 * rand.ExpFloat64()
-	log.Printf("Simulating work by sleeping for %f seconds\n", t)
-	time.Sleep(time.Duration(t) * time.Second)
+	client, err := storage.GetStorageClient(false)
+	if err != nil {
+		fmt.Fprintf(w, `{"message": "Could not create client."}`)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
 
+	// TODO(dev) Create reusable Client.
+	tr, err := storage.NewGCSTarReader(client, r.FormValue("filename"))
+	if err != nil {
+		log.Printf("%v", err)
+		fmt.Fprintf(w, `{"message": "Problem opening file."}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+		// TODO - anything better we could do here?
+	}
+	defer tr.Close()
+
+	parser := new(parser.TestParser)
+	ins, err := bq.NewInserter(os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "test3")
+	if err != nil {
+		log.Printf("%v", err)
+		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+		// TODO - anything better we could do here?
+	}
+	tsk := task.NewTask(tr, parser, ins, "test3")
+
+	tsk.ProcessAllTests()
+
+	// TODO - if there are any errors, consider sending back a meaningful response
+	// for web browser and queue-pusher debugging.
 	fmt.Fprintf(w, `{"message": "Success"}`)
 }
 
