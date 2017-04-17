@@ -424,7 +424,7 @@ R/W:		read-only
 ------------------------------------------------------------------------------
 VariableName:	StartTimeStamp
 Scope:		both
-RenameFrom:	StartTimeSec StartTime StartTimeUsec
+RenameFrom:	StartTimeSec StartTime
 ShortDescr:	Start Time
 ProcType:	Integer32
 SNMPType:	DateAndTime
