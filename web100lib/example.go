@@ -155,7 +155,10 @@ func (w *Web100) SnapValues() (map[string]string, error) {
 
 		// Convert raw var_data into a string based on var_type.
 		C.web100_value_to_textn((*C.char)(var_text), var_size, (C.WEB100_TYPE)(var_type), var_data)
-		results[C.GoString(name)] = C.GoString((*C.char)(var_text))
+		results[fmt.Sprintf("web100_log_entry.snap.%s", C.GoString(name))] = C.GoString((*C.char)(var_text))
+
+		fmt.Printf("name: %-20s type: %d %d size %d: %s\n", C.GoString(name), C.WEB100_TYPE_INTEGER32, var_type, var_size,
+			C.GoString((*C.char)(var_text)))
 	}
 
 	return results, nil
