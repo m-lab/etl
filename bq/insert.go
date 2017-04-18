@@ -66,9 +66,9 @@ func (in *BQInserter) Flush(timeout time.Duration) error {
 		return nil
 	}
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
-	// This is heavyweight, and may run forever without a context deadline.
-	var rows = in.rows
+	rows := in.rows
 	in.rows = []interface{}{}
+	// This is heavyweight, and may run forever without a context deadline.
 	return in.uploader.Put(ctx, rows)
 }
 
