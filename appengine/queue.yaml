@@ -3,8 +3,8 @@ queue:
 - name: etl-parser-queue
   target: etl-parser
   rate: 5/s
-  bucket_size: 200
-  max_concurrent_requests: 100
+  bucket_size: 500
+  max_concurrent_requests: 500
 
 - name: etl-pull-queue
   mode: pull
