@@ -88,6 +88,8 @@ func (tt *Task) ProcessAllTests() {
 			continue
 		}
 		if data == nil {
+			// TODO(dev) Handle directories (expected) and other
+			// things separately.
 			nilData += 1
 			// If verbose, log the filename that is skipped.
 			continue

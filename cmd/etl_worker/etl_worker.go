@@ -74,6 +74,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Form:   %q == %q\n", key, value)
 	}
 
+	// This handles base64 encoding, and requires a gs:// prefix.
 	filename, err := getFilename(r.FormValue("filename"))
 	if err != nil {
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
@@ -91,7 +92,6 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO - need to check for base64
 	tr, err := storage.NewGCSTarReader(client, filename)
 	if err != nil {
 		log.Printf("%v", err)
