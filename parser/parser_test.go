@@ -15,7 +15,8 @@ import (
 func TestPlumbing(t *testing.T) {
 	foo := [10]byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
 	p := parser.NullParser{}
-	_, err := p.Parse("foo", "table", foo[:])
+	var meta map[string]bigquery.Value
+	_, err := p.Parse(meta, "foo", "table", foo[:])
 	if err != nil {
 		fmt.Println(err)
 	}

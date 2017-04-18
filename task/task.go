@@ -72,11 +72,12 @@ func (tt *Task) NextTest() (string, []byte, error) {
 // ProcessAllTests loops through all the tests in a tar file, calls the
 // injected parser to parse them, and inserts them into bigquery (not yet implemented).
 func (tt *Task) ProcessAllTests() {
-	tests := 0
+	files := 0
 	inserts := 0
+	nilData := 0
 	// Read each file from the tar
 	for testname, data, err := tt.NextTest(); err != io.EOF; testname, data, err = tt.NextTest() {
-		tests += 1
+		files += 1
 		if err != nil {
 			if err == io.EOF {
 				return
@@ -86,6 +87,7 @@ func (tt *Task) ProcessAllTests() {
 			continue
 		}
 		if data == nil {
+			nilData += 1
 			// If verbose, log the filename that is skipped.
 			continue
 		}
@@ -106,6 +108,6 @@ func (tt *Task) ProcessAllTests() {
 		}
 	}
 	// TODO - make this debug or remove
-	log.Printf("%d tests, %d inserts", tests, inserts)
+	log.Printf("%d files, %d nil data, %d inserts", files, nilData, inserts)
 	return
 }

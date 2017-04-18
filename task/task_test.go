@@ -6,19 +6,23 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
+	"reflect"
+	"testing"
+
+	"cloud.google.com/go/bigquery"
+
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage" // TODO - would be better not to have this.
 	"github.com/m-lab/etl/task"
-	"reflect"
-	"testing"
 )
 
 // Just test call to NullParser.Parse
 func TestPlumbing(t *testing.T) {
 	foo := [10]byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
 	p := parser.NullParser{}
-	_, err := p.Parse("foo", "table", foo[:])
+	var meta map[string]bigquery.Value
+	_, err := p.Parse(meta, "foo", "table", foo[:])
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -51,9 +55,9 @@ type TestParser struct {
 	files []string
 }
 
-func (tp *TestParser) Parse(fn string, table string, test []byte) (interface{}, error) {
+func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error) {
 	// TODO - pass filename through to BQ inserter
-	tp.files = append(tp.files, fn)
+	tp.files = append(tp.files, testName)
 	return nil, nil
 }
 
@@ -64,7 +68,7 @@ func TestTarFileInput(t *testing.T) {
 
 	var prsr TestParser
 	in := bq.NullInserter{}
-	tt := task.NewTask(rdr, &prsr, &in, "test_table")
+	tt := task.NewTask("filename", rdr, &prsr, &in, "test_table")
 	fn, bb, err := tt.NextTest()
 	if err != nil {
 		t.Error(err)
@@ -89,7 +93,7 @@ func TestTarFileInput(t *testing.T) {
 
 	// Reset the tar reader and create new task, to test the ProcessAllTests behavior.
 	rdr = MakeTestTar(t)
-	tt = task.NewTask(rdr, &prsr, &in, "test_table")
+	tt = task.NewTask("filename", rdr, &prsr, &in, "test_table")
 	tt.ProcessAllTests()
 
 	if len(prsr.files) != 2 {
