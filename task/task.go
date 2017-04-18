@@ -64,6 +64,8 @@ func (tt *Task) NextTest() (string, []byte, error) {
 // ProcessAllTests loops through all the tests in a tar file, calls the
 // injected parser to parse them, and inserts them into bigquery (not yet implemented).
 func (tt *Task) ProcessAllTests() {
+	// TODO(dev) better error handling
+	defer tt.Flush(5*time.Second)
 	tests := 0
 	inserts := 0
 	// Read each file from the tar

@@ -24,12 +24,14 @@ import (
 // An Inserter provides the InsertRows function.
 type Inserter interface {
 	InsertRows(data interface{}, timeout time.Duration) error
+	Flush(timeout time.Duration) error
 }
 
 type BQInserter struct {
 	Inserter
 	client   *bigquery.Client
 	uploader *bigquery.Uploader
+	rows     []interface{}
 }
 
 // TODO - Consider injecting the Client here, to allow broader unit testing options.
@@ -47,9 +49,27 @@ func NewInserter(project string, dataset string, table string) (Inserter, error)
 }
 
 func (in *BQInserter) InsertRows(data interface{}, timeout time.Duration) error {
+	in.rows = append(in.rows, data)
+	// TODO(dev) a sensible value should go here, but a quick estimate
+	// of 10K per row times 100 results is 1MB, which is an order of
+	// magnitude below our 10MB max, so 100 might not be such a bad
+	// default.
+	if len(in.rows) > 100 {
+		return in.Flush(timeout)
+	} else {
+		return nil
+	}
+}
+
+func (in *BQInserter) Flush(timeout time.Duration) error {
+	if len(in.rows) == 0 {
+		return nil
+	}
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	// This is heavyweight, and may run forever without a context deadline.
-	return in.uploader.Put(ctx, data)
+	var rows = in.rows
+	in.rows = []interface{}{}
+	return in.uploader.Put(ctx, rows)
 }
 
 type NullInserter struct {
@@ -57,5 +77,8 @@ type NullInserter struct {
 }
 
 func (in *NullInserter) InsertRows(data interface{}, timeout time.Duration) error {
+	return nil
+}
+func (in *NullInserter) Flush(timeout time.Duration) error {
 	return nil
 }
