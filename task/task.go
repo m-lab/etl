@@ -21,6 +21,7 @@ import (
 	"github.com/m-lab/etl/storage"
 )
 
+// TODO(dev) Add unit tests for meta data.
 type Task struct {
 	storage.TarReader                           // Tar reader from which to read tests.
 	parser.Parser                               // Parser to parse the tests.

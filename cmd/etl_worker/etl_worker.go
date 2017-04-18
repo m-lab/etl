@@ -46,6 +46,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Hello world!")
 }
 
+// TODO(dev) Add unit test
 func getFilename(filename string) (string, error) {
 	if strings.HasPrefix(filename, "gs://") {
 		return filename, nil
