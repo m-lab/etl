@@ -24,13 +24,13 @@ resources:
     size_gb: 0.5
 
 automatic_scaling:
-        # We expect fairly steady load, so a modest minimum will rarely cost us anything.
-        min_num_instances: 2
-        max_num_instances: 20
-        cool_down_period_sec: 300
-        # We don't care much about latency, so a high utilization is desireable.
-        cpu_utilization:
-                target_utilization: 0.95
+  # We expect fairly steady load, so a modest minimum will rarely cost us anything.
+  min_num_instances: 2
+  max_num_instances: 20
+  cool_down_period_sec: 300
+  # We don't care much about latency, so a high utilization is desireable.
+  cpu_utilization:
+    target_utilization: 0.95
 
 # Note: add a public port for GCE auto discovery by prometheus.
 # TODO(dev): are any values redundant or irrelevant?
