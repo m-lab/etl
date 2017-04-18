@@ -1,3 +1,18 @@
 runtime: custom
 env: flex
 service: etl-parser
+resources:
+        cpu: 2
+        memory_gb: 2.0
+health_check:
+        enable_health_check: True
+        check_interval_sec: 30
+        timeout_sec: 4
+        unhealthy_threshold: 2
+        healthy_threshold: 2
+automatic_scaling:
+        min_num_instances: 3
+        max_num_instances: 20
+        cool_down_period_sec: 120 # default value
+        cpu_utilization:
+                target_utilization: 0.9

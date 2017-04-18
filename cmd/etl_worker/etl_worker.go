@@ -15,6 +15,7 @@ import (
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
@@ -63,6 +64,9 @@ func getFilename(filename string) (string, error) {
 }
 
 func worker(w http.ResponseWriter, r *http.Request) {
+	workerCount.Inc()
+	defer workerCount.Dec()
+
 	r.ParseForm()
 	// Log request data.
 	for key, value := range r.Form {
@@ -128,4 +132,19 @@ func main() {
 	// Assign the default prometheus handler to the standard exporter path.
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":8080", nil)
+}
+
+//=====================================================================================
+//                       Prometheus Monitoring
+//=====================================================================================
+
+var (
+	workerCount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "etl_parser_worker_count",
+		Help: "Number of active workers.",
+	})
+)
+
+func init() {
+	prometheus.MustRegister(workerCount)
 }
