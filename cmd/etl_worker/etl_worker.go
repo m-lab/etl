@@ -2,10 +2,13 @@
 package main
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/metrics"
@@ -17,6 +20,8 @@ import (
 	// Enable profiling. For more background and usage information, see:
 	//   https://blog.golang.org/profiling-go-programs
 	_ "net/http/pprof"
+	// Enable exported debug vars.  See https://golang.org/pkg/expvar/
+	_ "expvar"
 )
 
 // Task Queue can always submit to an admin restricted URL.
@@ -40,6 +45,23 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Hello world!")
 }
 
+func getFilename(filename string) (string, error) {
+	if strings.HasPrefix(filename, "gs://") {
+		return filename, nil
+	}
+
+	decode, err := base64.StdEncoding.DecodeString(filename)
+	if err != nil {
+		return "", errors.New("invalid file path: " + filename)
+	}
+	fn := string(decode[:])
+	if strings.HasPrefix(fn, "gs://") {
+		return fn, nil
+	}
+
+	return "", errors.New("invalid base64 encoded file path: " + fn)
+}
+
 func worker(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	// Log request data.
@@ -47,8 +69,15 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Form:   %q == %q\n", key, value)
 	}
 
+	filename, err := getFilename(r.FormValue("filename"))
+	if err != nil {
+		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	// TODO(dev): log the originating task queue name from headers.
-	log.Printf("Received filename: %q\n", r.FormValue("filename"))
+	log.Printf("Received filename: %q\n", filename)
 
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
@@ -57,8 +86,8 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO(dev) Create reusable Client.
-	tr, err := storage.NewGCSTarReader(client, r.FormValue("filename"))
+	// TODO - need to check for base64
+	tr, err := storage.NewGCSTarReader(client, filename)
 	if err != nil {
 		log.Printf("%v", err)
 		fmt.Fprintf(w, `{"message": "Problem opening file."}`)
@@ -69,7 +98,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	defer tr.Close()
 
 	parser := new(parser.TestParser)
-	ins, err := bq.NewInserter(os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "test3")
+	ins, err := bq.NewInserter(os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "with_meta")
 	if err != nil {
 		log.Printf("%v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
@@ -77,7 +106,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		return
 		// TODO - anything better we could do here?
 	}
-	tsk := task.NewTask(tr, parser, ins, "test3")
+	tsk := task.NewTask(filename, tr, parser, ins, "test3")
 
 	tsk.ProcessAllTests()
 
