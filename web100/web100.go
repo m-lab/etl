@@ -163,6 +163,7 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 			canonicalName = C.GoString(name)
 		}
 
+		// TODO(dev): are there any cases where we need unsigned int64?
 		// Attempt to convert the current variable to an int64.
 		value, err := strconv.ParseInt(C.GoString((*C.char)(var_text)), 10, 64)
 		if err != nil {
