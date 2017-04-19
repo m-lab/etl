@@ -14,21 +14,30 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/bigquery"
+
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage"
 )
 
+// TODO(dev) Add unit tests for meta data.
 type Task struct {
-	storage.TarReader        // Tar reader from which to read tests.
-	parser.Parser            // Parser to parse the tests.
-	bq.Inserter              // provides InsertRows(...)
-	table             string // The table to insert rows into, INCLUDING the partition!
+	storage.TarReader                           // Tar reader from which to read tests.
+	parser.Parser                               // Parser to parse the tests.
+	bq.Inserter                                 // provides InsertRows(...)
+	table             string                    // The table to insert rows into, INCLUDING the partition!
+	meta              map[string]bigquery.Value // Metadata about this task.
 }
 
 // NewTask constructs a task, injecting the tar reader and the parser.
-func NewTask(rdr storage.TarReader, prsr parser.Parser, inserter bq.Inserter, table string) *Task {
-	t := Task{rdr, prsr, inserter, table}
+func NewTask(filename string, rdr storage.TarReader, prsr parser.Parser, inserter bq.Inserter, table string) *Task {
+	// TODO - should the meta data be a nested type?
+	meta := make(map[string]bigquery.Value, 3)
+	meta["filename"] = filename
+	meta["parse_time"] = time.Now()
+	meta["attempt"] = 1
+	t := Task{rdr, prsr, inserter, table, meta}
 	return &t
 }
 
@@ -67,10 +76,12 @@ func (tt *Task) ProcessAllTests() {
 	// TODO(dev) better error handling
 	defer tt.Flush(5*time.Second)
 	tests := 0
+	files := 0
 	inserts := 0
+	nilData := 0
 	// Read each file from the tar
-	for fn, data, err := tt.NextTest(); err != io.EOF; fn, data, err = tt.NextTest() {
-		tests += 1
+	for testname, data, err := tt.NextTest(); err != io.EOF; testname, data, err = tt.NextTest() {
+		files += 1
 		if err != nil {
 			if err == io.EOF {
 				return
@@ -80,11 +91,14 @@ func (tt *Task) ProcessAllTests() {
 			continue
 		}
 		if data == nil {
+			// TODO(dev) Handle directories (expected) and other
+			// things separately.
+			nilData += 1
 			// If verbose, log the filename that is skipped.
 			continue
 		}
 
-		row, err := tt.Parser.Parse(fn, tt.table, data)
+		row, err := tt.Parser.Parse(tt.meta, testname, tt.table, data)
 		if err != nil {
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
@@ -105,5 +119,6 @@ func (tt *Task) ProcessAllTests() {
 	if err != nil {
 		log.Printf("%v", err)
 	}
+	log.Printf("%d files, %d nil data, %d inserts", files, nilData, inserts)
 	return
 }

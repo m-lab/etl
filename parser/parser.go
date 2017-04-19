@@ -16,7 +16,7 @@ type Parser interface {
 	// fn - Name of test file
 	// table - biq query table name (for metrics and error logging only)
 	// test - binary test data
-	Parse(fn string, table string, test []byte) (interface{}, error)
+	Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error)
 }
 
 //------------------------------------------------------------------------------------
@@ -24,20 +24,11 @@ type NullParser struct {
 	Parser
 }
 
-func (np *NullParser) Parse(fn string, table string, test []byte) (interface{}, error) {
+func (np *NullParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error) {
 	testCount.With(prometheus.Labels{"table": table}).Inc()
 	return nil, nil
 }
 
-//------------------------------------------------------------------------------------
-// TestParser ignores the content, returns a ValueSaver with map[string]Value
-// underneath, containing "filename":"..."
-// TODO add tests
-type TestParser struct {
-	Parser
-}
-
-// TODO - use or delete this struct
 type FileNameSaver struct {
 	Values map[string]bigquery.Value
 }
@@ -47,10 +38,24 @@ func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string,
 	return fns.Values, "", nil
 }
 
-func (np *TestParser) Parse(fn string, table string, test []byte) (interface{}, error) {
+//------------------------------------------------------------------------------------
+// TestParser ignores the content, returns a ValueSaver with map[string]Value
+// underneath, containing meta data and "testname":"..."
+// TODO add tests
+type TestParser struct {
+	Parser
+}
+
+func (np *TestParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error) {
 	testCount.With(prometheus.Labels{"table": table}).Inc()
-	log.Printf("Parsing %s", fn)
-	return FileNameSaver{map[string]bigquery.Value{"filename": fn}}, nil
+	log.Printf("Parsing %s", testName)
+	values := make(map[string]bigquery.Value, len(meta)+1)
+	// TODO is there a better way to do this?
+	for k, v := range meta {
+		values[k] = v
+	}
+	values["testname"] = testName
+	return FileNameSaver{values}, nil
 }
 
 //=====================================================================================
