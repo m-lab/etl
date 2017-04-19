@@ -2,6 +2,9 @@
 package web100lib
 
 // Cgo directives must immediately preceed 'import "C"' below.
+// For more information see:
+//  - https://blog.golang.org/c-go-cgo
+//  - https://golang.org/cmd/cgo
 
 /*
 #include <stdio.h>
@@ -10,17 +13,6 @@ package web100lib
 #include <web100-int.h>
 
 #include <arpa/inet.h>
-
-
-void print_bytes(size_t var_size, void *var_data) {
-	unsigned char *data = (unsigned char *)var_data;
-	int i = 0;
-	fflush(stdout);
-	for (i = 0; i < var_size; i++ ) {
-		fprintf(stdout, "%02x ", data[i]);
-	}
-	fflush(stdout);
-}
 */
 import "C"
 
@@ -28,28 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"unsafe"
+
+	"cloud.google.com/go/bigquery"
 )
 
-// Necessary web100 functions:
-//  + web100_log_open_read(filename)
-//  + web100_log_close_read(log_)
-//  + snap_ = web100_snapshot_alloc_from_log(log_);
-//  + web100_snap_from_log(snap_, log_)
-//
-//  + for (web100_var *var = web100_var_head(group_);
-//  +      var != NULL;
-//  +      var = web100_var_next(var)) {
-//
-//   web100_get_log_agent(log_)
-//   web100_get_log_time(log_);
-//   + web100_get_log_group(log_);
-//
-//   connection_ = web100_get_log_connection(log_);
-
-// Notes:
-//  - See: https://golang.org/cmd/cgo/#hdr-Go_references_to_C
-//
 // Discoveries:
 //  - Not all C macros exist in the "C" namespace.
 //  - 'NULL' is usually equivalent to 'nil'
@@ -99,44 +75,55 @@ func (w *Web100) Next() error {
 	return nil
 }
 
-// LogValues returns a map of values from the web100 log. IPv6 address
-// connection information is not available.
-func (w *Web100) LogValues() (map[string]string, error) {
+func (w *Web100) Values(legacyNames map[string]string) (map[string]bigquery.Value, error) {
+	v, err := w.logValues()
+	if err != nil {
+		return nil, err
+	}
+	v, err = w.snapValues(v, legacyNames)
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+// logValues returns a map of values from the web100 log. IPv6 address
+// connection information is not available and must be set based on a snapshot.
+func (w *Web100) logValues() (map[string]bigquery.Value, error) {
 	log := (*C.web100_log)(w.log)
 
 	agent := C.web100_get_log_agent(log)
 
-	results := make(map[string]string)
+	results := make(map[string]bigquery.Value)
 	results["web100_log_entry.version"] = C.GoString(C.web100_get_agent_version(agent))
 
 	time := C.web100_get_log_time(log)
-	results["web100_log_entry.log_time"] = fmt.Sprintf("%d", int64(time))
+	results["web100_log_entry.log_time"] = int64(time)
 
 	conn := C.web100_get_log_connection(log)
 	// NOTE: web100_connection_spec_v6 is not filled in by the web100 library.
 	// NOTE: addrtype is always WEB100_ADDRTYPE_UNKNOWN.
-	results["web100_log_entry.connection_spec.local_af"] = ""
+	// NOTE: legacy values for local_af are: IPv4 = 0, IPv6 = 1.
+	results["web100_log_entry.connection_spec.local_af"] = int64(0)
+
 	var spec C.struct_web100_connection_spec
 	C.web100_get_connection_spec(conn, &spec)
 
 	addr := C.struct_in_addr{C.in_addr_t(spec.src_addr)}
 	results["web100_log_entry.connection_spec.local_ip"] = C.GoString(C.inet_ntoa(addr))
-	results["web100_log_entry.connection_spec.local_port"] = fmt.Sprintf("%d", spec.src_port)
+	results["web100_log_entry.connection_spec.local_port"] = int64(spec.src_port)
 
 	addr = C.struct_in_addr{C.in_addr_t(spec.dst_addr)}
 	results["web100_log_entry.connection_spec.remote_ip"] = C.GoString(C.inet_ntoa(addr))
-	results["web100_log_entry.connection_spec.remote_port"] = fmt.Sprintf("%d", spec.dst_port)
+	results["web100_log_entry.connection_spec.remote_port"] = int64(spec.dst_port)
 
 	return results, nil
 }
 
-// SnapValues converts all variables in the latest snap record into a results
-// map.
-func (w *Web100) SnapValues(legacyNames map[string]string) (map[string]string, error) {
+// snapValues converts all variables in the latest snap record into a results map.
+func (w *Web100) snapValues(logValues map[string]bigquery.Value, legacyNames map[string]string) (map[string]bigquery.Value, error) {
 	log := (*C.web100_log)(w.log)
 	snap := (*C.web100_snapshot)(w.snap)
-
-	results := make(map[string]string)
 
 	var_text := C.calloc(2*C.WEB100_VALUE_LEN_MAX, 1) // Use a better size.
 	defer C.free(var_text)
@@ -149,30 +136,43 @@ func (w *Web100) SnapValues(legacyNames map[string]string) (map[string]string, e
 	for v := C.web100_var_head(group); v != nil; v = C.web100_var_next(v) {
 
 		name := C.web100_get_var_name(v)
-		var_size := C.web100_get_var_size(v)
+		// var_size := C.web100_get_var_size(v)
 		var_type := C.web100_get_var_type(v)
 
 		// Read the raw variable data from the snapshot data.
-		err := C.web100_snap_read(v, snap, var_data)
-		if err != C.WEB100_ERR_SUCCESS {
-			return nil, fmt.Errorf(C.GoString(C.web100_strerror(err)))
+		errno := C.web100_snap_read(v, snap, var_data)
+		if errno != C.WEB100_ERR_SUCCESS {
+			return nil, fmt.Errorf(C.GoString(C.web100_strerror(errno)))
 		}
 
 		// Convert raw var_data into a string based on var_type.
+		// TODO(final): ultimately, we should reimplement web100_value_to_textn to operate on Go types.
 		C.web100_value_to_textn((*C.char)(var_text), C.WEB100_VALUE_LEN_MAX, (C.WEB100_TYPE)(var_type), var_data)
-		newName := C.GoString(name)
-		if _, ok := legacyNames[newName]; ok {
-			newName = legacyNames[newName]
-		}
-		results[fmt.Sprintf("web100_log_entry.snap.%s", newName)] = C.GoString((*C.char)(var_text))
 
-		fmt.Printf("name: %-20s type: %d %d size %d: %-30s ", C.GoString(name), C.WEB100_TYPE_INTEGER32, var_type, var_size,
-			C.GoString((*C.char)(var_text)))
-		C.print_bytes(var_size, var_data)
-		fmt.Printf("\n")
+		// Use the canonical variable name.
+		var canonicalName string
+		if _, ok := legacyNames[canonicalName]; ok {
+			canonicalName = legacyNames[canonicalName]
+		} else {
+			canonicalName = C.GoString(name)
+		}
+
+		// Attempt to convert the current variable to an int64.
+		value, err := strconv.ParseInt(C.GoString((*C.char)(var_text)), 10, 64)
+		if err != nil {
+			// Leave variable as a string.
+			logValues[fmt.Sprintf("web100_log_entry.snap.%s", canonicalName)] = C.GoString((*C.char)(var_text))
+		} else {
+			//
+			logValues[fmt.Sprintf("web100_log_entry.snap.%s", canonicalName)] = value
+		}
+
+		// fmt.Printf("name: %-20s type: %d %d size %d: %-30s ", C.GoString(name), C.WEB100_TYPE_INTEGER32, var_type, var_size,
+		// 	C.GoString((*C.char)(var_text)))
+		// fmt.Printf("\n")
 	}
 
-	return results, nil
+	return logValues, nil
 }
 
 // Close releases resources created by Open.
