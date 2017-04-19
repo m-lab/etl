@@ -107,7 +107,7 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 
 	rdr := obj.Body
 	var closer io.Closer = obj.Body
-	// Is it a tar.gz or tgz file?
+	// Handle .tar.gz, .tgz files.
 	if strings.HasSuffix(strings.ToLower(fn), "gz") {
 		// TODO add unit test
 		// NB: This must not be :=, or it creates local rdr.
