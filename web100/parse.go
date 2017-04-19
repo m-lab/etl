@@ -1,4 +1,4 @@
-package web100lib
+package web100
 
 import (
 	"io"

@@ -1,4 +1,4 @@
-// web100_cli provides a simple CLI interface to web100lib functions.
+// web100_cli provides a simple CLI interface to web100 functions.
 package main
 
 import (
@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/etl/web100lib"
+	"github.com/m-lab/etl/web100"
 )
 
 var (
@@ -33,13 +33,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	legacyNames, err := web100lib.ParseWeb100Definitions(k)
+	legacyNames, err := web100.ParseWeb100Definitions(k)
 	if err != nil {
 		panic(err)
 	}
 
 	// Open web100 snapshot log.
-	w, err := web100lib.Open(*filename, legacyNames)
+	w, err := web100.Open(*filename, legacyNames)
 	if err != nil {
 		panic(err)
 	}
