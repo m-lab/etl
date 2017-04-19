@@ -32,6 +32,9 @@ import (
 
 // Web100 maintains state associated with a web100 log file.
 type Web100 struct {
+	// legacyNames maps legacy web100 variable names to their canonical names.
+	legacyNames map[string]string
+
 	// Do not export unsafe pointers.
 	log  unsafe.Pointer
 	snap unsafe.Pointer
@@ -39,7 +42,7 @@ type Web100 struct {
 
 // Open prepares a web100 log file for reading. The caller must call Close on
 // the returned Web100 instance to release resources.
-func Open(filename string) (*Web100, error) {
+func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	c_filename := C.CString(filename)
 	defer C.free(unsafe.Pointer(c_filename))
 
@@ -52,8 +55,9 @@ func Open(filename string) (*Web100, error) {
 	snap := C.web100_snapshot_alloc_from_log(log)
 
 	w := &Web100{
-		log:  unsafe.Pointer(log),
-		snap: unsafe.Pointer(snap),
+		legacyNames: legacyNames,
+		log:         unsafe.Pointer(log),
+		snap:        unsafe.Pointer(snap),
 	}
 	return w, nil
 }
@@ -75,12 +79,12 @@ func (w *Web100) Next() error {
 	return nil
 }
 
-func (w *Web100) Values(legacyNames map[string]string) (map[string]bigquery.Value, error) {
+func (w *Web100) Values() (map[string]bigquery.Value, error) {
 	v, err := w.logValues()
 	if err != nil {
 		return nil, err
 	}
-	v, err = w.snapValues(v, legacyNames)
+	v, err = w.snapValues(v)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +125,7 @@ func (w *Web100) logValues() (map[string]bigquery.Value, error) {
 }
 
 // snapValues converts all variables in the latest snap record into a results map.
-func (w *Web100) snapValues(logValues map[string]bigquery.Value, legacyNames map[string]string) (map[string]bigquery.Value, error) {
+func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]bigquery.Value, error) {
 	log := (*C.web100_log)(w.log)
 	snap := (*C.web100_snapshot)(w.snap)
 
@@ -136,7 +140,6 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value, legacyNames map
 	for v := C.web100_var_head(group); v != nil; v = C.web100_var_next(v) {
 
 		name := C.web100_get_var_name(v)
-		// var_size := C.web100_get_var_size(v)
 		var_type := C.web100_get_var_type(v)
 
 		// Read the raw variable data from the snapshot data.
@@ -151,8 +154,8 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value, legacyNames map
 
 		// Use the canonical variable name.
 		var canonicalName string
-		if _, ok := legacyNames[canonicalName]; ok {
-			canonicalName = legacyNames[canonicalName]
+		if _, ok := w.legacyNames[canonicalName]; ok {
+			canonicalName = w.legacyNames[canonicalName]
 		} else {
 			canonicalName = C.GoString(name)
 		}
@@ -161,17 +164,13 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value, legacyNames map
 		value, err := strconv.ParseInt(C.GoString((*C.char)(var_text)), 10, 64)
 		if err != nil {
 			// Leave variable as a string.
+			fmt.Println("var_type:", int(var_type), "name:", canonicalName)
 			logValues[fmt.Sprintf("web100_log_entry.snap.%s", canonicalName)] = C.GoString((*C.char)(var_text))
 		} else {
 			//
 			logValues[fmt.Sprintf("web100_log_entry.snap.%s", canonicalName)] = value
 		}
-
-		// fmt.Printf("name: %-20s type: %d %d size %d: %-30s ", C.GoString(name), C.WEB100_TYPE_INTEGER32, var_type, var_size,
-		// 	C.GoString((*C.char)(var_text)))
-		// fmt.Printf("\n")
 	}
-
 	return logValues, nil
 }
 
