@@ -27,9 +27,15 @@ func TestPlumbing(t *testing.T) {
 	}
 }
 
+type NullCloser struct{}
+
+func (nc NullCloser) Close() error {
+	return nil
+}
+
 // Create a TarReader with simple test contents.
 // TODO - could we break the dependency on storage here?
-func MakeTestTar(t *testing.T) storage.TarReader {
+func MakeTestSource(t *testing.T) *storage.ETLSource {
 	b := new(bytes.Buffer)
 	tw := tar.NewWriter(b)
 	hdr := tar.Header{Name: "foo", Mode: 0666, Typeflag: tar.TypeReg, Size: int64(8)}
@@ -46,7 +52,7 @@ func MakeTestTar(t *testing.T) storage.TarReader {
 		t.Fatal(err)
 	}
 
-	return tar.NewReader(b)
+	return &storage.ETLSource{tar.NewReader(b), NullCloser{}}
 }
 
 type TestParser struct {
@@ -63,7 +69,7 @@ func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, tab
 // TODO(dev) - add unit tests for tgz and tar.gz files
 // TODO(dev) - add good comments
 func TestTarFileInput(t *testing.T) {
-	rdr := MakeTestTar(t)
+	rdr := MakeTestSource(t)
 
 	var prsr TestParser
 	in := bq.NullInserter{}
@@ -91,7 +97,8 @@ func TestTarFileInput(t *testing.T) {
 	}
 
 	// Reset the tar reader and create new task, to test the ProcessAllTests behavior.
-	rdr = MakeTestTar(t)
+	rdr = MakeTestSource(t)
+
 	tt = task.NewTask("filename", rdr, &prsr, &in, "test_table")
 	tt.ProcessAllTests()
 
