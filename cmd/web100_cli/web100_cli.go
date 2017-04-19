@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/web100lib"
 )
 
@@ -16,7 +17,7 @@ var (
 	tcpKis   = flag.String("tcp-kis", "tcp-kis.txt", "tcp-kis.txt filename.")
 )
 
-func PrettyPrint(results map[string]string) {
+func PrettyPrint(results map[string]bigquery.Value) {
 	b, err := json.MarshalIndent(results, "", "  ")
 	if err != nil {
 		fmt.Println("error:", err)
@@ -45,11 +46,11 @@ func main() {
 	}
 
 	// Get connection spec values.
-	results, err := w.LogValues()
-	if err != nil {
-		panic(err)
-	}
-	PrettyPrint(results)
+	// results, err := w.LogValues()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// PrettyPrint(results)
 
 	// Find the last web100 snapshot.
 	for {
@@ -57,16 +58,21 @@ func main() {
 		if err != nil {
 			break
 		}
+		results, err := w.Values(legacyNames)
+		if err != nil {
+			panic(err)
+		}
+		PrettyPrint(results)
 	}
 	if err != io.EOF {
 		panic(err)
 	}
 
 	// Get results.
-	results, err = w.SnapValues(legacyNames)
-	if err != nil {
-		panic(err)
-	}
-	PrettyPrint(results)
+	// results, err = w.SnapValues(legacyNames)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// PrettyPrint(results)
 	fmt.Printf("%#v\n", w)
 }
