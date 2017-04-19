@@ -79,7 +79,7 @@ var errNoClient = errors.New("client should be non-null")
 // uri should be of form gs://bucket/filename.tar or gs://bucket/filename.tgz
 // FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
 // TODO(now) rename
-func NewGCSTarReader(client *http.Client, uri string) (*ETLSource, error) {
+func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	if client == nil {
 		return nil, errNoClient
 	}

@@ -19,21 +19,21 @@ import (
 
 // TODO(dev) Add unit tests for meta data.
 type Task struct {
-	*storage.ETLSource                           // Tar reader from which to read tests.
+	*storage.ETLSource                           // Source from which to read tests.
 	parser.Parser                                // Parser to parse the tests.
 	bq.Inserter                                  // provides InsertRows(...)
 	table              string                    // The table to insert rows into, INCLUDING the partition!
 	meta               map[string]bigquery.Value // Metadata about this task.
 }
 
-// NewTask constructs a task, injecting the tar reader and the parser.
-func NewTask(filename string, rdr *storage.ETLSource, prsr parser.Parser, inserter bq.Inserter, table string) *Task {
+// NewTask constructs a task, injecting the source and the parser.
+func NewTask(filename string, src *storage.ETLSource, prsr parser.Parser, inserter bq.Inserter, table string) *Task {
 	// TODO - should the meta data be a nested type?
 	meta := make(map[string]bigquery.Value, 3)
 	meta["filename"] = filename
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
-	t := Task{rdr, prsr, inserter, table, meta}
+	t := Task{src, prsr, inserter, table, meta}
 	return &t
 }
 

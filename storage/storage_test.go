@@ -16,12 +16,12 @@ func TestGetObject(t *testing.T) {
 }
 
 func TestNewTarReader(t *testing.T) {
-	reader, err := NewGCSTarReader(client, "gs://m-lab-sandbox/test.tar")
+	src, err := NewETLSource(client, "gs://m-lab-sandbox/test.tar")
 	if err != nil {
 		t.Fatal(err)
 	}
 	count := 0
-	for _, _, err := reader.NextTest(); err != io.EOF; _, _, err = reader.NextTest() {
+	for _, _, err := src.NextTest(); err != io.EOF; _, _, err = src.NextTest() {
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -30,16 +30,16 @@ func TestNewTarReader(t *testing.T) {
 	if count != 3 {
 		t.Error("Wrong number of files: ", count)
 	}
-	reader.Close()
+	src.Close()
 }
 
 func TestNewTarReaderGzip(t *testing.T) {
-	reader, err := NewGCSTarReader(client, "gs://m-lab-sandbox/test.tgz")
+	src, err := NewETLSource(client, "gs://m-lab-sandbox/test.tgz")
 	if err != nil {
 		t.Fatal(err)
 	}
 	count := 0
-	for _, _, err := reader.NextTest(); err != io.EOF; _, _, err = reader.NextTest() {
+	for _, _, err := src.NextTest(); err != io.EOF; _, _, err = src.NextTest() {
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -48,7 +48,7 @@ func TestNewTarReaderGzip(t *testing.T) {
 	if count != 3 {
 		t.Error("Wrong number of files: ", count)
 	}
-	reader.Close()
+	src.Close()
 }
 
 // Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
@@ -64,16 +64,16 @@ func init() {
 
 func BenchmarkNewTarReader(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		reader, _ := NewGCSTarReader(client, "gs://m-lab-sandbox/test.tar")
+		src, _ := NewETLSource(client, "gs://m-lab-sandbox/test.tar")
 		// Omitting the Close doesn't seem to cause any problems.  Is that really true?
-		reader.Close()
+		src.Close()
 	}
 }
 
 func BenchmarkNewTarReaderGzip(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		reader, _ := NewGCSTarReader(client, "gs://m-lab-sandbox/test.tgz")
+		src, _ := NewETLSource(client, "gs://m-lab-sandbox/test.tgz")
 		// Omitting the Close doesn't seem to cause any problems.  Is that really true?
-		reader.Close()
+		src.Close()
 	}
 }
