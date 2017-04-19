@@ -164,7 +164,6 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 		value, err := strconv.ParseInt(C.GoString((*C.char)(var_text)), 10, 64)
 		if err != nil {
 			// Leave variable as a string.
-			fmt.Println("var_type:", int(var_type), "name:", canonicalName)
 			logValues[fmt.Sprintf("web100_log_entry.snap.%s", canonicalName)] = C.GoString((*C.char)(var_text))
 		} else {
 			//
