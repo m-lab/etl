@@ -82,8 +82,8 @@ func Open(filename string) (*Web100, error) {
 	return w, nil
 }
 
-// Next iterates through the web100 log file and returns the next snapshot
-// record in the form of a map.
+// Next iterates through the web100 log file reading the next snapshot record
+// until EOF or an error occurs.
 func (w *Web100) Next() error {
 	log := (*C.web100_log)(w.log)
 	snap := (*C.web100_snapshot)(w.snap)
