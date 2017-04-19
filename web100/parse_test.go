@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// tcpKisTxt is a snippet from the tcp-kis.txt file. It includes variables with
+// shortTcpKisTxt is a snippet from the tcp-kis.txt file. It includes variables with
 // two legacy names, a single legacy name, and no legacy name.
-var tcpKisTxt = `
+const shortTcpKisTxt = `
 ------------------------------------------------------------------------------
 VariableName:	StartTimeStamp
 Scope:		both
@@ -52,7 +52,7 @@ func TestParseWeb100Definitions(t *testing.T) {
 		"StartTimeSec": "StartTimeStamp",
 	}
 
-	r := bytes.NewBufferString(tcpKisTxt)
+	r := bytes.NewBufferString(shortTcpKisTxt)
 	actualNames, err := ParseWeb100Definitions(r)
 	if err != nil {
 		t.Fatalf(err.Error())
