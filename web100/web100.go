@@ -1,5 +1,5 @@
-// web100lib provides Go bindings to some functions in the web100 library.
-package web100lib
+// web100 provides Go bindings to some functions in the web100 library.
+package web100
 
 // Cgo directives must immediately preceed 'import "C"' below.
 // For more information see:
