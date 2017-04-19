@@ -28,13 +28,6 @@ func PrettyPrint(results map[string]bigquery.Value) {
 func main() {
 	flag.Parse()
 
-	// Open web100 snapshot log.
-	w, err := web100lib.Open(*filename)
-	if err != nil {
-		panic(err)
-	}
-	defer w.Close()
-
 	// Parse tcp-kis.txt variable definitions.
 	k, err := os.Open(*tcpKis)
 	if err != nil {
@@ -45,28 +38,28 @@ func main() {
 		panic(err)
 	}
 
-	// Get connection spec values.
-	// results, err := w.LogValues()
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// PrettyPrint(results)
+	// Open web100 snapshot log.
+	w, err := web100lib.Open(*filename, legacyNames)
+	if err != nil {
+		panic(err)
+	}
+	defer w.Close()
 
-	// Find the last web100 snapshot.
+	// Find all last web100 snapshot.
 	for {
 		err = w.Next()
 		if err != nil {
 			break
 		}
-		results, err := w.Values(legacyNames)
-		if err != nil {
-			panic(err)
-		}
-		PrettyPrint(results)
 	}
 	if err != io.EOF {
 		panic(err)
 	}
+	results, err := w.Values()
+	if err != nil {
+		panic(err)
+	}
+	PrettyPrint(results)
 
 	// Get results.
 	// results, err = w.SnapValues(legacyNames)
@@ -74,5 +67,5 @@ func main() {
 	// 	panic(err)
 	// }
 	// PrettyPrint(results)
-	fmt.Printf("%#v\n", w)
+	// fmt.Printf("%#v\n", w)
 }
