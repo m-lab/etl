@@ -101,5 +101,9 @@ func (tt *Task) ProcessAllTests() {
 	}
 	// TODO - make this debug or remove
 	log.Printf("%d tests, %d inserts", tests, inserts)
+	err := tt.Flush(5*time.Second)
+	if err != nil {
+		log.Printf("%v", err)
+	}
 	return
 }
