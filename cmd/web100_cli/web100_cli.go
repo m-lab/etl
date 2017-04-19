@@ -51,6 +51,11 @@ func main() {
 		if err != nil {
 			break
 		}
+		results, err := w.Values(legacyNames)
+		if err != nil {
+			panic(err)
+		}
+		PrettyPrint(results)
 	}
 	if err != io.EOF {
 		panic(err)
