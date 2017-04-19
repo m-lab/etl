@@ -92,7 +92,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tr, err := storage.NewGCSTarReader(client, filename)
+	tr, err := storage.NewETLSource(client, filename)
 	if err != nil {
 		log.Printf("%v", err)
 		fmt.Fprintf(w, `{"message": "Problem opening file."}`)

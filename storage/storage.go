@@ -10,13 +10,15 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"errors"
-	"golang.org/x/net/context"
-	"golang.org/x/oauth2/google"
-	storage "google.golang.org/api/storage/v1"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
+
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2/google"
+	storage "google.golang.org/api/storage/v1"
 )
 
 type TarReader interface {
@@ -24,32 +26,60 @@ type TarReader interface {
 	Read(b []byte) (int, error)
 }
 
-type TarReaderCloser struct {
+type ETLSource struct {
 	TarReader
+	io.Closer
+}
+
+// Next reads the next test object from the tar file.
+// Returns io.EOF when there are no more tests.
+func (rr *ETLSource) NextTest() (string, []byte, error) {
+	h, err := rr.Next()
+	if err != nil {
+		return "", nil, err
+	}
+	if h.Typeflag != tar.TypeReg {
+		return h.Name, nil, nil
+	}
+	var data []byte
+	if strings.HasSuffix(strings.ToLower(h.Name), "gz") {
+		// TODO add unit test
+		zipReader, err := gzip.NewReader(rr)
+		if err != nil {
+			return h.Name, nil, err
+		}
+		defer zipReader.Close()
+		data, err = ioutil.ReadAll(zipReader)
+	} else {
+		data, err = ioutil.ReadAll(rr)
+	}
+	if err != nil {
+		return h.Name, nil, err
+	}
+	return h.Name, data, nil
+}
+
+// Compound closer, for use with gzip files.
+type Closer struct {
 	zipper io.Closer // Must be non-null
 	body   io.Closer // Must be non-null
 }
 
-// Implement io.Closer
-func (t *TarReaderCloser) Close() error {
+func (t *Closer) Close() error {
 	err := t.zipper.Close()
 	t.body.Close()
 	return err
 }
 
-type NullCloser struct{}
-
-func (c *NullCloser) Close() error { return nil }
-
 var errNoClient = errors.New("client should be non-null")
-var nullCloser io.Closer = new(NullCloser)
 
-// Create a tar.Reader suitable for injecting into Task.
+// Create a ETLSource suitable for injecting into Task.
 // Caller is responsible for calling Close on the returned object.
 //
 // uri should be of form gs://bucket/filename.tar or gs://bucket/filename.tgz
 // FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
-func NewGCSTarReader(client *http.Client, uri string) (*TarReaderCloser, error) {
+// TODO(now) rename
+func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	if client == nil {
 		return nil, errNoClient
 	}
@@ -75,11 +105,9 @@ func NewGCSTarReader(client *http.Client, uri string) (*TarReaderCloser, error) 
 		return nil, err
 	}
 
-	// Default nullCloser, if we don't need a gzip reader.
-	zc := nullCloser
-
 	rdr := obj.Body
-	// Is it a tar.gz or tgz file?
+	var closer io.Closer = obj.Body
+	// Handle .tar.gz, .tgz files.
 	if strings.HasSuffix(strings.ToLower(fn), "gz") {
 		// TODO add unit test
 		// NB: This must not be :=, or it creates local rdr.
@@ -89,11 +117,11 @@ func NewGCSTarReader(client *http.Client, uri string) (*TarReaderCloser, error) 
 			return nil, err
 		}
 
-		zc = rdr
+		closer = &Closer{rdr, obj.Body}
 	}
 	tarReader := tar.NewReader(rdr)
 
-	return &TarReaderCloser{tarReader, zc, obj.Body}, nil
+	return &ETLSource{tarReader, closer}, nil
 }
 
 // Create a storage reader client.
