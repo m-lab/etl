@@ -46,6 +46,7 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	c_filename := C.CString(filename)
 	defer C.free(unsafe.Pointer(c_filename))
 
+	// TODO(prod): do not require reading from a file. Accept a byte array.
 	log := C.web100_log_open_read(c_filename)
 	if log == nil {
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
@@ -113,6 +114,7 @@ func (w *Web100) logValues() (map[string]bigquery.Value, error) {
 	var spec C.struct_web100_connection_spec
 	C.web100_get_connection_spec(conn, &spec)
 
+	// TODO(prod): do not use inet_ntoa because it depends on a static internal buffer.
 	addr := C.struct_in_addr{C.in_addr_t(spec.src_addr)}
 	results["web100_log_entry.connection_spec.local_ip"] = C.GoString(C.inet_ntoa(addr))
 	results["web100_log_entry.connection_spec.local_port"] = int64(spec.src_port)
@@ -129,6 +131,7 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 	log := (*C.web100_log)(w.log)
 	snap := (*C.web100_snapshot)(w.snap)
 
+	// TODO(dev): do not re-allocate these buffers on every call.
 	var_text := C.calloc(2*C.WEB100_VALUE_LEN_MAX, 1) // Use a better size.
 	defer C.free(var_text)
 
@@ -149,7 +152,7 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 		}
 
 		// Convert raw var_data into a string based on var_type.
-		// TODO(final): ultimately, we should reimplement web100_value_to_textn to operate on Go types.
+		// TODO(prod): reimplement web100_value_to_textn to operate on Go types.
 		C.web100_value_to_textn((*C.char)(var_text), C.WEB100_VALUE_LEN_MAX, (C.WEB100_TYPE)(var_type), var_data)
 
 		// Use the canonical variable name.
@@ -166,7 +169,6 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 			// Leave variable as a string.
 			logValues[fmt.Sprintf("web100_log_entry.snap.%s", canonicalName)] = C.GoString((*C.char)(var_text))
 		} else {
-			//
 			logValues[fmt.Sprintf("web100_log_entry.snap.%s", canonicalName)] = value
 		}
 	}

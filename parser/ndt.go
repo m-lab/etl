@@ -16,6 +16,7 @@ type NDTParser struct {
 }
 
 func (n *NDTParser) Parse(fn string, table string, rawSnapLog []byte) (interface{}, error) {
+	// TODO(prod): do not write to a temporary file; operate on byte array directly.
 	// Write rawSnapLog to /mnt/tmpfs.
 	tmpFile := fmt.Sprintf("%s/%s", n.tmpDir, fn)
 	err := ioutil.WriteFile(tmpFile, rawSnapLog, 0644)
@@ -25,6 +26,7 @@ func (n *NDTParser) Parse(fn string, table string, rawSnapLog []byte) (interface
 	// TODO(dev): log possible remove errors.
 	defer os.Remove(tmpFile)
 
+	// TODO(dev): only do this once.
 	// Parse the tcp-kis.txt web100 variable definition file.
 	data, err := web100.Asset("tcp-kis.txt")
 	if err != nil {
