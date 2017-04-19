@@ -33,7 +33,7 @@ func TestNDTParser(t *testing.T) {
 		}
 	}
 	// TODO(dev): remove print of entire snaplog.
-	prettyPrint(r)
+	prettyPrint(results)
 }
 
 // TODO(dev): is there a better way to display these values?
