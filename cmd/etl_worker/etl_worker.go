@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/intf"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage"
@@ -103,9 +104,8 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tr.Close()
 
-	parser := new(parser.TestParser)
 	ins, err := bq.NewInserter(
-		bq.InserterParams{os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "with_meta", 10 * time.Second, 100})
+		intf.InserterParams{os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "with_meta", 10 * time.Second, 100})
 	if err != nil {
 		log.Printf("%v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
@@ -113,7 +113,9 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		return
 		// TODO - anything better we could do here?
 	}
-	tsk := task.NewTask(filename, tr, parser, ins, "test3")
+	// Create parser, injecting Inserter
+	p := parser.NewTestParser(ins)
+	tsk := task.NewTask(filename, tr, p, ins, "test3")
 
 	tsk.ProcessAllTests()
 

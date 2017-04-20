@@ -21,7 +21,7 @@ import (
 func TestPlumbing(t *testing.T) {
 	foo := [10]byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
 	p := parser.NullParser{}
-	_, err := p.Parse(nil, "foo", "table", foo[:])
+	err := p.Parse(nil, "foo", "table", foo[:])
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -60,10 +60,9 @@ type TestParser struct {
 	files []string
 }
 
-func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error) {
-	// TODO - pass filename through to BQ inserter
+func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) error {
 	tp.files = append(tp.files, testName)
-	return nil, nil
+	return nil
 }
 
 // TODO(dev) - add unit tests for tgz and tar.gz files

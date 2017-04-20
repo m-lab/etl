@@ -7,16 +7,19 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/m-lab/etl/intf"
 )
 
 //=====================================================================================
 //                       Parser Interface and implementations
 //=====================================================================================
 type Parser interface {
+	// meta - metadata from outside the test data.
 	// fn - Name of test file
 	// table - biq query table name (for metrics and error logging only)
 	// test - binary test data
-	Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error)
+	Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) error
 }
 
 //------------------------------------------------------------------------------------
@@ -24,9 +27,9 @@ type NullParser struct {
 	Parser
 }
 
-func (np *NullParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error) {
+func (np *NullParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) error {
 	testCount.With(prometheus.Labels{"table": table}).Inc()
-	return nil, nil
+	return nil
 }
 
 type FileNameSaver struct {
@@ -43,10 +46,15 @@ func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string,
 // underneath, containing meta data and "testname":"..."
 // TODO add tests
 type TestParser struct {
+	inserter intf.Inserter
 	Parser
 }
 
-func (np *TestParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error) {
+func NewTestParser(ins intf.Inserter) Parser {
+	return &TestParser{ins, nil}
+}
+
+func (np *TestParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) error {
 	testCount.With(prometheus.Labels{"table": table}).Inc()
 	log.Printf("Parsing %s", testName)
 	values := make(map[string]bigquery.Value, len(meta)+1)
@@ -55,7 +63,8 @@ func (np *TestParser) Parse(meta map[string]bigquery.Value, testName string, tab
 		values[k] = v
 	}
 	values["testname"] = testName
-	return FileNameSaver{values}, nil
+	np.inserter.InsertRows(FileNameSaver{values})
+	return nil
 }
 
 //=====================================================================================
