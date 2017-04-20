@@ -8,10 +8,10 @@ import (
 )
 
 // An Inserter provides:
-//   InsertRows - inserts one or more rows into BQ (or the insert buffer).
+//   InsertRows - inserts one or more rows into the insert buffer.
 //   Flush - flushes any rows in the buffer out to bigquery.
-//   InsertCount - returns the total count of rows passed through InsertRow.
-//   BufferSize - returns the count of rows currently in the buffer.
+//   Count - returns the count of rows currently in the buffer.
+//   RowsInBuffer - returns the count of rows currently in the buffer.
 type Inserter interface {
 	InsertRows(data interface{}) error
 	Flush() error
