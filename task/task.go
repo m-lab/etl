@@ -41,7 +41,7 @@ func NewTask(filename string, src *storage.ETLSource, prsr parser.Parser, insert
 // injected parser to parse them, and inserts them into bigquery (not yet implemented).
 func (tt *Task) ProcessAllTests() {
 	// TODO(dev) better error handling
-	defer tt.Flush(5 * time.Second)
+	defer tt.Flush()
 	tests := 0
 	files := 0
 	inserts := 0
@@ -74,7 +74,7 @@ func (tt *Task) ProcessAllTests() {
 		// TODO(dev) Aggregate rows into single insert request, here
 		// or in Inserter.
 		inserts += 1
-		err = tt.InsertRows(row, 5*time.Second)
+		err = tt.InsertRows(row)
 		if err != nil {
 			log.Printf("%v", err)
 			// Handle this error properly!
@@ -82,7 +82,7 @@ func (tt *Task) ProcessAllTests() {
 	}
 	// TODO - make this debug or remove
 	log.Printf("%d tests, %d inserts", tests, inserts)
-	err := tt.Flush(5 * time.Second)
+	err := tt.Flush()
 	if err != nil {
 		log.Printf("%v", err)
 	}

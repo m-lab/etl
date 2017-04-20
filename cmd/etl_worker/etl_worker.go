@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/metrics"
@@ -103,7 +104,8 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	defer tr.Close()
 
 	parser := new(parser.TestParser)
-	ins, err := bq.NewInserter(os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "with_meta")
+	ins, err := bq.NewInserter(
+		bq.InserterParams{os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "with_meta", 10 * time.Second, 100})
 	if err != nil {
 		log.Printf("%v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)

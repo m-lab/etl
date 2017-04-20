@@ -20,19 +20,25 @@ type Item struct {
 // TODO - use emulator when available.
 func TestInsert(t *testing.T) {
 	tag := "new"
-	items := []*Item{
+	items := [...]Item{
 		// Each item implements the ValueSaver interface.
 		{Name: tag + "_x0", Count: 17, Foobar: 44},
 		{Name: tag + "_x1", Count: 12, Foobar: 44},
 	}
 
-	in, err := NewInserter("mlab-sandbox", "mlab_sandbox", "test2")
+	in, err := NewInserter(
+		InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 100})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
 
-	if err = in.InsertRows(items, 10*time.Second); err != nil {
+	if err = in.InsertRows(items[:]); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to insert rows: %v\n", err)
 	}
+	// TODO - uncomment when this bug is resolved.
+	//if in.InsertCount() != 2 {
+	//	t.Error("Should have inserted two rows")
+	//}
+	in.Flush()
 }
