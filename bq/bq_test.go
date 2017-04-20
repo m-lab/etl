@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/m-lab/etl/intf"
 )
 
 // Item represents a row item.
@@ -27,7 +29,7 @@ func TestInsert(t *testing.T) {
 	}
 
 	in, err := NewInserter(
-		InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 100})
+		intf.InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 100})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return

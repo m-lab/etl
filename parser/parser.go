@@ -7,6 +7,8 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/m-lab/etl/intf"
 )
 
 //=====================================================================================
@@ -16,7 +18,7 @@ type Parser interface {
 	// meta - metadata, e.g. from the original tar file name.
 	// testName - Name of test file (typically extracted from a tar file)
 	// test - binary test data
-	Parse(meta map[string]bigquery.Value, testName string, test []byte) (interface{}, error)
+	Parse(meta map[string]bigquery.Value, testName string, test []byte) error
 
 	// The name of the table that this Parser inserts into.
 	// Used for metrics and logging.
@@ -51,10 +53,15 @@ func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string,
 // underneath, containing meta data and "testname":"..."
 // TODO add tests
 type TestParser struct {
+	inserter intf.Inserter
 	Parser
 }
 
-func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, test []byte) (interface{}, error) {
+func NewTestParser(ins intf.Inserter) Parser {
+	return &TestParser{ins, nil}
+}
+
+func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, test []byte) error {
 	testCount.With(prometheus.Labels{"table": tp.TableName()}).Inc()
 	log.Printf("Parsing %s", testName)
 	values := make(map[string]bigquery.Value, len(meta)+1)
@@ -63,7 +70,8 @@ func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, tes
 		values[k] = v
 	}
 	values["testname"] = testName
-	return FileNameSaver{values}, nil
+	tp.inserter.InsertRows(FileNameSaver{values})
+	return nil
 }
 
 func (tp *TestParser) TableName() string {
