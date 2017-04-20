@@ -104,6 +104,10 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	defer tr.Close()
 
 	parser := new(parser.TestParser)
+	// TODO(dev) Use a more thoughtful setting for buffer size.
+	// For now, 10K per row times 100 results is 1MB, which is an order of
+	// magnitude below our 10MB max, so 100 might not be such a bad
+	// default.
 	ins, err := bq.NewInserter(
 		bq.InserterParams{os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "with_meta", 10 * time.Second, 100})
 	if err != nil {

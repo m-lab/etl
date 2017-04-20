@@ -28,8 +28,8 @@ import (
 type Inserter interface {
 	InsertRows(data interface{}) error
 	Flush() error
-	InsertCount() int
-	BufferSize() int
+	Count() int
+	RowsInBuffer() int
 }
 
 type BQInserter struct {
@@ -39,20 +39,18 @@ type BQInserter struct {
 	uploader *bigquery.Uploader
 	timeout  time.Duration
 	rows     []interface{}
-	count    int
+	inserted int // Number of rows successfully inserted.
 }
 
 type InserterParams struct {
+	// These specify the google cloud project/dataset/table to write to.
 	Project    string
 	Dataset    string
 	Table      string
-	Timeout    time.Duration
-	BufferSize int
+	Timeout    time.Duration // max duration of backend calls.  (for context)
+	BufferSize int           // number of rows to buffer before writing to backend.
 }
 
-// TODO - Consider injecting the Client here, to allow broader unit testing options.
-// project, dataset, table - specifies the google cloud project/dataset/table
-// timeout - determines how long operations to the backend are allowed before failing.
 func NewInserter(params InserterParams) (Inserter, error) {
 
 	ctx, _ := context.WithTimeout(context.Background(), params.Timeout)
@@ -67,38 +65,38 @@ func NewInserter(params InserterParams) (Inserter, error) {
 	return &in, nil
 }
 
+// Caller should check error, and take appropriate action before calling again.
 func (in *BQInserter) InsertRows(data interface{}) error {
 	in.rows = append(in.rows, data)
-	// TODO(dev) a sensible value should go here, but a quick estimate
-	// of 10K per row times 100 results is 1MB, which is an order of
-	// magnitude below our 10MB max, so 100 might not be such a bad
-	// default.
-	if len(in.rows) > 100 {
+	if len(in.rows) >= in.params.BufferSize {
 		return in.Flush()
 	} else {
 		return nil
 	}
 }
 
+// TODO(dev) Should have a recovery mechanism for failed inserts.
 func (in *BQInserter) Flush() error {
 	if len(in.rows) == 0 {
 		return nil
 	}
-	outRows := in.rows
-	in.rows = []interface{}{}
-	in.count += len(outRows)
 
 	// This is heavyweight, and may run forever without a context deadline.
 	ctx, _ := context.WithTimeout(context.Background(), in.timeout)
-	return in.uploader.Put(ctx, outRows)
+	err := in.uploader.Put(ctx, in.rows)
+	if err == nil {
+		in.inserted += len(in.rows)
+		in.rows = make([]interface{}, in.params.BufferSize)
+	}
+	return err
 }
 
-func (in *BQInserter) BufferSize() int {
-	return in.count + len(in.rows)
+func (in *BQInserter) RowsInBuffer() int {
+	return len(in.rows)
 }
 
-func (in *BQInserter) InsertCount() int {
-	return in.count
+func (in *BQInserter) Count() int {
+	return in.inserted + len(in.rows)
 }
 
 type NullInserter struct {
