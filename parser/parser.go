@@ -13,10 +13,14 @@ import (
 //                       Parser Interface and implementations
 //=====================================================================================
 type Parser interface {
-	// fn - Name of test file
-	// table - biq query table name (for metrics and error logging only)
+	// meta - metadata, e.g. from the original tar file name.
+	// testName - Name of test file (typically extracted from a tar file)
 	// test - binary test data
-	Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error)
+	Parse(meta map[string]bigquery.Value, testName string, test []byte) (interface{}, error)
+
+	// The name of the table that this Parser inserts into.
+	// Used for metrics and logging.
+	TableName() string
 }
 
 //------------------------------------------------------------------------------------
@@ -24,9 +28,13 @@ type NullParser struct {
 	Parser
 }
 
-func (np *NullParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error) {
-	testCount.With(prometheus.Labels{"table": table}).Inc()
+func (np *NullParser) Parse(meta map[string]bigquery.Value, testName string, test []byte) (interface{}, error) {
+	testCount.With(prometheus.Labels{"table": np.TableName()}).Inc()
 	return nil, nil
+}
+
+func (np *NullParser) TableName() string {
+	return "null-table"
 }
 
 type FileNameSaver struct {
@@ -46,8 +54,8 @@ type TestParser struct {
 	Parser
 }
 
-func (np *TestParser) Parse(meta map[string]bigquery.Value, testName string, table string, test []byte) (interface{}, error) {
-	testCount.With(prometheus.Labels{"table": table}).Inc()
+func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, test []byte) (interface{}, error) {
+	testCount.With(prometheus.Labels{"table": tp.TableName()}).Inc()
 	log.Printf("Parsing %s", testName)
 	values := make(map[string]bigquery.Value, len(meta)+1)
 	// TODO is there a better way to do this?
@@ -56,6 +64,10 @@ func (np *TestParser) Parse(meta map[string]bigquery.Value, testName string, tab
 	}
 	values["testname"] = testName
 	return FileNameSaver{values}, nil
+}
+
+func (tp *TestParser) TableName() string {
+	return "test-table"
 }
 
 //=====================================================================================

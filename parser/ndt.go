@@ -13,10 +13,11 @@ import (
 
 type NDTParser struct {
 	Parser
-	tmpDir string
+	tmpDir    string
+	tableName string
 }
 
-func (n *NDTParser) Parse(meta map[string]bigquery.Value, testName string, table string, rawSnapLog []byte) (interface{}, error) {
+func (n *NDTParser) Parse(meta map[string]bigquery.Value, testName string, rawSnapLog []byte) (interface{}, error) {
 	// TODO(prod): do not write to a temporary file; operate on byte array directly.
 	// Write rawSnapLog to /mnt/tmpfs.
 	tmpFile := fmt.Sprintf("%s/%s", n.tmpDir, testName)
@@ -65,4 +66,9 @@ func (n *NDTParser) Parse(meta map[string]bigquery.Value, testName string, table
 		return nil, err
 	}
 	return results, nil
+}
+
+// TODO(dev) TableName should come from initialization params.
+func (n *NDTParser) TableName() string {
+	return n.tableName
 }
