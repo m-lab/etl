@@ -1,5 +1,10 @@
 package fake
 
+//========================================================================================
+// This file contains code pulled from bigquery golang libraries, to support emulating the
+// Uploader function.
+//========================================================================================
+
 // This file was copied from https://go.googlesource.com/go/+/go1.7.3/src/encoding/json/fold.go.
 // Only the license and package were changed.
 

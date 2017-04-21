@@ -1,5 +1,9 @@
 package fake
 
+//========================================================================================
+// This file contains code pulled from bigquery golang libraries, to support emulating the
+// Uploader function.
+//========================================================================================
 import (
 	"sync"
 	"sync/atomic"
