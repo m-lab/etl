@@ -8,14 +8,14 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/m-lab/etl/intf"
+	"github.com/m-lab/etl/etl"
 )
 
 //=====================================================================================
 //                       Parser implementations
 //=====================================================================================
 type NullParser struct {
-	intf.Parser
+	etl.Parser
 }
 
 func (np *NullParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
@@ -41,11 +41,11 @@ func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string,
 // underneath, containing meta data and "testname":"..."
 // TODO add tests
 type TestParser struct {
-	inserter intf.Inserter
-	intf.Parser
+	inserter etl.Inserter
+	etl.Parser
 }
 
-func NewTestParser(ins intf.Inserter) intf.Parser {
+func NewTestParser(ins etl.Inserter) etl.Parser {
 	return &TestParser{ins, nil}
 }
 

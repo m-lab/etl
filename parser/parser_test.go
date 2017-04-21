@@ -8,14 +8,14 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/intf"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 )
 
 // countingInserter counts the calls to InsertRows and Flush.
 // Inject into Parser for testing.
 type countingInserter struct {
-	intf.Inserter
+	etl.Inserter
 	CallCount  int
 	RowCount   int
 	FlushCount int
@@ -40,7 +40,7 @@ func (ti *countingInserter) Flush() error {
 func TestPlumbing(t *testing.T) {
 	foo := [10]byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
 	ti := countingInserter{}
-	var p intf.Parser
+	var p etl.Parser
 	p = parser.NewTestParser(&ti)
 	err := p.ParseAndInsert(nil, "foo", foo[:])
 	if err != nil {

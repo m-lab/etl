@@ -12,21 +12,21 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/intf"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/storage"
 )
 
 // TODO(dev) Add unit tests for meta data.
 type Task struct {
 	*storage.ETLSource                           // Source from which to read tests.
-	intf.Parser                                  // Parser to parse the tests.
-	intf.Inserter                                // provides InsertRows(...)
+	etl.Parser                                   // Parser to parse the tests.
+	etl.Inserter                                 // provides InsertRows(...)
 	table              string                    // The table to insert rows into, INCLUDING the partition!
 	meta               map[string]bigquery.Value // Metadata about this task.
 }
 
 // NewTask constructs a task, injecting the source and the parser.
-func NewTask(filename string, src *storage.ETLSource, prsr intf.Parser, inserter intf.Inserter, table string) *Task {
+func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser, inserter etl.Inserter, table string) *Task {
 	// TODO - should the meta data be a nested type?
 	meta := make(map[string]bigquery.Value, 3)
 	meta["filename"] = filename

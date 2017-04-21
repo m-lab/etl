@@ -12,7 +12,7 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/bq"
-	"github.com/m-lab/etl/intf"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage" // TODO - would be better not to have this.
 	"github.com/m-lab/etl/task"
@@ -57,7 +57,7 @@ func MakeTestSource(t *testing.T) *storage.ETLSource {
 }
 
 type TestParser struct {
-	intf.Parser
+	etl.Parser
 	files []string
 }
 

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/fake"
-	"github.com/m-lab/etl/intf"
 )
 
 // Item represents a row item.
@@ -28,7 +28,7 @@ func TestInsert(t *testing.T) {
 	items = append(items, &Item{Name: tag + "_x1", Count: 12, Foobar: 44})
 
 	in, err := fake.NewFakeInserter(
-		intf.InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 100})
+		etl.InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 100})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
