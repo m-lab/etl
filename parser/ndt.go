@@ -16,10 +16,10 @@ type NDTParser struct {
 	tmpDir string
 }
 
-func (n *NDTParser) Parse(meta map[string]bigquery.Value, fn string, table string, rawSnapLog []byte) (interface{}, error) {
+func (n *NDTParser) Parse(meta map[string]bigquery.Value, testName string, table string, rawSnapLog []byte) (interface{}, error) {
 	// TODO(prod): do not write to a temporary file; operate on byte array directly.
 	// Write rawSnapLog to /mnt/tmpfs.
-	tmpFile := fmt.Sprintf("%s/%s", n.tmpDir, fn)
+	tmpFile := fmt.Sprintf("%s/%s", n.tmpDir, testName)
 	err := ioutil.WriteFile(tmpFile, rawSnapLog, 0644)
 	if err != nil {
 		return nil, err
