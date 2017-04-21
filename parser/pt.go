@@ -103,9 +103,9 @@ func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, table
 			continue
 		}
 		if is_first_line {
-			fmt.Println("here")
 			is_first_line = false
-			// Handle the first line
+			// Handle the first line, like
+			// "traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s"
 			parts := strings.Split(oneLine, ",")
 			// check protocol
 			// check algo
@@ -130,11 +130,13 @@ func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, table
 			}
 		} else {
 			// Handle each line of hops
+			// Handle icmp
+			// Handle tcp or udp
 
 		}
 	}
 
-        if err := scanner.Err(); err != nil {
+	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
 
