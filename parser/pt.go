@@ -2,11 +2,14 @@
 package parser
 
 import (
+	"bufio"
 	"cloud.google.com/go/bigquery"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 type PTFileName struct {
@@ -27,7 +30,8 @@ func (f *PTFileName) GetIPTuple() (string, string, string, string) {
 }
 
 func (f *PTFileName) GetDate() string {
-	return f.name[0:8]
+	// Return date string in format "20170320T23:53:10Z"
+	return f.name[0:18]
 }
 
 type FileNameParser interface {
@@ -38,7 +42,7 @@ type FileNameParser interface {
 type PT struct {
 	test_id  string
 	project  int
-	log_time int
+	log_time int64
 	connection_spec
 }
 
@@ -47,7 +51,7 @@ type connection_spec struct {
 	server_af      int
 	client_ip      string
 	client_af      int
-	data_direction int
+	data_direction int // 0 for SERVER_TO_CLIENT
 }
 
 // Save implements the ValueSaver interface.
@@ -65,22 +69,76 @@ type PTParser struct {
 }
 
 func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, tableID string, rawContent []byte) (interface{}, error) {
-	tmpFile := fmt.Sprintf("%s/%s", pt.tmpDir, fileName)
-	err := ioutil.WriteFile(tmpFile, rawContent, 0644)
+	file, err := os.Open(fileName)
 	if err != nil {
 		return nil, err
 	}
-	// TODO(dev): log possible remove errors.
-	defer os.Remove(tmpFile)
+	defer file.Close()
+
+	// Get the logtime
+	fn := PTFileName{name: filepath.Base(fileName)}
+	date := fn.GetDate()
+	dest_IP, _, server_IP, _ := fn.GetIPTuple()
+
+	//layout := "2012-11-01T22:08:41+00:00"
+	// data is in format like "20170320T23:53:10Z"
+	revised_date := date[0:4] + "-" + date[4:6] + "-" + date[6:18]
+	fmt.Println(revised_date)
+	t, err := time.Parse(time.RFC3339, revised_date)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(t.Unix())
+
+	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
+	scanner := bufio.NewScanner(file)
+	is_first_line := true
+	protocal := "icmp"
+	for scanner.Scan() {
+		oneLine := strings.TrimSuffix(scanner.Text(), "\n")
+		fmt.Println(oneLine)
+		// Skip initial lines starting with #.
+		if oneLine[0] == '#' {
+			continue
+		}
+		if is_first_line {
+                        fmt.Println("here")
+			is_first_line = false
+			// Handle the first line
+			parts := strings.Split(oneLine, ",")
+			// check protocol
+			// check algo
+			for _, part := range parts {
+				mm := strings.Split(strings.TrimSpace(part), " ")
+                                fmt.Println(mm[0])
+				if mm[0] == "algo" {
+					if mm[1] != "exhaustive" {
+						log.Fatal("Unexpected algorithm")
+					}
+				}
+				if mm[0] == "protocol" {
+					if mm[1] != "icmp" && mm[1] != "udp" && mm[1] != "tcp" {
+						log.Fatal("Unknown protocol")
+					} else {
+						protocal = mm[1]
+						fmt.Println(protocal)
+					}
+				}
+			}
+		} else {
+			// Handle each line of hops
+		}
+	}
 
 	one_row := &PT{
 		test_id:  "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris.gz",
 		project:  3,
-		log_time: 1234,
+		log_time: t.Unix(),
 		connection_spec: connection_spec{
-			server_ip:      "1:2.3.4",
+			server_ip:      server_IP,
 			server_af:      2,
-			client_ip:      "4.3.2.1",
+			client_ip:      dest_IP,
 			client_af:      2,
 			data_direction: 0,
 		},
