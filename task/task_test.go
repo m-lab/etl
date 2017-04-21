@@ -12,6 +12,7 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/intf"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage" // TODO - would be better not to have this.
 	"github.com/m-lab/etl/task"
@@ -21,7 +22,7 @@ import (
 func TestPlumbing(t *testing.T) {
 	foo := [10]byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
 	p := parser.NullParser{}
-	err := p.Parse(nil, "foo", foo[:])
+	err := p.ParseAndInsert(nil, "foo", foo[:])
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -56,12 +57,12 @@ func MakeTestSource(t *testing.T) *storage.ETLSource {
 }
 
 type TestParser struct {
-	parser.Parser
+	intf.Parser
 	files []string
 }
 
-	// TODO - pass testName through to BQ inserter?
-func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, test []byte) error {
+// TODO - pass testName through to BQ inserter?
+func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	tp.files = append(tp.files, testName)
 	return nil
 }

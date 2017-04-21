@@ -33,8 +33,9 @@ func (ti *countingInserter) Flush() error {
 func TestPlumbing(t *testing.T) {
 	foo := [10]byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
 	ti := countingInserter{}
-	p := parser.NewTestParser(&ti)
-	err := p.Parse(nil, "foo", foo[:])
+	var p intf.Parser
+	p = parser.NewTestParser(&ti)
+	err := p.ParseAndInsert(nil, "foo", foo[:])
 	if err != nil {
 		fmt.Println(err)
 	}

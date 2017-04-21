@@ -1,6 +1,11 @@
+// etl package provides all interfaces that are used across other packages
+// in the project.
 package intf
 
-import "time"
+import (
+	"cloud.google.com/go/bigquery"
+	"time"
+)
 
 // An Inserter provides:
 //   InsertRows - inserts one or more rows into BQ (or the insert buffer).
@@ -22,4 +27,15 @@ type InserterParams struct {
 	Table      string
 	Timeout    time.Duration // max duration of backend calls.  (for context)
 	BufferSize int           // Number of rows to buffer before writing to backend.
+}
+
+type Parser interface {
+	// meta - metadata, e.g. from the original tar file name.
+	// testName - Name of test file (typically extracted from a tar file)
+	// test - binary test data
+	ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error
+
+	// The name of the table that this Parser inserts into.
+	// Used for metrics and logging.
+	TableName() string
 }
