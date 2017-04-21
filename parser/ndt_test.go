@@ -1,5 +1,7 @@
 package parser
 
+// TODO - use parser_test, to force proper package isolation.
+
 import (
 	"encoding/json"
 	"fmt"
@@ -13,8 +15,9 @@ func TestNDTParser(t *testing.T) {
 	// Load test data.
 	rawData, err := ioutil.ReadFile("testdata/c2s_snaplog")
 
-	n := NDTParser{tmpDir: "./"}
-	values, err := n.Parse("filename", "table", rawData)
+	var n Parser
+	n = &NDTParser{tmpDir: "./", tableName: "ndt-table"}
+	values, err := n.Parse(nil, "filename", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

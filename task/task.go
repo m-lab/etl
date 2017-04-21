@@ -65,7 +65,7 @@ func (tt *Task) ProcessAllTests() {
 			continue
 		}
 
-		row, err := tt.Parser.Parse(tt.meta, testname, tt.table, data)
+		row, err := tt.Parser.Parse(tt.meta, testname, data)
 		if err != nil {
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
