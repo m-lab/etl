@@ -1,19 +1,22 @@
-// etl package provides all interfaces that are used across other packages
-// in the project.
+// The etl package provides all major interfaces used across packages.
+// TODO move to etl/etl.go
 package intf
 
 import (
-	"cloud.google.com/go/bigquery"
 	"time"
+
+	"cloud.google.com/go/bigquery"
+	"golang.org/x/net/context"
 )
 
 // An Inserter provides:
-//   InsertRows - inserts one or more rows into BQ (or the insert buffer).
+//   InsertRows - inserts one or more rows into the insert buffer.
 //   Flush - flushes any rows in the buffer out to bigquery.
-//   InsertCount - returns the total count of rows passed through InsertRow.
-//   BufferSize - returns the count of rows currently in the buffer.
+//   Count - returns the count of rows currently in the buffer.
+//   RowsInBuffer - returns the count of rows currently in the buffer.
 type Inserter interface {
-	InsertRows(data interface{}) error
+	InsertRow(data interface{}) error
+	InsertRows(data []interface{}) error
 	Flush() error
 	Count() int
 	RowsInBuffer() int
@@ -38,4 +41,11 @@ type Parser interface {
 	// The name of the table that this Parser inserts into.
 	// Used for metrics and logging.
 	TableName() string
+}
+
+//========================================================================
+// Interfaces to allow fakes.
+//========================================================================
+type Uploader interface {
+	Put(ctx context.Context, src interface{}) error
 }

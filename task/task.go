@@ -66,11 +66,7 @@ func (tt *Task) ProcessAllTests() {
 		if err != nil {
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
-			continue
-		}
-		if err != nil {
-			log.Printf("%v", err)
-			// Handle this error properly!
+			break
 		}
 	}
 

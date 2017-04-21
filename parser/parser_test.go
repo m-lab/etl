@@ -17,11 +17,18 @@ import (
 type countingInserter struct {
 	intf.Inserter
 	CallCount  int
+	RowCount   int
 	FlushCount int
 }
 
-func (ti *countingInserter) InsertRows(data interface{}) error {
+func (ti *countingInserter) InsertRow(data interface{}) error {
 	ti.CallCount++
+	ti.RowCount++
+	return nil
+}
+func (ti *countingInserter) InsertRows(data []interface{}) error {
+	ti.CallCount++
+	ti.RowCount += len(data)
 	return nil
 }
 func (ti *countingInserter) Flush() error {

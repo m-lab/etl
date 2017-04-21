@@ -58,8 +58,7 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 		values[k] = v
 	}
 	values["testname"] = testName
-	tp.inserter.InsertRows(FileNameSaver{values})
-	return nil
+	return tp.inserter.InsertRow(FileNameSaver{values})
 }
 
 func (tp *TestParser) TableName() string {
