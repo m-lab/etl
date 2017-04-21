@@ -2,10 +2,8 @@
 package parser
 
 import (
-	//"bufio"
 	"cloud.google.com/go/bigquery"
 	"fmt"
-	//"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -67,19 +65,6 @@ type PTParser struct {
 }
 
 func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, tableID string, rawContent []byte) (interface{}, error) {
-	/*file, err := os.Open(fn)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
-	// We can get the logtime, local IP, local port, server IP, server port from fn directly
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		oneLine := strings.TrimSuffix(scanner.Text(), "\n")
-		fmt.Println(oneLine)
-	}*/
 	tmpFile := fmt.Sprintf("%s/%s", pt.tmpDir, fileName)
 	err := ioutil.WriteFile(tmpFile, rawContent, 0644)
 	if err != nil {
