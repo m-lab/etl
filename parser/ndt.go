@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/web100"
 )
 
@@ -15,7 +16,7 @@ type NDTParser struct {
 	tmpDir string
 }
 
-func (n *NDTParser) Parse(fn string, table string, rawSnapLog []byte) (interface{}, error) {
+func (n *NDTParser) Parse(meta map[string]bigquery.Value, fn string, table string, rawSnapLog []byte) (interface{}, error) {
 	// TODO(prod): do not write to a temporary file; operate on byte array directly.
 	// Write rawSnapLog to /mnt/tmpfs.
 	tmpFile := fmt.Sprintf("%s/%s", n.tmpDir, fn)
