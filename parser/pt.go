@@ -99,11 +99,11 @@ func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, table
 		oneLine := strings.TrimSuffix(scanner.Text(), "\n")
 		fmt.Println(oneLine)
 		// Skip initial lines starting with #.
-		if oneLine[0] == '#' {
+		if len(oneLine) == 0 || oneLine[0] == '#' {
 			continue
 		}
 		if is_first_line {
-                        fmt.Println("here")
+			fmt.Println("here")
 			is_first_line = false
 			// Handle the first line
 			parts := strings.Split(oneLine, ",")
@@ -111,24 +111,31 @@ func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, table
 			// check algo
 			for _, part := range parts {
 				mm := strings.Split(strings.TrimSpace(part), " ")
-                                fmt.Println(mm[0])
-				if mm[0] == "algo" {
-					if mm[1] != "exhaustive" {
-						log.Fatal("Unexpected algorithm")
+				if len(mm) > 1 {
+					fmt.Println(mm[0])
+					if mm[0] == "algo" {
+						if mm[1] != "exhaustive" {
+							log.Fatal("Unexpected algorithm")
+						}
 					}
-				}
-				if mm[0] == "protocol" {
-					if mm[1] != "icmp" && mm[1] != "udp" && mm[1] != "tcp" {
-						log.Fatal("Unknown protocol")
-					} else {
-						protocal = mm[1]
-						fmt.Println(protocal)
+					if mm[0] == "protocol" {
+						if mm[1] != "icmp" && mm[1] != "udp" && mm[1] != "tcp" {
+							log.Fatal("Unknown protocol")
+						} else {
+							protocal = mm[1]
+							fmt.Println(protocal)
+						}
 					}
 				}
 			}
 		} else {
 			// Handle each line of hops
+
 		}
+	}
+
+        if err := scanner.Err(); err != nil {
+		log.Fatal(err)
 	}
 
 	one_row := &PT{
