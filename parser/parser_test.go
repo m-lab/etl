@@ -12,19 +12,19 @@ import (
 	"github.com/m-lab/etl/parser"
 )
 
-// CountingInserter counts the calls to InsertRows and Flush.
+// countingInserter counts the calls to InsertRows and Flush.
 // Inject into Parser for testing.
-type CountingInserter struct {
+type countingInserter struct {
 	intf.Inserter
 	CallCount  int
 	FlushCount int
 }
 
-func (ti *CountingInserter) InsertRows(data interface{}) error {
+func (ti *countingInserter) InsertRows(data interface{}) error {
 	ti.CallCount++
 	return nil
 }
-func (ti *CountingInserter) Flush() error {
+func (ti *countingInserter) Flush() error {
 	ti.FlushCount++
 	return nil
 }
@@ -32,7 +32,7 @@ func (ti *CountingInserter) Flush() error {
 // Just test call to NullParser.Parser
 func TestPlumbing(t *testing.T) {
 	foo := [10]byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
-	ti := CountingInserter{}
+	ti := countingInserter{}
 	p := parser.NewTestParser(&ti)
 	err := p.Parse(nil, "foo", foo[:])
 	if err != nil {
