@@ -1,4 +1,4 @@
-package bq
+package bq_test
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/intf"
 )
 
@@ -22,20 +23,21 @@ type Item struct {
 // TODO - use emulator when available.
 func TestInsert(t *testing.T) {
 	tag := "new"
-	items := []Item{
-		// Each item implements the ValueSaver interface.
-		{Name: tag + "_x0", Count: 17, Foobar: 44},
-		{Name: tag + "_x1", Count: 12, Foobar: 44},
-	}
+	var items []interface{}
+	items = append(items, &Item{Name: tag + "_x0", Count: 17, Foobar: 44})
+	items = append(items, &Item{Name: tag + "_x1", Count: 12, Foobar: 44})
 
-	in, err := NewInserter(
+	in, err := fake.NewFakeInserter(
 		intf.InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 100})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
 
-	if err = in.InsertRows(items[:]); err != nil {
+	if err = in.InsertRow(Item{Name: tag + "_x0", Count: 17, Foobar: 44}); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to insert rows: %v\n", err)
+	}
+	if err = in.InsertRows(items); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to insert rows: %v\n", err)
 	}
 	// TODO - uncomment when this bug is resolved.

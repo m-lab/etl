@@ -109,7 +109,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// magnitude below our 10MB max, so 100 might not be such a bad
 	// default.
 	ins, err := bq.NewInserter(
-		intf.InserterParams{os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "with_meta", 10 * time.Second, 100})
+		intf.InserterParams{os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "with_meta", 10 * time.Second, 100}, nil)
 	if err != nil {
 		log.Printf("%v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
@@ -119,7 +119,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 	// Create parser, injecting Inserter
 	p := parser.NewTestParser(ins)
-	tsk := task.NewTask(filename, tr, p, ins, "test3")
+	tsk := task.NewTask(filename, tr, p, ins, "with_meta")
 
 	tsk.ProcessAllTests()
 

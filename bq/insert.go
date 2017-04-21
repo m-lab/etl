@@ -27,29 +27,42 @@ type BQInserter struct {
 	intf.Inserter
 	params   intf.InserterParams
 	client   *bigquery.Client
-	uploader *bigquery.Uploader
+	uploader intf.UploaderIntf // May be a BQ Uploader, or a test Uploader
 	timeout  time.Duration
 	rows     []interface{}
 	inserted int // Number of rows successfully inserted.
 }
 
-// TODO - Consider injecting the Client here, to allow broader unit testing options.
-func NewInserter(params intf.InserterParams) (intf.Inserter, error) {
-	ctx, _ := context.WithTimeout(context.Background(), params.Timeout)
-	// Heavyweight!
-	client, err := bigquery.NewClient(ctx, params.Project)
-	if err != nil {
-		return nil, err
-	}
+// Pass in nil uploader for normal use, custom uploader for custom behavior
+func NewInserter(params intf.InserterParams, uploader intf.UploaderIntf) (intf.Inserter, error) {
+	var client *bigquery.Client
+	if uploader == nil {
+		ctx, _ := context.WithTimeout(context.Background(), params.Timeout)
+		// Heavyweight!
+		client, err := bigquery.NewClient(ctx, params.Project)
+		if err != nil {
+			return nil, err
+		}
 
-	uploader := client.Dataset(params.Dataset).Table(params.Table).Uploader()
+		uploader = client.Dataset(params.Dataset).Table(params.Table).Uploader()
+	}
 	in := BQInserter{params: params, client: client, uploader: uploader, timeout: params.Timeout}
 	return &in, nil
 }
 
 // Caller should check error, and take appropriate action before calling again.
-func (in *BQInserter) InsertRows(data interface{}) error {
+func (in *BQInserter) InsertRow(data interface{}) error {
 	in.rows = append(in.rows, data)
+	if len(in.rows) >= in.params.BufferSize {
+		return in.Flush()
+	} else {
+		return nil
+	}
+}
+
+// Caller should check error, and take appropriate action before calling again.
+func (in *BQInserter) InsertRows(data []interface{}) error {
+	in.rows = append(in.rows, data...)
 	if len(in.rows) >= in.params.BufferSize {
 		return in.Flush()
 	} else {
@@ -85,7 +98,10 @@ type NullInserter struct {
 	intf.Inserter
 }
 
-func (in *NullInserter) InsertRows(data interface{}) error {
+func (in *NullInserter) InsertRow(data interface{}) error {
+	return nil
+}
+func (in *NullInserter) InsertRows(data []interface{}) error {
 	return nil
 }
 func (in *NullInserter) Flush() error {

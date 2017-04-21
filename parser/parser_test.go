@@ -20,7 +20,11 @@ type countingInserter struct {
 	FlushCount int
 }
 
-func (ti *countingInserter) InsertRows(data interface{}) error {
+func (ti *countingInserter) InsertRow(data interface{}) error {
+	ti.CallCount++
+	return nil
+}
+func (ti *countingInserter) InsertRows(data []interface{}) error {
 	ti.CallCount++
 	return nil
 }

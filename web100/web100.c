@@ -1169,7 +1169,7 @@ web100_value_to_textn(char* dest, size_t size, WEB100_TYPE type, void* buf)
     case WEB100_TYPE_TIME_TICKS:
         return snprintf(dest, size, "%u", *(u_int32_t *) buf);
     case WEB100_TYPE_COUNTER64:
-        return snprintf(dest, size, "%llu", *(u_int64_t *) buf);
+        return snprintf(dest, size, "%lu", *(u_int64_t *) buf);
     case WEB100_TYPE_INET_PORT_NUMBER:
         return snprintf(dest, size, "%u", *(u_int16_t *) buf);
     case WEB100_TYPE_INET_ADDRESS_IPV6:
