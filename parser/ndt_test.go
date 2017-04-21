@@ -15,8 +15,8 @@ func TestNDTParser(t *testing.T) {
 	// Load test data.
 	rawData, err := ioutil.ReadFile("testdata/c2s_snaplog")
 
-	var n Parser
-	n = &NDTParser{tmpDir: "./", tableName: "ndt-table"}
+	//	var n Parser
+	n := &NDTParser{tmpDir: "./", tableName: "ndt-table"}
 	values, err := n.Parse(nil, "filename", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())

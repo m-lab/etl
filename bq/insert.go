@@ -19,22 +19,13 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"golang.org/x/net/context"
+
+	"github.com/m-lab/etl/intf"
 )
 
-// An Inserter provides:
-//   InsertRows - inserts one or more rows into the insert buffer.
-//   Flush - flushes any rows in the buffer out to bigquery.
-//   Count - returns the count of rows currently in the buffer.
-type Inserter interface {
-	InsertRows(data interface{}) error
-	Flush() error
-	Count() int
-	RowsInBuffer() int
-}
-
 type BQInserter struct {
-	Inserter
-	params   InserterParams
+	intf.Inserter
+	params   intf.InserterParams
 	client   *bigquery.Client
 	uploader *bigquery.Uploader
 	timeout  time.Duration
@@ -42,17 +33,8 @@ type BQInserter struct {
 	inserted int // Number of rows successfully inserted.
 }
 
-type InserterParams struct {
-	// These specify the google cloud project/dataset/table to write to.
-	Project    string
-	Dataset    string
-	Table      string
-	Timeout    time.Duration // max duration of backend calls.  (for context)
-	BufferSize int           // number of rows to buffer before writing to backend.
-}
-
-func NewInserter(params InserterParams) (Inserter, error) {
-
+// TODO - Consider injecting the Client here, to allow broader unit testing options.
+func NewInserter(params intf.InserterParams) (intf.Inserter, error) {
 	ctx, _ := context.WithTimeout(context.Background(), params.Timeout)
 	// Heavyweight!
 	client, err := bigquery.NewClient(ctx, params.Project)
@@ -100,7 +82,7 @@ func (in *BQInserter) Count() int {
 }
 
 type NullInserter struct {
-	Inserter
+	intf.Inserter
 }
 
 func (in *NullInserter) InsertRows(data interface{}) error {
@@ -108,4 +90,12 @@ func (in *NullInserter) InsertRows(data interface{}) error {
 }
 func (in *NullInserter) Flush() error {
 	return nil
+}
+
+func (in *NullInserter) RowsInBuffer() int {
+	return 0
+}
+
+func (in *NullInserter) Count() int {
+	return 0
 }

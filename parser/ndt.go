@@ -9,14 +9,17 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/web100"
+
+	"github.com/m-lab/etl/intf"
 )
 
 type NDTParser struct {
-	Parser
+	intf.Parser
 	tmpDir    string
 	tableName string
 }
 
+// TODO correctly implement Parser interface.
 func (n *NDTParser) Parse(meta map[string]bigquery.Value, testName string, rawSnapLog []byte) (interface{}, error) {
 	// TODO(prod): do not write to a temporary file; operate on byte array directly.
 	// Write rawSnapLog to /mnt/tmpfs.

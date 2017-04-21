@@ -12,22 +12,21 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/bq"
-	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/intf"
 	"github.com/m-lab/etl/storage"
 )
 
 // TODO(dev) Add unit tests for meta data.
 type Task struct {
 	*storage.ETLSource                           // Source from which to read tests.
-	parser.Parser                                // Parser to parse the tests.
-	bq.Inserter                                  // provides InsertRows(...)
+	intf.Parser                                  // Parser to parse the tests.
+	intf.Inserter                                // provides InsertRows(...)
 	table              string                    // The table to insert rows into, INCLUDING the partition!
 	meta               map[string]bigquery.Value // Metadata about this task.
 }
 
 // NewTask constructs a task, injecting the source and the parser.
-func NewTask(filename string, src *storage.ETLSource, prsr parser.Parser, inserter bq.Inserter, table string) *Task {
+func NewTask(filename string, src *storage.ETLSource, prsr intf.Parser, inserter intf.Inserter, table string) *Task {
 	// TODO - should the meta data be a nested type?
 	meta := make(map[string]bigquery.Value, 3)
 	meta["filename"] = filename
@@ -42,9 +41,7 @@ func NewTask(filename string, src *storage.ETLSource, prsr parser.Parser, insert
 func (tt *Task) ProcessAllTests() {
 	// TODO(dev) better error handling
 	defer tt.Flush()
-	tests := 0
 	files := 0
-	inserts := 0
 	nilData := 0
 	// Read each file from the tar
 	for testname, data, err := tt.NextTest(); err != io.EOF; testname, data, err = tt.NextTest() {
@@ -65,27 +62,24 @@ func (tt *Task) ProcessAllTests() {
 			continue
 		}
 
-		row, err := tt.Parser.Parse(tt.meta, testname, data)
+		err := tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		if err != nil {
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
 			continue
 		}
-		// TODO(dev) Aggregate rows into single insert request, here
-		// or in Inserter.
-		inserts += 1
-		err = tt.InsertRows(row)
 		if err != nil {
 			log.Printf("%v", err)
 			// Handle this error properly!
 		}
 	}
-	// TODO - make this debug or remove
-	log.Printf("%d tests, %d inserts", tests, inserts)
+
+	// Flush any rows cached in the inserter.
 	err := tt.Flush()
 	if err != nil {
 		log.Printf("%v", err)
 	}
-	log.Printf("%d files, %d nil data, %d inserts", files, nilData, inserts)
+	// TODO - make this debug or remove
+	log.Printf("%d files, %d nil data, %d inserts", files, nilData, tt.Count())
 	return
 }
