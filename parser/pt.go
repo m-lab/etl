@@ -2,22 +2,21 @@
 package parser
 
 import (
-	"bufio"
+	//"bufio"
+	"cloud.google.com/go/bigquery"
 	"fmt"
 	//"io"
-	"cloud.google.com/go/bigquery"
+	"io/ioutil"
 	"os"
 	"strings"
-	//"golang.org/x/net/context"
-	//"google.golang.org/api/iterator"
 )
 
-type FileName struct {
+type PTFileName struct {
 	name string
 }
 
 // GetLocalIP parse the filename and return IP.
-func (f *FileName) GetIPTuple() (string, string, string, string) {
+func (f *PTFileName) GetIPTuple() (string, string, string, string) {
 	firstIPStart := strings.IndexByte(f.name, '-')
 	first_segment := f.name[firstIPStart+1 : len(f.name)]
 	firstPortStart := strings.IndexByte(first_segment, '-')
@@ -29,7 +28,7 @@ func (f *FileName) GetIPTuple() (string, string, string, string) {
 	return first_segment[0:firstPortStart], second_segment[0:secondIPStart], third_segment[0:secondPortStart], third_segment[secondPortStart+1 : secondPortEnd]
 }
 
-func (f *FileName) GetDate() string {
+func (f *PTFileName) GetDate() string {
 	return f.name[0:8]
 }
 
@@ -38,7 +37,6 @@ type FileNameParser interface {
 	GetDate()
 }
 
-// PT implements the ValueSaver interface.
 type PT struct {
 	test_id  string
 	project  int
@@ -63,9 +61,13 @@ func (i *PT) Save() (map[string]bigquery.Value, string, error) {
 	}, "", nil
 }
 
-// The input is filebase name,
-func PTParser(fn string) (bigquery.ValueSaver, error) {
-	file, err := os.Open(fn)
+type PTParser struct {
+	Parser
+	tmpDir string
+}
+
+func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, tableID string, rawContent []byte) (interface{}, error) {
+	/*file, err := os.Open(fn)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +79,15 @@ func PTParser(fn string) (bigquery.ValueSaver, error) {
 	for scanner.Scan() {
 		oneLine := strings.TrimSuffix(scanner.Text(), "\n")
 		fmt.Println(oneLine)
+	}*/
+	tmpFile := fmt.Sprintf("%s/%s", pt.tmpDir, fileName)
+	err := ioutil.WriteFile(tmpFile, rawContent, 0644)
+	if err != nil {
+		return nil, err
 	}
+	// TODO(dev): log possible remove errors.
+	defer os.Remove(tmpFile)
+
 	one_row := &PT{
 		test_id:  "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris.gz",
 		project:  3,
@@ -90,6 +100,7 @@ func PTParser(fn string) (bigquery.ValueSaver, error) {
 			data_direction: 0,
 		},
 	}
-	return one_row, nil
-
+	data := []*PT{one_row}
+	fmt.Printf("%v\n", data)
+	return nil, nil
 }
