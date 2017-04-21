@@ -27,14 +27,14 @@ type BQInserter struct {
 	intf.Inserter
 	params   intf.InserterParams
 	client   *bigquery.Client
-	uploader intf.UploaderIntf // May be a BQ Uploader, or a test Uploader
+	uploader intf.Uploader // May be a BQ Uploader, or a test Uploader
 	timeout  time.Duration
 	rows     []interface{}
 	inserted int // Number of rows successfully inserted.
 }
 
 // Pass in nil uploader for normal use, custom uploader for custom behavior
-func NewInserter(params intf.InserterParams, uploader intf.UploaderIntf) (intf.Inserter, error) {
+func NewInserter(params intf.InserterParams, uploader intf.Uploader) (intf.Inserter, error) {
 	var client *bigquery.Client
 	if uploader == nil {
 		ctx, _ := context.WithTimeout(context.Background(), params.Timeout)
@@ -52,6 +52,8 @@ func NewInserter(params intf.InserterParams, uploader intf.UploaderIntf) (intf.I
 
 // Caller should check error, and take appropriate action before calling again.
 func (in *BQInserter) InsertRow(data interface{}) error {
+	// TODO - this completely ignores the BufferSize, so may cause
+	// oversized Insert requests.  Should fix, probably in Flush.
 	in.rows = append(in.rows, data)
 	if len(in.rows) >= in.params.BufferSize {
 		return in.Flush()

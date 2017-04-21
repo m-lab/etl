@@ -22,7 +22,7 @@ import (
 	"github.com/m-lab/etl/intf"
 )
 
-// Create a test inserter, that uses a dummy UploaderIntf instead of contacting BQ.
+// Create a test inserter, that uses a dummy Uploader instead of contacting BQ.
 func NewFakeInserter(params intf.InserterParams) (intf.Inserter, error) {
 	uploader := NewFakeUploader()
 	return bq.NewInserter(params, uploader)
@@ -256,7 +256,7 @@ type FakeUploader struct {
 	Rows []*insertionRow // Most recently inserted rows, for testing/debugging.
 }
 
-func NewFakeUploader() intf.UploaderIntf {
+func NewFakeUploader() intf.Uploader {
 	return new(FakeUploader)
 }
 

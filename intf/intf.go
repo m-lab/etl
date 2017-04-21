@@ -46,6 +46,6 @@ type Parser interface {
 //========================================================================
 // Interfaces to allow fakes.
 //========================================================================
-type UploaderIntf interface {
+type Uploader interface {
 	Put(ctx context.Context, src interface{}) error
 }
