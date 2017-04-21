@@ -18,7 +18,7 @@ type Parser interface {
 	// meta - metadata, e.g. from the original tar file name.
 	// testName - Name of test file (typically extracted from a tar file)
 	// test - binary test data
-	Parse(meta map[string]bigquery.Value, testName string, test []byte) error
+	ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error
 
 	// The name of the table that this Parser inserts into.
 	// Used for metrics and logging.
@@ -27,12 +27,12 @@ type Parser interface {
 
 //------------------------------------------------------------------------------------
 type NullParser struct {
-	Parser
+	intf.Parser
 }
 
-func (np *NullParser) Parse(meta map[string]bigquery.Value, testName string, test []byte) (interface{}, error) {
+func (np *NullParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) (interface{}, error) {
 	testCount.With(prometheus.Labels{"table": np.TableName()}).Inc()
-	return nil, nil
+	return nil
 }
 
 func (np *NullParser) TableName() string {
@@ -61,7 +61,7 @@ func NewTestParser(ins intf.Inserter) Parser {
 	return &TestParser{ins, nil}
 }
 
-func (tp *TestParser) Parse(meta map[string]bigquery.Value, testName string, test []byte) error {
+func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	testCount.With(prometheus.Labels{"table": tp.TableName()}).Inc()
 	log.Printf("Parsing %s", testName)
 	values := make(map[string]bigquery.Value, len(meta)+1)
