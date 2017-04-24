@@ -15,6 +15,7 @@
 package bq
 
 import (
+	"log"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -47,6 +48,7 @@ func NewInserter(params intf.InserterParams, uploader intf.Uploader) (intf.Inser
 		uploader = client.Dataset(params.Dataset).Table(params.Table).Uploader()
 	}
 	in := BQInserter{params: params, client: client, uploader: uploader, timeout: params.Timeout}
+	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	return &in, nil
 }
 
@@ -64,12 +66,20 @@ func (in *BQInserter) InsertRow(data interface{}) error {
 
 // Caller should check error, and take appropriate action before calling again.
 func (in *BQInserter) InsertRows(data []interface{}) error {
-	in.rows = append(in.rows, data...)
-	if len(in.rows) >= in.params.BufferSize {
-		return in.Flush()
-	} else {
-		return nil
+	for len(data)+len(in.rows) >= in.params.BufferSize {
+		// space >= len(data)
+		space := cap(in.rows) - len(in.rows)
+		var add []interface{}
+		add, data = data[:space], data[space:] // does this break?
+		in.rows = append(in.rows, add...)
+		err := in.Flush()
+		if err != nil {
+			// TODO - handle errors in middle better?
+			return err
+		}
 	}
+	in.rows = append(in.rows, data...)
+	return nil
 }
 
 // TODO(dev) Should have a recovery mechanism for failed inserts.
@@ -83,9 +93,12 @@ func (in *BQInserter) Flush() error {
 	err := in.uploader.Put(ctx, in.rows)
 	if err == nil {
 		in.inserted += len(in.rows)
-		in.rows = make([]interface{}, in.params.BufferSize)
+		in.rows = make([]interface{}, 0, in.params.BufferSize)
+		return nil
+	} else {
+		log.Printf("Error on flush: %v\n", err)
+		return err
 	}
-	return err
 }
 
 func (in *BQInserter) RowsInBuffer() int {
