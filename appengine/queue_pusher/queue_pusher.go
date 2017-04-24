@@ -104,7 +104,7 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 	// over those files without comment.
 	if queuename != "" {
 		ctx := appengine.NewContext(r)
-		params := url.Values{"filename": []string{decoded_filename}}
+		params := url.Values{"filename": []string{filename}}
 		t := taskqueue.NewPOSTTask("/worker", params)
 		if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
