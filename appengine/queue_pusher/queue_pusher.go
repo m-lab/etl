@@ -16,25 +16,21 @@ import (
 
 const defaultMessage = "<html><body>This is not the app you're looking for.</body></html>"
 
-type experimentDataType uint8
-const (
-	NDT experimentDataType = iota + 1
-	SIDESTREAM
-	TRACEROUTE
-	DISCO
-)
-
-struct TaskInfo {
-	re *regexp.Regexp
-        kind experimentDataType
-}
-
 // Requests can only add tasks to one of these whitelisted queue names.
 var queueWhitelist = map[string]*regexp.Regexp{
-	"etl-ndt-queue":              regexp.MustCompile("/ndt/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
-	"etl-sidestream-queue":       regexp.MustCompile("/sidestream/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
-	"etl-paris-traceroute-queue": regexp.MustCompile("/paris-traceroute/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
-	"etl-disco-queue": regexp.MustCompile("/switch/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
+	"etl-ndt-queue":        regexp.MustCompile("/ndt/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
+	"etl-sidestream-queue": regexp.MustCompile("/sidestream/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
+	"etl-traceroute-queue": regexp.MustCompile("/paris-traceroute/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
+	"etl-disco-queue":      regexp.MustCompile("/switch/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
+}
+
+func queueForFile(string filename) string {
+	for queue, re := range queueWhitelist {
+		if re.Find(decoded_filename) != nil {
+			return queue
+		}
+	}
+	return ""
 }
 
 func init() {
@@ -102,24 +98,17 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// determine correct queue based on file name.
-	queuename := ""
-	for queue, re := range queueWhitelist {
-		if re.Find(decoded_filename) != nil {
-			queuename = queue
-			break
-		}
-	}
+	queuename := queueForFile(decoded_filename)
+
 	// Lots of files will be archived that should not be enqueued. Pass
 	// over those files without comment.
-	if queuename == "" {
-		return
-	}
-
-	ctx := appengine.NewContext(r)
-	params := url.Values{"filename": []string{decoded_filename}}
-	t := taskqueue.NewPOSTTask("/worker", params)
-	if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if queuename != "" {
+		ctx := appengine.NewContext(r)
+		params := url.Values{"filename": []string{decoded_filename}}
+		t := taskqueue.NewPOSTTask("/worker", params)
+		if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
