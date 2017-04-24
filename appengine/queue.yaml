@@ -26,8 +26,8 @@ queue:
   # latency associated with BQ inserts.
   max_concurrent_requests: 500
 
-- name: etl-paris-traceroute-queue
-  target: paris-traceroute-parser
+- name: etl-traceroute-queue
+  target: traceroute-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
   rate: 5/s
@@ -40,6 +40,18 @@ queue:
 
 - name: etl-sidestream-queue
   target: sidestream-parser
+  # Average rate at which to release tasks to the service.  Default is 5/sec
+  # This is actually the rate at which tokens are added to the bucket.
+  rate: 5/s
+  # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
+  # have very little impact for our environment.
+  bucket_size: 50
+  # Maximum number of concurrent requests.  This is large now, until we address the
+  # latency associated with BQ inserts.
+  max_concurrent_requests: 500
+
+- name: etl-disco-queue
+  target: disco-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
   rate: 5/s
