@@ -32,8 +32,7 @@ var (
 )
 
 // Returns the Singleton bigquery client for this process.
-// Should this be called MustClient() ?
-func MustClient(timeout time.Duration) *bigquery.Client {
+func MustGetClient(timeout time.Duration) *bigquery.Client {
 	// We do this here, instead of in init(), because we only want to do it
 	// when we actually want to access the bigquery backend.
 	clientOnce.Do(func() {
@@ -60,7 +59,7 @@ type BQInserter struct {
 // Pass in nil uploader for normal use, custom uploader for custom behavior
 func NewInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
 	if uploader == nil {
-		client := MustClient(params.Timeout)
+		client := MustGetClient(params.Timeout)
 		uploader = client.Dataset(params.Dataset).Table(params.Table).Uploader()
 	}
 	in := BQInserter{params: params, uploader: uploader, timeout: params.Timeout}
