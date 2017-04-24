@@ -17,18 +17,19 @@ var (
 type DataType int
 
 const (
-	TypeInvalid DataType = iota
-	TypeNDT
-	TypeSS
-	TypePT
-	TypeSW
+	InvalidData DataType = iota
+	NDTData
+	SSData
+	PTData
+	SWData
 )
 
+// Temporary - should come from a config.
 var (
 	TableNames = map[DataType]string{
-		TypeNDT: "ndt_test",
-		TypeSS:  "ss_test",
-		TypePT:  "pt_test",
-		TypeSW:  "disco_test",
+		NDTData: "ndt_test",
+		SSData:  "ss_test",
+		PTData:  "pt_test",
+		SWData:  "disco_test",
 	}
 )

@@ -68,19 +68,19 @@ func getFilename(filename string) (string, error) {
 func getDataType(fn string) etl.DataType {
 	fields := etl.TaskPattern.FindStringSubmatch(fn)
 	if fields == nil {
-		return etl.TypeInvalid
+		return etl.InvalidData
 	}
 	switch fields[2] {
 	case "ndt":
-		return etl.TypeNDT
+		return etl.NDTData
 	case "sidestream":
-		return etl.TypeSS
+		return etl.SSData
 	case "paris-traceroute":
-		return etl.TypePT
+		return etl.PTData
 	case "switch":
-		return etl.TypeSW
+		return etl.SWData
 	default:
-		return etl.TypeInvalid
+		return etl.InvalidData
 	}
 }
 
@@ -91,13 +91,14 @@ func getInserter(dt etl.DataType, fake bool) (etl.Inserter, error) {
 
 func getParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
-	case etl.TypeNDT:
+	case etl.NDTData:
+		// TODO - substitute appropriate parsers here and below.
 		return parser.NewTestParser(ins)
-	case etl.TypeSS:
+	case etl.SSData:
 		return parser.NewTestParser(ins)
-	case etl.TypePT:
+	case etl.PTData:
 		return parser.NewTestParser(ins)
-	case etl.TypeSW:
+	case etl.SWData:
 		return parser.NewTestParser(ins)
 	default:
 		return nil
@@ -124,7 +125,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dataType := getDataType(fn)
-	if dataType == etl.TypeInvalid {
+	if dataType == etl.InvalidData {
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		w.WriteHeader(http.StatusBadRequest)
 		log.Printf("Invalid filename: %s\n", fn)
