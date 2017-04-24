@@ -65,6 +65,59 @@ func getFilename(filename string) (string, error) {
 	return "", errors.New("invalid base64 encoded file path: " + fn)
 }
 
+func getDataType(fn string) etl.DataType {
+	fields := etl.TaskPattern.FindStringSubmatch(fn)
+	if fields == nil {
+		return etl.TypeInvalid
+	}
+	switch fields[2] {
+	case "ndt":
+		return etl.TypeNDT
+	case "sidestream":
+		return etl.TypeSS
+	case "paris-traceroute":
+		return etl.TypePT
+	case "switch":
+		return etl.TypeSW
+	default:
+		return etl.TypeInvalid
+	}
+}
+
+func getInserter(dt etl.DataType, fake bool) (etl.Inserter, error) {
+	switch dt {
+	case etl.TypeNDT:
+		return bq.NewInserter(
+			etl.InserterParams{"mlab_sandbox", "ndt_test", 10 * time.Second, 100}, nil)
+	case etl.TypeSS:
+		return bq.NewInserter(
+			etl.InserterParams{"mlab_sandbox", "ss_test", 10 * time.Second, 100}, nil)
+	case etl.TypePT:
+		return bq.NewInserter(
+			etl.InserterParams{"mlab_sandbox", "pt_test", 10 * time.Second, 100}, nil)
+	case etl.TypeSW:
+		return bq.NewInserter(
+			etl.InserterParams{"mlab_sandbox", "disco_test", 10 * time.Second, 100}, nil)
+	default:
+		return nil, errors.New("Unknown data type.")
+	}
+}
+
+func getParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
+	switch dt {
+	case etl.TypeNDT:
+		return parser.NewTestParser(ins)
+	case etl.TypeSS:
+		return parser.NewTestParser(ins)
+	case etl.TypePT:
+		return parser.NewTestParser(ins)
+	case etl.TypeSW:
+		return parser.NewTestParser(ins)
+	default:
+		return nil
+	}
+}
+
 func worker(w http.ResponseWriter, r *http.Request) {
 	workerCount.Inc()
 	defer workerCount.Dec()
@@ -76,15 +129,24 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// This handles base64 encoding, and requires a gs:// prefix.
-	filename, err := getFilename(r.FormValue("filename"))
+	fn, err := getFilename(r.FormValue("filename"))
 	if err != nil {
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("Invalid filename: %s\n", fn)
+		return
+	}
+
+	dataType := getDataType(fn)
+	if dataType == etl.TypeInvalid {
+		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
+		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("Invalid filename: %s\n", fn)
 		return
 	}
 
 	// TODO(dev): log the originating task queue name from headers.
-	log.Printf("Received filename: %q\n", filename)
+	log.Printf("Received filename: %q\n", fn)
 
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
@@ -93,11 +155,11 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tr, err := storage.NewETLSource(client, filename)
+	tr, err := storage.NewETLSource(client, fn)
 	if err != nil {
-		log.Printf("%v", err)
-		fmt.Fprintf(w, `{"message": "Problem opening file."}`)
+		fmt.Fprintf(w, `{"message": "Problem downloading file."}`)
 		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("%v", err)
 		return
 		// TODO - anything better we could do here?
 	}
@@ -107,8 +169,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// For now, 10K per row times 100 results is 1MB, which is an order of
 	// magnitude below our 10MB max, so 100 might not be such a bad
 	// default.
-	ins, err := bq.NewInserter(
-		etl.InserterParams{"mlab_sandbox", "with_meta", 10 * time.Second, 100}, nil)
+	ins, err := getInserter(dataType, false)
 	if err != nil {
 		log.Printf("%v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
@@ -117,8 +178,8 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		// TODO - anything better we could do here?
 	}
 	// Create parser, injecting Inserter
-	p := parser.NewTestParser(ins)
-	tsk := task.NewTask(filename, tr, p, ins, "with_meta")
+	p := getParser(dataType, ins)
+	tsk := task.NewTask(fn, tr, p, ins, "with_meta")
 
 	tsk.ProcessAllTests()
 
