@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TODO: IPv6 tests
 func TestGetIPTuple(t *testing.T) {
 	fn1 := PTFileName{name: "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris"}
 	dest_ip, dest_port, server_ip, server_port := fn1.GetIPTuple()
