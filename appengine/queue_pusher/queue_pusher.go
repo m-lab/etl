@@ -3,10 +3,12 @@
 package pushqueue
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/taskqueue"
@@ -14,12 +16,25 @@ import (
 
 const defaultMessage = "<html><body>This is not the app you're looking for.</body></html>"
 
+type experimentDataType uint8
+const (
+	NDT experimentDataType = iota + 1
+	SIDESTREAM
+	TRACEROUTE
+	DISCO
+)
+
+struct TaskInfo {
+	re *regexp.Regexp
+        kind experimentDataType
+}
+
 // Requests can only add tasks to one of these whitelisted queue names.
-var queueWhitelist = map[string]bool{
-	"etl-parser-queue":           true,
-	"etl-ndt-queue":              true,
-	"etl-sidestream-queue":       true,
-	"etl-paris-traceroute-queue": true,
+var queueWhitelist = map[string]*regexp.Regexp{
+	"etl-ndt-queue":              regexp.MustCompile("/ndt/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
+	"etl-sidestream-queue":       regexp.MustCompile("/sidestream/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
+	"etl-paris-traceroute-queue": regexp.MustCompile("/paris-traceroute/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
+	"etl-disco-queue": regexp.MustCompile("/switch/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
 }
 
 func init() {
@@ -70,26 +85,38 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, string(b))
 }
 
-// receiver accepts a GET request, and transforms the given parameters into a TaskQueue Task.
+// receiver accepts a GET or POST request, and transforms the given parameters into a TaskQueue Task.
 func receiver(w http.ResponseWriter, r *http.Request) {
-	// TODO(dev): require a POST instead of a GET.
-	if r.Method != http.MethodGet {
-		http.Error(w, `{"message": "Method not allowed"}`, http.StatusMethodNotAllowed)
+	// TODO(dev): require a POST instead of working with both POST and GET
+	// after we update the Cloud Function to use POST.
+	filename := r.FormValue("filename")
+	if filename == "" {
+		http.Error(w, `{"message": "No filename provided"}`, http.StatusBadRequest)
 		return
 	}
 
-	filename := r.FormValue("filename")
+	decoded_filename, err := base64.StdEncoding.DecodeString(filename)
+	if err != nil {
+		http.Error(w, `{"message": "Could not base64decode filename"}`, http.StatusBadRequest)
+		return
+	}
 
-	// TODO(dev): determine correct queue based on file type.
-	queuename := "etl-parser-queue"
-
-	if filename == "" {
-		http.Error(w, `{"message": "Bad request parameters"}`, http.StatusBadRequest)
+	// determine correct queue based on file name.
+	queuename := ""
+	for queue, re := range queueWhitelist {
+		if re.Find(decoded_filename) != nil {
+			queuename = queue
+			break
+		}
+	}
+	// Lots of files will be archived that should not be enqueued. Pass
+	// over those files without comment.
+	if queuename == "" {
 		return
 	}
 
 	ctx := appengine.NewContext(r)
-	params := url.Values{"filename": []string{filename}}
+	params := url.Values{"filename": []string{decoded_filename}}
 	t := taskqueue.NewPOSTTask("/worker", params)
 	if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
