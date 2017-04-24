@@ -85,22 +85,8 @@ func getDataType(fn string) etl.DataType {
 }
 
 func getInserter(dt etl.DataType, fake bool) (etl.Inserter, error) {
-	switch dt {
-	case etl.TypeNDT:
-		return bq.NewInserter(
-			etl.InserterParams{"mlab_sandbox", "ndt_test", 10 * time.Second, 100}, nil)
-	case etl.TypeSS:
-		return bq.NewInserter(
-			etl.InserterParams{"mlab_sandbox", "ss_test", 10 * time.Second, 100}, nil)
-	case etl.TypePT:
-		return bq.NewInserter(
-			etl.InserterParams{"mlab_sandbox", "pt_test", 10 * time.Second, 100}, nil)
-	case etl.TypeSW:
-		return bq.NewInserter(
-			etl.InserterParams{"mlab_sandbox", "disco_test", 10 * time.Second, 100}, nil)
-	default:
-		return nil, errors.New("Unknown data type.")
-	}
+	return bq.NewInserter(
+		etl.InserterParams{"mlab_sandbox", etl.TableNames[dt], 10 * time.Second, 100}, nil)
 }
 
 func getParser(dt etl.DataType, ins etl.Inserter) etl.Parser {

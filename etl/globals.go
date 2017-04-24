@@ -23,3 +23,12 @@ const (
 	TypePT
 	TypeSW
 )
+
+var (
+	TableNames = map[DataType]string{
+		TypeNDT: "ndt_test",
+		TypeSS:  "ss_test",
+		TypePT:  "pt_test",
+		TypeSW:  "disco_test",
+	}
+)
