@@ -16,6 +16,8 @@ package bq
 
 import (
 	"log"
+	"os"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -24,10 +26,31 @@ import (
 	"github.com/m-lab/etl/etl"
 )
 
+var (
+	clientOnce sync.Once // This avoids a race on setting bqClient.
+	bqClient   *bigquery.Client
+)
+
+// Returns the Singleton bigquery client for this process.
+// Should this be called MustClient() ?
+func MustClient(timeout time.Duration) *bigquery.Client {
+	// We do this here, instead of in init(), because we only want to do it
+	// when we actually want to access the bigquery backend.
+	clientOnce.Do(func() {
+		ctx, _ := context.WithTimeout(context.Background(), timeout)
+		// Heavyweight!
+		var err error
+		bqClient, err = bigquery.NewClient(ctx, os.Getenv("GCLOUD_PROJECT"))
+		if err != nil {
+			panic(err.Error())
+		}
+	})
+	return bqClient
+}
+
 type BQInserter struct {
 	etl.Inserter
 	params   etl.InserterParams
-	client   *bigquery.Client
 	uploader etl.Uploader // May be a BQ Uploader, or a test Uploader
 	timeout  time.Duration
 	rows     []interface{}
@@ -36,18 +59,11 @@ type BQInserter struct {
 
 // Pass in nil uploader for normal use, custom uploader for custom behavior
 func NewInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
-	var client *bigquery.Client
 	if uploader == nil {
-		ctx, _ := context.WithTimeout(context.Background(), params.Timeout)
-		// Heavyweight!
-		client, err := bigquery.NewClient(ctx, params.Project)
-		if err != nil {
-			return nil, err
-		}
-
+		client := MustClient(params.Timeout)
 		uploader = client.Dataset(params.Dataset).Table(params.Table).Uploader()
 	}
-	in := BQInserter{params: params, client: client, uploader: uploader, timeout: params.Timeout}
+	in := BQInserter{params: params, uploader: uploader, timeout: params.Timeout}
 	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	return &in, nil
 }

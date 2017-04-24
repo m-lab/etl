@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -109,7 +108,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// magnitude below our 10MB max, so 100 might not be such a bad
 	// default.
 	ins, err := bq.NewInserter(
-		etl.InserterParams{os.Getenv("GCLOUD_PROJECT"), "mlab_sandbox", "with_meta", 10 * time.Second, 100}, nil)
+		etl.InserterParams{"mlab_sandbox", "with_meta", 10 * time.Second, 100}, nil)
 	if err != nil {
 		log.Printf("%v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
