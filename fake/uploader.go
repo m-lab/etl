@@ -20,11 +20,11 @@ import (
 	bqv2 "google.golang.org/api/bigquery/v2"
 
 	"github.com/m-lab/etl/bq"
-	"github.com/m-lab/etl/intf"
+	"github.com/m-lab/etl/etl"
 )
 
 // Create a test inserter, that uses a dummy Uploader instead of contacting BQ.
-func NewFakeInserter(params intf.InserterParams) (intf.Inserter, error) {
+func NewFakeInserter(params etl.InserterParams) (etl.Inserter, error) {
 	uploader := NewFakeUploader()
 	return bq.NewInserter(params, uploader)
 }
@@ -259,7 +259,7 @@ type FakeUploader struct {
 	Err     error
 }
 
-func NewFakeUploader() intf.Uploader {
+func NewFakeUploader() etl.Uploader {
 	return new(FakeUploader)
 }
 

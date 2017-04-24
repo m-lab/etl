@@ -21,21 +21,21 @@ import (
 	"cloud.google.com/go/bigquery"
 	"golang.org/x/net/context"
 
-	"github.com/m-lab/etl/intf"
+	"github.com/m-lab/etl/etl"
 )
 
 type BQInserter struct {
-	intf.Inserter
-	params   intf.InserterParams
+	etl.Inserter
+	params   etl.InserterParams
 	client   *bigquery.Client
-	uploader intf.Uploader // May be a BQ Uploader, or a test Uploader
+	uploader etl.Uploader // May be a BQ Uploader, or a test Uploader
 	timeout  time.Duration
 	rows     []interface{}
 	inserted int // Number of rows successfully inserted.
 }
 
 // Pass in nil uploader for normal use, custom uploader for custom behavior
-func NewInserter(params intf.InserterParams, uploader intf.Uploader) (intf.Inserter, error) {
+func NewInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
 	var client *bigquery.Client
 	if uploader == nil {
 		ctx, _ := context.WithTimeout(context.Background(), params.Timeout)
@@ -106,7 +106,7 @@ func (in *BQInserter) Count() int {
 }
 
 type NullInserter struct {
-	intf.Inserter
+	etl.Inserter
 }
 
 func (in *NullInserter) InsertRow(data interface{}) error {

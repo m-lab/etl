@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/fake"
-	"github.com/m-lab/etl/intf"
 )
 
 func init() {
@@ -27,7 +27,7 @@ func TestBasicInsert(t *testing.T) {
 		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
 
 	in, err := fake.NewFakeInserter(
-		intf.InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 1})
+		etl.InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestBufferingAndFlushing(t *testing.T) {
 	// Set up an Inserter with a fake Uploader backend for testing.
 	// Buffer 3 rows, so that we can test the buffering.
 	in, err := fake.NewFakeInserter(
-		intf.InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 3})
+		etl.InserterParams{"mlab-sandbox", "mlab_sandbox", "test2", 10 * time.Second, 3})
 	if err != nil {
 		log.Printf("%v\n", err)
 		t.Fatal()

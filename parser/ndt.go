@@ -10,11 +10,11 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/web100"
 
-	"github.com/m-lab/etl/intf"
+	"github.com/m-lab/etl/etl"
 )
 
 type NDTParser struct {
-	intf.Parser
+	etl.Parser
 	tmpDir    string
 	tableName string
 }

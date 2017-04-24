@@ -1,6 +1,5 @@
 // The etl package provides all major interfaces used across packages.
-// TODO move to etl/etl.go
-package intf
+package etl
 
 import (
 	"time"
