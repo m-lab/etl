@@ -23,8 +23,8 @@ type Inserter interface {
 
 // Params for NewInserter
 type InserterParams struct {
-	// These specify the google cloud project/dataset/table to write to.
-	Project    string
+	// The project comes from os.GetEnv("GCLOUD_PROJECT")
+	// These specify the google cloud dataset/table to write to.
 	Dataset    string
 	Table      string
 	Timeout    time.Duration // max duration of backend calls.  (for context)
