@@ -1,6 +1,7 @@
 total_storage_limit: 500M
 
 queue:
+# TODO(dev): delete this queue
 - name: etl-parser-queue
   target: etl-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
@@ -13,11 +14,38 @@ queue:
   # latency associated with BQ inserts.
   max_concurrent_requests: 100
 
-###################################################################################
-- name: etl-pull-queue
-  mode: pull
-  acl:
-  # Provide full access to the taskqueue by the mlab-sandbox default GCE service account.
-  # This should apply to default GCE VMs and AppEngine Flex VMs.
-  - user_email: 581276032543-compute@developer.gserviceaccount.com
-  - writer_email: 581276032543-compute@developer.gserviceaccount.com
+- name: etl-ndt-queue
+  target: ndt-parser
+  # Average rate at which to release tasks to the service.  Default is 5/sec
+  # This is actually the rate at which tokens are added to the bucket.
+  rate: 5/s
+  # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
+  # have very little impact for our environment.
+  bucket_size: 50
+  # Maximum number of concurrent requests.  This is large now, until we address the
+  # latency associated with BQ inserts.
+  max_concurrent_requests: 500
+
+- name: etl-paris-traceroute-queue
+  target: paris-traceroute-parser
+  # Average rate at which to release tasks to the service.  Default is 5/sec
+  # This is actually the rate at which tokens are added to the bucket.
+  rate: 5/s
+  # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
+  # have very little impact for our environment.
+  bucket_size: 50
+  # Maximum number of concurrent requests.  This is large now, until we address the
+  # latency associated with BQ inserts.
+  max_concurrent_requests: 500
+
+- name: etl-sidestream-queue
+  target: sidestream-parser
+  # Average rate at which to release tasks to the service.  Default is 5/sec
+  # This is actually the rate at which tokens are added to the bucket.
+  rate: 5/s
+  # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
+  # have very little impact for our environment.
+  bucket_size: 50
+  # Maximum number of concurrent requests.  This is large now, until we address the
+  # latency associated with BQ inserts.
+  max_concurrent_requests: 500
