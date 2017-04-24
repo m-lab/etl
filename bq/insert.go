@@ -54,17 +54,13 @@ func NewInserter(params intf.InserterParams, uploader intf.Uploader) (intf.Inser
 
 // Caller should check error, and take appropriate action before calling again.
 func (in *BQInserter) InsertRow(data interface{}) error {
-	// TODO - this completely ignores the BufferSize, so may cause
-	// oversized Insert requests.  Should fix, probably in Flush.
-	in.rows = append(in.rows, data)
-	if len(in.rows) >= in.params.BufferSize {
-		return in.Flush()
-	} else {
-		return nil
-	}
+	return in.InsertRows([]interface{}{data})
 }
 
 // Caller should check error, and take appropriate action before calling again.
+// TODO - should this return a specific error to indicate that a flush is needed
+// instead of flushing internally?  The "handle errors in the middle" would
+// be easier, though other complications would ensue.
 func (in *BQInserter) InsertRows(data []interface{}) error {
 	for len(data)+len(in.rows) >= in.params.BufferSize {
 		// space >= len(data)
