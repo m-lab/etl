@@ -11,6 +11,7 @@ import (
 	"log"
 	"reflect"
 	"regexp"
+	"runtime/debug"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -253,7 +254,9 @@ type FakeUploader struct {
 	IgnoreUnknownValues bool
 	TableTemplateSuffix string
 
-	Rows []*insertionRow // Most recently inserted rows, for testing/debugging.
+	Rows    []*InsertionRow // Most recently inserted rows, for testing/debugging.
+	Request *bqv2.TableDataInsertAllRequest
+	Err     error
 }
 
 func NewFakeUploader() intf.Uploader {
@@ -282,7 +285,9 @@ func NewFakeUploader() intf.Uploader {
 func (u *FakeUploader) Put(ctx context.Context, src interface{}) error {
 	savers, err := valueSavers(src)
 	if err != nil {
-		log.Printf("%v\n", err)
+		log.Printf("Put: %v\n", err)
+		log.Printf("src: %v\n", src)
+		debug.PrintStack()
 		return err
 	}
 	return u.putMulti(ctx, savers)
@@ -341,25 +346,26 @@ func toValueSaver(x interface{}) (bigquery.ValueSaver, bool, error) {
 }
 
 func (u *FakeUploader) putMulti(ctx context.Context, src []bigquery.ValueSaver) error {
-	var rows []*insertionRow
+	var rows []*InsertionRow
 	for _, saver := range src {
 		row, insertID, err := saver.Save()
 		if err != nil {
+			log.Printf("%v\n", err)
+			debug.PrintStack()
 			return err
 		}
-		log.Printf("Row (%T): %v\n", row, row)
-		rows = append(rows, &insertionRow{InsertID: insertID, Row: row})
+		rows = append(rows, &InsertionRow{InsertID: insertID, Row: row})
 	}
 
 	u.Rows = rows
 
 	// Substitute for service call.
-	insertRows(rows)
+	u.Request, u.Err = insertRows(rows)
 	return nil
 }
 
-// An insertionRow represents a row of data to be inserted into a table.
-type insertionRow struct {
+// An InsertionRow represents a row of data to be inserted into a table.
+type InsertionRow struct {
 	// If InsertID is non-empty, BigQuery will use it to de-duplicate insertions of
 	// this row on a best-effort basis.
 	InsertID string
@@ -370,7 +376,7 @@ type insertionRow struct {
 //---------------------------------------------------------------------------------------
 // Stuff from service.go
 //---------------------------------------------------------------------------------------
-func insertRows(rows []*insertionRow) (*bqv2.TableDataInsertAllRequest, error) {
+func insertRows(rows []*InsertionRow) (*bqv2.TableDataInsertAllRequest, error) {
 	req := &bqv2.TableDataInsertAllRequest{}
 	for _, row := range rows {
 		m := make(map[string]bqv2.JsonValue)
@@ -381,7 +387,6 @@ func insertRows(rows []*insertionRow) (*bqv2.TableDataInsertAllRequest, error) {
 			InsertId: row.InsertID,
 			Json:     m,
 		})
-		log.Printf("%v\n", req.Rows[len(req.Rows)-1])
 	}
 	// Truncated here, because the remainder hits the backend.
 	return req, nil
