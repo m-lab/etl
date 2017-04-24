@@ -24,9 +24,9 @@ var queueWhitelist = map[string]*regexp.Regexp{
 	"etl-disco-queue":      regexp.MustCompile("/switch/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
 }
 
-func queueForFile(string filename) string {
+func queueForFile(filename []byte) string {
 	for queue, re := range queueWhitelist {
-		if re.Find(decoded_filename) != nil {
+		if re.Find(filename) != nil {
 			return queue
 		}
 	}
@@ -104,7 +104,7 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 	// over those files without comment.
 	if queuename != "" {
 		ctx := appengine.NewContext(r)
-		params := url.Values{"filename": []string{decoded_filename}}
+		params := url.Values{"filename": []string{filename}}
 		t := taskqueue.NewPOSTTask("/worker", params)
 		if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
