@@ -3,13 +3,13 @@
 package pushqueue
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-	"regexp"
 
+	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/storage"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/taskqueue"
 )
@@ -17,20 +17,11 @@ import (
 const defaultMessage = "<html><body>This is not the app you're looking for.</body></html>"
 
 // Requests can only add tasks to one of these whitelisted queue names.
-var queueWhitelist = map[string]*regexp.Regexp{
-	"etl-ndt-queue":        regexp.MustCompile("/ndt/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
-	"etl-sidestream-queue": regexp.MustCompile("/sidestream/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
-	"etl-traceroute-queue": regexp.MustCompile("/paris-traceroute/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
-	"etl-disco-queue":      regexp.MustCompile("/switch/\\d{4}/\\d{2}/\\d{2}/[^/]*.tgz"),
-}
-
-func queueForFile(filename []byte) string {
-	for queue, re := range queueWhitelist {
-		if re.Find(filename) != nil {
-			return queue
-		}
-	}
-	return ""
+var queueForType = map[etl.DataType]string {
+	etl.NDTData: "etl-ndt-queue",
+	etl.SSData: "etl-sidestream-queue",
+	etl.PTData: "etl-traceroute-queue",
+	etl.SWData: "etl-disco-queue",
 }
 
 func init() {
@@ -57,7 +48,11 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, ok := queueWhitelist[queuename]; !ok {
+	validQueue := false
+	for _, queue := range queueForType {
+		validQueue = validQueue || (queuename == queue)
+	}
+	if !validQueue {
 		// TODO(dev): return the queueWhitelist to client.
 		http.Error(w, `{"message": "Given queue name is not acceptable"}`, http.StatusNotAcceptable)
 		return
@@ -91,18 +86,19 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decoded_filename, err := base64.StdEncoding.DecodeString(filename)
+	decoded_filename, err := storage.GetFilename(filename)
 	if err != nil {
 		http.Error(w, `{"message": "Could not base64decode filename"}`, http.StatusBadRequest)
 		return
 	}
 
 	// determine correct queue based on file name.
-	queuename := queueForFile(decoded_filename)
+	queuename, ok := queueForType[storage.GetDataType(decoded_filename)]
 
 	// Lots of files will be archived that should not be enqueued. Pass
 	// over those files without comment.
-	if queuename != "" {
+	// TODO(dev) count how many names we skip over using prometheus
+	if ok {
 		ctx := appengine.NewContext(r)
 		params := url.Values{"filename": []string{filename}}
 		t := taskqueue.NewPOSTTask("/worker", params)

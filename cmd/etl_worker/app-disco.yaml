@@ -1,6 +1,6 @@
 runtime: custom
 env: flex
-service: disco-parser
+service: etl-disco-parser
 
 # Resource and scaling options. For more background, see:
 #   https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml

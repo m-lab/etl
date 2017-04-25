@@ -15,7 +15,7 @@ queue:
   max_concurrent_requests: 100
 
 - name: etl-ndt-queue
-  target: ndt-parser
+  target: etl-ndt-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
   rate: 5/s
@@ -27,7 +27,7 @@ queue:
   max_concurrent_requests: 500
 
 - name: etl-traceroute-queue
-  target: traceroute-parser
+  target: etl-traceroute-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
   rate: 5/s
@@ -39,7 +39,7 @@ queue:
   max_concurrent_requests: 500
 
 - name: etl-sidestream-queue
-  target: sidestream-parser
+  target: etl-sidestream-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
   rate: 5/s
@@ -51,7 +51,7 @@ queue:
   max_concurrent_requests: 500
 
 - name: etl-disco-queue
-  target: disco-parser
+  target: etl-disco-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
   rate: 5/s
