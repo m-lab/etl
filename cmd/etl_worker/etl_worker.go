@@ -181,12 +181,17 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Define a custom serve mux for prometheus to listen on a separate port.
+	// We listen on a separate port so we can forward this port on the host VM.
+	// We cannot forward port 8080 because it is used by AppEngine.
+	mux := http.NewServeMux()
+	// Assign the default prometheus handler to the standard exporter path.
+	mux.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":9090", mux)
+
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/worker", metrics.DurationHandler("generic", worker))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
-
-	// Assign the default prometheus handler to the standard exporter path.
-	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":8080", nil)
 }
 
