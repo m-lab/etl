@@ -47,6 +47,21 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 	return bqClient
 }
 
+//----------------------------------------------------------------------------
+
+// Generic implementation of bq.ValueSaver, based on map.  This avoids extra
+// conversion steps in the bigquery library (except for the JSON conversion).
+// IMPLEMENTS: bigquery.ValueSaver
+type MapSaver struct {
+	Values map[string]bigquery.Value
+}
+
+func (s *MapSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
+	return s.Values, "", nil
+}
+
+//----------------------------------------------------------------------------
+
 type BQInserter struct {
 	etl.Inserter
 	params   etl.InserterParams

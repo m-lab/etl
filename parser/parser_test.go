@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"cloud.google.com/go/bigquery"
-
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 )
@@ -36,26 +34,16 @@ func (ti *countingInserter) Flush() error {
 	return nil
 }
 
-// Just test call to NullParser.Parser
 func TestPlumbing(t *testing.T) {
 	foo := [10]byte{1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
-	ti := countingInserter{}
-	var p etl.Parser
-	p = parser.NewTestParser(&ti)
+	tci := countingInserter{}
+	var ti etl.Inserter = &tci
+	var p etl.Parser = parser.NewTestParser(ti)
 	err := p.ParseAndInsert(nil, "foo", foo[:])
 	if err != nil {
 		fmt.Println(err)
 	}
-	if ti.CallCount != 1 {
+	if tci.CallCount != 1 {
 		t.Error("Should have called the inserter")
 	}
-}
-
-func foobar(vs bigquery.ValueSaver) {
-	_, _, _ = vs.Save()
-}
-
-func TestSaverInterface(t *testing.T) {
-	fns := parser.FileNameSaver{map[string]bigquery.Value{"filename": "foobar"}}
-	foobar(&fns)
 }

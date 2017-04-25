@@ -8,6 +8,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 )
 
@@ -27,18 +28,9 @@ func (np *NullParser) TableName() string {
 	return "null-table"
 }
 
-type FileNameSaver struct {
-	Values map[string]bigquery.Value
-}
-
-// TODO(dev) - Figure out if this can use a pointer receiver.
-func (fns FileNameSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
-	return fns.Values, "", nil
-}
-
 //------------------------------------------------------------------------------------
-// TestParser ignores the content, returns a ValueSaver with map[string]Value
-// underneath, containing meta data and "testname":"..."
+// TestParser ignores the content, returns a MapSaver containing meta data and
+// "testname":"..."
 // TODO add tests
 type TestParser struct {
 	inserter etl.Inserter
@@ -58,7 +50,7 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 		values[k] = v
 	}
 	values["testname"] = testName
-	return tp.inserter.InsertRow(FileNameSaver{values})
+	return tp.inserter.InsertRow(bq.MapSaver{values})
 }
 
 func (tp *TestParser) TableName() string {

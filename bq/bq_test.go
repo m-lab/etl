@@ -5,12 +5,24 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/bigquery"
+
+	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/fake"
 )
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
+func foobar(vs bigquery.ValueSaver) {
+	_, _, _ = vs.Save()
+}
+
+func TestMapSaver(t *testing.T) {
+	fns := bq.MapSaver{map[string]bigquery.Value{"filename": "foobar"}}
+	foobar(&fns)
 }
 
 // Item represents a row item.
