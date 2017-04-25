@@ -192,6 +192,11 @@ func main() {
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/worker", metrics.DurationHandler("generic", worker))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
+
+	// We also setup another prometheus handler on a non-standard path. This
+	// path name will be accessible through the AppEngine service address,
+	// however it will be served by a random instance.
+	http.Handle("/random-metrics", promhttp.Handler())
 	http.ListenAndServe(":8080", nil)
 }
 
