@@ -9,6 +9,7 @@ package storage
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/base64"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/m-lab/etl/etl"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
@@ -140,6 +142,45 @@ func GetStorageClient(writeAccess bool) (*http.Client, error) {
 		return nil, err
 	}
 	return client, nil
+}
+
+// Turn the bytes received from the queue into a filename
+// TODO(dev) Add unit test
+func GetFilename(filename string) (string, error) {
+	if strings.HasPrefix(filename, "gs://") {
+		return filename, nil
+	}
+
+	decode, err := base64.StdEncoding.DecodeString(filename)
+	if err != nil {
+		return "", errors.New("invalid file path: " + filename)
+	}
+	fn := string(decode[:])
+	if strings.HasPrefix(fn, "gs://") {
+		return fn, nil
+	}
+
+	return "", errors.New("invalid base64 encoded file path: " + fn)
+}
+
+// Find the type of data stored in a file from its comlete filename
+func GetDataType(fn string) etl.DataType {
+	fields := etl.TaskPattern.FindStringSubmatch(fn)
+	if fields == nil {
+		return etl.InvalidData
+	}
+	switch fields[2] {
+	case "ndt":
+		return etl.NDTData
+	case "sidestream":
+		return etl.SSData
+	case "paris-traceroute":
+		return etl.PTData
+	case "switch":
+		return etl.SWData
+	default:
+		return etl.InvalidData
+	}
 }
 
 //---------------------------------------------------------------------------------
