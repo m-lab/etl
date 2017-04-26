@@ -21,7 +21,7 @@ import (
 
 	// Enable profiling. For more background and usage information, see:
 	//   https://blog.golang.org/profiling-go-programs
-	_ "net/http/pprof"
+	"net/http/pprof"
 	// Enable exported debug vars.  See https://golang.org/pkg/expvar/
 	_ "expvar"
 )
@@ -187,6 +187,13 @@ func main() {
 	mux := http.NewServeMux()
 	// Assign the default prometheus handler to the standard exporter path.
 	mux.Handle("/metrics", promhttp.Handler())
+	// Assign the pprof handling paths to the external port to access individual
+	// instances.
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	go http.ListenAndServe(":9090", mux)
 
 	http.HandleFunc("/", handler)
