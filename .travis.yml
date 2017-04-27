@@ -31,8 +31,8 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 script:
-# Currently skipping bq tests, because they depend on bigquery, and there is
-# no emulator
+# Currently skipping storage tests, because they depend on GCS, and there is
+# no emulator.
 - go test -v github.com/m-lab/etl/bq
 - go test -v github.com/m-lab/etl/parser
 - go test -v github.com/m-lab/etl/task
