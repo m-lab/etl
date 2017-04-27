@@ -6,14 +6,14 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/web100"
-
-	"github.com/m-lab/etl/etl"
 )
 
 const (
@@ -22,12 +22,13 @@ const (
 )
 
 type NDTParser struct {
-	inserter etl.Inserter
-	tmpDir   string
+	inserter  etl.Inserter
+	tmpDir    string
+	tableName string
 }
 
-func NewNDTParser(ins etl.Inserter) *NDTParser {
-	return &NDTParser{ins, tmpDir}
+func NewNDTParser(ins etl.Inserter, tableName, tmpDir string) *NDTParser {
+	return &NDTParser{ins, tmpDir, tableName}
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
@@ -35,22 +36,16 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// TODO(prod): do not write to a temporary file; operate on byte array directly.
 	// Write rawSnapLog to /mnt/tmpfs.
 	if !strings.HasSuffix(testName, "c2s_snaplog") && !strings.HasSuffix(testName, "s2c_snaplog") {
-		// Ignoring non-snaplog file.
+		log.Printf("Ignoring non-snaplog file: %s\n", testName)
 		return nil
-	}
-	tmpFile, err := ioutil.TempFile(n.tmpDir, "snaplog-")
-	if err != nil {
-		log.Printf("Failed to create tmpfile for: %s\n", testName)
-		return err
 	}
 	// Record the file size.
 	metrics.FileSizeHistogram.Observe(float64(len(rawSnapLog)))
-	c := 0
-	for count := 0; count < len(rawSnapLog); count += c {
-		c, err = tmpFile.Write(rawSnapLog)
-		if err != nil {
-			return err
-		}
+	tmpFile := fmt.Sprintf("%s/%s", n.tmpDir, path.Base(testName))
+	log.Printf("writing file: %s\n", tmpFile)
+	err := ioutil.WriteFile(tmpFile, rawSnapLog, 0644)
+	if err != nil {
+		return err
 	}
 	tmpFile.Sync()
 	// TODO(dev): log possible remove errors.
@@ -69,6 +64,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 
+	log.Printf("opening web100 snap file: %s\n", tmpFile)
 	// Open the file we created above.
 	w, err := web100.Open(tmpFile.Name(), legacyNames)
 	if err != nil {
@@ -76,6 +72,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	defer w.Close()
 
+	log.Printf("finding last snaplog\n")
 	// Find the last web100 snapshot.
 	for {
 		err = w.Next()
@@ -85,7 +82,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	// We expect EOF.
 	if err != io.EOF {
-		log.Printf("Failed to reach EOF: %s\n", tmpFile.Name())
+		log.Printf("Failed to reach EOF: %s\n", tmpFile)
 		return err
 	}
 
@@ -94,6 +91,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if err != nil {
 		return err
 	}
+	log.Printf("Inserting values from: %s\n", tmpFile)
 	return n.inserter.InsertRow(&bq.MapSaver{results})
 }
 
