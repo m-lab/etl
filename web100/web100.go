@@ -100,28 +100,28 @@ func (w *Web100) logValues() (map[string]bigquery.Value, error) {
 	agent := C.web100_get_log_agent(log)
 
 	results := make(map[string]bigquery.Value)
-	results["web100_log_entry.version"] = C.GoString(C.web100_get_agent_version(agent))
+	results["web100_log_entry_version"] = C.GoString(C.web100_get_agent_version(agent))
 
 	time := C.web100_get_log_time(log)
-	results["web100_log_entry.log_time"] = int64(time)
+	results["web100_log_entry_log_time"] = int64(time)
 
 	conn := C.web100_get_log_connection(log)
 	// NOTE: web100_connection_spec_v6 is not filled in by the web100 library.
 	// NOTE: addrtype is always WEB100_ADDRTYPE_UNKNOWN.
 	// NOTE: legacy values for local_af are: IPv4 = 0, IPv6 = 1.
-	results["web100_log_entry.connection_spec.local_af"] = int64(0)
+	results["web100_log_entry_connection_spec_local_af"] = int64(0)
 
 	var spec C.struct_web100_connection_spec
 	C.web100_get_connection_spec(conn, &spec)
 
 	// TODO(prod): do not use inet_ntoa because it depends on a static internal buffer.
 	addr := C.struct_in_addr{C.in_addr_t(spec.src_addr)}
-	results["web100_log_entry.connection_spec.local_ip"] = C.GoString(C.inet_ntoa(addr))
-	results["web100_log_entry.connection_spec.local_port"] = int64(spec.src_port)
+	results["web100_log_entry_connection_spec_local_ip"] = C.GoString(C.inet_ntoa(addr))
+	results["web100_log_entry_connection_spec_local_port"] = int64(spec.src_port)
 
 	addr = C.struct_in_addr{C.in_addr_t(spec.dst_addr)}
-	results["web100_log_entry.connection_spec.remote_ip"] = C.GoString(C.inet_ntoa(addr))
-	results["web100_log_entry.connection_spec.remote_port"] = int64(spec.dst_port)
+	results["web100_log_entry_connection_spec_remote_ip"] = C.GoString(C.inet_ntoa(addr))
+	results["web100_log_entry_connection_spec_remote_port"] = int64(spec.dst_port)
 
 	return results, nil
 }
@@ -168,9 +168,9 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 		value, err := strconv.ParseInt(C.GoString((*C.char)(var_text)), 10, 64)
 		if err != nil {
 			// Leave variable as a string.
-			logValues[fmt.Sprintf("web100_log_entry.snap.%s", canonicalName)] = C.GoString((*C.char)(var_text))
+			logValues[fmt.Sprintf("web100_log_entry_snap_%s", canonicalName)] = C.GoString((*C.char)(var_text))
 		} else {
-			logValues[fmt.Sprintf("web100_log_entry.snap.%s", canonicalName)] = value
+			logValues[fmt.Sprintf("web100_log_entry_snap_%s", canonicalName)] = value
 		}
 	}
 	return logValues, nil
