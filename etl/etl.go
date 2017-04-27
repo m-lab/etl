@@ -11,12 +11,16 @@ import (
 // An Inserter provides:
 //   InsertRows - inserts one or more rows into the insert buffer.
 //   Flush - flushes any rows in the buffer out to bigquery.
+//   TableName - name of the BQ table that the uploader pushes to.
+//   Dataset - name of the BQ dataset containing the table.
 //   Count - returns the count of rows currently in the buffer.
 //   RowsInBuffer - returns the count of rows currently in the buffer.
 type Inserter interface {
 	InsertRow(data interface{}) error
 	InsertRows(data []interface{}) error
 	Flush() error
+	TableName() string
+	Dataset() string
 	Count() int
 	RowsInBuffer() int
 }

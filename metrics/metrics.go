@@ -18,21 +18,22 @@ import (
 func init() {
 	// Register the metrics defined with Prometheus's default registry.
 	prometheus.MustRegister(DurationHistogram)
-	prometheus.MustRegister(TestInput)
+	prometheus.MustRegister(InsertionHistogram)
+	prometheus.MustRegister(TaskCount)
 	prometheus.MustRegister(BigQueryInsert)
 }
 
 var (
-	// Counts the number of tests read into the pipeline.
+	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
 	//   etl_worker_test_input_total{status="..."}
 	// Example usage:
-	//   metrics.TestInput.WithLabelValues("ndt", "ok").Inc()
-	TestInput = prometheus.NewCounterVec(
+	//   metrics.TaskCount.WithLabelValues("ndt", "ok").Inc()
+	TaskCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "etl_worker_test_input_total",
-			Help: "Number of test files read from archive files add sent to parsers.",
+			Name: "etl_task_count",
+			Help: "Number of tasks/archive files processed.",
 		},
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
 		[]string{"worker", "status"},
@@ -64,7 +65,32 @@ var (
 	// Usage example:
 	//   t := time.Now()
 	//   // do some stuff.
-	//   metrics.DurationHistogram.WithLabelValues(name).Observe(time.Since(t).Seconds())
+	//   metrics.InsertionHistogram.WithLabelValues("ndt", "ok").Observe(time.Since(t).Seconds())
+	InsertionHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "etl_insertion_time_seconds",
+			Help: "Insertion time distributions.",
+			Buckets: []float64{
+				0.001, 0.003, 0.01, 0.03, 0.1, 0.2, 0.5, 1.0, 2.0,
+				5.0, 10.0, 20.0, 50.0, 100.0, math.Inf(+1),
+			},
+		},
+		// Worker type, e.g. ndt, sidestream, ptr, etc.
+		[]string{"table", "status"},
+	)
+
+	// A histogram of bigquery insertion times. The buckets should use
+	// periods that are intuitive for people.
+	//
+	// Provides metrics:
+	//   etl_insertion_time_seconds_bucket{type="...", le="..."}
+	//   ...
+	//   etl_insertion_time_seconds_sum{type="..."}
+	//   etl_insertion_time_seconds_count{type="..."}
+	// Usage example:
+	//   t := time.Now()
+	//   // do some stuff.
+	//   metrics.InsertionHistogram.WithLabelValues(name).Observe(time.Since(t).Seconds())
 	DurationHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_worker_duration_seconds",

@@ -24,6 +24,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/metrics"
 )
 
 var (
@@ -32,6 +33,7 @@ var (
 )
 
 // Returns the Singleton bigquery client for this process.
+// TODO - is there any advantage to using more than one client?
 func MustGetClient(timeout time.Duration) *bigquery.Client {
 	// We do this here, instead of in init(), because we only want to do it
 	// when we actually want to access the bigquery backend.
@@ -114,26 +116,40 @@ func (in *BQInserter) Flush() error {
 		return nil
 	}
 
+	// TODO - add prometheus counters for attempts, number of rows.
+	t := time.Now()
+
 	// This is heavyweight, and may run forever without a context deadline.
 	ctx, _ := context.WithTimeout(context.Background(), in.timeout)
 	err := in.uploader.Put(ctx, in.rows)
+	var tag string
 	if err == nil {
 		in.inserted += len(in.rows)
 		in.rows = make([]interface{}, 0, in.params.BufferSize)
-		return nil
+		tag = "succeed"
 	} else {
 		log.Printf("Error on flush: %v\n", err)
-		return err
+		tag = "fail"
 	}
+	metrics.InsertionHistogram.WithLabelValues(
+		in.TableName(), tag).Observe(time.Since(t).Seconds())
+	return err
 }
 
+func (in *BQInserter) TableName() string {
+	return in.params.Table
+}
+func (in *BQInserter) Dataset() string {
+	return in.params.Dataset
+}
 func (in *BQInserter) RowsInBuffer() int {
 	return len(in.rows)
 }
-
 func (in *BQInserter) Count() int {
 	return in.inserted + len(in.rows)
 }
+
+//----------------------------------------------------------------------------
 
 type NullInserter struct {
 	etl.Inserter
@@ -148,11 +164,15 @@ func (in *NullInserter) InsertRows(data []interface{}) error {
 func (in *NullInserter) Flush() error {
 	return nil
 }
-
+func (in *NullInserter) TableName() string {
+	return ""
+}
+func (in *NullInserter) Dataset() string {
+	return ""
+}
 func (in *NullInserter) RowsInBuffer() int {
 	return 0
 }
-
 func (in *NullInserter) Count() int {
 	return 0
 }

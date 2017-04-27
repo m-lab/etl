@@ -21,26 +21,23 @@ type Task struct {
 	*storage.ETLSource                           // Source from which to read tests.
 	etl.Parser                                   // Parser to parse the tests.
 	etl.Inserter                                 // provides InsertRows(...)
-	table              string                    // The table to insert rows into, INCLUDING the partition!
 	meta               map[string]bigquery.Value // Metadata about this task.
 }
 
 // NewTask constructs a task, injecting the source and the parser.
-func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser, inserter etl.Inserter, table string) *Task {
+func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser, inserter etl.Inserter) *Task {
 	// TODO - should the meta data be a nested type?
 	meta := make(map[string]bigquery.Value, 3)
 	meta["filename"] = filename
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
-	t := Task{src, prsr, inserter, table, meta}
+	t := Task{src, prsr, inserter, meta}
 	return &t
 }
 
 // ProcessAllTests loops through all the tests in a tar file, calls the
 // injected parser to parse them, and inserts them into bigquery (not yet implemented).
-func (tt *Task) ProcessAllTests() {
-	// TODO(dev) better error handling
-	defer tt.Flush()
+func (tt *Task) ProcessAllTests() error {
 	files := 0
 	nilData := 0
 	// Read each file from the tar
@@ -48,7 +45,7 @@ func (tt *Task) ProcessAllTests() {
 		files += 1
 		if err != nil {
 			if err == io.EOF {
-				return
+				break
 			}
 			// TODO(dev) Handle this error properly!
 			log.Printf("%v", err)
@@ -66,7 +63,7 @@ func (tt *Task) ProcessAllTests() {
 		if err != nil {
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
-			break
+			return err
 		}
 	}
 
@@ -76,6 +73,6 @@ func (tt *Task) ProcessAllTests() {
 		log.Printf("%v", err)
 	}
 	// TODO - make this debug or remove
-	log.Printf("%d files, %d nil data, %d inserts", files, nilData, tt.Count())
-	return
+	log.Printf("%d files, %d nil data, %d rows", files, nilData, tt.Count())
+	return err
 }
