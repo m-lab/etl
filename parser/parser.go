@@ -50,11 +50,10 @@ func (np *NullParser) TableName() string {
 // TODO add tests
 type TestParser struct {
 	inserter etl.Inserter
-	etl.Parser
 }
 
 func NewTestParser(ins etl.Inserter) etl.Parser {
-	return &TestParser{ins, nil}
+	return &TestParser{ins}
 }
 
 func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
