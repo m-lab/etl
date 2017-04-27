@@ -105,7 +105,7 @@ func getParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	case etl.PT:
 		return parser.NewTestParser(ins)
 	case etl.SW:
-		return parser.NewTestParser(ins)
+		return parser.NewDiscoParser(ins)
 	default:
 		return nil
 	}
