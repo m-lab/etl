@@ -2,11 +2,13 @@
 package main
 
 import (
+	"sync/atomic"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
@@ -25,6 +27,11 @@ import (
 	// Enable exported debug vars.  See https://golang.org/pkg/expvar/
 	_ "expvar"
 )
+
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 // Task Queue can always submit to an admin restricted URL.
 //   login: admin
@@ -84,11 +91,13 @@ func getDataType(fn string) etl.DataType {
 	}
 }
 
+// TODO move to another module.
 func getInserter(dt etl.DataType, fake bool) (etl.Inserter, error) {
 	return bq.NewInserter(
-		etl.InserterParams{"mlab_sandbox", etl.TableNames[dt], 10 * time.Second, 100}, nil)
+		etl.InserterParams{"mlab_sandbox", etl.TableNames[dt], 60 * time.Second, 500}, nil)
 }
 
+// TODO move this to another module
 func getParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
 	case etl.NDTData:
@@ -105,7 +114,36 @@ func getParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	}
 }
 
+// Basic throttling to restrict the number of tasks in flight.
+var inFlight int32
+
+// Returns true if request should be rejected.
+func shouldThrottle() bool {
+	if atomic.AddInt32(&inFlight, 1) > 25 {
+		atomic.AddInt32(&inFlight, -1)
+		return true
+	}
+	return false
+}
+
+func decrementInFlight() {
+	atomic.AddInt32(&inFlight, -1)
+}
+
 func worker(w http.ResponseWriter, r *http.Request) {
+	// TODO - replace with appropriate name based on task type.
+	parserName := "disco"
+
+	// Throttle by grabbing a semaphore from channel.
+	if shouldThrottle() {
+		metrics.TaskCount.WithLabelValues(parserName, "TooManyRequests").Inc()
+		fmt.Fprintf(w, `{"message": "Too many tasks."}`)
+		w.WriteHeader(http.StatusTooManyRequests)
+		return
+	}
+	// Decrement counter when worker finishes.
+	defer decrementInFlight()
+
 	workerCount.Inc()
 	defer workerCount.Dec()
 
@@ -118,6 +156,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// This handles base64 encoding, and requires a gs:// prefix.
 	fn, err := getFilename(r.FormValue("filename"))
 	if err != nil {
+		metrics.TaskCount.WithLabelValues("parserName", "BadRequest").Inc()
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		w.WriteHeader(http.StatusBadRequest)
 		log.Printf("Invalid filename: %s\n", fn)
@@ -126,6 +165,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 
 	dataType := getDataType(fn)
 	if dataType == etl.InvalidData {
+		metrics.TaskCount.WithLabelValues("parserName", "BadRequest").Inc()
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		w.WriteHeader(http.StatusBadRequest)
 		log.Printf("Invalid filename: %s\n", fn)
@@ -137,16 +177,20 @@ func worker(w http.ResponseWriter, r *http.Request) {
 
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
+		metrics.TaskCount.WithLabelValues("parserName", "ServiceUnavailable").Inc()
+		log.Printf("Error getting storage client: %v\n", err)
 		fmt.Fprintf(w, `{"message": "Could not create client."}`)
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
 
+	// TODO - add a timer for reading the file.
 	tr, err := storage.NewETLSource(client, fn)
 	if err != nil {
+		metrics.TaskCount.WithLabelValues("parserName", "InternalServerError").Inc()
+		log.Printf("Error downloading file: %v", err)
 		fmt.Fprintf(w, `{"message": "Problem downloading file."}`)
 		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("%v", err)
 		return
 		// TODO - anything better we could do here?
 	}
@@ -158,7 +202,9 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// default.
 	ins, err := getInserter(dataType, false)
 	if err != nil {
-		log.Printf("%v", err)
+
+		metrics.TaskCount.WithLabelValues("parserName", "InternalServerError").Inc()
+		log.Printf("Error creating BQ Inserter:  %v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -166,13 +212,24 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 	// Create parser, injecting Inserter
 	p := getParser(dataType, ins)
-	tsk := task.NewTask(fn, tr, p, ins, "with_meta")
+	tsk := task.NewTask(fn, tr, p, ins)
 
-	tsk.ProcessAllTests()
+	err = tsk.ProcessAllTests()
+	if err != nil {
+		metrics.TaskCount.WithLabelValues("parserName", "InternalServerError").Inc()
+		log.Printf("Error Processing Tests:  %v", err)
+		fmt.Fprintf(w, `{"message": "Error in ProcessAllTests"}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+		// TODO - anything better we could do here?
+	}
 
 	// TODO - if there are any errors, consider sending back a meaningful response
 	// for web browser and queue-pusher debugging.
 	fmt.Fprintf(w, `{"message": "Success"}`)
+
+	// TODO - use actual test type.
+	metrics.TaskCount.WithLabelValues("parserName", "OK").Inc()
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
@@ -205,15 +262,19 @@ func main() {
 	// however it will be served by a random instance.
 	http.Handle("/random-metrics", promhttp.Handler())
 	http.ListenAndServe(":8080", nil)
+
+	// Enable block profiling
+	runtime.SetBlockProfileRate(1000000) // One event per msec.
 }
 
 //=====================================================================================
 //                       Prometheus Monitoring
 //=====================================================================================
 
+// TODO - move to metrics.
 var (
 	workerCount = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "etl_parser_worker_count",
+		Name: "etl_worker_count",
 		Help: "Number of active workers.",
 	})
 )

@@ -78,7 +78,7 @@ func TestTarFileInput(t *testing.T) {
 
 	var prsr TestParser
 	in := bq.NullInserter{}
-	tt := task.NewTask("filename", rdr, &prsr, &in, "test_table")
+	tt := task.NewTask("filename", rdr, &prsr, &in)
 	fn, bb, err := tt.NextTest()
 	if err != nil {
 		t.Error(err)
@@ -104,7 +104,7 @@ func TestTarFileInput(t *testing.T) {
 	// Reset the tar reader and create new task, to test the ProcessAllTests behavior.
 	rdr = MakeTestSource(t)
 
-	tt = task.NewTask("filename", rdr, &prsr, &in, "test_table")
+	tt = task.NewTask("filename", rdr, &prsr, &in)
 	tt.ProcessAllTests()
 
 	if len(prsr.files) != 2 {

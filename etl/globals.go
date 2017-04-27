@@ -14,6 +14,7 @@ var (
 	TaskPattern = regexp.MustCompile(`(.*)/([^/]*)/` + date + `/([^/]*).tgz`)
 )
 
+// TODO - use map[string]... instead of enum
 type DataType int
 
 const (

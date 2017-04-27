@@ -5,13 +5,13 @@ queue:
   target: etl-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
-  rate: 5/s
+  rate: 7/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
-  bucket_size: 50
+  bucket_size: 10
   # Maximum number of concurrent requests.  This is large now, until we address the
   # latency associated with BQ inserts.
-  max_concurrent_requests: 500
+  max_concurrent_requests: 100
 
 ###################################################################################
 - name: etl-pull-queue
