@@ -5,28 +5,41 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
+	"path"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/web100"
 
 	"github.com/m-lab/etl/etl"
 )
 
 type NDTParser struct {
-	etl.Parser
+	inserter  etl.Inserter
 	tmpDir    string
 	tableName string
 }
 
-// TODO correctly implement Parser interface.
-func (n *NDTParser) Parse(meta map[string]bigquery.Value, testName string, rawSnapLog []byte) (interface{}, error) {
+func NewNDTParser(ins etl.Inserter, tableName, tmpDir string) *NDTParser {
+	return &NDTParser{ins, tmpDir, tableName}
+}
+
+// ParseAndInsert extracts the last snaplog from the given raw snap log.
+func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawSnapLog []byte) error {
 	// TODO(prod): do not write to a temporary file; operate on byte array directly.
 	// Write rawSnapLog to /mnt/tmpfs.
-	tmpFile := fmt.Sprintf("%s/%s", n.tmpDir, testName)
+	if !strings.HasSuffix(testName, "c2s_snaplog") && !strings.HasSuffix(testName, "s2c_snaplog") {
+		log.Printf("Ignoring non-snaplog file: %s\n", testName)
+		return nil
+	}
+	tmpFile := fmt.Sprintf("%s/%s", n.tmpDir, path.Base(testName))
+	log.Printf("writing file: %s\n", tmpFile)
 	err := ioutil.WriteFile(tmpFile, rawSnapLog, 0644)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// TODO(dev): log possible remove errors.
 	defer os.Remove(tmpFile)
@@ -36,21 +49,23 @@ func (n *NDTParser) Parse(meta map[string]bigquery.Value, testName string, rawSn
 	data, err := web100.Asset("tcp-kis.txt")
 	if err != nil {
 		// Asset missing from build.
-		return nil, err
+		return err
 	}
 	b := bytes.NewBuffer(data)
 	legacyNames, err := web100.ParseWeb100Definitions(b)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	log.Printf("opening web100 snap file: %s\n", tmpFile)
 	// Open the file we created above.
 	w, err := web100.Open(tmpFile, legacyNames)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer w.Close()
 
+	log.Printf("finding last snaplog\n")
 	// Find the last web100 snapshot.
 	for {
 		err = w.Next()
@@ -60,15 +75,17 @@ func (n *NDTParser) Parse(meta map[string]bigquery.Value, testName string, rawSn
 	}
 	// We expect EOF.
 	if err != io.EOF {
-		return nil, err
+		log.Printf("Failed to reach EOF: %s\n", tmpFile)
+		return err
 	}
 
 	// Extract the values from the last snapshot.
 	results, err := w.Values()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return results, nil
+	log.Printf("Inserting values from: %s\n", tmpFile)
+	return n.inserter.InsertRow(&bq.MapSaver{results})
 }
 
 // TODO(dev) TableName should come from initialization params.
