@@ -44,13 +44,13 @@ type FileNameParser interface {
 	GetDate()
 }
 
-type MLabSnapshot struct {
+// MLabSnapshot in legacy code
+type PT struct {
 	test_id              string
 	project              int // 3 for PARIS_TRACEROUTE
 	log_time             int64
 	connection_spec      MLabConnectionSpecification
 	paris_traceroute_hop ParisTracerouteHop
-	blacklist_flags      int32
 }
 
 type MLabConnectionSpecification struct {
@@ -168,7 +168,6 @@ func ParseFirstLine(oneLine string) (protocal string) {
 	for _, part := range parts {
 		mm := strings.Split(strings.TrimSpace(part), " ")
 		if len(mm) > 1 {
-			fmt.Println(mm[0])
 			if mm[0] == "algo" {
 				if mm[1] != "exhaustive" {
 					log.Fatal("Unexpected algorithm")
@@ -179,7 +178,6 @@ func ParseFirstLine(oneLine string) (protocal string) {
 					log.Fatal("Unknown protocol")
 				} else {
 					protocal = mm[1]
-					fmt.Println(protocal)
 				}
 			}
 		}
@@ -187,8 +185,8 @@ func ParseFirstLine(oneLine string) (protocal string) {
 	return protocal
 }
 
-func GetLogtime(filename string) int64 {
-	date, _ := fn.GetDate()
+func GetLogtime(filename PTFileName) int64 {
+	date, _ := filename.GetDate()
 	// data is in format like "20170320T23:53:10Z"
 	revised_date := date[0:4] + "-" + date[4:6] + "-" + date[6:18]
 	fmt.Println(revised_date)
@@ -198,7 +196,7 @@ func GetLogtime(filename string) int64 {
 		fmt.Println(err)
 		return 0
 	}
-	fmt.Println(t.Unix())
+	
 	return t.Unix()
 }
 
@@ -217,6 +215,7 @@ func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, table
 	fmt.Println(server_IP)
 
 	t := GetLogtime(fn)
+        fmt.Println(t)
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
 	scanner := bufio.NewScanner(file)
