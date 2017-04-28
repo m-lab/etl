@@ -17,17 +17,29 @@ import (
 
 func init() {
 	// Register the metrics defined with Prometheus's default registry.
-	prometheus.MustRegister(DurationHistogram)
-	prometheus.MustRegister(InsertionHistogram)
+	prometheus.MustRegister(WorkerCount)
 	prometheus.MustRegister(TaskCount)
 	prometheus.MustRegister(BigQueryInsert)
+	prometheus.MustRegister(DurationHistogram)
+	prometheus.MustRegister(InsertionHistogram)
 }
 
 var (
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_worker_test_input_total{status="..."}
+	//   etl_worker_count
+	// Example usage:
+	//   metrics.TaskCount.Inc() / .Dec()
+	WorkerCount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "etl_worker_count",
+		Help: "Number of active workers.",
+	})
+
+	// Counts the number of tasks processed by the pipeline.
+	//
+	// Provides metrics:
+	//   etl_task_count{worker, status}
 	// Example usage:
 	//   metrics.TaskCount.WithLabelValues("ndt", "ok").Inc()
 	TaskCount = prometheus.NewCounterVec(
@@ -42,7 +54,7 @@ var (
 	// Counts the number of into BigQuery insert operations.
 	//
 	// Provides metrics:
-	//   etl_worker_bigquery_insert_total{worker="..."}
+	//   etl_worker_bigquery_insert_total{worker, status}
 	// Usage example:
 	//   metrics.BigQueryInsert.WithLabelValues("ndt", "200").Inc()
 	BigQueryInsert = prometheus.NewCounterVec(
@@ -52,31 +64,6 @@ var (
 		},
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
 		[]string{"worker", "status"},
-	)
-
-	// A histogram of worker processing times. The buckets should use
-	// periods that are intuitive for people.
-	//
-	// Provides metrics:
-	//   etl_worker_duration_seconds_bucket{worker="...", le="..."}
-	//   ...
-	//   etl_worker_duration_seconds_sum{worker="..."}
-	//   etl_worker_duration_seconds_count{worker="..."}
-	// Usage example:
-	//   t := time.Now()
-	//   // do some stuff.
-	//   metrics.InsertionHistogram.WithLabelValues("ndt", "ok").Observe(time.Since(t).Seconds())
-	InsertionHistogram = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "etl_insertion_time_seconds",
-			Help: "Insertion time distributions.",
-			Buckets: []float64{
-				0.001, 0.003, 0.01, 0.03, 0.1, 0.2, 0.5, 1.0, 2.0,
-				5.0, 10.0, 20.0, 50.0, 100.0, math.Inf(+1),
-			},
-		},
-		// Worker type, e.g. ndt, sidestream, ptr, etc.
-		[]string{"table", "status"},
 	)
 
 	// A histogram of bigquery insertion times. The buckets should use
@@ -90,7 +77,34 @@ var (
 	// Usage example:
 	//   t := time.Now()
 	//   // do some stuff.
-	//   metrics.InsertionHistogram.WithLabelValues(name).Observe(time.Since(t).Seconds())
+	//   metrics.InsertionHistogram.WithLabelValues(
+	//           "ndt_test", "ok").Observe(time.Since(t).Seconds())
+	InsertionHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "etl_insertion_time_seconds",
+			Help: "Insertion time distributions.",
+			Buckets: []float64{
+				0.001, 0.003, 0.01, 0.03, 0.1, 0.2, 0.5, 1.0, 2.0,
+				5.0, 10.0, 20.0, 50.0, 100.0, math.Inf(+1),
+			},
+		},
+		// Worker type, e.g. ndt, sidestream, ptr, etc.
+		[]string{"table", "status"},
+	)
+
+	// A histogram of worker processing times. The buckets should use
+	// periods that are intuitive for people.
+	//
+	// Provides metrics:
+	//   etl_worker_duration_seconds_bucket{worker="...", le="..."}
+	//   ...
+	//   etl_worker_duration_seconds_sum{worker="..."}
+	//   etl_worker_duration_seconds_count{worker="..."}
+	// Usage example:
+	//   t := time.Now()
+	//   // do some stuff.
+	//   metrics.DurationHistogram.WithLabelValues(
+	//           "ndt").Observe(time.Since(t).Seconds())
 	DurationHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_worker_duration_seconds",

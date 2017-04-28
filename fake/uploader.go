@@ -26,7 +26,7 @@ import (
 // Create a test inserter, that uses a dummy Uploader instead of contacting BQ.
 func NewFakeInserter(params etl.InserterParams) (etl.Inserter, error) {
 	uploader := NewFakeUploader()
-	return bq.NewInserter(params, uploader)
+	return bq.NewBQInserter(params, uploader)
 }
 
 //---------------------------------------------------------------------------------------
