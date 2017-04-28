@@ -51,7 +51,7 @@ func TestJSONParsing(t *testing.T) {
 
 	var parser etl.Parser = parser.NewDiscoParser(ins)
 
-	meta := map[string]bigquery.Value{"filename": "filename", "parse_time": time.Now()}
+	meta := map[string]bigquery.Value{"filename": "filename", "parsetime": time.Now()}
 	// Should result in two tests sent to inserter, but no call to uploader.
 	err = parser.ParseAndInsert(meta, "testName", test_data)
 	if ins.Count() != 2 {
@@ -97,10 +97,18 @@ func xTestRealBackend(t *testing.T) {
 
 	var parser etl.Parser = parser.NewDiscoParser(ins)
 
-	meta := map[string]bigquery.Value{"filename": "filename", "parse_time": time.Now()}
-	err = parser.ParseAndInsert(meta, "testName", test_data)
-	err = parser.ParseAndInsert(meta, "testName", test_data)
-	err = parser.ParseAndInsert(meta, "testName", test_data)
+	meta := map[string]bigquery.Value{"filename": "filename", "parsetime": time.Now()}
+	for i := 0; i < 3; i++ {
+		// Iterations:
+		// Add two rows, no upload.
+		// Add two more rows, triggering an upload of 3 rows.
+		// Add two more rows, triggering an upload of 3 rows.
+		err = parser.ParseAndInsert(meta, "testName", test_data)
+		if ins.Count() != 2 {
+			t.Error("Count = ", ins.Count())
+			t.Fail()
+		}
+	}
 
 	if ins.Count() != 6 {
 		t.Error("Count = ", ins.Count())

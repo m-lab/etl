@@ -49,7 +49,7 @@ func NewDiscoParser(ins etl.Inserter) etl.Parser {
 }
 
 // Disco data a JSON representation that should be pushed directly into BigQuery.
-// For now, though, we translate it into a map, for compatibility with current inserter
+// For now, though, we parse into a struct, for compatibility with current inserter
 // backend.
 //
 // Returns:
@@ -66,7 +66,7 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 		FileName  string `json:"filename, string"`
 		TestName  string `json:"testname, string"`
 		ParseTime int64  `json:"parsetime, int64"`
-	}{meta["filename"].(string), meta["testname"].(string), meta["parse_time"].(time.Time).Unix()}
+	}{meta["filename"].(string), meta["testname"].(string), meta["parsetime"].(time.Time).Unix()}
 
 	rdr := bytes.NewReader(test)
 	dec := json.NewDecoder(rdr)
@@ -82,6 +82,7 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 		if err != nil {
 			switch t := err.(type) {
 			case bigquery.PutMultiError:
+				// TODO improve error handling??
 				log.Printf("%v\n", t[0].Error())
 			default:
 			}
