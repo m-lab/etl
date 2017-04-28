@@ -13,8 +13,6 @@ package web100
 #include <web100-int.h>
 
 #include <arpa/inet.h>
-
-#cgo CFLAGS: -Og
 */
 import "C"
 
