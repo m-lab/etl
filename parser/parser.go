@@ -15,9 +15,10 @@ import (
 func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
 	case etl.NDT:
-		// TODO - substitute appropriate parsers here and below.
-		return NewTestParser(ins)
+		// TODO - eliminate need for "/mnt/tmpfs"
+		return parser.NewNDTParser(ins, etl.TableNames[etl.NDTData], "/mnt/tmpfs")
 	case etl.SS:
+		// TODO - substitute appropriate parsers here and below.
 		return NewTestParser(ins)
 	case etl.PT:
 		return NewTestParser(ins)

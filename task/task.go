@@ -49,7 +49,7 @@ func (tt *Task) ProcessAllTests() error {
 			}
 			// TODO(dev) Handle this error properly!
 			log.Printf("%v", err)
-			continue
+			break
 		}
 		if data == nil {
 			// TODO(dev) Handle directories (expected) and other
