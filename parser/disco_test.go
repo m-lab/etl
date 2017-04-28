@@ -46,7 +46,7 @@ var test_data []byte = []byte(`{
 func TestJSONParsing(t *testing.T) {
 	// This creates a real inserter, with a fake uploader, for local testing.
 	uploader := fake.FakeUploader{}
-	ins, err := bq.NewInserter(etl.InserterParams{
+	ins, err := bq.NewBQInserter(etl.InserterParams{
 		"mlab_sandbox", "disco_test", 10 * time.Second, 3}, &uploader)
 
 	var parser etl.Parser = parser.NewDiscoParser(ins)
@@ -92,7 +92,7 @@ func TestJSONParsing(t *testing.T) {
 // DISABLED
 // This tests insertion into a test table in the cloud.  Should not normally be executed.
 func xTestRealBackend(t *testing.T) {
-	ins, err := bq.NewInserter(etl.InserterParams{
+	ins, err := bq.NewBQInserter(etl.InserterParams{
 		"mlab_sandbox", "disco_test", 10 * time.Second, 3}, nil)
 
 	var parser etl.Parser = parser.NewDiscoParser(ins)

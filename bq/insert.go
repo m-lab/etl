@@ -15,7 +15,6 @@
 package bq
 
 import (
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -26,6 +25,25 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 )
+
+// TODO - improve the naming between here and NewInserter.
+func NewInserter(dataset string, dt etl.DataType) (etl.Inserter, error) {
+	return NewBQInserter(
+		etl.InserterParams{dataset, etl.TableNames[dt],
+			//etl.DataTypeToTable[dt],
+			60 * time.Second, 500}, nil)
+}
+
+// Pass in nil uploader for normal use, custom uploader for custom behavior
+func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
+	if uploader == nil {
+		client := MustGetClient(params.Timeout)
+		uploader = client.Dataset(params.Dataset).Table(params.Table).Uploader()
+	}
+	in := BQInserter{params: params, uploader: uploader, timeout: params.Timeout}
+	in.rows = make([]interface{}, 0, in.params.BufferSize)
+	return &in, nil
+}
 
 var (
 	clientOnce sync.Once // This avoids a race on setting bqClient.
@@ -73,17 +91,6 @@ type BQInserter struct {
 	inserted int // Number of rows successfully inserted.
 }
 
-// Pass in nil uploader for normal use, custom uploader for custom behavior
-func NewInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
-	if uploader == nil {
-		client := MustGetClient(params.Timeout)
-		uploader = client.Dataset(params.Dataset).Table(params.Table).Uploader()
-	}
-	in := BQInserter{params: params, uploader: uploader, timeout: params.Timeout}
-	in.rows = make([]interface{}, 0, in.params.BufferSize)
-	return &in, nil
-}
-
 // Caller should check error, and take appropriate action before calling again.
 func (in *BQInserter) InsertRow(data interface{}) error {
 	return in.InsertRows([]interface{}{data})
@@ -116,23 +123,13 @@ func (in *BQInserter) Flush() error {
 		return nil
 	}
 
-	// TODO - add prometheus counters for attempts, number of rows.
-	t := time.Now()
-
 	// This is heavyweight, and may run forever without a context deadline.
 	ctx, _ := context.WithTimeout(context.Background(), in.timeout)
 	err := in.uploader.Put(ctx, in.rows)
-	var tag string
 	if err == nil {
 		in.inserted += len(in.rows)
 		in.rows = make([]interface{}, 0, in.params.BufferSize)
-		tag = "succeed"
-	} else {
-		log.Printf("Error on flush: %v\n", err)
-		tag = "fail"
 	}
-	metrics.InsertionHistogram.WithLabelValues(
-		in.TableName(), tag).Observe(time.Since(t).Seconds())
 	return err
 }
 
@@ -175,4 +172,24 @@ func (in *NullInserter) RowsInBuffer() int {
 }
 func (in *NullInserter) Count() int {
 	return 0
+}
+
+//----------------------------------------------------------------------------
+
+// Inserter wrapper that handles flush metrics.
+// TODO - add prometheus counters for attempts, number of rows.
+type DurationWrapper struct {
+	etl.Inserter
+}
+
+func (dw DurationWrapper) Flush() error {
+	t := time.Now()
+	status := "succeed"
+	err := dw.Inserter.Flush()
+	if err != nil {
+		status = "fail"
+	}
+	metrics.DurationHistogram.WithLabelValues(
+		dw.TableName(), status).Observe(time.Since(t).Seconds())
+	return err
 }

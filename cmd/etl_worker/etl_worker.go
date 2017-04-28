@@ -2,7 +2,6 @@
 package main
 
 import (
-	"sync/atomic"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/m-lab/etl/bq"
@@ -18,7 +18,6 @@ import (
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
@@ -93,8 +92,14 @@ func getDataType(fn string) etl.DataType {
 
 // TODO move to another module.
 func getInserter(dt etl.DataType, fake bool) (etl.Inserter, error) {
-	return bq.NewInserter(
-		etl.InserterParams{"mlab_sandbox", etl.TableNames[dt], 60 * time.Second, 500}, nil)
+	ins, err := bq.NewBQInserter(
+		etl.InserterParams{"mlab_sandbox", etl.TableNames[dt],
+            // etl.DataTypeToTable[dt],
+			60 * time.Second, 500}, nil)
+	if err != nil {
+		return ins, err
+	}
+	return bq.DurationWrapper{ins}, err
 }
 
 // TODO move this to another module
@@ -131,12 +136,9 @@ func decrementInFlight() {
 }
 
 func worker(w http.ResponseWriter, r *http.Request) {
-	// TODO - replace with appropriate name based on task type.
-	parserName := "disco"
-
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
-		metrics.TaskCount.WithLabelValues(parserName, "TooManyRequests").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
 		fmt.Fprintf(w, `{"message": "Too many tasks."}`)
 		w.WriteHeader(http.StatusTooManyRequests)
 		return
@@ -144,8 +146,8 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// Decrement counter when worker finishes.
 	defer decrementInFlight()
 
-	workerCount.Inc()
-	defer workerCount.Dec()
+	metrics.WorkerCount.Inc()
+	defer metrics.WorkerCount.Dec()
 
 	r.ParseForm()
 	// Log request data.
@@ -156,16 +158,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// This handles base64 encoding, and requires a gs:// prefix.
 	fn, err := getFilename(r.FormValue("filename"))
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("parserName", "BadRequest").Inc()
-		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
-		w.WriteHeader(http.StatusBadRequest)
-		log.Printf("Invalid filename: %s\n", fn)
-		return
-	}
-
-	dataType := getDataType(fn)
-	if dataType == etl.InvalidData {
-		metrics.TaskCount.WithLabelValues("parserName", "BadRequest").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		w.WriteHeader(http.StatusBadRequest)
 		log.Printf("Invalid filename: %s\n", fn)
@@ -175,9 +168,21 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): log the originating task queue name from headers.
 	log.Printf("Received filename: %q\n", fn)
 
+	dataType := getDataType(fn)
+	if dataType == etl.InvalidData {
+		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
+		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
+		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("Invalid filename: %s\n", fn)
+		return
+	}
+
+	// TODO - replace with appropriate name based on task type.
+	parserName := "disco"
+
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("parserName", "ServiceUnavailable").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "ServiceUnavailable").Inc()
 		log.Printf("Error getting storage client: %v\n", err)
 		fmt.Fprintf(w, `{"message": "Could not create client."}`)
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -187,7 +192,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO - add a timer for reading the file.
 	tr, err := storage.NewETLSource(client, fn)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("parserName", "InternalServerError").Inc()
+		metrics.TaskCount.WithLabelValues(parserName, "InternalServerError").Inc()
 		log.Printf("Error downloading file: %v", err)
 		fmt.Fprintf(w, `{"message": "Problem downloading file."}`)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -203,7 +208,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	ins, err := getInserter(dataType, false)
 	if err != nil {
 
-		metrics.TaskCount.WithLabelValues("parserName", "InternalServerError").Inc()
+		metrics.TaskCount.WithLabelValues(parserName, "InternalServerError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -216,7 +221,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 
 	err = tsk.ProcessAllTests()
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("parserName", "InternalServerError").Inc()
+		metrics.TaskCount.WithLabelValues(parserName, "InternalServerError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
 		fmt.Fprintf(w, `{"message": "Error in ProcessAllTests"}`)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -228,8 +233,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// for web browser and queue-pusher debugging.
 	fmt.Fprintf(w, `{"message": "Success"}`)
 
-	// TODO - use actual test type.
-	metrics.TaskCount.WithLabelValues("parserName", "OK").Inc()
+	metrics.TaskCount.WithLabelValues(parserName, "OK").Inc()
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
@@ -257,28 +261,12 @@ func main() {
 	http.HandleFunc("/worker", metrics.DurationHandler("generic", worker))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
 
+	// Enable block profiling
+	runtime.SetBlockProfileRate(1000000) // One event per msec.
+
 	// We also setup another prometheus handler on a non-standard path. This
 	// path name will be accessible through the AppEngine service address,
 	// however it will be served by a random instance.
 	http.Handle("/random-metrics", promhttp.Handler())
 	http.ListenAndServe(":8080", nil)
-
-	// Enable block profiling
-	runtime.SetBlockProfileRate(1000000) // One event per msec.
-}
-
-//=====================================================================================
-//                       Prometheus Monitoring
-//=====================================================================================
-
-// TODO - move to metrics.
-var (
-	workerCount = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "etl_worker_count",
-		Help: "Number of active workers.",
-	})
-)
-
-func init() {
-	prometheus.MustRegister(workerCount)
 }
