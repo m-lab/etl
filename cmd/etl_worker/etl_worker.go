@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -83,34 +82,6 @@ func getDataType(fn string) etl.DataType {
 	return dt
 }
 
-// TODO move to another module.
-func getInserter(dt etl.DataType, fake bool) (etl.Inserter, error) {
-	ins, err := bq.NewBQInserter(
-		etl.InserterParams{"mlab_sandbox", etl.DataTypeToTable[dt],
-			60 * time.Second, 500}, nil)
-	if err != nil {
-		return ins, err
-	}
-	return bq.DurationWrapper{ins}, err
-}
-
-// TODO move this to another module
-func getParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
-	switch dt {
-	case etl.NDT:
-		// TODO - substitute appropriate parsers here and below.
-		return parser.NewTestParser(ins)
-	case etl.SS:
-		return parser.NewTestParser(ins)
-	case etl.PT:
-		return parser.NewTestParser(ins)
-	case etl.SW:
-		return parser.NewTestParser(ins)
-	default:
-		return nil
-	}
-}
-
 // Basic throttling to restrict the number of tasks in flight.
 var inFlight int32
 
@@ -169,9 +140,6 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO - replace with appropriate name based on task type.
-	parserName := "disco"
-
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues("unknown", "ServiceUnavailable").Inc()
@@ -184,7 +152,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO - add a timer for reading the file.
 	tr, err := storage.NewETLSource(client, fn)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(parserName, "InternalServerError").Inc()
+		metrics.TaskCount.WithLabelValues(string(dataType), "InternalServerError").Inc()
 		log.Printf("Error downloading file: %v", err)
 		fmt.Fprintf(w, `{"message": "Problem downloading file."}`)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -193,27 +161,26 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tr.Close()
 
-	// TODO(dev) Use a more thoughtful setting for buffer size.
-	// For now, 10K per row times 100 results is 1MB, which is an order of
-	// magnitude below our 10MB max, so 100 might not be such a bad
-	// default.
-	ins, err := getInserter(dataType, false)
+	ins, err := bq.NewInserter("mlab_sandbox", dataType)
 	if err != nil {
-
-		metrics.TaskCount.WithLabelValues(parserName, "InternalServerError").Inc()
+		metrics.TaskCount.WithLabelValues(string(dataType), "InternalServerError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 		// TODO - anything better we could do here?
 	}
+
+	// Wrap inserter to give insertion time metrics.
+	ins = bq.DurationWrapper{ins}
+
 	// Create parser, injecting Inserter
-	p := getParser(dataType, ins)
+	p := parser.NewParser(dataType, ins)
 	tsk := task.NewTask(fn, tr, p, ins)
 
 	err = tsk.ProcessAllTests()
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(parserName, "InternalServerError").Inc()
+		metrics.TaskCount.WithLabelValues(string(dataType), "InternalServerError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
 		fmt.Fprintf(w, `{"message": "Error in ProcessAllTests"}`)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -225,7 +192,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// for web browser and queue-pusher debugging.
 	fmt.Fprintf(w, `{"message": "Success"}`)
 
-	metrics.TaskCount.WithLabelValues(parserName, "OK").Inc()
+	metrics.TaskCount.WithLabelValues(string(dataType), "OK").Inc()
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {

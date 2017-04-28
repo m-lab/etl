@@ -8,6 +8,7 @@ exports.fileIsProcessable = function (file) {
 
 exports.queueForFile = function (filename) {
     const experiment_to_task_queue = {
+        "switch": "etl-parser-queue",
         "ndt": "etl-ndt-queue",
         "sidestream": "etl-sidestream-queue",
         "paris-traceroute": "etl-paris-traceroute-queue"

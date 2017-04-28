@@ -26,13 +26,17 @@ import (
 	"github.com/m-lab/etl/metrics"
 )
 
-// TODO - improve the naming between here and NewInserter.
+// TODO(dev) Use a more thoughtful setting for buffer size.
+// For now, 10K per row times 100 results is 1MB, which is an order of
+// magnitude below our 10MB max, so 100 might not be such a bad
+// default.
 func NewInserter(dataset string, dt etl.DataType) (etl.Inserter, error) {
 	return NewBQInserter(
 		etl.InserterParams{dataset, etl.DataTypeToTable[dt],
 			60 * time.Second, 500}, nil)
 }
 
+// TODO - improve the naming between here and NewInserter.
 // Pass in nil uploader for normal use, custom uploader for custom behavior
 func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
 	if uploader == nil {
