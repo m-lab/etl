@@ -2,16 +2,15 @@ package parser
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/web100"
 
 	"github.com/m-lab/etl/etl"
@@ -32,17 +31,26 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// TODO(prod): do not write to a temporary file; operate on byte array directly.
 	// Write rawSnapLog to /mnt/tmpfs.
 	if !strings.HasSuffix(testName, "c2s_snaplog") && !strings.HasSuffix(testName, "s2c_snaplog") {
-		log.Printf("Ignoring non-snaplog file: %s\n", testName)
+		// Ignoring non-snaplog file.
 		return nil
 	}
-	tmpFile := fmt.Sprintf("%s/%s", n.tmpDir, path.Base(testName))
-	log.Printf("writing file: %s\n", tmpFile)
-	err := ioutil.WriteFile(tmpFile, rawSnapLog, 0644)
+	tmpFile, err := ioutil.TempFile(n.tmpDir, "snaplog-")
 	if err != nil {
+		log.Printf("Failed to create tmpfile for: %s\n", testName)
 		return err
 	}
+	// Record the file size.
+	metrics.FileSizeHistogram.Observe(float64(len(rawSnapLog)))
+	c := 0
+	for count := 0; count < len(rawSnapLog); count += c {
+		c, err = tmpFile.Write(rawSnapLog)
+		if err != nil {
+			return err
+		}
+	}
+	tmpFile.Sync()
 	// TODO(dev): log possible remove errors.
-	defer os.Remove(tmpFile)
+	defer os.Remove(tmpFile.Name())
 
 	// TODO(dev): only do this once.
 	// Parse the tcp-kis.txt web100 variable definition file.
@@ -57,15 +65,13 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 
-	log.Printf("opening web100 snap file: %s\n", tmpFile)
 	// Open the file we created above.
-	w, err := web100.Open(tmpFile, legacyNames)
+	w, err := web100.Open(tmpFile.Name(), legacyNames)
 	if err != nil {
 		return err
 	}
 	defer w.Close()
 
-	log.Printf("finding last snaplog\n")
 	// Find the last web100 snapshot.
 	for {
 		err = w.Next()
@@ -75,7 +81,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	// We expect EOF.
 	if err != io.EOF {
-		log.Printf("Failed to reach EOF: %s\n", tmpFile)
+		log.Printf("Failed to reach EOF: %s\n", tmpFile.Name())
 		return err
 	}
 
@@ -84,7 +90,6 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if err != nil {
 		return err
 	}
-	log.Printf("Inserting values from: %s\n", tmpFile)
 	return n.inserter.InsertRow(&bq.MapSaver{results})
 }
 

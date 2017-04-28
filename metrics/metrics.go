@@ -22,6 +22,7 @@ func init() {
 	prometheus.MustRegister(BigQueryInsert)
 	prometheus.MustRegister(DurationHistogram)
 	prometheus.MustRegister(InsertionHistogram)
+	prometheus.MustRegister(FileSizeHistogram)
 }
 
 var (
@@ -117,6 +118,28 @@ var (
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
 		// TODO(soltesz): support a status field based on HTTP status.
 		[]string{"worker"},
+	)
+
+	FileSizeHistogram = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name: "etl_web100_snaplog_file_size_bytes",
+			Help: "Size of individual snaplog files.",
+			Buckets: []float64{
+				100000,
+				1000000,   // mb
+				2000000,   // mb
+				4000000,   // mb
+				8000000,   // mb
+				10000000,  // 10 mb
+				20000000,  // 20
+				40000000,  // 40
+				80000000,  // 80
+				100000000, // 100 mb
+				200000000, // 200
+				400000000, // 400
+				800000000, // 800
+			},
+		},
 	)
 )
 

@@ -13,6 +13,8 @@ package web100
 #include <web100-int.h>
 
 #include <arpa/inet.h>
+
+#cgo CFLAGS: -Og
 */
 import "C"
 
@@ -21,9 +23,14 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 	"unsafe"
 
 	"cloud.google.com/go/bigquery"
+)
+
+var (
+	web100Lock sync.Mutex
 )
 
 // Discoveries:
@@ -43,6 +50,8 @@ type Web100 struct {
 // Open prepares a web100 log file for reading. The caller must call Close on
 // the returned Web100 instance to release resources.
 func Open(filename string, legacyNames map[string]string) (*Web100, error) {
+	web100Lock.Lock()
+
 	c_filename := C.CString(filename)
 	defer C.free(unsafe.Pointer(c_filename))
 
@@ -178,6 +187,8 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 
 // Close releases resources created by Open.
 func (w *Web100) Close() error {
+	web100Lock.Unlock()
+
 	snap := (*C.web100_snapshot)(w.snap)
 	C.web100_snapshot_free(snap)
 
