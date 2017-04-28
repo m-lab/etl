@@ -14,23 +14,33 @@ var (
 	TaskPattern = regexp.MustCompile(`(.*)/([^/]*)/` + date + `/([^/]*).tgz`)
 )
 
-// TODO - use map[string]... instead of enum
-type DataType int
+type DataType string
 
 const (
-	InvalidData DataType = iota
-	NDTData
-	SSData
-	PTData
-	SWData
+	NDT     = DataType("ndt")
+	SS      = DataType("sidestream")
+	PT      = DataType("traceroute")
+	SW      = DataType("disco")
+	INVALID = DataType("invalid")
 )
 
-// Temporary - should come from a config.
 var (
-	TableNames = map[DataType]string{
-		NDTData: "ndt_test",
-		SSData:  "ss_test",
-		PTData:  "pt_test",
-		SWData:  "disco_test",
+	// Map from gs:// subdirectory to data type.
+	// TODO - this should be loaded from a config.
+	DirToDataType = map[string]DataType{
+		"ndt":              NDT,
+		"sidestream":       SS,
+		"paris-traceroute": PT,
+		"switch":           SW,
+	}
+
+	// Map from data type to BigQuery table name.
+	// TODO - this should be loaded from a config.
+	DataTypeToTable = map[DataType]string{
+		NDT:     "ndt_test",
+		SS:      "ss_test",
+		PT:      "pt_test",
+		SW:      "disco_test",
+		INVALID: "invalid",
 	}
 )

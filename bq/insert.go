@@ -29,8 +29,7 @@ import (
 // TODO - improve the naming between here and NewInserter.
 func NewInserter(dataset string, dt etl.DataType) (etl.Inserter, error) {
 	return NewBQInserter(
-		etl.InserterParams{dataset, etl.TableNames[dt],
-			//etl.DataTypeToTable[dt],
+		etl.InserterParams{dataset, etl.DataTypeToTable[dt],
 			60 * time.Second, 500}, nil)
 }
 
