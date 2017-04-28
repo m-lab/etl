@@ -8,20 +8,20 @@ import (
 	"golang.org/x/net/context"
 )
 
-// An Inserter provides:
-//   InsertRows - inserts one or more rows into the insert buffer.
-//   Flush - flushes any rows in the buffer out to bigquery.
-//   TableName - name of the BQ table that the uploader pushes to.
-//   Dataset - name of the BQ dataset containing the table.
-//   Count - returns the count of rows currently in the buffer.
-//   RowsInBuffer - returns the count of rows currently in the buffer.
 type Inserter interface {
+	// InsertRow inserts one row into the insert buffer.
 	InsertRow(data interface{}) error
+	// InsertRows inserts multiple rows into the insert buffer.
 	InsertRows(data []interface{}) error
+	// Flush flushes any rows in the buffer out to bigquery.
 	Flush() error
+	// TableName name of the BQ table that the uploader pushes to.
 	TableName() string
+	// Dataset name of the BQ dataset containing the table.
 	Dataset() string
+	// Count returns the count of rows currently in the buffer.
 	Count() int
+	// RowsInBuffer returns the count of rows currently in the buffer.
 	RowsInBuffer() int
 }
 

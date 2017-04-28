@@ -74,27 +74,19 @@ func getFilename(filename string) (string, error) {
 func getDataType(fn string) etl.DataType {
 	fields := etl.TaskPattern.FindStringSubmatch(fn)
 	if fields == nil {
-		return etl.InvalidData
+		return etl.INVALID
 	}
-	switch fields[2] {
-	case "ndt":
-		return etl.NDTData
-	case "sidestream":
-		return etl.SSData
-	case "paris-traceroute":
-		return etl.PTData
-	case "switch":
-		return etl.SWData
-	default:
-		return etl.InvalidData
+	dt, ok := etl.DirToDataType[fields[2]]
+	if !ok {
+		return etl.INVALID
 	}
+	return dt
 }
 
 // TODO move to another module.
 func getInserter(dt etl.DataType, fake bool) (etl.Inserter, error) {
 	ins, err := bq.NewBQInserter(
-		etl.InserterParams{"mlab_sandbox", etl.TableNames[dt],
-            // etl.DataTypeToTable[dt],
+		etl.InserterParams{"mlab_sandbox", etl.DataTypeToTable[dt],
 			60 * time.Second, 500}, nil)
 	if err != nil {
 		return ins, err
@@ -105,14 +97,14 @@ func getInserter(dt etl.DataType, fake bool) (etl.Inserter, error) {
 // TODO move this to another module
 func getParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
-	case etl.NDTData:
+	case etl.NDT:
 		// TODO - substitute appropriate parsers here and below.
 		return parser.NewTestParser(ins)
-	case etl.SSData:
+	case etl.SS:
 		return parser.NewTestParser(ins)
-	case etl.PTData:
+	case etl.PT:
 		return parser.NewTestParser(ins)
-	case etl.SWData:
+	case etl.SW:
 		return parser.NewTestParser(ins)
 	default:
 		return nil
@@ -169,7 +161,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Received filename: %q\n", fn)
 
 	dataType := getDataType(fn)
-	if dataType == etl.InvalidData {
+	if dataType == etl.INVALID {
 		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		w.WriteHeader(http.StatusBadRequest)
