@@ -105,8 +105,6 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	for {
 		err = w.Next()
 		if err != nil {
-			metrics.TestCount.With(prometheus.Labels{
-				"table": n.TableName(), "type": "tmp-read"}).Inc()
 			break
 		}
 	}
