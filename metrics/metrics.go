@@ -19,6 +19,7 @@ func init() {
 	// Register the metrics defined with Prometheus's default registry.
 	prometheus.MustRegister(WorkerCount)
 	prometheus.MustRegister(TaskCount)
+	prometheus.MustRegister(TestCount)
 	prometheus.MustRegister(BigQueryInsert)
 	prometheus.MustRegister(DurationHistogram)
 	prometheus.MustRegister(InsertionHistogram)
@@ -50,6 +51,21 @@ var (
 		},
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
 		[]string{"worker", "status"},
+	)
+
+	// Counts the number of tests processed by the parsers..
+	//
+	// Provides metrics:
+	//   etl_test_count{type}
+	// Example usage:
+	//   metrics.TaskCount.WithLabelValues("s2c").Inc()
+	TestCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_test_count",
+			Help: "Number of tests processed.",
+		},
+		// Test type, e.g. s2c, c2s, reject, traceroute, sidestream
+		[]string{"table", "type"},
 	)
 
 	// Counts the number of into BigQuery insert operations.

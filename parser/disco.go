@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/metrics"
 )
 
 //=====================================================================================
@@ -59,7 +60,8 @@ func NewDiscoParser(ins etl.Inserter) etl.Parser {
 //
 // TODO - optimize this to use the JSON directly, if possible.
 func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	testCount.With(prometheus.Labels{"table": dp.TableName()}).Inc()
+	// TODO - handle errors in counts.
+	metrics.TestCount.With(prometheus.Labels{"table": dp.TableName(), "type": "disco"}).Inc()
 
 	meta["testname"] = testName
 	ms := struct {
