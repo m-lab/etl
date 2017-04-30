@@ -99,6 +99,8 @@ func decrementInFlight() {
 }
 
 func worker(w http.ResponseWriter, r *http.Request) {
+	metrics.TaskCount.WithLabelValues("unknown", "Total").Inc()
+
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
 		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
