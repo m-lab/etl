@@ -94,6 +94,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Open the file we created above.
 	w, err := web100.Open(tmpFile.Name(), legacyNames)
 	if err != nil {
+		metrics.TestCount.With(prometheus.Labels{
+			"table": n.TableName(), "type": "bad-open"}).Inc()
 		return err
 	}
 	defer w.Close()
@@ -103,6 +105,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	for {
 		err = w.Next()
 		if err != nil {
+			metrics.TestCount.With(prometheus.Labels{
+				"table": n.TableName(), "type": "tmp-read"}).Inc()
 			break
 		}
 	}
