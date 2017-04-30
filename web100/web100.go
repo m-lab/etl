@@ -28,6 +28,7 @@ import (
 )
 
 var (
+	// TODO(prod): eliminate this lock (along with tmpfs).
 	web100Lock sync.Mutex
 )
 
