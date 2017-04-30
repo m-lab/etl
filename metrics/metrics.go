@@ -120,6 +120,7 @@ var (
 		[]string{"worker"},
 	)
 
+	// TODO(dev): generalize this metric for size of any file type.
 	FileSizeHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name: "etl_web100_snaplog_file_size_bytes",
