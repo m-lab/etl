@@ -42,8 +42,8 @@ type Web100 struct {
 	legacyNames map[string]string
 
 	// Do not export unsafe pointers.
-	log  unsafe.Pointer
-	snap unsafe.Pointer
+	snaplog unsafe.Pointer
+	snap    unsafe.Pointer
 }
 
 // Open prepares a web100 log file for reading. The caller must call Close on
@@ -55,17 +55,17 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	defer C.free(unsafe.Pointer(c_filename))
 
 	// TODO(prod): do not require reading from a file. Accept a byte array.
-	log := C.web100_log_open_read(c_filename)
-	if log == nil {
+	snaplog := C.web100_log_open_read(c_filename)
+	if snaplog == nil {
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
 	}
 
 	// Pre-allocate a snapshot record.
-	snap := C.web100_snapshot_alloc_from_log(log)
+	snap := C.web100_snapshot_alloc_from_log(snaplog)
 
 	w := &Web100{
 		legacyNames: legacyNames,
-		log:         unsafe.Pointer(log),
+		snaplog:         unsafe.Pointer(snaplog),
 		snap:        unsafe.Pointer(snap),
 	}
 	return w, nil
@@ -74,11 +74,11 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 // Next iterates through the web100 log file reading the next snapshot record
 // until EOF or an error occurs.
 func (w *Web100) Next() error {
-	log := (*C.web100_log)(w.log)
+	snaplog := (*C.web100_log)(w.snaplog)
 	snap := (*C.web100_snapshot)(w.snap)
 
 	// Read the next web100_snaplog data from underlying file.
-	err := C.web100_snap_from_log(snap, log)
+	err := C.web100_snap_from_log(snap, snaplog)
 	if err == C.EOF {
 		return io.EOF
 	}
@@ -103,17 +103,17 @@ func (w *Web100) Values() (map[string]bigquery.Value, error) {
 // logValues returns a map of values from the web100 log. IPv6 address
 // connection information is not available and must be set based on a snapshot.
 func (w *Web100) logValues() (map[string]bigquery.Value, error) {
-	log := (*C.web100_log)(w.log)
+	snaplog := (*C.web100_log)(w.snaplog)
 
-	agent := C.web100_get_log_agent(log)
+	agent := C.web100_get_log_agent(snaplog)
 
 	results := make(map[string]bigquery.Value)
 	results["web100_log_entry_version"] = C.GoString(C.web100_get_agent_version(agent))
 
-	time := C.web100_get_log_time(log)
+	time := C.web100_get_log_time(snaplog)
 	results["web100_log_entry_log_time"] = int64(time)
 
-	conn := C.web100_get_log_connection(log)
+	conn := C.web100_get_log_connection(snaplog)
 	// NOTE: web100_connection_spec_v6 is not filled in by the web100 library.
 	// NOTE: addrtype is always WEB100_ADDRTYPE_UNKNOWN.
 	// NOTE: legacy values for local_af are: IPv4 = 0, IPv6 = 1.
@@ -136,7 +136,7 @@ func (w *Web100) logValues() (map[string]bigquery.Value, error) {
 
 // snapValues converts all variables in the latest snap record into a results map.
 func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]bigquery.Value, error) {
-	log := (*C.web100_log)(w.log)
+	snaplog := (*C.web100_log)(w.snaplog)
 	snap := (*C.web100_snapshot)(w.snap)
 
 	// TODO(dev): do not re-allocate these buffers on every call.
@@ -147,7 +147,7 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 	defer C.free(var_data)
 
 	// Parses variables from most recent web100_snapshot data.
-	group := C.web100_get_log_group(log)
+	group := C.web100_get_log_group(snaplog)
 	for v := C.web100_var_head(group); v != nil; v = C.web100_var_next(v) {
 
 		name := C.web100_get_var_name(v)
@@ -191,14 +191,14 @@ func (w *Web100) Close() error {
 	snap := (*C.web100_snapshot)(w.snap)
 	C.web100_snapshot_free(snap)
 
-	log := (*C.web100_log)(w.log)
-	err := C.web100_log_close_read(log)
+	snaplog := (*C.web100_log)(w.snaplog)
+	err := C.web100_log_close_read(snaplog)
 	if err != C.WEB100_ERR_SUCCESS {
 		return fmt.Errorf(C.GoString(C.web100_strerror(err)))
 	}
 
 	// Clear pointer after free.
-	w.log = nil
+	w.snaplog = nil
 	w.snap = nil
 	return nil
 }
