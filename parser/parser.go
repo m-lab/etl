@@ -10,13 +10,13 @@ import (
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/metrics"
 )
 
 func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
 	case etl.NDT:
-		// TODO - eliminate need for "/mnt/tmpfs"
-		return NewNDTParser(ins, etl.DataTypeToTable[etl.NDT], "/mnt/tmpfs")
+		return NewNDTParser(ins, etl.DataTypeToTable[etl.NDT])
 	case etl.SS:
 		// TODO - substitute appropriate parsers here and below.
 		return NewTestParser(ins)
@@ -37,7 +37,7 @@ type NullParser struct {
 }
 
 func (np *NullParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	testCount.With(prometheus.Labels{"table": np.TableName()}).Inc()
+	metrics.TestCount.With(prometheus.Labels{"table": np.TableName(), "type": "null"}).Inc()
 	return nil
 }
 
@@ -58,7 +58,7 @@ func NewTestParser(ins etl.Inserter) etl.Parser {
 }
 
 func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	testCount.With(prometheus.Labels{"table": tp.TableName()}).Inc()
+	metrics.TestCount.With(prometheus.Labels{"table": tp.TableName(), "type": "test"}).Inc()
 	log.Printf("Parsing %s", testName)
 	values := make(map[string]bigquery.Value, len(meta)+1)
 	// TODO is there a better way to do this?
@@ -71,25 +71,4 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 
 func (tp *TestParser) TableName() string {
 	return "test-table"
-}
-
-//=====================================================================================
-//                       Prometheus Monitoring
-//=====================================================================================
-
-var (
-	testCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "etl_parser_test_count",
-		Help: "Number of tests processed.",
-	}, []string{"table"})
-
-	failureCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "etl_parser_failure_count",
-		Help: "Number of test processing failures.",
-	}, []string{"table", "failure_type"})
-)
-
-func init() {
-	prometheus.MustRegister(testCount)
-	prometheus.MustRegister(failureCount)
 }
