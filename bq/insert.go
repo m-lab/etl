@@ -192,7 +192,7 @@ func (dw DurationWrapper) Flush() error {
 	if err != nil {
 		status = "fail"
 	}
-	metrics.DurationHistogram.WithLabelValues(
+	metrics.InsertionHistogram.WithLabelValues(
 		dw.TableName(), status).Observe(time.Since(t).Seconds())
 	return err
 }
