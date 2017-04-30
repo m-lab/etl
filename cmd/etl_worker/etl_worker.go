@@ -100,6 +100,9 @@ func decrementInFlight() {
 
 func worker(w http.ResponseWriter, r *http.Request) {
 	metrics.TaskCount.WithLabelValues("unknown", "Total").Inc()
+	// This is to identify whether some workers are dying without incrementing
+	// any of the other metrics.
+	defer metrics.TaskCount.WithLabelValues("unknown", "Exit").Inc()
 
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
