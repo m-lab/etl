@@ -16,13 +16,18 @@ import (
 	"github.com/m-lab/etl/etl"
 )
 
+const (
+	// TODO(prod): eliminate need for tmpfs.
+	tmpDir = "/mnt/tmpfs"
+)
+
 type NDTParser struct {
 	inserter  etl.Inserter
 	tmpDir    string
 	tableName string
 }
 
-func NewNDTParser(ins etl.Inserter, tableName, tmpDir string) *NDTParser {
+func NewNDTParser(ins etl.Inserter, tableName string) *NDTParser {
 	return &NDTParser{ins, tmpDir, tableName}
 }
 
