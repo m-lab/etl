@@ -16,7 +16,7 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
 	case etl.NDT:
 		// TODO - substitute appropriate parsers here and below.
-		return NewTestParser(ins)
+		return NewNDTParser(ins)
 	case etl.SS:
 		return NewTestParser(ins)
 	case etl.PT:
@@ -50,11 +50,10 @@ func (np *NullParser) TableName() string {
 // TODO add tests
 type TestParser struct {
 	inserter etl.Inserter
-	etl.Parser
 }
 
 func NewTestParser(ins etl.Inserter) etl.Parser {
-	return &TestParser{ins, nil}
+	return &TestParser{ins}
 }
 
 func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {

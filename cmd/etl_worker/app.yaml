@@ -21,7 +21,7 @@ resources:
   # Mounted under: /mnt/tmpfs
   - name: tmpfs
     volume_type: tmpfs
-    size_gb: 0.5
+    size_gb: 1.0
 
 automatic_scaling:
   # We expect fairly steady load, so a modest minimum will rarely cost us anything.
