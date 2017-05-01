@@ -138,7 +138,6 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			"table": n.TableName(), "type": "values-err"}).Inc()
 		return err
 	}
-	log.Printf("Inserting values from: %s\n", tmpFile)
 	err = n.inserter.InsertRow(&bq.MapSaver{results})
 
 	if err != nil {
