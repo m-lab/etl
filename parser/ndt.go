@@ -114,10 +114,20 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Find the last web100 snapshot.
 	metrics.WorkerState.WithLabelValues("seek").Inc()
 	defer metrics.WorkerState.WithLabelValues("seek").Dec()
-	for {
+	// Limit to parsing only up to 2000 snapshots.
+	for count := 0; count < 2000; count++ {
 		err = w.Next()
 		if err != nil {
 			break
+		}
+		// HACK - just to see how expensive the Values() call is...
+		// parse every 10th snapshot.
+		if count%10 == 0 {
+			_, err := w.Values()
+			if err != nil {
+				metrics.TestCount.With(prometheus.Labels{
+					"table": n.TableName(), "type": "values-err"}).Inc()
+			}
 		}
 	}
 	// We expect EOF.
@@ -138,7 +148,6 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			"table": n.TableName(), "type": "values-err"}).Inc()
 		return err
 	}
-	log.Printf("Inserting values from: %s\n", tmpFile)
 	err = n.inserter.InsertRow(&bq.MapSaver{results})
 
 	if err != nil {
