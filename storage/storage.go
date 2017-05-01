@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/m-lab/etl/metrics"
+
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
@@ -34,6 +36,9 @@ type ETLSource struct {
 // Next reads the next test object from the tar file.
 // Returns io.EOF when there are no more tests.
 func (rr *ETLSource) NextTest() (string, []byte, error) {
+	metrics.WorkerState.WithLabelValues("read").Inc()
+	defer metrics.WorkerState.WithLabelValues("read").Dec()
+
 	h, err := rr.Next()
 	if err != nil {
 		return "", nil, err

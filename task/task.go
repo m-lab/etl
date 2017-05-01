@@ -13,6 +13,7 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/storage"
 )
 
@@ -38,6 +39,8 @@ func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser, inserter 
 // ProcessAllTests loops through all the tests in a tar file, calls the
 // injected parser to parse them, and inserts them into bigquery (not yet implemented).
 func (tt *Task) ProcessAllTests() error {
+	metrics.WorkerState.WithLabelValues("task").Inc()
+	defer metrics.WorkerState.WithLabelValues("task").Dec()
 	files := 0
 	nilData := 0
 	// Read each file from the tar
@@ -70,6 +73,7 @@ func (tt *Task) ProcessAllTests() error {
 
 	// Flush any rows cached in the inserter.
 	err := tt.Flush()
+
 	if err != nil {
 		log.Printf("%v", err)
 	}
