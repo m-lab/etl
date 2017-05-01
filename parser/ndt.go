@@ -6,10 +6,11 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -61,9 +62,12 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	for count := 0; count < len(rawSnapLog); count += c {
 		c, err = tmpFile.Write(rawSnapLog)
 		if err != nil {
+			metrics.TestCount.With(prometheus.Labels{
+				"table": n.TableName(), "type": "write-err"}).Inc()
 			return err
 		}
 	}
+
 	tmpFile.Sync()
 	// TODO(dev): log possible remove errors.
 	defer os.Remove(tmpFile.Name())
@@ -73,11 +77,15 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	data, err := web100.Asset("tcp-kis.txt")
 	if err != nil {
 		// Asset missing from build.
+		metrics.TestCount.With(prometheus.Labels{
+			"table": n.TableName(), "type": "no-asset"}).Inc()
 		return err
 	}
 	b := bytes.NewBuffer(data)
 	legacyNames, err := web100.ParseWeb100Definitions(b)
 	if err != nil {
+		metrics.TestCount.With(prometheus.Labels{
+			"table": n.TableName(), "type": "legacy-names"}).Inc()
 		return err
 	}
 
@@ -97,6 +105,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	// We expect EOF.
 	if err != io.EOF {
+		metrics.TestCount.With(prometheus.Labels{
+			"table": n.TableName(), "type": "not-eof"}).Inc()
 		log.Printf("Failed to reach EOF: %s\n", tmpFile.Name())
 		return err
 	}
@@ -104,12 +114,28 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Extract the values from the last snapshot.
 	results, err := w.Values()
 	if err != nil {
+		metrics.TestCount.With(prometheus.Labels{
+			"table": n.TableName(), "type": "values-err"}).Inc()
 		return err
 	}
-	return n.inserter.InsertRow(&bq.MapSaver{results})
+	log.Printf("Inserting values from: %s\n", tmpFile)
+	err = n.inserter.InsertRow(&bq.MapSaver{results})
+
+	if err != nil {
+		metrics.TestCount.With(prometheus.Labels{
+			"table": n.TableName(), "type": "insert-err"}).Inc()
+	} else {
+		if strings.HasSuffix(testName, "c2s_snaplog") {
+			metrics.TestCount.With(prometheus.Labels{
+				"table": n.TableName(), "type": "c2s"}).Inc()
+		} else {
+			metrics.TestCount.With(prometheus.Labels{
+				"table": n.TableName(), "type": "s2c"}).Inc()
+		}
+	}
+	return err
 }
 
-// TODO(dev) TableName should come from initialization params.
 func (n *NDTParser) TableName() string {
 	return n.inserter.TableName()
 }
