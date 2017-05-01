@@ -39,8 +39,8 @@ func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser, inserter 
 // ProcessAllTests loops through all the tests in a tar file, calls the
 // injected parser to parse them, and inserts them into bigquery (not yet implemented).
 func (tt *Task) ProcessAllTests() error {
-	metrics.WorkerState.WithLabelValues("process").Inc()
-	defer metrics.WorkerState.WithLabelValues("process").Dec()
+	metrics.WorkerState.WithLabelValues("task").Inc()
+	defer metrics.WorkerState.WithLabelValues("task").Dec()
 	files := 0
 	nilData := 0
 	// Read each file from the tar

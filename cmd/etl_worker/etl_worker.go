@@ -100,8 +100,8 @@ func decrementInFlight() {
 
 func worker(w http.ResponseWriter, r *http.Request) {
 	// These keep track of the (nested) state of the worker.
-	metrics.WorkerState.WithLabelValues("top").Inc()
-	defer metrics.WorkerState.WithLabelValues("top").Dec()
+	metrics.WorkerState.WithLabelValues("worker").Inc()
+	defer metrics.WorkerState.WithLabelValues("worker").Dec()
 
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
