@@ -36,6 +36,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return nil
 	}
 
+	// NOTE: this file size threshold and the number of simultaneous workers
+	// defined in etl_worker.go must guarantee that all files written to
+	// /mnt/tmpfs will fit.
 	if len(rawSnapLog) > 10*1024*1024 {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "oversize"}).Inc()
