@@ -18,6 +18,7 @@ import (
 func init() {
 	// Register the metrics defined with Prometheus's default registry.
 	prometheus.MustRegister(WorkerCount)
+	prometheus.MustRegister(WorkerState)
 	prometheus.MustRegister(TaskCount)
 	prometheus.MustRegister(TestCount)
 	prometheus.MustRegister(BigQueryInsert)
@@ -52,8 +53,8 @@ var (
 	// Example usage:
 	//   metrics.WorkerState.WithLabelValues("flush").Inc() / .Dec()
 	WorkerState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "etl_worker_count",
-		Help: "Number of active workers.",
+		Name: "etl_worker_state",
+		Help: "Number of workers in different states.",
 	},
 		// Worker state, e.g. create task, read, parse, insert
 		[]string{"state"},
