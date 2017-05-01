@@ -100,7 +100,7 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 		return nil, errors.New("not tar or tgz: " + uri)
 	}
 
-	obj, err := getObject(client, bucket, fn, 60*time.Second)
+	obj, err := getObject(client, bucket, fn, 600*time.Second)
 	if err != nil {
 		return nil, err
 	}
