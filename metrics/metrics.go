@@ -26,17 +26,38 @@ func init() {
 	prometheus.MustRegister(FileSizeHistogram)
 }
 
+// TODO
+// Want a goroutine that monitors the workers, and updates metrics to indicate how long the
+// workers have been working, and perhaps what their state is.
+// How about a gauge, broken down by state?  The state transitions will be triggered by the
+// worker code.
+//
+
 var (
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
 	//   etl_worker_count
 	// Example usage:
-	//   metrics.TaskCount.Inc() / .Dec()
+	//   metrics.WorkerCount.Inc() / .Dec()
 	WorkerCount = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "etl_worker_count",
 		Help: "Number of active workers.",
 	})
+
+	// Counts the number of tasks processed by the pipeline.
+	//
+	// Provides metrics:
+	//   etl_worker_count
+	// Example usage:
+	//   metrics.WorkerState.WithLabelValues("flush").Inc() / .Dec()
+	WorkerState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "etl_worker_count",
+		Help: "Number of active workers.",
+	},
+		// Worker state, e.g. create task, read, parse, insert
+		[]string{"state"},
+	)
 
 	// Counts the number of tasks processed by the pipeline.
 	//

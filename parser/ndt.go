@@ -59,6 +59,13 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		log.Printf("Failed to create tmpfile for: %s\n", testName)
 		return err
 	}
+
+	// Record the file size.
+	metrics.FileSizeHistogram.Observe(float64(len(rawSnapLog)))
+
+	metrics.WorkerState.WithLabelValues("ndt").Inc()
+	defer metrics.WorkerState.WithLabelValues("ndt").Dec()
+
 	c := 0
 	for count := 0; count < len(rawSnapLog); count += c {
 		c, err = tmpFile.Write(rawSnapLog)
@@ -75,6 +82,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 	// TODO(dev): only do this once.
 	// Parse the tcp-kis.txt web100 variable definition file.
+	metrics.WorkerState.WithLabelValues("asset").Inc()
+	defer metrics.WorkerState.WithLabelValues("asset").Dec()
+
 	data, err := web100.Asset("tcp-kis.txt")
 	if err != nil {
 		// Asset missing from build.
@@ -83,6 +93,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 	b := bytes.NewBuffer(data)
+	metrics.WorkerState.WithLabelValues("parse-def").Inc()
+	defer metrics.WorkerState.WithLabelValues("parse-def").Dec()
 	legacyNames, err := web100.ParseWeb100Definitions(b)
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
@@ -92,6 +104,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 	log.Printf("opening web100 snap file: %s\n", tmpFile)
 	// Open the file we created above.
+	metrics.WorkerState.WithLabelValues("parse").Inc()
+	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 	w, err := web100.Open(tmpFile.Name(), legacyNames)
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
