@@ -24,7 +24,7 @@ type NDTParser struct {
 }
 
 func NewNDTParser(ins etl.Inserter) *NDTParser {
-	return &NDTParser{ins, "/mnt/tmpDir"}
+	return &NDTParser{ins, "/mnt/tmpfs"}
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
