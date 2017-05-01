@@ -49,15 +49,16 @@ type Web100 struct {
 // Open prepares a web100 log file for reading. The caller must call Close on
 // the returned Web100 instance to release resources.
 func Open(filename string, legacyNames map[string]string) (*Web100, error) {
-	web100Lock.Lock()
-
 	c_filename := C.CString(filename)
 	defer C.free(unsafe.Pointer(c_filename))
 
 	// TODO(prod): do not require reading from a file. Accept a byte array.
+	// We need to lock calls to web100_log_open_read because of "log_header".
+	web100Lock.Lock()
 	snaplog := C.web100_log_open_read(c_filename)
+	web100Lock.Unlock()
+
 	if snaplog == nil {
-		web100Lock.Unlock()
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
 	}
 
@@ -187,8 +188,6 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 
 // Close releases resources created by Open.
 func (w *Web100) Close() error {
-	web100Lock.Unlock()
-
 	snap := (*C.web100_snapshot)(w.snap)
 	C.web100_snapshot_free(snap)
 
