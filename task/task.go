@@ -48,8 +48,9 @@ func (tt *Task) ProcessAllTests() error {
 				break
 			}
 			// TODO(dev) Handle this error properly!
-			log.Printf("%v", err)
-			continue
+			log.Printf("filename:%s files:%d duration:%v err:%v",
+				tt.meta["filename"], files, time.Since(tt.meta["parse_time"].(time.Time)), err)
+			break
 		}
 		if data == nil {
 			// TODO(dev) Handle directories (expected) and other
