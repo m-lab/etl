@@ -22,13 +22,12 @@ const (
 )
 
 type NDTParser struct {
-	inserter  etl.Inserter
-	tmpDir    string
-	tableName string
+	inserter etl.Inserter
+	tmpDir   string
 }
 
-func NewNDTParser(ins etl.Inserter, tableName string) *NDTParser {
-	return &NDTParser{ins, tmpDir, tableName}
+func NewNDTParser(ins etl.Inserter) *NDTParser {
+	return &NDTParser{ins, tmpDir}
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
@@ -100,5 +99,5 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 // TODO(dev) TableName should come from initialization params.
 func (n *NDTParser) TableName() string {
-	return n.tableName
+	return n.inserter.TableName()
 }

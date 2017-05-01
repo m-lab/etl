@@ -21,7 +21,7 @@ func TestNDTParser(t *testing.T) {
 	}
 
 	ins := &inMemoryInserter{}
-	n := &NDTParser{inserter: ins, tmpDir: "./", tableName: "ndt_table"}
+	n := &NDTParser{inserter: ins, tmpDir: "./"}
 	err = n.ParseAndInsert(nil, "filename.c2s_snaplog", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -86,7 +86,7 @@ func (in *inMemoryInserter) Flush() error {
 	return nil
 }
 func (in *inMemoryInserter) TableName() string {
-	return ""
+	return "ndt_test"
 }
 func (in *inMemoryInserter) Dataset() string {
 	return ""
