@@ -58,6 +58,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 
+	metrics.WorkerState.WithLabelValues("ndt").Inc()
+	defer metrics.WorkerState.WithLabelValues("ndt").Dec()
+
 	c := 0
 	for count := 0; count < len(rawSnapLog); count += c {
 		c, err = tmpFile.Write(rawSnapLog)
@@ -74,6 +77,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 	// TODO(dev): only do this once.
 	// Parse the tcp-kis.txt web100 variable definition file.
+	metrics.WorkerState.WithLabelValues("asset").Inc()
+	defer metrics.WorkerState.WithLabelValues("asset").Dec()
+
 	data, err := web100.Asset("tcp-kis.txt")
 	if err != nil {
 		// Asset missing from build.
@@ -82,6 +88,10 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 	b := bytes.NewBuffer(data)
+
+	// These unfortunately nest.
+	metrics.WorkerState.WithLabelValues("parse-def").Inc()
+	defer metrics.WorkerState.WithLabelValues("parse-def").Dec()
 	legacyNames, err := web100.ParseWeb100Definitions(b)
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
@@ -92,11 +102,15 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Open the file we created above.
 	w, err := web100.Open(tmpFile.Name(), legacyNames)
 	if err != nil {
+		metrics.TestCount.With(prometheus.Labels{
+			"table": n.TableName(), "type": "no-tmp-legacy"}).Inc()
 		return err
 	}
 	defer w.Close()
 
 	// Find the last web100 snapshot.
+	metrics.WorkerState.WithLabelValues("seek").Inc()
+	defer metrics.WorkerState.WithLabelValues("seek").Dec()
 	for {
 		err = w.Next()
 		if err != nil {
@@ -105,6 +119,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	// We expect EOF.
 	if err != io.EOF {
+		// TODO - this will lose tests.  Do something better!
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "not-eof"}).Inc()
 		log.Printf("Failed to reach EOF: %s\n", tmpFile.Name())
@@ -112,6 +127,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 
 	// Extract the values from the last snapshot.
+	metrics.WorkerState.WithLabelValues("parse").Inc()
+	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 	results, err := w.Values()
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{

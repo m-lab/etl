@@ -99,6 +99,10 @@ func decrementInFlight() {
 }
 
 func worker(w http.ResponseWriter, r *http.Request) {
+	// These keep track of the (nested) state of the worker.
+	metrics.WorkerState.WithLabelValues("top").Inc()
+	defer metrics.WorkerState.WithLabelValues("top").Dec()
+
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
 		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
@@ -179,6 +183,9 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	tsk := task.NewTask(fn, tr, p, ins)
 
 	err = tsk.ProcessAllTests()
+
+	metrics.WorkerState.WithLabelValues("finish").Inc()
+	defer metrics.WorkerState.WithLabelValues("finish").Dec()
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(string(dataType), "InternalServerError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
