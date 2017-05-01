@@ -82,7 +82,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 	b := bytes.NewBuffer(data)
-	metrics.WorkerState.WithLabelValues("parse-def").Inc()
+	metrics.WorkerState.WithLabelValues("parse-def").Inc() // ####################
 	defer metrics.WorkerState.WithLabelValues("parse-def").Dec()
 	legacyNames, err := web100.ParseWeb100Definitions(b)
 	if err != nil {
@@ -92,8 +92,6 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 
 	// Open the file we created above.
-	metrics.WorkerState.WithLabelValues("parse").Inc()
-	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 	w, err := web100.Open(tmpFile.Name(), legacyNames)
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
@@ -103,6 +101,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	defer w.Close()
 
 	// Find the last web100 snapshot.
+	metrics.WorkerState.WithLabelValues("seek").Inc()
+	defer metrics.WorkerState.WithLabelValues("seek").Dec()
 	for {
 		err = w.Next()
 		if err != nil {
@@ -119,6 +119,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 
 	// Extract the values from the last snapshot.
+	metrics.WorkerState.WithLabelValues("parse").Inc()
+	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 	results, err := w.Values()
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
