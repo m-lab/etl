@@ -6,28 +6,25 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/web100"
-
-	"github.com/m-lab/etl/etl"
-)
-
-const (
-	// TODO(prod): eliminate need for tmpfs.
-	tmpDir = "/mnt/tmpfs"
 )
 
 type NDTParser struct {
-	inserter etl.Inserter
-	tmpDir   string
+	inserter  etl.Inserter
+	tableName string
+	// TODO(prod): eliminate need for tmpfs.
+	tmpDir string
 }
 
-func NewNDTParser(ins etl.Inserter) *NDTParser {
-	return &NDTParser{ins, tmpDir}
+func NewNDTParser(ins etl.Inserter, tableName string) *NDTParser {
+	return &NDTParser{ins, tableName, "/mnt/tmpDir"}
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
@@ -40,9 +37,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	tmpFile, err := ioutil.TempFile(n.tmpDir, "snaplog-")
 	if err != nil {
-		log.Printf("Failed to create tmpfile for: %s\n", testName)
 		return err
 	}
+
 	// Record the file size.
 	metrics.FileSizeHistogram.Observe(float64(len(rawSnapLog)))
 	c := 0
