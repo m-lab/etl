@@ -1520,7 +1520,11 @@ web100_log_open_read(char *logname)
     }
 
     while ((c = fgetc(log->fp)) != '\0') {
-       	fputc(c, header);
+        if (c == EOF) {
+            web100_errno = WEB100_ERR_HEADER;
+            goto Cleanup;
+        }
+        fputc(c, header);
     }
 
     rewind(header);
@@ -1622,11 +1626,19 @@ web100_snap_from_log(web100_snapshot* snap, web100_log *log)
 	return -WEB100_ERR_FILE; 
     }        
 
-    if(fscanf(log->fp, "%s[^\n]", tmpbuf) == EOF) {
+    // Read no more than 79 characters into tmpbuf (which has size 80).
+    if(fscanf(log->fp, "%79s[^\n]", tmpbuf) == EOF) {
 	return EOF;
     }
-    while( (fgetc(log->fp)) != '\n' )
-        ;    // Cleanup the line
+    while(1) {
+        c = fgetc(log->fp);
+        if (c == '\n') {
+            break;
+        } else if (c == EOF) {
+            return EOF;
+        }
+    }
+    // Cleanup the line
 
     if( strcmp(tmpbuf,BEGIN_SNAP_DATA) != 0 ){
         web100_errno = WEB100_ERR_FILE; 

@@ -86,7 +86,7 @@ func (in *inMemoryInserter) Flush() error {
 	return nil
 }
 func (in *inMemoryInserter) TableName() string {
-	return ""
+	return "ndt_test"
 }
 func (in *inMemoryInserter) Dataset() string {
 	return ""

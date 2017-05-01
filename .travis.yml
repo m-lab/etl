@@ -58,7 +58,7 @@ deploy:
     # A bash-style 'if' condition, matching branches with a "sandbox-" prefix.
     # Sandbox branches will be deployed to personalized service names.
     # Integration branch will not use decorated service names.
-    condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
+    condition: $TRAVIS_BRANCH == sandbox-*
 
 ## Service: queue-pusher -- AppEngine Standard Environment.
 - provider: script
@@ -71,7 +71,7 @@ deploy:
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
-    condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
+    condition: $TRAVIS_BRANCH == sandbox-*
 
 # NOTE: Cloud functions only support primitive IAM roles: Owner, Editor, Viewer.
 # See: https://cloud.google.com/functions/docs/concepts/iam

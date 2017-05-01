@@ -17,13 +17,18 @@ import (
 	"github.com/m-lab/etl/web100"
 )
 
+const (
+	// TODO(prod): eliminate need for tmpfs.
+	tmpDir = "/mnt/tmpfs"
+)
+
 type NDTParser struct {
 	inserter  etl.Inserter
 	tmpDir    string
 	tableName string
 }
 
-func NewNDTParser(ins etl.Inserter, tableName, tmpDir string) *NDTParser {
+func NewNDTParser(ins etl.Inserter, tableName string) *NDTParser {
 	return &NDTParser{ins, tmpDir, tableName}
 }
 
@@ -32,9 +37,10 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// TODO(prod): do not write to a temporary file; operate on byte array directly.
 	// Write rawSnapLog to /mnt/tmpfs.
 	if !strings.HasSuffix(testName, "c2s_snaplog") && !strings.HasSuffix(testName, "s2c_snaplog") {
-		// Ignoring non-snaplog file.
+		log.Printf("Ignoring non-snaplog file: %s\n", testName)
 		return nil
 	}
+
 	if len(rawSnapLog) > 10*1024*1024 {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "oversize"}).Inc()
@@ -43,13 +49,17 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return nil
 	}
 
+	// Record the file size.
+	metrics.FileSizeHistogram.Observe(float64(len(rawSnapLog)))
+
 	tmpFile, err := ioutil.TempFile(n.tmpDir, "snaplog-")
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "bad-tmp"}).Inc()
+			"table": n.TableName(), "type": "no-tmp"}).Inc()
 		log.Printf("Failed to create tmpfile for: %s\n", testName)
 		return err
 	}
+
 	// Record the file size.
 	metrics.FileSizeHistogram.Observe(float64(len(rawSnapLog)))
 
@@ -61,10 +71,11 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		c, err = tmpFile.Write(rawSnapLog)
 		if err != nil {
 			metrics.TestCount.With(prometheus.Labels{
-				"table": n.TableName(), "type": "bad-write"}).Inc()
+				"table": n.TableName(), "type": "write-err"}).Inc()
 			return err
 		}
 	}
+
 	tmpFile.Sync()
 	// TODO(dev): log possible remove errors.
 	defer os.Remove(tmpFile.Name())
@@ -91,6 +102,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 
+	log.Printf("opening web100 snap file: %s\n", tmpFile)
 	// Open the file we created above.
 	w, err := web100.Open(tmpFile.Name(), legacyNames)
 	if err != nil {
@@ -100,6 +112,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	defer w.Close()
 
+	log.Printf("finding last snaplog\n")
 	// Find the last web100 snapshot.
 	metrics.WorkerState.WithLabelValues("seek").Inc()
 	defer metrics.WorkerState.WithLabelValues("seek").Dec()
@@ -145,5 +158,5 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 }
 
 func (n *NDTParser) TableName() string {
-	return n.tableName
+	return n.inserter.TableName()
 }
