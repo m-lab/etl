@@ -106,6 +106,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	for {
 		err = w.Next()
 		if err != nil {
+			// TODO - this will lose tests.  Do something better!
 			break
 		}
 	}
