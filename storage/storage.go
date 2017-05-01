@@ -51,6 +51,7 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 		// TODO add unit test
 		zipReader, err := gzip.NewReader(rr)
 		if err != nil {
+			metrics.TaskCount.WithLabelValues("NDT", "zipReaderError").Inc()
 			return h.Name, nil, err
 		}
 		defer zipReader.Close()
@@ -59,6 +60,7 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 		data, err = ioutil.ReadAll(rr)
 	}
 	if err != nil {
+		metrics.TaskCount.WithLabelValues("NDT", "otherReaderError").Inc()
 		return h.Name, nil, err
 	}
 	return h.Name, data, nil

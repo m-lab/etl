@@ -33,7 +33,7 @@ import (
 func NewInserter(dataset string, dt etl.DataType) (etl.Inserter, error) {
 	return NewBQInserter(
 		etl.InserterParams{dataset, etl.DataTypeToTable[dt],
-			10 * time.Minute, 500}, nil)
+			15 * time.Minute, 500}, nil)
 }
 
 // TODO - improve the naming between here and NewInserter.

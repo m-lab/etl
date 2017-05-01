@@ -51,6 +51,8 @@ func (tt *Task) ProcessAllTests() error {
 				break
 			}
 			// TODO(dev) Handle this error properly!
+			// TODO - fix dataType
+			metrics.TaskCount.WithLabelValues("NDT", "NonEOFError").Inc()
 			log.Printf("filename:%s files:%d duration:%v err:%v",
 				tt.meta["filename"], files, time.Since(tt.meta["parse_time"].(time.Time)), err)
 			break
@@ -65,6 +67,9 @@ func (tt *Task) ProcessAllTests() error {
 
 		err := tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		if err != nil {
+			metrics.TaskCount.WithLabelValues(
+				// TODO - fix dataType
+				"NDT", "ParseAndInsertError").Inc()
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
 			return err

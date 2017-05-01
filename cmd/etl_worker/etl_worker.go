@@ -156,7 +156,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO - add a timer for reading the file.
 	tr, err := storage.NewETLSource(client, fn)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(string(dataType), "InternalServerError").Inc()
+		metrics.TaskCount.WithLabelValues(string(dataType), "ETLSourceError").Inc()
 		log.Printf("Error downloading file: %v", err)
 		fmt.Fprintf(w, `{"message": "Problem downloading file."}`)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -167,7 +167,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 
 	ins, err := bq.NewInserter("mlab_sandbox", dataType)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(string(dataType), "InternalServerError").Inc()
+		metrics.TaskCount.WithLabelValues(string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)
 		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -187,7 +187,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	metrics.WorkerState.WithLabelValues("finish").Inc()
 	defer metrics.WorkerState.WithLabelValues("finish").Dec()
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(string(dataType), "InternalServerError").Inc()
+		metrics.TaskCount.WithLabelValues(string(dataType), "TaskError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
 		fmt.Fprintf(w, `{"message": "Error in ProcessAllTests"}`)
 		w.WriteHeader(http.StatusInternalServerError)
