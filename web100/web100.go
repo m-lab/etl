@@ -57,6 +57,7 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	// TODO(prod): do not require reading from a file. Accept a byte array.
 	snaplog := C.web100_log_open_read(c_filename)
 	if snaplog == nil {
+		web100Lock.Unlock()
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
 	}
 
@@ -65,7 +66,7 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 
 	w := &Web100{
 		legacyNames: legacyNames,
-		snaplog:         unsafe.Pointer(snaplog),
+		snaplog:     unsafe.Pointer(snaplog),
 		snap:        unsafe.Pointer(snap),
 	}
 	return w, nil
