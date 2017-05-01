@@ -104,6 +104,9 @@ func (in *BQInserter) InsertRow(data interface{}) error {
 // instead of flushing internally?  The "handle errors in the middle" would
 // be easier, though other complications would ensue.
 func (in *BQInserter) InsertRows(data []interface{}) error {
+	metrics.WorkerState.WithLabelValues("insert").Inc()
+	defer metrics.WorkerState.WithLabelValues("insert").Dec()
+
 	for len(data)+len(in.rows) >= in.params.BufferSize {
 		// space >= len(data)
 		space := cap(in.rows) - len(in.rows)
@@ -122,6 +125,9 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 
 // TODO(dev) Should have a recovery mechanism for failed inserts.
 func (in *BQInserter) Flush() error {
+	metrics.WorkerState.WithLabelValues("flush").Inc()
+	defer metrics.WorkerState.WithLabelValues("flush").Dec()
+
 	if len(in.rows) == 0 {
 		return nil
 	}
