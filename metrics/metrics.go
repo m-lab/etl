@@ -137,7 +137,7 @@ var (
 	)
 
 	// TODO(dev): generalize this metric for size of any file type.
-	FileSizeHistogram = prometheus.NewHistogram(
+	FileSizeHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_web100_snaplog_file_size_bytes",
 			Help: "Size of individual snaplog files.",
@@ -175,6 +175,7 @@ var (
 				math.Inf(+1),
 			},
 		},
+		[]string{"range"},
 	)
 )
 

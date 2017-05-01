@@ -18,14 +18,13 @@ import (
 )
 
 type NDTParser struct {
-	inserter  etl.Inserter
-	tableName string
+	inserter etl.Inserter
 	// TODO(prod): eliminate need for tmpfs.
 	tmpDir string
 }
 
-func NewNDTParser(ins etl.Inserter, tableName string) *NDTParser {
-	return &NDTParser{ins, tableName, "/mnt/tmpDir"}
+func NewNDTParser(ins etl.Inserter) *NDTParser {
+	return &NDTParser{ins, "/mnt/tmpDir"}
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
@@ -42,11 +41,14 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			"table": n.TableName(), "type": "oversize"}).Inc()
 		log.Printf("Ignoring oversize snaplog: %d, %s\n",
 			len(rawSnapLog), testName)
+		metrics.FileSizeHistogram.WithLabelValues(
+			"huge").Observe(float64(len(rawSnapLog)))
 		return nil
+	} else {
+		// Record the file size.
+		metrics.FileSizeHistogram.WithLabelValues(
+			"normal").Observe(float64(len(rawSnapLog)))
 	}
-
-	// Record the file size.
-	metrics.FileSizeHistogram.Observe(float64(len(rawSnapLog)))
 
 	tmpFile, err := ioutil.TempFile(n.tmpDir, "snaplog-")
 	if err != nil {
@@ -56,8 +58,6 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 
-	// Record the file size.
-	metrics.FileSizeHistogram.Observe(float64(len(rawSnapLog)))
 	c := 0
 	for count := 0; count < len(rawSnapLog); count += c {
 		c, err = tmpFile.Write(rawSnapLog)
@@ -125,6 +125,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "insert-err"}).Inc()
 	} else {
+		// TODO - test type should be a separate label, so we can see which files have which errors.
 		if strings.HasSuffix(testName, "c2s_snaplog") {
 			metrics.TestCount.With(prometheus.Labels{
 				"table": n.TableName(), "type": "c2s"}).Inc()
