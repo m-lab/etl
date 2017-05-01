@@ -114,11 +114,21 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Find the last web100 snapshot.
 	metrics.WorkerState.WithLabelValues("seek").Inc()
 	defer metrics.WorkerState.WithLabelValues("seek").Dec()
-	// Limit to parsing only up to 2000 snapshots.
-	for count := 0; count < 2000; count++ {
+	// Limit to parsing only up to 2100 snapshots.
+	// NOTE: This is different from legacy pipeline!!
+	for count := 0; count < 2100; count++ {
 		err = w.Next()
 		if err != nil {
-			break
+			if err == io.EOF {
+				// We expect EOF.
+				break
+			} else {
+				// TODO - this will lose tests.  Do something better!
+				metrics.TestCount.With(prometheus.Labels{
+					"table": n.TableName(), "type": "not-eof"}).Inc()
+				log.Printf("Failed to reach EOF: %s\n", tmpFile.Name())
+				return err
+			}
 		}
 		// HACK - just to see how expensive the Values() call is...
 		// parse every 10th snapshot.
@@ -129,14 +139,6 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 					"table": n.TableName(), "type": "values-err"}).Inc()
 			}
 		}
-	}
-	// We expect EOF.
-	if err != io.EOF {
-		// TODO - this will lose tests.  Do something better!
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "not-eof"}).Inc()
-		log.Printf("Failed to reach EOF: %s\n", tmpFile.Name())
-		return err
 	}
 
 	// Extract the values from the last snapshot.
