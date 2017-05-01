@@ -35,8 +35,23 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		// Ignoring non-snaplog file.
 		return nil
 	}
+
+	if len(rawSnapLog) > 10*1024*1024 {
+		metrics.TestCount.With(prometheus.Labels{
+			"table": n.TableName(), "type": "oversize"}).Inc()
+		log.Printf("Ignoring oversize snaplog: %d, %s\n",
+			len(rawSnapLog), testName)
+		return nil
+	}
+
+	// Record the file size.
+	metrics.FileSizeHistogram.Observe(float64(len(rawSnapLog)))
+
 	tmpFile, err := ioutil.TempFile(n.tmpDir, "snaplog-")
 	if err != nil {
+		metrics.TestCount.With(prometheus.Labels{
+			"table": n.TableName(), "type": "no-tmp"}).Inc()
+		log.Printf("Failed to create tmpfile for: %s\n", testName)
 		return err
 	}
 
