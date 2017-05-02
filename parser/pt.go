@@ -4,6 +4,7 @@ package parser
 import (
 	"bufio"
 	"cloud.google.com/go/bigquery"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -253,15 +254,15 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			}
 
 			// Drop the first 3 parts, like "1  P(6, 6)" because they are useless.
-			// The following pars are grouped into 4 tuples, for each 4 tuples, it is like:
+			// The following parts are grouped into 4 tuples, for each 4 tuples, it is like:
 			// parts[3] is the hostname, like "if-ae-10-3.tcore2.DT8-Dallas.as6453.net".
 			// parts[4] is IP address like "(66.110.57.41)" or "(72.14.218.190):0,2,3,4,6,8,10"
 			// parts[5] are rtt in numbers like "0.298/0.318/0.340/0.016"
-			// parts[6] should walys be "ms"
+			// parts[6] should always be "ms"
 			// if there is parts[7], it should be hostname again like parts[3] ......
 			for i := 3; i < len(parts); i += 4 {
 				if parts[i+3] != "ms" {
-					log.Fatal("Malformed line. Expected 'ms'")
+					return errors.New("Malformed line. Expected 'ms'")
 				}
 				var rtt []float64
 				// Handle tcp or udp, parts[5] is a single number.
@@ -271,26 +272,28 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 					if err == nil {
 						rtt = append(rtt, one_rtt)
 					} else {
-						log.Fatal("Failed to conver rtt to number with error %v", err)
+						log.Println("Failed to conver rtt to number with error %v", err)
+						return err
 					}
 				}
 				// Handle icmp, parts[5] has 4 numbers separated by "/"
 				if protocal == "icmp" {
 					nums := strings.Split(parts[i+2], "/")
 					if len(nums) != 4 {
-						log.Fatal("Failed to parse rtts for icmp test. 4 numbers expected")
+						return errors.New("Failed to parse rtts for icmp test. 4 numbers expected")
 					}
 					for _, num := range nums {
 						one_rtt, err := strconv.ParseFloat(num, 64)
 						if err == nil {
 							rtt = append(rtt, one_rtt)
 						} else {
-							log.Fatal("Failed to conver rtt to number with error %v", err)
+							fmt.Printf("Failed to conver rtt to number with error %v", err)
+							return err
 						}
 					}
 				}
 				// check whether it is single flow or mulitple flows
-				// sample of miltiple flows: (72.14.218.190):0,2,3,4,6,8,10
+				// sample of multiple flows: (72.14.218.190):0,2,3,4,6,8,10
 				// sample of single flows: (172.25.252.166)
 				parts_4 := parts[i+1]
 				ips := strings.Split(parts_4, ":")
@@ -309,7 +312,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 					break
 				}
 				if len(ips) == 1 {
-					// Single flow will be son of all current leaves
+					// For single flow, the new node will be son of all current leaves
 					for _, leaf := range current_leaves {
 						one_node := &Node{
 							hostname: parts[i],
@@ -358,7 +361,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	} // Done with a test file
 
 	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP)
