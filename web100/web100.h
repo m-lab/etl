@@ -109,33 +109,33 @@ typedef struct web100_connection  web100_connection;
 typedef struct web100_snapshot    web100_snapshot;
 typedef struct web100_log         web100_log;
 
-void               web100_perror(const char* _str);
+void               web100_perror(const char* str, const char* errstr, int w_errno);
 const char*        web100_strerror(int _errnum);
 
-web100_agent*      web100_attach(int _type, void* _data);
+web100_agent*      web100_attach(int _type, void* _data, int *w_errno);
 void               web100_detach(web100_agent* _agent);
 
 int                web100_agent_find_var_and_group(web100_agent* _agent, const char* _varname, web100_group** _group, web100_var** _var);
 
-web100_group*      web100_group_head(web100_agent* _agent);
-web100_group*      web100_group_next(web100_group* _group);
-web100_group*      web100_group_find(web100_agent* _agent, const char* _name);
+web100_group*      web100_group_head(web100_agent *agent, int *w_errno);
+web100_group*      web100_group_next(web100_group* _group, int *w_errno);
+web100_group*      web100_group_find(web100_agent* _agent, const char* _name, int *w_errno);
 
-web100_var*        web100_var_head(web100_group* _group);
-web100_var*        web100_var_next(web100_var* _var);
-web100_var*        web100_var_find(web100_group* _group, const char* _name);
+web100_var*        web100_var_head(web100_group* _group, int *w_errno);
+web100_var*        web100_var_next(web100_var* _var, int *w_errno);
+web100_var*        web100_var_find(web100_group* _group, const char* _name, int *w_errno);
 
-web100_connection* web100_connection_head(web100_agent* _agent);
-web100_connection* web100_connection_next(web100_connection* _conn);
-web100_connection* web100_connection_find(web100_agent* _agent, struct web100_connection_spec* _spec);
-web100_connection* web100_connection_find_v6(web100_agent* _agent, struct web100_connection_spec_v6* _spec_v6);
-web100_connection* web100_connection_lookup(web100_agent* _agent, int _cid);
-web100_connection* web100_connection_from_socket(web100_agent* _agent, int _sockfd);
-int                web100_connection_data_copy(web100_connection* _dest, web100_connection* _src);
-web100_connection* web100_connection_new_local_copy(web100_connection *src);
-void               web100_connection_free_local_copy(web100_connection *conn);
+web100_connection* web100_connection_head(web100_agent* _agent, int *w_errno);
+web100_connection* web100_connection_next(web100_connection* _conn, int *w_errno);
+web100_connection* web100_connection_find(web100_agent* _agent, struct web100_connection_spec* _spec, int *w_errno);
+web100_connection* web100_connection_find_v6(web100_agent* _agent, struct web100_connection_spec_v6* _spec_v6, int *w_errno);
+web100_connection* web100_connection_lookup(web100_agent* _agent, int _cid, int *w_errno);
+web100_connection* web100_connection_from_socket(web100_agent* _agent, int _sockfd, int *w_errno);
+int                web100_connection_data_copy(web100_connection* _dest, web100_connection* _src, int *w_errno);
+web100_connection* web100_connection_new_local_copy(web100_connection *src, int *w_errno);
+int                web100_connection_free_local_copy(web100_connection *conn);
 
-web100_snapshot*   web100_snapshot_alloc(web100_group* _group, web100_connection* _conn);
+web100_snapshot*   web100_snapshot_alloc(web100_group* _group, web100_connection* _conn, int *w_errno);
 void               web100_snapshot_free(web100_snapshot* _snap);
 int                web100_snap(web100_snapshot* _snap);
 
@@ -175,12 +175,12 @@ WEB100_ADDRTYPE    web100_get_connection_addrtype(web100_connection* _conn);
 void               web100_get_connection_spec(web100_connection* _conn, struct web100_connection_spec* _spec);
 void               web100_get_connection_spec_v6(web100_connection* _conn, struct web100_connection_spec_v6* _spec_v6);
 
-web100_log*        web100_log_open_write(char* _logname, web100_connection* _conn, web100_group* _group);
+web100_log*        web100_log_open_write(char* _logname, web100_connection* _conn, web100_group* _group, int *w_errno);
 int                web100_log_close_write(web100_log* _log);
 int                web100_log_write(web100_log* _log, web100_snapshot* _snap);
-web100_log*        web100_log_open_read(char* _logname);
+web100_log*        web100_log_open_read(char* _logname, int *w_errno);
 int                web100_log_close_read(web100_log* _log);
-web100_snapshot*   web100_snapshot_alloc_from_log(web100_log* _log);
+web100_snapshot*   web100_snapshot_alloc_from_log(web100_log* _log, int *w_errno);
 int                web100_snap_from_log(web100_snapshot* _snap, web100_log* _log);
 
 web100_agent*      web100_get_log_agent(web100_log* _log);

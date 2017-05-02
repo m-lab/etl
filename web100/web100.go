@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"strconv"
 	"sync"
 	"unsafe"
@@ -54,12 +55,16 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 
 	// TODO(prod): do not require reading from a file. Accept a byte array.
 	// We need to lock calls to web100_log_open_read because of "log_header".
+	var w_errno C.int = C.WEB100_ERR_SUCCESS
 	web100Lock.Lock()
-	snaplog := C.web100_log_open_read(c_filename)
+	snaplog := C.web100_log_open_read(c_filename, &w_errno)
+	if w_errno != C.WEB100_ERR_SUCCESS {
+		fmt.Printf("%v\n", snaplog)
+	}
 
 	if snaplog == nil {
 		web100Lock.Unlock()
-		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
+		return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 	}
 	if C.web100_errno != C.WEB100_ERR_SUCCESS {
 		web100Lock.Unlock()
@@ -68,17 +73,18 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	}
 
 	// Pre-allocate a snapshot record.
-	snap := C.web100_snapshot_alloc_from_log(snaplog)
+	snap := C.web100_snapshot_alloc_from_log(snaplog, &w_errno)
 	if snap == nil {
-		web100Lock.Unlock()
+		web100Lock.Unlock() // Is this the right place?
+		log.Printf("%s\n", C.GoString(C.web100_strerror(w_errno)))
 		C.web100_log_close_read(snaplog)
-		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
+		return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 	}
 	if C.web100_errno != C.WEB100_ERR_SUCCESS {
-		web100Lock.Unlock()
+		web100Lock.Unlock() // Is this the right place?
 		C.web100_snapshot_free(snap)
 		C.web100_log_close_read(snaplog)
-		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
+		return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 	}
 
 	w := &Web100{
@@ -92,8 +98,13 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 // Next iterates through the web100 log file reading the next snapshot record
 // until EOF or an error occurs.
 func (w *Web100) Next() error {
+	var w_errno C.int = C.WEB100_ERR_SUCCESS
 	snaplog := (*C.web100_log)(w.snaplog)
 	snap := (*C.web100_snapshot)(w.snap)
+	if snap == nil {
+		log.Printf("%s\n", C.GoString(C.web100_strerror(w_errno)))
+		return fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
+	}
 
 	// Read the next web100_snaplog data from underlying file.
 	err := C.web100_snap_from_log(snap, snaplog)
@@ -165,8 +176,12 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 	defer C.free(var_data)
 
 	// Parses variables from most recent web100_snapshot data.
+	var w_errno C.int = C.WEB100_ERR_SUCCESS
 	group := C.web100_get_log_group(snaplog)
-	for v := C.web100_var_head(group); v != nil; v = C.web100_var_next(v) {
+	for v := C.web100_var_head(group, &w_errno); v != nil; v = C.web100_var_next(v, &w_errno) {
+		if w_errno != C.WEB100_ERR_SUCCESS {
+			return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
+		}
 
 		name := C.web100_get_var_name(v)
 		var_type := C.web100_get_var_type(v)
