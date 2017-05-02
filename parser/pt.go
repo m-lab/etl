@@ -196,7 +196,7 @@ func GetLogtime(filename PTFileName) int64 {
 		fmt.Println(err)
 		return 0
 	}
-	
+
 	return t.Unix()
 }
 
@@ -215,7 +215,7 @@ func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, table
 	fmt.Println(server_IP)
 
 	t := GetLogtime(fn)
-        fmt.Println(t)
+	fmt.Println(t)
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
 	scanner := bufio.NewScanner(file)
