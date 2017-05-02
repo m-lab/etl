@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/m-lab/etl/etl"
 )
 
 type PTFileName struct {
@@ -71,8 +73,8 @@ func (i *PT) Save() (map[string]bigquery.Value, string, error) {
 }
 
 type PTParser struct {
-	Parser
-	tmpDir string
+	inserter etl.Inserter
+	tmpDir   string
 }
 
 type Node struct {
@@ -114,6 +116,10 @@ type GeolocationIP struct {
 	postal_code    string
 	latitude       float64
 	longitude      float64
+}
+
+func NewPTParser(ins etl.Inserter) *PTParser {
+	return &PTParser{ins, "/mnt/tmpfs"}
 }
 
 func ProcessAllNodes(all_nodes []Node, server_IP string) []ParisTracerouteHop {
@@ -170,12 +176,13 @@ func ParseFirstLine(oneLine string) (protocal string) {
 		if len(mm) > 1 {
 			if mm[0] == "algo" {
 				if mm[1] != "exhaustive" {
-					log.Fatal("Unexpected algorithm")
+					log.Printf("Unexpected algorithm")
 				}
 			}
 			if mm[0] == "protocol" {
 				if mm[1] != "icmp" && mm[1] != "udp" && mm[1] != "tcp" {
-					log.Fatal("Unknown protocol")
+					log.Printf("Unknown protocol")
+					return ""
 				} else {
 					protocal = mm[1]
 				}
@@ -200,15 +207,15 @@ func GetLogtime(filename PTFileName) int64 {
 	return t.Unix()
 }
 
-func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, tableID string, rawContent []byte) (interface{}, error) {
-	file, err := os.Open(fileName)
+func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
+	file, err := os.Open(testName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer file.Close()
 
 	// Get the logtime
-	fn := PTFileName{name: filepath.Base(fileName)}
+	fn := PTFileName{name: filepath.Base(testName)}
 
 	dest_IP, _, server_IP, _ := fn.GetIPTuple()
 	fmt.Println(dest_IP)
@@ -356,5 +363,5 @@ func (pt *PTParser) Parse(meta map[string]bigquery.Value, fileName string, table
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP)
 	fmt.Println(len(PT_hops))
-	return nil, nil
+	return nil
 }
