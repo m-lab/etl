@@ -72,7 +72,7 @@ func (tt *Task) ProcessAllTests() error {
 				"NDT", "ParseAndInsertError").Inc()
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
-			return err
+			continue
 		}
 	}
 
