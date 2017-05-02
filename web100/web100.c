@@ -51,18 +51,10 @@
 #include "web100-int.h"
 #include "web100.h"
 
-
-/*
- * Global library errno.  XXX: Not threadsafe (needs to be in thread-local
- * storage).
- */ 
-int web100_errno;
-char web100_errstr[128];
-
 #ifdef QUIET
-char web100_quiet = 1;
+const char web100_quiet = 1;
 #else
-char web100_quiet = 0;
+const char web100_quiet = 0;
 #endif
 
 /*
@@ -137,22 +129,22 @@ size_from_type(WEB100_TYPE type)
 
 /*
  * web100_attach_local - Initializes the provided agent with the information
- * from the local Web100 installation.  Returns NULL and sets web100_errno
+ * from the local Web100 installation.  Returns NULL and sets *w_errno
  * on failure.
- */ 
+ */
 static web100_agent*
-_web100_agent_attach_header(FILE *header)
+_web100_agent_attach_header(FILE *header, int *w_errno)
 {
     web100_agent* agent = NULL;
     int c;
     web100_group* gp;
-    web100_var* vp; 
+    web100_var* vp;
     int fsize;
     char tmpbuf[WEB100_VARNAME_LEN_MAX];
     int have_len = 0;
 
     if ((agent = calloc(1, sizeof(web100_agent))) == NULL) {
-        web100_errno = WEB100_ERR_NOMEM;
+        *w_errno = WEB100_ERR_NOMEM;
         goto Cleanup;
     }
 
@@ -160,7 +152,7 @@ _web100_agent_attach_header(FILE *header)
     bzero(agent, sizeof(web100_agent));
 
     if (fscanf(header, "%[^\n]", agent->version) != 1) {
-        web100_errno = WEB100_ERR_HEADER;
+        *w_errno = WEB100_ERR_HEADER;
         goto Cleanup;
     }
     if (strncmp(agent->version, "1.", 2) != 0)
@@ -168,32 +160,32 @@ _web100_agent_attach_header(FILE *header)
 
     /* XXX: Watch out for failure cases, be sure to deallocate memory
      * properly */
-    
-    gp = NULL; 
+
+    gp = NULL;
     while (!feof(header) && !ferror(header)) {
         while (isspace(c = fgetc(header)))
             ;
-        
+
         if (c < 0) {
             break;
         } else if (c == '/') {
             if ((gp = (web100_group*) calloc(1, sizeof(web100_group))) == NULL) {
-                web100_errno = WEB100_ERR_NOMEM;
+                *w_errno = WEB100_ERR_NOMEM;
                 goto Cleanup;
             }
-                
+
             gp->agent = agent;
-            
+
             if (fscanf(header, "%s", gp->name) != 1) {
-                web100_errno = WEB100_ERR_HEADER;
+                *w_errno = WEB100_ERR_HEADER;
                 goto Cleanup;
             }
-            
+
             IFDEBUG(printf("_web100_agent_attach_local: new group: %s\n", gp->name));
-            
+
             gp->size = 0;
             gp->nvars = 0;
-            
+
             if (strcmp(gp->name, "spec") == 0) {
                 agent->info.local.spec = gp;
             } else {
@@ -203,32 +195,32 @@ _web100_agent_attach_header(FILE *header)
             }
         } else {
             ungetc(c, header);
-            
+
             if (gp == NULL) {
-                web100_errno = WEB100_ERR_HEADER;
+                *w_errno = WEB100_ERR_HEADER;
                 goto Cleanup;
             }
-            
+
             if ((vp = (web100_var *)calloc(1, sizeof (web100_var))) == NULL) {
-                web100_errno = WEB100_ERR_NOMEM;
+                *w_errno = WEB100_ERR_NOMEM;
                 goto Cleanup;
             }
 
             vp->group = gp;
-            
+
             if (!have_len) {
                 if (fscanf(header, "%s%d%d", vp->name, &vp->offset, &vp->type) != 3) {
-                    web100_errno = WEB100_ERR_HEADER;
+                    *w_errno = WEB100_ERR_HEADER;
                     goto Cleanup;
                 }
                 vp->len = -1;
             } else {
                 if (fscanf(header, "%s%d%d%d", vp->name, &vp->offset, &vp->type, &vp->len) != 4) {
-                    web100_errno = WEB100_ERR_HEADER;
+                    *w_errno = WEB100_ERR_HEADER;
                     goto Cleanup;
                 }
             }
-            
+
             /* Depricated variable check */
             vp->flags = 0;
             if (vp->name[0] == '_') {
@@ -240,10 +232,10 @@ _web100_agent_attach_header(FILE *header)
 
             IFDEBUG(printf("_web100_agent_attach_local: new var: %s %d %d\n", vp->name, vp->offset, vp->type));
 
-	    /* increment group (== file) size if necessary */ 
+	    /* increment group (== file) size if necessary */
             fsize = vp->offset + size_from_type(vp->type);
-            gp->size = ((gp->size < fsize) ? fsize : gp->size); 
-            
+            gp->size = ((gp->size < fsize) ? fsize : gp->size);
+
 	    /* if size_from_type 0 (i.e., type unrecognized),
 	       forgo adding the variable */
 	    if(!size_from_type(vp->type)) {
@@ -252,26 +244,26 @@ _web100_agent_attach_header(FILE *header)
 	    }
 
             gp->nvars++;
-            
+
             vp->info.local.next = gp->info.local.var_head;
             gp->info.local.var_head = vp;
         }
     }
-   
-    web100_errno = WEB100_ERR_SUCCESS;
-    
+
+    *w_errno = WEB100_ERR_SUCCESS;
+
  Cleanup:
-    if (web100_errno != WEB100_ERR_SUCCESS) {
+    if (*w_errno != WEB100_ERR_SUCCESS) {
         web100_detach(agent);
         agent = NULL;
     }
-    
+
     return agent;
 }
 
 
 static web100_agent*
-_web100_agent_attach_local(void)
+_web100_agent_attach_local(int *w_errno)
 {
     web100_agent* agent = NULL;
     FILE* header = NULL;
@@ -280,45 +272,45 @@ _web100_agent_attach_local(void)
     web100_var* vp;
 
     if ((header = fopen(WEB100_HEADER_FILE, "r")) == NULL) {
-        web100_errno = WEB100_ERR_HEADER;
+        *w_errno = WEB100_ERR_HEADER;
         goto Cleanup;
     }
 
-    if((agent = _web100_agent_attach_header(header)) == NULL)
+    if((agent = _web100_agent_attach_header(header, w_errno)) == NULL)
        	goto Cleanup;
 
     agent->type = WEB100_AGENT_TYPE_LOCAL;
 
-    web100_errno = WEB100_ERR_SUCCESS;
-    
+    *w_errno = WEB100_ERR_SUCCESS;
+
  Cleanup:
     if (header != NULL) {
         fclose(header);
         header = NULL;
     }
-    
-    if (web100_errno != WEB100_ERR_SUCCESS) { 
+
+    if (*w_errno != WEB100_ERR_SUCCESS) {
         web100_detach(agent);
         agent = NULL;
     }
-    
+
     return agent;
 }
 
 
 static web100_agent*
-_web100_agent_attach_log(FILE *header)
+_web100_agent_attach_log(FILE *header, int *w_errno)
 {
     web100_agent* agent = NULL;
 
-    if((agent = _web100_agent_attach_header(header)) == NULL) {
+    if((agent = _web100_agent_attach_header(header, w_errno)) == NULL) {
 	return NULL;
-    } 
+    }
 
     agent->type = WEB100_AGENT_TYPE_LOG;
 
-    web100_errno = WEB100_ERR_SUCCESS;
-    
+    *w_errno = WEB100_ERR_SUCCESS;
+
     return agent;
 }
 
@@ -333,7 +325,8 @@ refresh_connections(web100_agent *agent)
     char filename[PATH_MAX];
     web100_group *spec_gp;
     web100_var *var;
-    
+    int w_errno;
+
     cp = agent->info.local.connection_head;
     while (cp) {
         cp2 = cp->info.local.next;
@@ -341,18 +334,18 @@ refresh_connections(web100_agent *agent)
         cp = cp2;
     }
     agent->info.local.connection_head = NULL;
-    
+
     if ((dir = opendir(WEB100_ROOT_DIR)) == NULL) {
         perror("refresh_connections: opendir");
         return WEB100_ERR_FILE;
     }
-    
+
     while ((ent = readdir(dir))) {
         int cid;
         char *addr_name, *port_name;
         void *dst;
         char buf[256];
-        
+
         cid = atoi(ent->d_name);
         if (cid == 0 && ent->d_name[0] != '0')
             continue;
@@ -364,19 +357,22 @@ refresh_connections(web100_agent *agent)
         if ((cp = (web100_connection *)calloc(1, sizeof (web100_connection))) == NULL)
             return WEB100_ERR_NOMEM;
         cp->agent = agent;
-        cp->cid = cid; 
-        cp->logstate = 0; 
+        cp->cid = cid;
+        cp->logstate = 0;
 
         cp->info.local.next = agent->info.local.connection_head;
         agent->info.local.connection_head = cp;
-        
+
         spec_gp = agent->info.local.spec;
-        
-        if ((var = web100_var_find(spec_gp, "LocalAddressType")) == NULL)
+
+        if ((var = web100_var_find(spec_gp, "LocalAddressType", &w_errno)) == NULL)
             cp->addrtype = WEB100_ADDRTYPE_IPV4;
-        else if (web100_raw_read(var, cp, &cp->addrtype) != WEB100_ERR_SUCCESS)
-            return web100_errno;
-        
+        else {
+            w_errno = web100_raw_read(var, cp, &cp->addrtype);
+            if (w_errno != WEB100_ERR_SUCCESS)
+                return w_errno;
+        }
+
         if (strncmp(agent->version, "1.", 2) == 0) {
             addr_name = "RemoteAddress";
             port_name = "RemotePort";
@@ -384,41 +380,46 @@ refresh_connections(web100_agent *agent)
             addr_name = "RemAddress";
             port_name = "RemPort";
         }
-        
-        if ((var = web100_var_find(spec_gp, "LocalAddress")) == NULL)
-            return WEB100_ERR_FILE;
-        if (web100_raw_read(var, cp, buf) != WEB100_ERR_SUCCESS)
-            return web100_errno;
+
+        if ((var = web100_var_find(spec_gp, "LocalAddress", &w_errno)) == NULL)
+            return WEB100_ERR_FILE;  // ??? Use w_errno?
+        w_errno = web100_raw_read(var, cp, buf);
+        if (w_errno != WEB100_ERR_SUCCESS) {
+            return w_errno;
+        }
         if (cp->addrtype == WEB100_ADDRTYPE_IPV4)
             memcpy(&cp->spec.src_addr, buf, 4);
         else
             memcpy(&cp->spec_v6.src_addr, buf, 16);
-        
-        if ((var = web100_var_find(spec_gp, addr_name)) == NULL)
-            return WEB100_ERR_FILE;
-        if (web100_raw_read(var, cp, buf) != WEB100_ERR_SUCCESS)
-            return web100_errno;
+
+        if ((var = web100_var_find(spec_gp, addr_name, &w_errno)) == NULL)
+            return WEB100_ERR_FILE;  // ??? Return w_errno?
+        w_errno = web100_raw_read(var, cp, buf);
+        if (w_errno != WEB100_ERR_SUCCESS)
+            return w_errno;
         if (cp->addrtype == WEB100_ADDRTYPE_IPV4)
             memcpy(&cp->spec.dst_addr, buf, 4);
         else
             memcpy(&cp->spec_v6.dst_addr, buf, 16);
-        
-        if ((var = web100_var_find(spec_gp, "LocalPort")) == NULL)
-            return WEB100_ERR_FILE;
+
+        if ((var = web100_var_find(spec_gp, "LocalPort", &w_errno)) == NULL)
+            return WEB100_ERR_FILE;  // ?? w_errno?
         dst = (cp->addrtype == WEB100_ADDRTYPE_IPV4) ? &cp->spec.src_port : &cp->spec_v6.src_port;
-        if (web100_raw_read(var, cp, dst) != WEB100_ERR_SUCCESS)
-            return web100_errno;
-        
-        if ((var = web100_var_find(spec_gp, port_name)) == NULL)
-            return WEB100_ERR_FILE;
+        w_errno = web100_raw_read(var, cp, dst);
+        if (w_errno != WEB100_ERR_SUCCESS)
+            return w_errno;
+
+        if ((var = web100_var_find(spec_gp, port_name, &w_errno)) == NULL)
+            return WEB100_ERR_FILE;  // w_errno?
         dst = (cp->addrtype == WEB100_ADDRTYPE_IPV4) ? &cp->spec.dst_port : &cp->spec_v6.dst_port;
-        if (web100_raw_read(var, cp, dst) != WEB100_ERR_SUCCESS)
-            return web100_errno;
+        w_errno = web100_raw_read(var, cp, dst);
+        if (w_errno != WEB100_ERR_SUCCESS) 
+            return w_errno;
     }
-    
+
     if (closedir(dir))
         perror("refresh_connections: closedir");
-    
+
     return WEB100_ERR_SUCCESS;
 }
 
@@ -428,13 +429,14 @@ refresh_connections(web100_agent *agent)
  */
 
 void
-web100_perror(const char* str)
+web100_perror(const char* str, const char* errstr, int w_errno)
 {
-  if( strlen(web100_errstr) == 0 )
-      fprintf(stderr, "%s: %s\n", str, web100_strerror(web100_errno));
+  if( strlen(errstr) == 0 )
+      fprintf(stderr, "%s: %s\n", str, web100_strerror(w_errno));
   else {
-      fprintf(stderr, "%s: %s - %s\n", str, web100_strerror(web100_errno), web100_errstr);
-      strcpy(web100_errstr,"");     // Clear the error string
+      fprintf(stderr, "%s: %s - %s\n", str, web100_strerror(w_errno), errstr);
+      // TODO
+      // strcpy(errstr,"");     // Clear the error string
   }
 }
 
@@ -444,19 +446,19 @@ web100_strerror(int errnum)
 {
     if (errnum < 0 || errnum >= web100_sys_nerr)
         return "unknown error";
-        
+
     return web100_sys_errlist[errnum];
 }
 
 
 web100_agent*
-web100_attach(int type, void *data)
+web100_attach(int type, void *data, int *w_errno)
 {
     switch (type) {
     case WEB100_AGENT_TYPE_LOCAL:
-        return _web100_agent_attach_local();
+        return _web100_agent_attach_local(w_errno);
     default:
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
 }
@@ -468,11 +470,11 @@ web100_detach(web100_agent *agent)
     web100_group *gp, *gp2;
     web100_var *vp, *vp2;
     web100_connection *cp, *cp2;
-    
+
     if (agent == NULL) {
         return;
     }
-    
+
     gp = agent->info.local.group_head;
     while (gp) {
         vp = gp->info.local.var_head;
@@ -481,118 +483,118 @@ web100_detach(web100_agent *agent)
             free(vp);
             vp = vp2;
         }
-        
+
         gp2 = gp->info.local.next;
         free(gp);
         gp = gp2;
     }
-    
+
     cp = agent->info.local.connection_head;
     while (cp) {
         cp2 = cp->info.local.next;
         free(cp);
         cp = cp2;
     }
-    
+
     free(agent);
 }
 
 
 web100_group*
-web100_group_head(web100_agent *agent)
+web100_group_head(web100_agent *agent, int *w_errno)
 {
     if (!((agent->type == WEB100_AGENT_TYPE_LOCAL) || (agent->type == WEB100_AGENT_TYPE_LOG))) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
-    web100_errno = WEB100_ERR_SUCCESS;
+
+    *w_errno = WEB100_ERR_SUCCESS;
     return agent->info.local.group_head;
 }
 
 
 web100_group*
-web100_group_next(web100_group *group)
+web100_group_next(web100_group *group, int *w_errno)
 {
     if (!((group->agent->type == WEB100_AGENT_TYPE_LOCAL) || (group->agent->type == WEB100_AGENT_TYPE_LOG))) {
-	web100_errno = WEB100_ERR_AGENT_TYPE;
+	*w_errno = WEB100_ERR_AGENT_TYPE;
 	return NULL;
     }
-    
-    web100_errno = WEB100_ERR_SUCCESS;
+
+    *w_errno = WEB100_ERR_SUCCESS;
     return group->info.local.next;
 }
 
 
 web100_group*
-web100_group_find(web100_agent *agent, const char *name)
+web100_group_find(web100_agent *agent, const char *name, int *w_errno)
 {
     web100_group *gp;
 
     if (!((agent->type == WEB100_AGENT_TYPE_LOCAL) || (agent->type == WEB100_AGENT_TYPE_LOG))) {
-	web100_errno = WEB100_ERR_AGENT_TYPE;
+	*w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
+
     gp = agent->info.local.group_head;
     while (gp) {
         if (strcmp(gp->name, name) == 0)
             break;
         gp = gp->info.local.next;
     }
-    
-    web100_errno = (gp == NULL ? WEB100_ERR_NOGROUP : WEB100_ERR_SUCCESS);
+
+    *w_errno = (gp == NULL ? WEB100_ERR_NOGROUP : WEB100_ERR_SUCCESS);
     return gp;
 }
 
 
 web100_var*
-web100_var_head(web100_group *group)
+web100_var_head(web100_group *group, int *w_errno)
 {
     web100_var *vp;
-    
+
     if (!((group->agent->type == WEB100_AGENT_TYPE_LOCAL) || (group->agent->type == WEB100_AGENT_TYPE_LOG))) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
+
     vp = group->info.local.var_head;
     while (vp && (vp->flags & WEB100_VAR_FL_DEP))
         vp = vp->info.local.next;
-    web100_errno = WEB100_ERR_SUCCESS;
+    *w_errno = WEB100_ERR_SUCCESS;
     return vp;
 }
 
 
 web100_var*
-web100_var_next(web100_var *var)
+web100_var_next(web100_var *var, int *w_errno)
 {
     web100_var *vp;
-    
+
 
     if (!((var->group->agent->type == WEB100_AGENT_TYPE_LOCAL) || (var->group->agent->type == WEB100_AGENT_TYPE_LOG))) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
+
     vp = var->info.local.next;
     while (vp && (vp->flags & WEB100_VAR_FL_DEP))
         vp = vp->info.local.next;
-    web100_errno = WEB100_ERR_SUCCESS;
+    *w_errno = WEB100_ERR_SUCCESS;
     return vp;
 }
 
 
 web100_var*
-web100_var_find(web100_group *group, const char *name)
+web100_var_find(web100_group *group, const char *name, int *w_errno)
 {
     web100_var *vp;
-    
+
     if (!((group->agent->type == WEB100_AGENT_TYPE_LOCAL) || (group->agent->type == WEB100_AGENT_TYPE_LOG))) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
+
     vp = group->info.local.var_head;
     while (vp) {
         if (strcmp(vp->name, name) == 0)
@@ -600,7 +602,7 @@ web100_var_find(web100_group *group, const char *name)
         vp = vp->info.local.next;
     }
 
-    web100_errno = (vp == NULL ? WEB100_ERR_NOVAR : WEB100_ERR_SUCCESS);
+    *w_errno = (vp == NULL ? WEB100_ERR_NOVAR : WEB100_ERR_SUCCESS);
     if (vp)
         dep_check(vp);
     return vp;
@@ -615,67 +617,69 @@ web100_agent_find_var_and_group(web100_agent* agent, const char* name,
                                 web100_group** group, web100_var** var)
 {
     web100_group* g;
-    
-    g = web100_group_head(agent);
+
+    int w_errno;  // Not actually used.
+    g = web100_group_head(agent, &w_errno);
+    // TODO - use w_errno?
     while (g) {
-        web100_var* v = web100_var_find(g, name);
+        web100_var* v = web100_var_find(g, name, &w_errno);
         if (v) {
             *group = g;
             *var = v;
             dep_check(v);
             return WEB100_ERR_SUCCESS;
         }
-        g = web100_group_next(g);
+        g = web100_group_next(g, &w_errno);
     }
 
     /* var not found in any of the groups */
-    web100_errno = WEB100_ERR_NOVAR;
+    // *w_errno = WEB100_ERR_NOVAR;
     return WEB100_ERR_NOVAR;
 }
 
 
 web100_connection*
-web100_connection_head(web100_agent *agent)
+web100_connection_head(web100_agent *agent, int *w_errno)
 {
     if (agent->type != WEB100_AGENT_TYPE_LOCAL) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
-    if ((web100_errno = refresh_connections(agent)) != WEB100_ERR_SUCCESS)
+
+    if ((*w_errno = refresh_connections(agent)) != WEB100_ERR_SUCCESS)
         return NULL;
-    
+
     return agent->info.local.connection_head;
 }
 
 
 web100_connection*
-web100_connection_next(web100_connection *connection)
+web100_connection_next(web100_connection *connection, int *w_errno)
 {
     if (connection->agent->type != WEB100_AGENT_TYPE_LOCAL) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
-    web100_errno = WEB100_ERR_SUCCESS;
+
+    *w_errno = WEB100_ERR_SUCCESS;
     return connection->info.local.next;
 }
 
 
 web100_connection*
 web100_connection_find(web100_agent *agent,
-                       struct web100_connection_spec *spec)
+                       struct web100_connection_spec *spec, int *w_errno)
 {
     web100_connection *cp;
-    
+
     if (agent->type != WEB100_AGENT_TYPE_LOCAL) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
-    if ((web100_errno = refresh_connections(agent)) != WEB100_ERR_SUCCESS)
+
+    if ((*w_errno = refresh_connections(agent)) != WEB100_ERR_SUCCESS)
         return NULL;
-    
+
     cp = agent->info.local.connection_head;
     while (cp) {
         if (cp->spec.dst_port == spec->dst_port &&
@@ -685,56 +689,56 @@ web100_connection_find(web100_agent *agent,
             break;
         cp = cp->info.local.next;
     }
-    
-    web100_errno = (cp == NULL ? WEB100_ERR_NOCONNECTION : WEB100_ERR_SUCCESS);
+
+    *w_errno = (cp == NULL ? WEB100_ERR_NOCONNECTION : WEB100_ERR_SUCCESS);
     return cp;
 }
 
 
 web100_connection*
 web100_connection_find_v6(web100_agent *agent,
-                       struct web100_connection_spec_v6 *spec_v6)
+                       struct web100_connection_spec_v6 *spec_v6, int *w_errno)
 {
     web100_connection *cp;
-    
+
     if (agent->type != WEB100_AGENT_TYPE_LOCAL) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
-    if ((web100_errno = refresh_connections(agent)) != WEB100_ERR_SUCCESS)
+
+    if ((*w_errno = refresh_connections(agent)) != WEB100_ERR_SUCCESS)
         return NULL;
-    
+
     cp = agent->info.local.connection_head;
     while (cp) {
         if (memcmp(&cp->spec_v6, spec_v6, sizeof (struct web100_connection_spec_v6)) == 0)
             break;
         cp = cp->info.local.next;
     }
-    
-    web100_errno = (cp == NULL ? WEB100_ERR_NOCONNECTION : WEB100_ERR_SUCCESS);
+
+    *w_errno = (cp == NULL ? WEB100_ERR_NOCONNECTION : WEB100_ERR_SUCCESS);
     return cp;
 }
 
 
 web100_connection*
-web100_connection_lookup(web100_agent *agent, int cid)
+web100_connection_lookup(web100_agent *agent, int cid, int *w_errno)
 {
     web100_connection *cp;
-    
+
     if (!agent) {
-        web100_errno = WEB100_ERR_INVAL;
+        *w_errno = WEB100_ERR_INVAL;
         return NULL;
     }
 
     if (agent->type != WEB100_AGENT_TYPE_LOCAL) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
+        *w_errno = WEB100_ERR_AGENT_TYPE;
         return NULL;
     }
-    
-    if ((web100_errno = refresh_connections(agent)) != WEB100_ERR_SUCCESS)
+
+    if ((*w_errno = refresh_connections(agent)) != WEB100_ERR_SUCCESS)
         return NULL;
-    
+
     cp = agent->info.local.connection_head;
     while (cp) {
         if (cp->cid == cid)
@@ -742,13 +746,13 @@ web100_connection_lookup(web100_agent *agent, int cid)
         cp = cp->info.local.next;
     }
 
-    web100_errno = (cp == NULL ? WEB100_ERR_NOCONNECTION : WEB100_ERR_SUCCESS);
+    *w_errno = (cp == NULL ? WEB100_ERR_NOCONNECTION : WEB100_ERR_SUCCESS);
     return cp;
 }
 
 
 web100_connection*
-web100_connection_from_socket(web100_agent *agent, int sockfd)
+web100_connection_from_socket(web100_agent *agent, int sockfd, int *w_errno)
 {
     struct sockaddr_in6 ne6, fe6; /* near and far ends */
     socklen_t namelen; /* may not be POSIX */
@@ -756,30 +760,30 @@ web100_connection_from_socket(web100_agent *agent, int sockfd)
     struct web100_connection_spec_v6 spec6;
 
     /* XXX TODO XXX: Should we only allow local agents? */
-    
+
     namelen = sizeof (fe6);
     if (getpeername(sockfd, (struct sockaddr *)&fe6, &namelen) != 0) {
-        web100_errno = WEB100_ERR_SOCK;
+        *w_errno = WEB100_ERR_SOCK;
         return NULL;
     }
 
     namelen = sizeof (ne6);
     if (getsockname(sockfd, (struct sockaddr *)&ne6, &namelen) != 0) {
-        web100_errno = WEB100_ERR_SOCK;
+        *w_errno = WEB100_ERR_SOCK;
         return NULL;
     }
-    
+
     switch (((struct sockaddr *)&fe6)->sa_family) {
     case AF_INET:
     {
         struct sockaddr_in *ne4 = (struct sockaddr_in *)&ne6;
         struct sockaddr_in *fe4 = (struct sockaddr_in *)&fe6;
-        
+
         spec.src_addr = ne4->sin_addr.s_addr;
         spec.src_port = ntohs(ne4->sin_port);
         spec.dst_addr = fe4->sin_addr.s_addr;
         spec.dst_port = ntohs(fe4->sin_port);
-        return web100_connection_find(agent, &spec);
+        return web100_connection_find(agent, &spec, w_errno);
     }
     case AF_INET6:
     	/* V4 mapped addresses are kind of tricky.  It turns out that
@@ -794,12 +798,12 @@ web100_connection_from_socket(web100_agent *agent, int sockfd)
     	 */
         if (IN6_IS_ADDR_V4MAPPED(&fe6.sin6_addr)) {
             web100_connection* conn;
-            
+
             memcpy(&spec.src_addr, &ne6.sin6_addr.s6_addr[12], 4);
             spec.src_port = ntohs(ne6.sin6_port);
             memcpy(&spec.dst_addr, &fe6.sin6_addr.s6_addr[12], 4);
             spec.dst_port = ntohs(fe6.sin6_port);
-            conn = web100_connection_find(agent, &spec);
+            conn = web100_connection_find(agent, &spec, w_errno);
             if (conn)
             	return conn;
         }
@@ -807,40 +811,40 @@ web100_connection_from_socket(web100_agent *agent, int sockfd)
         spec6.src_port = ntohs(ne6.sin6_port);
         memcpy(&spec6.dst_addr, &fe6.sin6_addr, 16);
         spec6.dst_port = ntohs(fe6.sin6_port);
-        return web100_connection_find_v6(agent, &spec6);
+        return web100_connection_find_v6(agent, &spec6, w_errno);
     default:
-        web100_errno = WEB100_ERR_SOCK;
+        *w_errno = WEB100_ERR_SOCK;
         return NULL;
     }
 }
 
 
 int
-web100_connection_data_copy(web100_connection *dest, web100_connection *src)
-{ 
+web100_connection_data_copy(web100_connection *dest, web100_connection *src, int *w_errno)
+{
     if (!dest || !src) {
-	web100_errno = WEB100_ERR_INVAL;
-        return -WEB100_ERR_INVAL;
+	*w_errno = WEB100_ERR_INVAL;
+        return WEB100_ERR_INVAL;
     }
 
     dest->agent = src->agent;
     dest->cid = src->cid;
-    memcpy(&dest->spec, &src->spec, sizeof(struct web100_connection_spec)); 
+    memcpy(&dest->spec, &src->spec, sizeof(struct web100_connection_spec));
     return WEB100_ERR_SUCCESS;
 }
 
 web100_connection*
-web100_connection_new_local_copy(web100_connection *src)
+web100_connection_new_local_copy(web100_connection *src, int *w_errno)
 {
     web100_connection *conn;
 
     if (!src) {
-	web100_errno = WEB100_ERR_INVAL;
+	*w_errno = WEB100_ERR_INVAL;
 	return NULL;
     }
 
     if ((conn = calloc(1, sizeof (web100_connection))) == NULL ) {
-       	web100_errno = WEB100_ERR_NOMEM;
+       	*w_errno = WEB100_ERR_NOMEM;
        	return NULL;
     }
     conn->agent = src->agent;
@@ -850,43 +854,43 @@ web100_connection_new_local_copy(web100_connection *src)
     return conn;
 }
 
-void
+int
 web100_connection_free_local_copy(web100_connection *conn)
 {
     if (!conn) {
-	web100_errno = WEB100_ERR_INVAL;
-	return;
+	return WEB100_ERR_INVAL;
     }
     free(conn);
+    return WEB100_ERR_SUCCESS;
 }
 
 /*@
 web100_snapshot_alloc - allocate a snapshot
 @*/
 web100_snapshot*
-web100_snapshot_alloc(web100_group *group, web100_connection *conn)
+web100_snapshot_alloc(web100_group *group, web100_connection *conn, int *w_errno)
 {
     web100_snapshot *snap;
-    
+
     if (group->agent != conn->agent) {
-        web100_errno = WEB100_ERR_INVAL;
+        *w_errno = WEB100_ERR_INVAL;
         return NULL;
     }
-    
+
     if ((snap = (web100_snapshot *)calloc(1, sizeof (web100_snapshot))) == NULL) {
-        web100_errno = WEB100_ERR_NOMEM;
+        *w_errno = WEB100_ERR_NOMEM;
         return NULL;
     }
-    
+
     if ((snap->data = (void *)calloc(1, group->size)) == NULL) {
         free(snap);
-        web100_errno = WEB100_ERR_NOMEM;
+        *w_errno = WEB100_ERR_NOMEM;
         return NULL;
     }
-    
+
     snap->group = group;
     snap->connection = conn;
-    
+
     return snap;
 }
 
@@ -895,29 +899,29 @@ web100_snapshot_alloc(web100_group *group, web100_connection *conn)
 web100_snapshot_alloc_from_log - allocate a snapshot based on logged info
 @*/
 web100_snapshot*
-web100_snapshot_alloc_from_log(web100_log *log)
+web100_snapshot_alloc_from_log(web100_log *log, int *w_errno)
 {
     web100_snapshot *snap;
-    
+
     if (log->group->agent != log->connection->agent) {
-        web100_errno = WEB100_ERR_INVAL;
+        *w_errno = WEB100_ERR_INVAL;
         return NULL;
     }
-    
+
     if ((snap = (web100_snapshot *)calloc(1, sizeof (web100_snapshot))) == NULL) {
-        web100_errno = WEB100_ERR_NOMEM;
+        *w_errno = WEB100_ERR_NOMEM;
         return NULL;
     }
-    
+
     if ((snap->data = (void *)calloc(1, log->group->size)) == NULL) {
         free(snap);
-        web100_errno = WEB100_ERR_NOMEM;
+        *w_errno = WEB100_ERR_NOMEM;
         return NULL;
     }
-    
+
     snap->group = log->group;
     snap->connection = log->connection;
-    
+
     return snap;
 }
 
@@ -931,7 +935,7 @@ web100_snapshot_free(web100_snapshot *snap)
     if (snap) {
         free(snap->data);
         snap->data = NULL;
-    } 
+    }
     free(snap);
 }
 
@@ -944,28 +948,24 @@ web100_snap(web100_snapshot *snap)
 {
     FILE *fp;
     char filename[PATH_MAX];
-    
+
     if (snap->group->agent->type != WEB100_AGENT_TYPE_LOCAL) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
-        return -WEB100_ERR_AGENT_TYPE;
+        return WEB100_ERR_AGENT_TYPE;
     }
-    
+
     sprintf(filename, "%s/%d/%s", WEB100_ROOT_DIR, snap->connection->cid, snap->group->name);
     if ((fp = fopen(filename, "r")) == NULL) {
-        web100_errno = WEB100_ERR_NOCONNECTION;
-        return -WEB100_ERR_NOCONNECTION;
+        return WEB100_ERR_NOCONNECTION;
     }
-    
+
     if (fread(snap->data, snap->group->size, 1, fp) != 1){
-        web100_errno = WEB100_ERR_NOCONNECTION;
-        return -WEB100_ERR_NOCONNECTION;
+        return WEB100_ERR_NOCONNECTION;
     }
 
     if (fclose(fp)) {
-       	web100_errno = WEB100_ERR_FILE;
-       	return -WEB100_ERR_FILE;
+       	return WEB100_ERR_FILE;
     }
-    
+
     return WEB100_ERR_SUCCESS;
 }
 
@@ -978,37 +978,32 @@ web100_raw_read(web100_var *var, web100_connection *conn, void *buf)
 {
     FILE *fp;
     char filename[PATH_MAX];
-    
+
     if (var->group->agent != conn->agent) {
-        web100_errno = WEB100_ERR_INVAL;
-        return -WEB100_ERR_INVAL;
+        return WEB100_ERR_INVAL;
     }
-    
+
     if (conn->agent->type != WEB100_AGENT_TYPE_LOCAL) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
-        return -WEB100_ERR_AGENT_TYPE;
+        return WEB100_ERR_AGENT_TYPE;
     }
-    
+
     sprintf(filename, "%s/%d/%s", WEB100_ROOT_DIR, conn->cid, var->group->name);
     if ((fp = fopen(filename, "r")) == NULL) {
-        web100_errno = WEB100_ERR_NOCONNECTION;
-        return -WEB100_ERR_NOCONNECTION;
+        return WEB100_ERR_NOCONNECTION;
     }
-    
+
     if (fseek(fp, var->offset, SEEK_SET)) {
         perror("web100_raw_read: fseek");
-        web100_errno = WEB100_ERR_FILE;
-        return -WEB100_ERR_FILE;
+        return WEB100_ERR_FILE;
     }
     if (fread(buf, size_from_type(var->type), 1, fp) != 1) {
         perror("web100_raw_read: fread");
-        web100_errno = WEB100_ERR_FILE;
-        return -WEB100_ERR_FILE;
+        return WEB100_ERR_FILE;
     }
-    
+
     if (fclose(fp))
         perror("web100_raw_read: fclose");
-    
+
     return WEB100_ERR_SUCCESS;
 }
 
@@ -1021,42 +1016,37 @@ web100_raw_write(web100_var *var, web100_connection *conn, void *buf)
 {
     FILE *fp;
     char filename[PATH_MAX];
-    
+
     if (var->group->agent != conn->agent) {
-        web100_errno = WEB100_ERR_INVAL;
-        return -WEB100_ERR_INVAL;
+        return WEB100_ERR_INVAL;
     }
-    
+
     if (conn->agent->type != WEB100_AGENT_TYPE_LOCAL) {
-        web100_errno = WEB100_ERR_AGENT_TYPE;
-        return -WEB100_ERR_AGENT_TYPE;
+        return WEB100_ERR_AGENT_TYPE;
     }
-    
+
     sprintf(filename, "%s/%d/%s", WEB100_ROOT_DIR, conn->cid, var->group->name);
     if ((fp = fopen(filename, "w")) == NULL) {
-        web100_errno = WEB100_ERR_NOCONNECTION;
-        return -WEB100_ERR_NOCONNECTION;
+        return WEB100_ERR_NOCONNECTION;
     }
-    
+
     if (fseek(fp, var->offset, SEEK_SET)) {
         perror("web100_raw_write: fseek");
-        web100_errno = WEB100_ERR_FILE;
-        return -WEB100_ERR_FILE;
+        return WEB100_ERR_FILE;
     }
     if (fwrite(buf, size_from_type(var->type), 1, fp) != 1) {
         perror("web100_raw_write: fread");
-        web100_errno = WEB100_ERR_FILE;
-        return -WEB100_ERR_FILE;
+        return WEB100_ERR_FILE;
     }
 
     if (fflush(fp)) {
 	perror("web100_raw_write: flush failed");
-	return -WEB100_ERR_FILE;
+	return WEB100_ERR_FILE;
     }
 
     if (fclose(fp))
         perror("web100_raw_write: fclose");
-    
+
     return WEB100_ERR_SUCCESS;
 }
 
@@ -1068,13 +1058,12 @@ int
 web100_snap_read(web100_var *var, web100_snapshot *snap, void *buf)
 {
     if (var->group != snap->group) {
-        web100_errno = WEB100_ERR_INVAL;
-        return -WEB100_ERR_INVAL;
+        return WEB100_ERR_INVAL;
     }
-    
+
     memcpy(buf, (void *)((unsigned long)(snap->data) + var->offset),
            size_from_type(var->type));
-    
+
     return WEB100_ERR_SUCCESS;
 }
 
@@ -1087,17 +1076,20 @@ web100_delta_any(web100_var *var, web100_snapshot *s1,
                  web100_snapshot *s2, void *buf)
 {
     unsigned long long int v1, v2, val;
-    
+
     v1 = v2 = val = 0;
 
     if (s1->group != s2->group) {
-        web100_errno = WEB100_ERR_INVAL;
-        return -WEB100_ERR_INVAL;
-    } 
+        return WEB100_ERR_INVAL;
+    }
 
-    if ((web100_snap_read(var, s1, &v1) < 0) ||
-        (web100_snap_read(var, s2, &v2) < 0))
-        return -web100_errno; 
+    int w_errno;
+    w_errno = web100_snap_read(var, s1, &v1);
+    if (w_errno != WEB100_ERR_SUCCESS)
+        return w_errno;
+    w_errno = web100_snap_read(var, s2, &v2);
+    if (w_errno != WEB100_ERR_SUCCESS)
+        return w_errno;
 
     val = v1 - v2;
 
@@ -1114,12 +1106,10 @@ int
 web100_snap_data_copy(web100_snapshot *dest, web100_snapshot *src)
 {
     if (dest->connection != src->connection) {
-        web100_errno = WEB100_ERR_INVAL;
-        return -WEB100_ERR_INVAL;
+        return WEB100_ERR_INVAL;
     }
     if (dest->group != src->group) {
-        web100_errno = WEB100_ERR_INVAL;
-        return -WEB100_ERR_INVAL;
+        return WEB100_ERR_INVAL;
     }
 
     memcpy(dest->data, src->data, src->group->size);
@@ -1153,18 +1143,18 @@ web100_value_to_textn(char* dest, size_t size, WEB100_TYPE type, void* buf)
         type = ((char *)buf)[16] == WEB100_ADDRTYPE_IPV4 ?
                WEB100_TYPE_INET_ADDRESS_IPV4 :
                WEB100_TYPE_INET_ADDRESS_IPV6;
-    
+
     switch(type) {
     case WEB100_TYPE_INET_ADDRESS_IPV4:
     {
-        unsigned char *addr = (unsigned char *) buf; 
+        unsigned char *addr = (unsigned char *) buf;
         return snprintf(dest, size, "%u.%u.%u.%u", addr[0], addr[1], addr[2], addr[3]);
     }
     case WEB100_TYPE_INTEGER:
     case WEB100_TYPE_INTEGER32:
         return snprintf(dest, size, "%d", *(int32_t *) buf);
-    case WEB100_TYPE_COUNTER32: 
-    case WEB100_TYPE_GAUGE32: 
+    case WEB100_TYPE_COUNTER32:
+    case WEB100_TYPE_GAUGE32:
     case WEB100_TYPE_UNSIGNED32:
     case WEB100_TYPE_TIME_TICKS:
         return snprintf(dest, size, "%u", *(u_int32_t *) buf);
@@ -1178,7 +1168,7 @@ web100_value_to_textn(char* dest, size_t size, WEB100_TYPE type, void* buf)
         int start = -1, end = -1;
         int i, j;
         int pos;
-        
+
         /* Find longest subsequence of 0's in addr */
         for (i = 0; i < 8; i++) {
             if (addr[i] == 0) {
@@ -1193,7 +1183,7 @@ web100_value_to_textn(char* dest, size_t size, WEB100_TYPE type, void* buf)
         }
         if (end - start == 1)
             start = -1;
-        
+
         pos = 0;
         for (i = 0; i < 8; i++) {
             if (i > 0)
@@ -1209,7 +1199,7 @@ web100_value_to_textn(char* dest, size_t size, WEB100_TYPE type, void* buf)
             if (pos >= size)
                 break;
         }
-        
+
         if (pos > size)
         	pos = size;
         return pos;
@@ -1350,7 +1340,7 @@ web100_get_connection_spec(web100_connection *connection,
 void
 web100_get_connection_spec_v6(web100_connection* connection, struct web100_connection_spec_v6* spec_v6)
 {
-    memcpy(spec_v6, &connection->spec_v6, sizeof (struct web100_connection_spec_v6)); 
+    memcpy(spec_v6, &connection->spec_v6, sizeof (struct web100_connection_spec_v6));
 }
 
 /* Logging functionality begins here */
@@ -1362,49 +1352,49 @@ web100_get_connection_spec_v6(web100_connection* connection, struct web100_conne
 
 web100_log*
 web100_log_open_write(char *logname, web100_connection *conn,
-		      web100_group *group)
+		      web100_group *group, int *w_errno)
 {
     FILE      *header;
-    int       c; 
+    int       c;
     // time_t    timep;
 
     web100_log *log = NULL;
 
     if (group->agent != conn->agent) {
-       	web100_errno = WEB100_ERR_INVAL;
-	goto Cleanup; 
-    } 
+       	*w_errno = WEB100_ERR_INVAL;
+	goto Cleanup;
+    }
 
     if ((log = (web100_log *)calloc(1, sizeof (web100_log))) == NULL) {
-        web100_errno = WEB100_ERR_NOMEM; 
+        *w_errno = WEB100_ERR_NOMEM;
 	goto Cleanup;
     }
 
     if ((header = fopen(WEB100_HEADER_FILE, "r")) == NULL) {
-        web100_errno = WEB100_ERR_HEADER; 
+        *w_errno = WEB100_ERR_HEADER;
         goto Cleanup;
     }
 
-    log->group       = group; 
+    log->group       = group;
     log->connection  = conn;
 
     if((log->fp = fopen(logname, "w")) == NULL) {
-	web100_errno = WEB100_ERR_FILE; 
+	*w_errno = WEB100_ERR_FILE;
 	goto Cleanup;
     }
 
     while ((c=fgetc(header)) != EOF){
       if(fputc(c, log->fp) != c){
-	web100_errno = WEB100_ERR_FILE; 
+	*w_errno = WEB100_ERR_FILE;
 	goto Cleanup;
       }
     }
     fputc('\0', log->fp);
 
-    if(fclose(header)) { 
-	web100_errno = WEB100_ERR_FILE; 
+    if(fclose(header)) {
+	*w_errno = WEB100_ERR_FILE;
 	goto Cleanup;
-    } 
+    }
     //
     // Put an end of HEADER marker
     //
@@ -1415,46 +1405,45 @@ web100_log_open_write(char *logname, web100_connection *conn,
     log->time = time(NULL);
 
     if(fwrite(&log->time, sizeof(uint32_t), 1, log->fp) != 1) {
-	web100_errno = WEB100_ERR_FILE;
+	*w_errno = WEB100_ERR_FILE;
 	goto Cleanup;
-    } 
+    }
     //
     // Put in group name
-    // 
+    //
     if(fwrite(group->name, WEB100_GROUPNAME_LEN_MAX, 1, log->fp) != 1) {
-       	web100_errno = WEB100_ERR_FILE;
+       	*w_errno = WEB100_ERR_FILE;
        	goto Cleanup;
     }
     //
     // Put in connection spec
     //
     if(fwrite(&(conn->spec), sizeof(struct web100_connection_spec), 1, log->fp) != 1) {
-	web100_errno = WEB100_ERR_FILE;
+	*w_errno = WEB100_ERR_FILE;
        	goto Cleanup;
     }
 
-    web100_errno = WEB100_ERR_SUCCESS;
+    *w_errno = WEB100_ERR_SUCCESS;
 
 Cleanup:
-    if(web100_errno != WEB100_ERR_SUCCESS) { 
+    if(w_errno != WEB100_ERR_SUCCESS) {
 	if(log) {
 	    if(log->fp)
-	       	fclose(log->fp); 
+	       	fclose(log->fp);
 	    free(log);
        	}
        	return NULL;
-    } 
+    }
 
     return log;
 }
 
 int
-web100_log_close_write(web100_log *log) 
-{ 
-    if(fclose(log->fp) != 0) { 
-	web100_errno = WEB100_ERR_FILE; 
-	return -WEB100_ERR_FILE;
-    } 
+web100_log_close_write(web100_log *log)
+{
+    if(fclose(log->fp) != 0) {
+	return WEB100_ERR_FILE;
+    }
 
     free(log);
     return WEB100_ERR_SUCCESS;
@@ -1462,66 +1451,62 @@ web100_log_close_write(web100_log *log)
 
 int
 web100_log_write(web100_log *log, web100_snapshot *snap)
-{ 
+{
     if(log->fp == NULL) {
-	web100_errno = WEB100_ERR_FILE; 
-	return -WEB100_ERR_FILE;
+	return WEB100_ERR_FILE;
     }
 
     if(log->group != snap->group) {
-	web100_errno = WEB100_ERR_INVAL; 
-	return -WEB100_ERR_INVAL;
+	return WEB100_ERR_INVAL;
     }
 
     if(log->connection->spec.dst_port != snap->connection->spec.dst_port ||
        log->connection->spec.dst_addr != snap->connection->spec.dst_addr ||
        log->connection->spec.src_port != snap->connection->spec.src_port) {
 
-	web100_errno = WEB100_ERR_INVAL; 
-	return -WEB100_ERR_INVAL;
+	return WEB100_ERR_INVAL;
     }
 
     fprintf(log->fp, "%s\n", BEGIN_SNAP_DATA);
 
     if(fwrite(snap->data, snap->group->size, 1, log->fp) != 1) {
-	web100_errno = WEB100_ERR_FILE;
-	return -WEB100_ERR_FILE;
+	return WEB100_ERR_FILE;
     }
 
     return WEB100_ERR_SUCCESS;
 }
 
 web100_log*
-web100_log_open_read(char *logname)
+web100_log_open_read(char *logname, int *w_errno)
 {
-    int           c; 
+    int           c;
     char      	  tmpbuf[MAX_TMP_BUF_SIZE];
     struct tm     *tmp;
     char          group_name[WEB100_GROUPNAME_LEN_MAX];
     web100_agent       *agent = NULL;
-    web100_connection  *cp = NULL; 
+    web100_connection  *cp = NULL;
     FILE               *header = NULL;
-    
+
     web100_log *log = NULL;
 
     if ((log = (web100_log *)calloc(1, sizeof (web100_log))) == NULL) {
-        web100_errno = WEB100_ERR_NOMEM; 
+        *w_errno = WEB100_ERR_NOMEM;
 	goto Cleanup;
     }
 
     if ((log->fp = fopen(logname, "r")) == NULL) {
-        web100_errno  = WEB100_ERR_FILE;
+        *w_errno  = WEB100_ERR_FILE;
         goto Cleanup;
     }
 
     if ((header = fopen("./log_header", "w+")) == NULL) {
-	web100_errno = WEB100_ERR_FILE;
-	goto Cleanup; 
+	*w_errno = WEB100_ERR_FILE;
+	goto Cleanup;
     }
 
     while ((c = fgetc(log->fp)) != '\0') {
         if (c == EOF) {
-            web100_errno = WEB100_ERR_HEADER;
+            *w_errno = WEB100_ERR_HEADER;
             goto Cleanup;
         }
         fputc(c, header);
@@ -1529,29 +1514,30 @@ web100_log_open_read(char *logname)
 
     rewind(header);
 
-    agent = _web100_agent_attach_log(header);
-    if (agent == NULL ) {
-        web100_errno = WEB100_ERR_HEADER;
+    agent = _web100_agent_attach_log(header, w_errno);
+    if (agent == NULL) {
+        // TODO - is the w_errno set by agent_attach_log adequate?
+        // *w_errno = WEB100_ERR_AGENT_TYPE;
         goto Cleanup;
     }
 
     if (fgets(tmpbuf, MAX_TMP_BUF_SIZE, log->fp) == NULL ) {
-       	web100_errno = WEB100_ERR_HEADER;
+       	*w_errno = WEB100_ERR_HEADER;
        	goto Cleanup;
     }
 
-    if (strncmp(tmpbuf, END_OF_HEADER_MARKER, strlen(END_OF_HEADER_MARKER)) != 0 ) { 
-	web100_errno = WEB100_ERR_FILE;
+    if (strncmp(tmpbuf, END_OF_HEADER_MARKER, strlen(END_OF_HEADER_MARKER)) != 0 ) {
+	*w_errno = WEB100_ERR_FILE;
        	goto Cleanup;
     }
 
     if(fread(&log->time, sizeof(unsigned int), 1, log->fp) != 1) {
-       	web100_errno = WEB100_ERR_FILE;
+       	*w_errno = WEB100_ERR_FILE;
        	goto Cleanup;
     }
 
     if(fread(group_name, WEB100_GROUPNAME_LEN_MAX, 1, log->fp) != 1) {
-	web100_errno = WEB100_ERR_FILE;
+	*w_errno = WEB100_ERR_FILE;
        	goto Cleanup;
     }
 
@@ -1559,14 +1545,14 @@ web100_log_open_read(char *logname)
     // Define (dummy) connection with logged spec
     //
     if ((cp = (web100_connection *)calloc(1, sizeof (web100_connection))) == NULL) {
-        web100_errno = WEB100_ERR_NOMEM;
+        *w_errno = WEB100_ERR_NOMEM;
 	goto Cleanup;
     }
 
     cp->agent    = agent;
     cp->cid      = WEB100_LOG_CID; //dummy
     if(fread(&(cp->spec), sizeof(struct web100_connection_spec), 1, log->fp) != 1) {
-	web100_errno = WEB100_ERR_FILE;
+	*w_errno = WEB100_ERR_FILE;
        	goto Cleanup;
     }
 
@@ -1574,32 +1560,33 @@ web100_log_open_read(char *logname)
     agent->info.local.connection_head = cp;
 
     log->agent = agent;
-    log->group = web100_group_find(agent, group_name);
+
+    *w_errno = WEB100_ERR_NOGROUP;
+    log->group = web100_group_find(agent, group_name, w_errno);
     if (log->group == NULL) {
-        web100_errno = WEB100_ERR_NOGROUP;
         goto Cleanup;
     }
     log->connection = cp;
 
-    web100_errno = WEB100_ERR_SUCCESS;
+    *w_errno = WEB100_ERR_SUCCESS;
 
  Cleanup:
 
     if (header) fclose(header);
-    remove("./log_header"); 
+    remove("./log_header");
 
-    if (web100_errno != WEB100_ERR_SUCCESS) {
+    if (*w_errno != WEB100_ERR_SUCCESS) {
        	if (log) {
 	    if (log->fp)
 	       	fclose(log->fp);
-	    free(log); 
-	} 
+	    free(log);
+	}
 	if(agent) web100_detach(agent);
-       	if(cp) free(cp); 
+       	if(cp) free(cp);
 
 	return NULL;
     }
-    
+
     return log;
 }
 
@@ -1607,10 +1594,9 @@ int
 web100_log_close_read(web100_log *log)
 {
     if(log) {
-       	if(fclose(log->fp) != 0) { 
-	    web100_errno = WEB100_ERR_FILE; 
-	    return -WEB100_ERR_FILE;
-       	} 
+       	if(fclose(log->fp) != 0) {
+	    return WEB100_ERR_FILE;
+       	}
 	web100_detach(log->agent);
        	free(log);
     }
@@ -1625,14 +1611,12 @@ web100_snap_from_log(web100_snapshot* snap, web100_log *log)
     char tmpbuf[MAX_TMP_BUF_SIZE];
 
     if (snap->group->agent->type != WEB100_AGENT_TYPE_LOG) {
-       	web100_errno = WEB100_ERR_AGENT_TYPE; 
-	return -WEB100_ERR_AGENT_TYPE;
+	return WEB100_ERR_AGENT_TYPE;
     }
 
     if (log->fp == NULL) {
-	web100_errno = WEB100_ERR_FILE; 
-	return -WEB100_ERR_FILE; 
-    }        
+	return WEB100_ERR_FILE;
+    }
 
     // Read no more than 79 characters into tmpbuf (which has size 80).
     if(fscanf(log->fp, "%79s[^\n]", tmpbuf) == EOF) {
@@ -1649,13 +1633,11 @@ web100_snap_from_log(web100_snapshot* snap, web100_log *log)
     // Cleanup the line
 
     if( strcmp(tmpbuf,BEGIN_SNAP_DATA) != 0 ){
-        web100_errno = WEB100_ERR_FILE; 
-        return -WEB100_ERR_FILE; 
-    }        
+        return WEB100_ERR_FILE;
+    }
 
     if(fread(snap->data, snap->group->size, 1, log->fp) != 1) {
-	web100_errno = WEB100_ERR_FILE; 
-	return -WEB100_ERR_FILE; 
+	return WEB100_ERR_FILE;
     }
 
     return WEB100_ERR_SUCCESS;

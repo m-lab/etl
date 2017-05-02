@@ -57,8 +57,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "no-tmp"}).Inc()
-		log.Printf("Failed to create tmpfile for: %s\n", testName)
-		return err
+		log.Printf("Failed to create tmpfile for: %s, when processing: %s\n",
+			testName, meta["filename"])
+		return nil
 	}
 
 	metrics.WorkerState.WithLabelValues("ndt").Inc()
@@ -70,7 +71,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if err != nil {
 			metrics.TestCount.With(prometheus.Labels{
 				"table": n.TableName(), "type": "write-err"}).Inc()
-			return err
+			log.Printf("Tmpfs write error: %s, when processing: %s\n%s\n",
+				testName, meta["filename"], err)
+			return nil
 		}
 	}
 
@@ -88,7 +91,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		// Asset missing from build.
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "no-asset"}).Inc()
-		return err
+		log.Printf("Asset missing error: %s, when processing: %s\n%s\n",
+			testName, meta["filename"], err)
+		return nil
 	}
 	b := bytes.NewBuffer(data)
 
@@ -99,7 +104,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "legacy-names"}).Inc()
-		return err
+		log.Printf("ParseWeb100Def error: %s, when processing: %s\n%s\n",
+			testName, meta["filename"], err)
+		return nil
 	}
 
 	// Open the file we created above.
@@ -107,7 +114,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "no-tmp-legacy"}).Inc()
-		return err
+		log.Printf("legacyNames error: %s, when processing: %s\n%s\n",
+			testName, meta["filename"], err)
+		return nil
 	}
 	defer w.Close()
 
@@ -126,8 +135,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				// TODO - this will lose tests.  Do something better!
 				metrics.TestCount.With(prometheus.Labels{
 					"table": n.TableName(), "type": "not-eof"}).Inc()
-				log.Printf("Failed to reach EOF: %s\n", tmpFile.Name())
-				return err
+				log.Printf("Failed to reach EOF: %d, %s, (%s), when processing: %s\n%s\n",
+					count, tmpFile.Name(), testName, meta["filename"], err)
+				return nil
 			}
 		}
 		// HACK - just to see how expensive the Values() call is...
@@ -148,13 +158,17 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "values-err"}).Inc()
-		return err
+		log.Printf("Error calling web100 Values(): %s, (%s), when processing: %s\n%s\n",
+			tmpFile.Name(), testName, meta["filename"], err)
+		return nil
 	}
 	err = n.inserter.InsertRow(&bq.MapSaver{results})
 
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "insert-err"}).Inc()
+		// TODO: This is an insert error, that might be recoverable if we try again.
+		return err
 	} else {
 		// TODO - test type should be a separate label, so we can see which files have which errors.
 		if strings.HasSuffix(testName, "c2s_snaplog") {
@@ -164,8 +178,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			metrics.TestCount.With(prometheus.Labels{
 				"table": n.TableName(), "type": "s2c"}).Inc()
 		}
+		return nil
 	}
-	return err
 }
 
 func (n *NDTParser) TableName() string {
