@@ -95,11 +95,10 @@ struct web100_connection_spec_v6 {
 #define WEB100_ERR_SOCK            9
 #define WEB100_ERR_KERNVER         10
 
-extern int               web100_errno;
 extern const char* const web100_sys_errlist[];
 extern int               web100_sys_nerr;
 
-extern char              web100_quiet;
+extern const char              web100_quiet;
 
 /* The following are opaque types. */
 typedef struct web100_agent       web100_agent;

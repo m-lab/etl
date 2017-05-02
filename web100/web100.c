@@ -51,16 +51,10 @@
 #include "web100-int.h"
 #include "web100.h"
 
-
-/*
- * Global library w_errno.  XXX: Not threadsafe (needs to be in thread-local
- * storage).
- */
-
 #ifdef QUIET
-char web100_quiet = 1;
+const char web100_quiet = 1;
 #else
-char web100_quiet = 0;
+const char web100_quiet = 0;
 #endif
 
 /*
@@ -1522,7 +1516,8 @@ web100_log_open_read(char *logname, int *w_errno)
 
     agent = _web100_agent_attach_log(header, w_errno);
     if (agent == NULL) {
-        *w_errno = WEB100_ERR_AGENT_TYPE;
+        // TODO - is the w_errno set by agent_attach_log adequate?
+        // *w_errno = WEB100_ERR_AGENT_TYPE;
         goto Cleanup;
     }
 

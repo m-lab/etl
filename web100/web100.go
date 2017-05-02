@@ -95,12 +95,11 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 // Next iterates through the web100 log file reading the next snapshot record
 // until EOF or an error occurs.
 func (w *Web100) Next() error {
-	var w_errno C.int = C.WEB100_ERR_SUCCESS
 	snaplog := (*C.web100_log)(w.snaplog)
 	snap := (*C.web100_snapshot)(w.snap)
 	if snap == nil {
-		log.Printf("%s\n", C.GoString(C.web100_strerror(w_errno)))
-		return fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
+		log.Printf("Snapshot is nil\n")
+		return fmt.Errorf("Snapshot is nil")
 	}
 
 	// Read the next web100_snaplog data from underlying file.
