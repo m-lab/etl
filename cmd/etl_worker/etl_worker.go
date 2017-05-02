@@ -2,13 +2,10 @@
 package main
 
 import (
-	"encoding/base64"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"runtime"
-	"strings"
 	"sync/atomic"
 
 	"github.com/m-lab/etl/bq"
@@ -52,36 +49,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Hello world!")
 }
 
-// TODO(dev) Add unit test
-func getFilename(filename string) (string, error) {
-	if strings.HasPrefix(filename, "gs://") {
-		return filename, nil
-	}
-
-	decode, err := base64.StdEncoding.DecodeString(filename)
-	if err != nil {
-		return "", errors.New("invalid file path: " + filename)
-	}
-	fn := string(decode[:])
-	if strings.HasPrefix(fn, "gs://") {
-		return fn, nil
-	}
-
-	return "", errors.New("invalid base64 encoded file path: " + fn)
-}
-
-func getDataType(fn string) etl.DataType {
-	fields := etl.TaskPattern.FindStringSubmatch(fn)
-	if fields == nil {
-		return etl.INVALID
-	}
-	dt, ok := etl.DirToDataType[fields[2]]
-	if !ok {
-		return etl.INVALID
-	}
-	return dt
-}
-
 // Basic throttling to restrict the number of tasks in flight.
 var inFlight int32
 
@@ -123,7 +90,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// This handles base64 encoding, and requires a gs:// prefix.
-	fn, err := getFilename(r.FormValue("filename"))
+	fn, err := storage.GetFilename(r.FormValue("filename"))
 	if err != nil {
 		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
@@ -135,9 +102,8 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): log the originating task queue name from headers.
 	log.Printf("Received filename: %q\n", fn)
 
-	dataType := getDataType(fn)
+	dataType := storage.GetDataType(fn)
 	if dataType == etl.INVALID {
-		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		w.WriteHeader(http.StatusBadRequest)
 		log.Printf("Invalid filename: %s\n", fn)

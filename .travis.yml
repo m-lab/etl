@@ -44,11 +44,11 @@ script:
 # after a merge with matching "on:" conditions.
 deploy:
 # SANDBOX: before code review for development code in a specific branch.
-## Service: etl-parser -- AppEngine Flexible Environment.
+## Service: etl-disco-parser -- AppEngine Flexible Environment.
 - provider: script
   script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -58,7 +58,55 @@ deploy:
     # A bash-style 'if' condition, matching branches with a "sandbox-" prefix.
     # Sandbox branches will be deployed to personalized service names.
     # Integration branch will not use decorated service names.
-    condition: $TRAVIS_BRANCH == sandbox-*
+    condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
+
+## Service: etl-ndt-parser -- AppEngine Flexible Environment.
+- provider: script
+  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    # Consider all branches and match using the condition. By default
+    # "all_branches" is false, and the condition is ignored.
+    all_branches: true
+    # A bash-style 'if' condition, matching branches with a "sandbox-" prefix.
+    # Sandbox branches will be deployed to personalized service names.
+    # Integration branch will not use decorated service names.
+    condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
+
+## Service: etl-sidestream-parser -- AppEngine Flexible Environment.
+- provider: script
+  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    # Consider all branches and match using the condition. By default
+    # "all_branches" is false, and the condition is ignored.
+    all_branches: true
+    # A bash-style 'if' condition, matching branches with a "sandbox-" prefix.
+    # Sandbox branches will be deployed to personalized service names.
+    # Integration branch will not use decorated service names.
+    condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
+
+## Service: etl-traceroute-parser -- AppEngine Flexible Environment.
+- provider: script
+  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    # Consider all branches and match using the condition. By default
+    # "all_branches" is false, and the condition is ignored.
+    all_branches: true
+    # A bash-style 'if' condition, matching branches with a "sandbox-" prefix.
+    # Sandbox branches will be deployed to personalized service names.
+    # Integration branch will not use decorated service names.
+    condition: $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == integration
 
 ## Service: queue-pusher -- AppEngine Standard Environment.
 - provider: script
