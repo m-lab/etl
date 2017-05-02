@@ -56,7 +56,6 @@
  * Global library w_errno.  XXX: Not threadsafe (needs to be in thread-local
  * storage).
  */
-char web100_errstr[128];
 
 #ifdef QUIET
 char web100_quiet = 1;
