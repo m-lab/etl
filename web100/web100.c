@@ -151,7 +151,7 @@ _web100_agent_attach_header(FILE *header)
     char tmpbuf[WEB100_VARNAME_LEN_MAX];
     int have_len = 0;
 
-    if ((agent = malloc(sizeof(web100_agent))) == NULL) {
+    if ((agent = calloc(1, sizeof(web100_agent))) == NULL) {
         web100_errno = WEB100_ERR_NOMEM;
         goto Cleanup;
     }
@@ -177,7 +177,7 @@ _web100_agent_attach_header(FILE *header)
         if (c < 0) {
             break;
         } else if (c == '/') {
-            if ((gp = (web100_group*) malloc(sizeof(web100_group))) == NULL) {
+            if ((gp = (web100_group*) calloc(1, sizeof(web100_group))) == NULL) {
                 web100_errno = WEB100_ERR_NOMEM;
                 goto Cleanup;
             }
@@ -209,7 +209,7 @@ _web100_agent_attach_header(FILE *header)
                 goto Cleanup;
             }
             
-            if ((vp = (web100_var *)malloc(sizeof (web100_var))) == NULL) {
+            if ((vp = (web100_var *)calloc(1, sizeof (web100_var))) == NULL) {
                 web100_errno = WEB100_ERR_NOMEM;
                 goto Cleanup;
             }
@@ -361,7 +361,7 @@ refresh_connections(web100_agent *agent)
 	if (access(filename, R_OK))
 	    continue;
 	
-        if ((cp = (web100_connection *)malloc(sizeof (web100_connection))) == NULL)
+        if ((cp = (web100_connection *)calloc(1, sizeof (web100_connection))) == NULL)
             return WEB100_ERR_NOMEM;
         cp->agent = agent;
         cp->cid = cid; 
@@ -839,7 +839,7 @@ web100_connection_new_local_copy(web100_connection *src)
 	return NULL;
     }
 
-    if ((conn = malloc(sizeof (web100_connection))) == NULL ) {
+    if ((conn = calloc(1, sizeof (web100_connection))) == NULL ) {
        	web100_errno = WEB100_ERR_NOMEM;
        	return NULL;
     }
@@ -873,12 +873,12 @@ web100_snapshot_alloc(web100_group *group, web100_connection *conn)
         return NULL;
     }
     
-    if ((snap = (web100_snapshot *)malloc(sizeof (web100_snapshot))) == NULL) {
+    if ((snap = (web100_snapshot *)calloc(1, sizeof (web100_snapshot))) == NULL) {
         web100_errno = WEB100_ERR_NOMEM;
         return NULL;
     }
     
-    if ((snap->data = (void *)malloc(group->size)) == NULL) {
+    if ((snap->data = (void *)calloc(1, group->size)) == NULL) {
         free(snap);
         web100_errno = WEB100_ERR_NOMEM;
         return NULL;
@@ -904,12 +904,12 @@ web100_snapshot_alloc_from_log(web100_log *log)
         return NULL;
     }
     
-    if ((snap = (web100_snapshot *)malloc(sizeof (web100_snapshot))) == NULL) {
+    if ((snap = (web100_snapshot *)calloc(1, sizeof (web100_snapshot))) == NULL) {
         web100_errno = WEB100_ERR_NOMEM;
         return NULL;
     }
     
-    if ((snap->data = (void *)malloc(log->group->size)) == NULL) {
+    if ((snap->data = (void *)calloc(1, log->group->size)) == NULL) {
         free(snap);
         web100_errno = WEB100_ERR_NOMEM;
         return NULL;
@@ -1375,7 +1375,7 @@ web100_log_open_write(char *logname, web100_connection *conn,
 	goto Cleanup; 
     } 
 
-    if ((log = (web100_log *)malloc(sizeof (web100_log))) == NULL) {
+    if ((log = (web100_log *)calloc(1, sizeof (web100_log))) == NULL) {
         web100_errno = WEB100_ERR_NOMEM; 
 	goto Cleanup;
     }
@@ -1504,7 +1504,7 @@ web100_log_open_read(char *logname)
     
     web100_log *log = NULL;
 
-    if ((log = (web100_log *)malloc(sizeof (web100_log))) == NULL) {
+    if ((log = (web100_log *)calloc(1, sizeof (web100_log))) == NULL) {
         web100_errno = WEB100_ERR_NOMEM; 
 	goto Cleanup;
     }
@@ -1530,6 +1530,10 @@ web100_log_open_read(char *logname)
     rewind(header);
 
     agent = _web100_agent_attach_log(header);
+    if (agent == NULL ) {
+        web100_errno = WEB100_ERR_HEADER;
+        goto Cleanup;
+    }
 
     if (fgets(tmpbuf, MAX_TMP_BUF_SIZE, log->fp) == NULL ) {
        	web100_errno = WEB100_ERR_HEADER;
@@ -1554,7 +1558,7 @@ web100_log_open_read(char *logname)
     //
     // Define (dummy) connection with logged spec
     //
-    if ((cp = (web100_connection *)malloc(sizeof (web100_connection))) == NULL) {
+    if ((cp = (web100_connection *)calloc(1, sizeof (web100_connection))) == NULL) {
         web100_errno = WEB100_ERR_NOMEM;
 	goto Cleanup;
     }
@@ -1571,6 +1575,10 @@ web100_log_open_read(char *logname)
 
     log->agent = agent;
     log->group = web100_group_find(agent, group_name);
+    if (log->group == NULL) {
+        web100_errno = WEB100_ERR_NOGROUP;
+        goto Cleanup;
+    }
     log->connection = cp;
 
     web100_errno = WEB100_ERR_SUCCESS;
