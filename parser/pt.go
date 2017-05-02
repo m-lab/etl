@@ -18,7 +18,7 @@ type PTFileName struct {
 }
 
 // GetLocalIP parse the filename and return IP.
-// TODO: use regex parser.
+// TODO(dev): use regex parser.
 func (f *PTFileName) GetIPTuple() (string, string, string, string) {
 	firstIPStart := strings.IndexByte(f.name, '-')
 	first_segment := f.name[firstIPStart+1 : len(f.name)]
