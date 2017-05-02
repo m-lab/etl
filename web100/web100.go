@@ -58,30 +58,27 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	var w_errno C.int = C.WEB100_ERR_SUCCESS
 	web100Lock.Lock()
 	snaplog := C.web100_log_open_read(c_filename, &w_errno)
+	web100Lock.Unlock()
 	if w_errno != C.WEB100_ERR_SUCCESS {
 		fmt.Printf("%v\n", snaplog)
 	}
 
 	if snaplog == nil {
-		web100Lock.Unlock()
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 	}
-	if C.web100_errno != C.WEB100_ERR_SUCCESS {
-		web100Lock.Unlock()
+	if w_errno != C.WEB100_ERR_SUCCESS {
 		C.web100_log_close_read(snaplog)
-		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
+		return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 	}
 
 	// Pre-allocate a snapshot record.
 	snap := C.web100_snapshot_alloc_from_log(snaplog, &w_errno)
 	if snap == nil {
-		web100Lock.Unlock() // Is this the right place?
 		log.Printf("%s\n", C.GoString(C.web100_strerror(w_errno)))
 		C.web100_log_close_read(snaplog)
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 	}
-	if C.web100_errno != C.WEB100_ERR_SUCCESS {
-		web100Lock.Unlock() // Is this the right place?
+	if w_errno != C.WEB100_ERR_SUCCESS {
 		C.web100_snapshot_free(snap)
 		C.web100_log_close_read(snaplog)
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
@@ -224,7 +221,6 @@ func (w *Web100) Close() error {
 
 	snaplog := (*C.web100_log)(w.snaplog)
 	err := C.web100_log_close_read(snaplog)
-	web100Lock.Unlock()
 	if err != C.WEB100_ERR_SUCCESS {
 		return fmt.Errorf(C.GoString(C.web100_strerror(err)))
 	}
