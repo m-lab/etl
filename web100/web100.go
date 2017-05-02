@@ -45,6 +45,11 @@ type Web100 struct {
 	// Do not export unsafe pointers.
 	snaplog unsafe.Pointer
 	snap    unsafe.Pointer
+
+	// The original filename created by the NDT server.
+	TestId string
+	// The time associated with that file.
+	LogTime int64
 }
 
 // Open prepares a web100 log file for reading. The caller must call Close on
@@ -129,32 +134,65 @@ func (w *Web100) Values() (map[string]bigquery.Value, error) {
 // connection information is not available and must be set based on a snapshot.
 func (w *Web100) logValues() (map[string]bigquery.Value, error) {
 	snaplog := (*C.web100_log)(w.snaplog)
-
 	agent := C.web100_get_log_agent(snaplog)
 
-	results := make(map[string]bigquery.Value)
-	results["web100_log_entry_version"] = C.GoString(C.web100_get_agent_version(agent))
+	results := map[string]bigquery.Value{
+		"test_id":  w.TestId,
+		"log_time": w.LogTime,
+		"connection_spec": map[string]bigquery.Value{
+			"server_ip":             "",
+			"server_af":             0,
+			"server_hostname":       "",
+			"server_kernel_version": "",
+			"client_ip":             "",
+			"client_af":             0,
+			"client_hostname":       "",
+			"client_os":             "",
+			"client_kernel_version": "",
+			"client_version":        "",
+			"client_browser":        "",
+			"client_application":    "",
+			"data_direction":        0,
+			// TODO(prod): add geolocation sub-records.
+			//  client_geolocation: record
+			//  server_geolocation: record
+		},
+		"web100_log_entry": map[string]bigquery.Value{
+			"version":  C.GoString(C.web100_get_agent_version(agent)),
+			"log_time": int64(C.web100_get_log_time(snaplog)),
+			"connection_spec": map[string]bigquery.Value{
+				"remote_ip":   "",
+				"remote_port": 0,
+				"local_ip":    "",
+				"local_af":    0,
+				"local_port":  0,
+			},
+			"snap": make(map[string]bigquery.Value),
+		},
+	}
 
-	time := C.web100_get_log_time(snaplog)
-	results["web100_log_entry_log_time"] = int64(time)
-
+	web100LogEntry := results["web100_log_entry"].(map[string]bigquery.Value)
+	connectionSpec := web100LogEntry["connection_spec"].(map[string]bigquery.Value)
 	conn := C.web100_get_log_connection(snaplog)
 	// NOTE: web100_connection_spec_v6 is not filled in by the web100 library.
 	// NOTE: addrtype is always WEB100_ADDRTYPE_UNKNOWN.
 	// NOTE: legacy values for local_af are: IPv4 = 0, IPv6 = 1.
-	results["web100_log_entry_connection_spec_local_af"] = int64(0)
+	connectionSpec["local_af"] = int64(0)
 
 	var spec C.struct_web100_connection_spec
 	C.web100_get_connection_spec(conn, &spec)
 
 	// TODO(prod): do not use inet_ntoa because it depends on a static internal buffer.
+	/* inet_ntoa(their_addr.sin_addr), */ // IPv4
+	// inet_ntop(AF_INET6, &their_addr.sin6_addr, buf, sizeof(buf)), // IPv6
+
 	addr := C.struct_in_addr{C.in_addr_t(spec.src_addr)}
-	results["web100_log_entry_connection_spec_local_ip"] = C.GoString(C.inet_ntoa(addr))
-	results["web100_log_entry_connection_spec_local_port"] = int64(spec.src_port)
+	connectionSpec["local_ip"] = C.GoString(C.inet_ntoa(addr))
+	connectionSpec["local_port"] = int64(spec.src_port)
 
 	addr = C.struct_in_addr{C.in_addr_t(spec.dst_addr)}
-	results["web100_log_entry_connection_spec_remote_ip"] = C.GoString(C.inet_ntoa(addr))
-	results["web100_log_entry_connection_spec_remote_port"] = int64(spec.dst_port)
+	connectionSpec["remote_ip"] = C.GoString(C.inet_ntoa(addr))
+	connectionSpec["remote_port"] = int64(spec.dst_port)
 
 	return results, nil
 }
@@ -170,6 +208,9 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 
 	var_data := C.calloc(C.WEB100_VALUE_LEN_MAX, 1)
 	defer C.free(var_data)
+
+	web100log := logValues["web100_log_entry"].(map[string]bigquery.Value)
+	web100snap := web100log["snap"].(map[string]bigquery.Value)
 
 	// Parses variables from most recent web100_snapshot data.
 	var w_errno C.int = C.WEB100_ERR_SUCCESS
@@ -205,9 +246,9 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]big
 		value, err := strconv.ParseInt(C.GoString((*C.char)(var_text)), 10, 64)
 		if err != nil {
 			// Leave variable as a string.
-			logValues[fmt.Sprintf("web100_log_entry_snap_%s", canonicalName)] = C.GoString((*C.char)(var_text))
+			web100snap[canonicalName] = C.GoString((*C.char)(var_text))
 		} else {
-			logValues[fmt.Sprintf("web100_log_entry_snap_%s", canonicalName)] = value
+			web100snap[canonicalName] = value
 		}
 	}
 	return logValues, nil
