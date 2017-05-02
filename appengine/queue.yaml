@@ -10,9 +10,8 @@ queue:
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
   bucket_size: 10
-  # Maximum number of concurrent requests.  This is large now, until we address the
-  # latency associated with BQ inserts.
-  max_concurrent_requests: 100
+  # Maximum number of concurrent requests.
+  max_concurrent_requests: 50
 
 - name: etl-ndt-queue
   target: etl-ndt-parser
@@ -21,10 +20,9 @@ queue:
   rate: 5/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
-  bucket_size: 50
-  # Maximum number of concurrent requests.  This is large now, until we address the
-  # latency associated with BQ inserts.
-  max_concurrent_requests: 500
+  bucket_size: 10
+  # Maximum number of concurrent requests.
+  max_concurrent_requests: 50
 
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
@@ -33,10 +31,9 @@ queue:
   rate: 5/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
-  bucket_size: 50
-  # Maximum number of concurrent requests.  This is large now, until we address the
-  # latency associated with BQ inserts.
-  max_concurrent_requests: 500
+  bucket_size: 10
+  # Maximum number of concurrent requests.
+  max_concurrent_requests: 50
 
 - name: etl-sidestream-queue
   target: etl-sidestream-parser
@@ -45,10 +42,9 @@ queue:
   rate: 5/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
-  bucket_size: 50
-  # Maximum number of concurrent requests.  This is large now, until we address the
-  # latency associated with BQ inserts.
-  max_concurrent_requests: 500
+  bucket_size: 10
+  # Maximum number of concurrent requests.
+  max_concurrent_requests: 50
 
 - name: etl-disco-queue
   target: etl-disco-parser
@@ -57,7 +53,6 @@ queue:
   rate: 5/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
-  bucket_size: 50
-  # Maximum number of concurrent requests.  This is large now, until we address the
-  # latency associated with BQ inserts.
-  max_concurrent_requests: 500
+  bucket_size: 10
+  # Maximum number of concurrent requests.
+  max_concurrent_requests: 50
