@@ -225,13 +225,13 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	fmt.Println(t)
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
-	scanner := bufio.NewScanner(file)
 	is_first_line := true
 	protocal := "icmp"
 	// This var keep all current leaves
 	var current_leaves []Node
 	// This var keep all possible nodes
 	var all_nodes []Node
+	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		oneLine := strings.TrimSuffix(scanner.Text(), "\n")
 		fmt.Println(oneLine)
