@@ -56,14 +56,30 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	// We need to lock calls to web100_log_open_read because of "log_header".
 	web100Lock.Lock()
 	snaplog := C.web100_log_open_read(c_filename)
-	web100Lock.Unlock()
 
 	if snaplog == nil {
+		web100Lock.Unlock()
+		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
+	}
+	if C.web100_errno != C.WEB100_ERR_SUCCESS {
+		web100Lock.Unlock()
+		C.web100_log_close_read(snaplog)
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
 	}
 
 	// Pre-allocate a snapshot record.
 	snap := C.web100_snapshot_alloc_from_log(snaplog)
+	if snap == nil {
+		web100Lock.Unlock()
+		C.web100_log_close_read(snaplog)
+		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
+	}
+	if C.web100_errno != C.WEB100_ERR_SUCCESS {
+		web100Lock.Unlock()
+		C.web100_snapshot_free(snap)
+		C.web100_log_close_read(snaplog)
+		return nil, fmt.Errorf(C.GoString(C.web100_strerror(C.web100_errno)))
+	}
 
 	w := &Web100{
 		legacyNames: legacyNames,
@@ -193,6 +209,7 @@ func (w *Web100) Close() error {
 
 	snaplog := (*C.web100_log)(w.snaplog)
 	err := C.web100_log_close_read(snaplog)
+	web100Lock.Unlock()
 	if err != C.WEB100_ERR_SUCCESS {
 		return fmt.Errorf(C.GoString(C.web100_strerror(err)))
 	}
