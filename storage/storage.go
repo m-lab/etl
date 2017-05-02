@@ -174,19 +174,19 @@ func GetFilename(filename string) (string, error) {
 func GetDataType(fn string) etl.DataType {
 	fields := etl.TaskPattern.FindStringSubmatch(fn)
 	if fields == nil {
-		return etl.InvalidData
+		return etl.INVALID
 	}
 	switch fields[2] {
 	case "ndt":
-		return etl.NDTData
+		return etl.NDT
 	case "sidestream":
-		return etl.SSData
+		return etl.SS
 	case "paris-traceroute":
-		return etl.PTData
+		return etl.PT
 	case "switch":
-		return etl.SWData
+		return etl.SW
 	default:
-		return etl.InvalidData
+		return etl.INVALID
 	}
 }
 

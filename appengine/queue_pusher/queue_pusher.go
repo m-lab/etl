@@ -18,10 +18,10 @@ const defaultMessage = "<html><body>This is not the app you're looking for.</bod
 
 // Requests can only add tasks to one of these whitelisted queue names.
 var queueForType = map[etl.DataType]string {
-	etl.NDTData: "etl-ndt-queue",
-	etl.SSData: "etl-sidestream-queue",
-	etl.PTData: "etl-traceroute-queue",
-	etl.SWData: "etl-disco-queue",
+	etl.NDT: "etl-ndt-queue",
+	etl.SS: "etl-sidestream-queue",
+	etl.PT: "etl-traceroute-queue",
+	etl.SW: "etl-disco-queue",
 }
 
 func init() {
@@ -99,21 +99,6 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 	// over those files without comment.
 	// TODO(dev) count how many names we skip over using prometheus
 	if ok {
-		ctx := appengine.NewContext(r)
-		params := url.Values{"filename": []string{filename}}
-		t := taskqueue.NewPOSTTask("/worker", params)
-		if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	// determine correct queue based on file name.
-	queuename := queueForFile(decoded_filename)
-
-	// Lots of files will be archived that should not be enqueued. Pass
-	// over those files without comment.
-	if queuename != "" {
 		ctx := appengine.NewContext(r)
 		params := url.Values{"filename": []string{filename}}
 		t := taskqueue.NewPOSTTask("/worker", params)

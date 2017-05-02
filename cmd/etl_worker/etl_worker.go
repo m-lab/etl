@@ -6,9 +6,7 @@ import (
 	"log"
 	"net/http"
 	"runtime"
-	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -105,7 +103,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Received filename: %q\n", fn)
 
 	dataType := storage.GetDataType(fn)
-	if dataType == etl.InvalidData {
+	if dataType == etl.INVALID {
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		w.WriteHeader(http.StatusBadRequest)
 		log.Printf("Invalid filename: %s\n", fn)
