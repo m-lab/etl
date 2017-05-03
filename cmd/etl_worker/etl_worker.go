@@ -123,7 +123,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// This handles base64 encoding, and requires a gs:// prefix.
-	fn, err := getFilename(r.FormValue("filename"))
+	fn, err := storage.GetFilename(r.FormValue("filename"))
 	if err != nil {
 		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
@@ -135,7 +135,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): log the originating task queue name from headers.
 	log.Printf("Received filename: %q\n", fn)
 
-	dataType := getDataType(fn)
+	dataType := storage.GetDataType(fn)
 	if dataType == etl.INVALID {
 		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
