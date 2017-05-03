@@ -3,12 +3,14 @@ package parser
 // TODO - use parser_test, to force proper package isolation.
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"testing"
 
 	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/schema"
+
+	"github.com/kr/pretty"
 
 	"cloud.google.com/go/bigquery"
 )
@@ -31,43 +33,49 @@ func TestNDTParser(t *testing.T) {
 		t.Fatalf("Failed to insert snaplog data.")
 	}
 
-	results := ins.data[0].(*bq.MapSaver).Values
-	// TODO(dev): find a better way to verify the returned values are correct.
+	// Extract the values saved to the inserter.
+	actualValues := schema.Map(ins.data[0].(*bq.MapSaver).Values)
 	expectedValues := map[string]bigquery.Value{
-		"web100_log_entry_version":                    "2.5.27 201001301335 net100",
-		"web100_log_entry_snap_RemAddress":            "45.56.98.222",
-		"web100_log_entry_connection_spec_local_port": int64(43685),
+		"web100_log_entry": map[string]bigquery.Value{
+			"version": "2.5.27 201001301335 net100",
+			"snap": map[string]bigquery.Value{
+				"RemAddress": "45.56.98.222",
+			},
+			"connection_spec": map[string]bigquery.Value{
+				"local_port": int64(43685),
+			},
+		},
 	}
-	for key, value := range expectedValues {
-		// Raw bigquery.Value instances do not compare.
-		if results[key] != value {
-			t.Errorf("Wrong value for %q: got %q; want %q", key, str(results[key]), str(value))
+	if !compare(t, actualValues, expectedValues) {
+		t.Errorf("Missing expected values:")
+		t.Errorf(pretty.Sprint(expectedValues))
+	}
+}
+
+// compare recursively checks whether actual values equal values in the expected values.
+// The expected values may be a subset of the actual values, but not a superset.
+func compare(t *testing.T, actual map[string]bigquery.Value, expected map[string]bigquery.Value) bool {
+	match := true
+	for key, value := range expected {
+		switch v := value.(type) {
+		case map[string]bigquery.Value:
+			match = match && compare(t, actual[key].(map[string]bigquery.Value), v)
+		case string:
+			if actual[key].(string) != v {
+				t.Logf("Wrong strings for key %q: got %q; want %q", key, v, actual[key].(string))
+				match = false
+			}
+		case int64:
+			if actual[key].(int64) != v {
+				t.Logf("Wrong ints for key %q: got %d; want %d", key, v, actual[key].(int64))
+				match = false
+			}
+		default:
+			fmt.Printf("Unsupported type. %T\n", v)
+			panic(nil)
 		}
 	}
-	// TODO(dev): remove print of entire snaplog.
-	// prettyPrint(results)
-}
-
-// TODO(dev): is there a better way to display these values?
-func str(v bigquery.Value) string {
-	switch t := v.(type) {
-	case string:
-		s := v.(string)
-		return s
-	case int64:
-		i := v.(int64)
-		return fmt.Sprintf("%d", i)
-	default:
-		return fmt.Sprintf("Unexpected<%T>", t)
-	}
-}
-
-func prettyPrint(results map[string]bigquery.Value) {
-	b, err := json.MarshalIndent(results, "", "  ")
-	if err != nil {
-		fmt.Println("error:", err)
-	}
-	fmt.Print(string(b))
+	return match
 }
 
 type inMemoryInserter struct {
