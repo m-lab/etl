@@ -17,6 +17,10 @@ import (
 	"github.com/m-lab/etl/web100"
 )
 
+var (
+	TmpDir = "/mnt/tmpfs"
+)
+
 type NDTParser struct {
 	inserter etl.Inserter
 	// TODO(prod): eliminate need for tmpfs.
@@ -24,7 +28,7 @@ type NDTParser struct {
 }
 
 func NewNDTParser(ins etl.Inserter) *NDTParser {
-	return &NDTParser{ins, "/mnt/tmpfs"}
+	return &NDTParser{ins, TmpDir}
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
