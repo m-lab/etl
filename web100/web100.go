@@ -208,7 +208,7 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) error {
 	group := C.web100_get_log_group(snaplog)
 	for v := C.web100_var_head(group, &w_errno); v != nil; v = C.web100_var_next(v, &w_errno) {
 		if w_errno != C.WEB100_ERR_SUCCESS {
-			return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
+			return fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 		}
 
 		name := C.web100_get_var_name(v)
