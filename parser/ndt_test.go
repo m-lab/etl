@@ -1,6 +1,4 @@
-package parser
-
-// TODO - use parser_test, to force proper package isolation.
+package parser_test
 
 import (
 	"fmt"
@@ -8,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 
 	"github.com/kr/pretty"
@@ -23,7 +22,8 @@ func TestNDTParser(t *testing.T) {
 	}
 
 	ins := &inMemoryInserter{}
-	n := &NDTParser{inserter: ins, tmpDir: "./"}
+	parser.TmpDir = "./"
+	n := parser.NewNDTParser(ins)
 	err = n.ParseAndInsert(nil, "filename.c2s_snaplog", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
