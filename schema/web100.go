@@ -1,3 +1,5 @@
+// The schema package provides an interface for the flexible map-based full
+// schema for web100 tests.
 package schema
 
 import (
@@ -14,6 +16,7 @@ func Map(v bigquery.Value) map[string]bigquery.Value {
 	}
 }
 
+// NewRecord creates an empty full schema record with nested records already in place.
 func NewRecord() map[string]bigquery.Value {
 	return map[string]bigquery.Value{
 		"test_id":  "",
