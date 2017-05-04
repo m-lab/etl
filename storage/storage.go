@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/etl/etl"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
@@ -169,27 +168,6 @@ func GetFilename(filename string) (string, error) {
 
 	return "", errors.New("invalid base64 encoded file path: " + fn)
 }
-
-// Find the type of data stored in a file from its comlete filename
-func GetDataType(fn string) etl.DataType {
-	fields := etl.TaskPattern.FindStringSubmatch(fn)
-	if fields == nil {
-		return etl.INVALID
-	}
-	switch fields[2] {
-	case "ndt":
-		return etl.NDT
-	case "sidestream":
-		return etl.SS
-	case "paris-traceroute":
-		return etl.PT
-	case "switch":
-		return etl.SW
-	default:
-		return etl.INVALID
-	}
-}
-
 
 //---------------------------------------------------------------------------------
 //          Local functions

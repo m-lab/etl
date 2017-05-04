@@ -135,7 +135,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): log the originating task queue name from headers.
 	log.Printf("Received filename: %q\n", fn)
 
-	dataType := storage.GetDataType(fn)
+	dataType := etl.GetDataType(fn)
 	if dataType == etl.INVALID {
 		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)

@@ -49,6 +49,7 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO(dev): maybe this should be made more efficient?
 	validQueue := false
 	for _, queue := range queueForType {
 		validQueue = validQueue || (queuename == queue)
@@ -94,7 +95,7 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// determine correct queue based on file name.
-	queuename, ok := queueForType[storage.GetDataType(decoded_filename)]
+	queuename, ok := queueForType[etl.GetDataType(decoded_filename)]
 
 	// Lots of files will be archived that should not be enqueued. Pass
 	// over those files without comment.
