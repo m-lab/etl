@@ -17,15 +17,13 @@ package web100
 import "C"
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"strconv"
 	"sync"
 	"unsafe"
-
-	"cloud.google.com/go/bigquery"
 )
 
 var (
@@ -37,18 +35,36 @@ var (
 //  - Not all C macros exist in the "C" namespace.
 //  - 'NULL' is usually equivalent to 'nil'
 
+// The Saver interface decouples reading data from the web100 log files and
+// saving those values.
+type Saver interface {
+	SetInt64(name string, value int64)
+	SetString(name string, value string)
+}
+
 // Web100 maintains state associated with a web100 log file.
 type Web100 struct {
 	// legacyNames maps legacy web100 variable names to their canonical names.
 	legacyNames map[string]string
 
-	// Do not export unsafe pointers.
+	// NOTE: we define all C-allocated types as unsafe.Pointers here. This is a
+	// design choice to emphasize that these values should not be used outside
+	// of this package and even within this package, they should be used
+	// carefully.
+
+	// snaplog is the primary *C.web100_log object encapsulating a snaplog file.
 	snaplog unsafe.Pointer
-	snap    unsafe.Pointer
+
+	// snap is an individual *C.web100_snapshot record read from a snaplog.
+	snap unsafe.Pointer
+
+	// Pointers to C buffers for use in calls to web100 functions.
+	text unsafe.Pointer
+	data unsafe.Pointer
 }
 
-// Open prepares a web100 log file for reading. The caller must call Close on
-// the returned Web100 instance to release resources.
+// Open prepares a web100 snaplog file for reading. The caller must call Close on
+// the returned Web100 instance to free memory and close open file descriptors.
 func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	c_filename := C.CString(filename)
 	defer C.free(unsafe.Pointer(c_filename))
@@ -63,6 +79,7 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 		fmt.Printf("%v\n", snaplog)
 	}
 
+	// Verify that the snaplog is valid before continuing.
 	if snaplog == nil {
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 	}
@@ -88,12 +105,17 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 		legacyNames: legacyNames,
 		snaplog:     unsafe.Pointer(snaplog),
 		snap:        unsafe.Pointer(snap),
+		// Pre-allocate space for converting snapshot values.
+		text: C.calloc(2*C.WEB100_VALUE_LEN_MAX, 1),
+		data: C.calloc(C.WEB100_VALUE_LEN_MAX, 1),
 	}
 	return w, nil
 }
 
-// Next iterates through the web100 log file reading the next snapshot record
-// until EOF or an error occurs.
+// Next reads the next C.web100_snapshot record from the web100 snaplog and
+// saves it in an internal buffer. Use SnapshotValues to read the all values from
+// the most recently read snapshot.  If Next reaches EOF or another error, the
+// last snapshot is in an undefined state.
 func (w *Web100) Next() error {
 	snaplog := (*C.web100_log)(w.snaplog)
 	snap := (*C.web100_snapshot)(w.snap)
@@ -113,104 +135,110 @@ func (w *Web100) Next() error {
 	return nil
 }
 
-func (w *Web100) Values() (map[string]bigquery.Value, error) {
-	v, err := w.logValues()
-	if err != nil {
-		return nil, err
-	}
-	v, err = w.snapValues(v)
-	if err != nil {
-		return nil, err
-	}
-	return v, nil
+// LogVersion returns the snaplog version.
+func (w *Web100) LogVersion() string {
+	snaplog := (*C.web100_log)(w.snaplog)
+	return C.GoString(C.web100_get_agent_version(C.web100_get_log_agent(snaplog)))
 }
 
-// logValues returns a map of values from the web100 log. IPv6 address
-// connection information is not available and must be set based on a snapshot.
-func (w *Web100) logValues() (map[string]bigquery.Value, error) {
+// LogTime returns the timestamp of when the snaplog was opened for writing.
+func (w *Web100) LogTime() int64 {
+	snaplog := (*C.web100_log)(w.snaplog)
+	return int64(C.web100_get_log_time(snaplog))
+}
+
+// ConnectionSpec populates the connSpec Saver with values from C.web100_connection_spec.
+// TODO(dev): define the field names saved in connSpec since they are not the
+// same ones defined in C.web100_connection_spec.
+func (w *Web100) ConnectionSpec(connSpec Saver) error {
 	snaplog := (*C.web100_log)(w.snaplog)
 
-	agent := C.web100_get_log_agent(snaplog)
-
-	results := make(map[string]bigquery.Value)
-	results["web100_log_entry_version"] = C.GoString(C.web100_get_agent_version(agent))
-
-	time := C.web100_get_log_time(snaplog)
-	results["web100_log_entry_log_time"] = int64(time)
-
-	conn := C.web100_get_log_connection(snaplog)
-	// NOTE: web100_connection_spec_v6 is not filled in by the web100 library.
-	// NOTE: addrtype is always WEB100_ADDRTYPE_UNKNOWN.
-	// NOTE: legacy values for local_af are: IPv4 = 0, IPv6 = 1.
-	results["web100_log_entry_connection_spec_local_af"] = int64(0)
-
+	// NOTE: web100_connection_spec_v6 is never set by the web100 library.
+	// NOTE: conn->addrtype is always WEB100_ADDRTYPE_UNKNOWN.
+	// So, we expect it to be IPv4 and fix local_ip and remote_ip later if
+	// snapshots have IPv6 addresses.
 	var spec C.struct_web100_connection_spec
+
+	// Get reference to the snaplog connection.
+	conn := C.web100_get_log_connection(snaplog)
+	// Copy the connection spec from the snaplog connection information.
 	C.web100_get_connection_spec(conn, &spec)
 
-	// TODO(prod): do not use inet_ntoa because it depends on a static internal buffer.
-	addr := C.struct_in_addr{C.in_addr_t(spec.src_addr)}
-	results["web100_log_entry_connection_spec_local_ip"] = C.GoString(C.inet_ntoa(addr))
-	results["web100_log_entry_connection_spec_local_port"] = int64(spec.src_port)
+	// NOTE: web100_connection_spec only contains IPv4 addresses (4 byte values).
+	// If the connection was IPv6, the IPv4 addresses here will be 0.0.0.0.
+	srcIp := net.IP(C.GoBytes(unsafe.Pointer(&spec.src_addr), 4))
+	dstIp := net.IP(C.GoBytes(unsafe.Pointer(&spec.dst_addr), 4))
 
-	addr = C.struct_in_addr{C.in_addr_t(spec.dst_addr)}
-	results["web100_log_entry_connection_spec_remote_ip"] = C.GoString(C.inet_ntoa(addr))
-	results["web100_log_entry_connection_spec_remote_port"] = int64(spec.dst_port)
+	connSpec.SetString("local_ip", srcIp.String())
+	connSpec.SetInt64("local_port", int64(spec.src_port))
+	connSpec.SetString("remote_ip", dstIp.String())
+	connSpec.SetInt64("remote_port", int64(spec.dst_port))
+	// NOTE: legacy values of local_af are: IPv4 = 0, IPv6 = 1.
+	connSpec.SetInt64("local_af", 0)
 
-	return results, nil
+	return nil
 }
 
-// snapValues converts all variables in the latest snap record into a results map.
-func (w *Web100) snapValues(logValues map[string]bigquery.Value) (map[string]bigquery.Value, error) {
+// SnapshotValues saves all values from the most recent C.web100_snapshot read by
+// Next. Next must be called at least once before calling SnapshotValues.
+func (w *Web100) SnapshotValues(snapValues Saver) error {
 	snaplog := (*C.web100_log)(w.snaplog)
 	snap := (*C.web100_snapshot)(w.snap)
-
-	// TODO(dev): do not re-allocate these buffers on every call.
-	var_text := C.calloc(2*C.WEB100_VALUE_LEN_MAX, 1) // Use a better size.
-	defer C.free(var_text)
-
-	var_data := C.calloc(C.WEB100_VALUE_LEN_MAX, 1)
-	defer C.free(var_data)
 
 	// Parses variables from most recent web100_snapshot data.
 	var w_errno C.int = C.WEB100_ERR_SUCCESS
 	group := C.web100_get_log_group(snaplog)
+
+	// The web100 group is a set of web100 variables from a specific agent.
+	// M-Lab snaplogs only ever have a single agent ("local") and group
+	// (whatever the static set of web100 variables read from
+	// /proc/web100/header).
+	//
+	// To extract each web100 variables corresponding to all the variables
+	// in the group, we iterate through each one.
 	for v := C.web100_var_head(group, &w_errno); v != nil; v = C.web100_var_next(v, &w_errno) {
 		if w_errno != C.WEB100_ERR_SUCCESS {
-			return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
+			return fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 		}
 
+		// Extract the web100 variable name and type. This will
+		// correspond to one of the variables defined in tcp-kis.txt.
 		name := C.web100_get_var_name(v)
 		var_type := C.web100_get_var_type(v)
 
-		// Read the raw variable data from the snapshot data.
-		errno := C.web100_snap_read(v, snap, var_data)
+		// Read the raw bytes for the variable from the snapshot.
+		errno := C.web100_snap_read(v, snap, w.data)
 		if errno != C.WEB100_ERR_SUCCESS {
-			return nil, fmt.Errorf(C.GoString(C.web100_strerror(errno)))
+			return fmt.Errorf(C.GoString(C.web100_strerror(errno)))
 		}
 
-		// Convert raw var_data into a string based on var_type.
+		// Convert raw w.data into a string based on var_type.
 		// TODO(prod): reimplement web100_value_to_textn to operate on Go types.
-		C.web100_value_to_textn((*C.char)(var_text), C.WEB100_VALUE_LEN_MAX, (C.WEB100_TYPE)(var_type), var_data)
+		C.web100_value_to_textn((*C.char)(w.text), C.WEB100_VALUE_LEN_MAX,
+			(C.WEB100_TYPE)(var_type), w.data)
 
-		// Use the canonical variable name.
-		var canonicalName string
+		// Use the canonical variable name. The variable name known to
+		// the web100 kernel at run time lagged behind the official
+		// web100 spec. So, some variable names need to be translated
+		// from their legacy form (read from the kernel and written to
+		// the snaplog) to the canonical form (as defined in
+		// tcp-kis.txt).
+		canonicalName := C.GoString(name)
 		if _, ok := w.legacyNames[canonicalName]; ok {
 			canonicalName = w.legacyNames[canonicalName]
-		} else {
-			canonicalName = C.GoString(name)
 		}
 
 		// TODO(dev): are there any cases where we need unsigned int64?
 		// Attempt to convert the current variable to an int64.
-		value, err := strconv.ParseInt(C.GoString((*C.char)(var_text)), 10, 64)
+		value, err := strconv.ParseInt(C.GoString((*C.char)(w.text)), 10, 64)
 		if err != nil {
-			// Leave variable as a string.
-			logValues[fmt.Sprintf("web100_log_entry_snap_%s", canonicalName)] = C.GoString((*C.char)(var_text))
+			// If it cannot be converted, leave the variable as a string.
+			snapValues.SetString(canonicalName, C.GoString((*C.char)(w.text)))
 		} else {
-			logValues[fmt.Sprintf("web100_log_entry_snap_%s", canonicalName)] = value
+			snapValues.SetInt64(canonicalName, value)
 		}
 	}
-	return logValues, nil
+	return nil
 }
 
 // Close releases resources created by Open.
@@ -223,21 +251,17 @@ func (w *Web100) Close() error {
 	if err != C.WEB100_ERR_SUCCESS {
 		return fmt.Errorf(C.GoString(C.web100_strerror(err)))
 	}
+	if w.text != nil {
+		C.free(w.text)
+		w.text = nil
+	}
+	if w.data != nil {
+		C.free(w.data)
+		w.data = nil
+	}
 
 	// Clear pointer after free.
 	w.snaplog = nil
 	w.snap = nil
 	return nil
-}
-
-func LookupError(errnum int) string {
-	return C.GoString(C.web100_strerror(C.int(errnum)))
-}
-
-func PrettyPrint(results map[string]string) {
-	b, err := json.MarshalIndent(results, "", "  ")
-	if err != nil {
-		fmt.Println("error:", err)
-	}
-	fmt.Print(string(b))
 }
