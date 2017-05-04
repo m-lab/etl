@@ -58,7 +58,7 @@ type Web100 struct {
 	// snap is an individual *C.web100_snapshot record read from a snaplog.
 	snap unsafe.Pointer
 
-	// text and data are temporary space for converting web100 variables to strings.
+	// Pointers to C buffers for use in calls to web100 functions.
 	text unsafe.Pointer
 	data unsafe.Pointer
 }
