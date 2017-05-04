@@ -204,7 +204,7 @@ func (n *NDTParser) TableName() string {
 
 // fixValues updates web100 log values that need post-processing fix-ups.
 // TODO(dev): does this only apply to NDT or is NPAD also affected?
-func fixValues(r map[string]bigquery.Value) error {
+func fixValues(r map[string]bigquery.Value) map[string]bigquery.Value {
 	// TODO(dev): fix these values.
 	// Fix StartTimeStamp:
 	//  - web100_log_entry.snap.StartTimeStamp: (1000000 * StartTimeStamp + StartTimeUsec)
