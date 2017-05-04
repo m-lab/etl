@@ -17,7 +17,6 @@ package web100
 import "C"
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -25,9 +24,6 @@ import (
 	"strconv"
 	"sync"
 	"unsafe"
-
-	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/etl/schema"
 )
 
 var (
@@ -39,26 +35,36 @@ var (
 //  - Not all C macros exist in the "C" namespace.
 //  - 'NULL' is usually equivalent to 'nil'
 
+// The Saver interface decouples reading data from the web100 log files and
+// saving those values.
+type Saver interface {
+	SetInt64(name string, value int64)
+	SetString(name string, value string)
+}
+
 // Web100 maintains state associated with a web100 log file.
 type Web100 struct {
 	// legacyNames maps legacy web100 variable names to their canonical names.
 	legacyNames map[string]string
 
-	// Do not export unsafe pointers.
+	// NOTE: we define all C-allocated types as unsafe.Pointers here. This is a
+	// design choice to emphasize that these values should not be used outside
+	// of this package and even within this package, they should be used
+	// carefully.
+
+	// snaplog is the primary *C.web100_log object encapsulating a snaplog file.
 	snaplog unsafe.Pointer
-	snap    unsafe.Pointer
-	// temp space for converting web100 variables to string.
+
+	// snap is an individual *C.web100_snapshot record read from a snaplog.
+	snap unsafe.Pointer
+
+	// text and data are temporary space for converting web100 variables to strings.
 	text unsafe.Pointer
 	data unsafe.Pointer
-
-	// The original filename created by the NDT server.
-	TestId string
-	// The time associated with that file.
-	LogTime int64
 }
 
-// Open prepares a web100 log file for reading. The caller must call Close on
-// the returned Web100 instance to release resources.
+// Open prepares a web100 snaplog file for reading. The caller must call Close on
+// the returned Web100 instance to free memory and close open file descriptors.
 func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	c_filename := C.CString(filename)
 	defer C.free(unsafe.Pointer(c_filename))
@@ -73,6 +79,7 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 		fmt.Printf("%v\n", snaplog)
 	}
 
+	// Verify that the snaplog is valid before continuing.
 	if snaplog == nil {
 		return nil, fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 	}
@@ -105,8 +112,10 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 	return w, nil
 }
 
-// Next iterates through the web100 log file reading the next snapshot record
-// until EOF or an error occurs.
+// Next reads the next C.web100_snapshot record from the web100 snaplog and
+// saves it in an internal buffer. Use SnapValues to read the all values from
+// the most recently read snapshot.  If Next reaches EOF or another error, the
+// last snapshot is in an undefined state.
 func (w *Web100) Next() error {
 	snaplog := (*C.web100_log)(w.snaplog)
 	snap := (*C.web100_snapshot)(w.snap)
@@ -126,82 +135,55 @@ func (w *Web100) Next() error {
 	return nil
 }
 
-func (w *Web100) Values() (map[string]bigquery.Value, error) {
-	results := schema.NewRecord()
-	err := w.logValues(schema.Map(results["web100_log_entry"]))
-	if err != nil {
-		return nil, err
-	}
-	err = w.snapValues(schema.Map(results["web100_log_entry"]))
-	if err != nil {
-		return nil, err
-	}
-	// TODO(dev): is NPAD also affected in the same way?
-	err = fixValues(results["web100_log_entry"])
-	if err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
-// fixValues updates web100 log values that need post-processing fix-ups.
-// TODO(dev): does this only apply to NDT or is NPAD also affected?
-func fixValues(r bigquery.Value) error {
-	record := schema.Map(r)
-	if record == nil {
-		return fmt.Errorf("Can only fix types of map[string]bigquery.Value")
-	}
-	// TODO(dev): fix these values.
-	// Fix StartTimeStamp:
-	//  - web100_log_entry.snap.StartTimeStamp: (1000000 * StartTimeStamp + StartTimeUsec)
-	// Fix IPv6 addresses in connection_spec:
-	//  - web100_log_entry.connection_spec.local_ip
-	//  - web100_log_entry.connection_spec.remote_ip
-	// Fix local_af:
-	//  - web100_log_entry.connection_spec.local_af: IPv4 = 0, IPv6 = 1.
-	return nil
-}
-
-// logValues returns a map of values from the web100 log. IPv6 address
-// connection information is not available and must be set based on a snapshot.
-func (w *Web100) logValues(web100LogEntry map[string]bigquery.Value) error {
+// LogVersion returns the snaplog version.
+func (w *Web100) LogVersion() string {
 	snaplog := (*C.web100_log)(w.snaplog)
-	agent := C.web100_get_log_agent(snaplog)
+	return C.GoString(C.web100_get_agent_version(C.web100_get_log_agent(snaplog)))
+}
 
-	web100LogEntry["version"] = C.GoString(C.web100_get_agent_version(agent))
-	web100LogEntry["log_time"] = int64(C.web100_get_log_time(snaplog))
+// LogTime returns the timestamp of when the snaplog was opened for writing.
+func (w *Web100) LogTime() int64 {
+	snaplog := (*C.web100_log)(w.snaplog)
+	return int64(C.web100_get_log_time(snaplog))
+}
 
-	conn := C.web100_get_log_connection(snaplog)
+// ConnectionSpec populates the connSpec Saver with values from C.web100_connection_spec.
+// TODO(dev): define the field names saved in connSpec since they are not the
+// same ones defined in C.web100_connection_spec.
+func (w *Web100) ConnectionSpec(connSpec Saver) error {
+	snaplog := (*C.web100_log)(w.snaplog)
 
 	// NOTE: web100_connection_spec_v6 is never set by the web100 library.
 	// NOTE: conn->addrtype is always WEB100_ADDRTYPE_UNKNOWN.
 	// So, we expect it to be IPv4 and fix local_ip and remote_ip later if
 	// snapshots have IPv6 addresses.
 	var spec C.struct_web100_connection_spec
+
+	// Get reference to the snaplog connection.
+	conn := C.web100_get_log_connection(snaplog)
+	// Copy the connection spec from the snaplog connection information.
 	C.web100_get_connection_spec(conn, &spec)
 
 	// NOTE: web100_connection_spec only contains IPv4 addresses (4 byte values).
 	// If the connection was IPv6, the IPv4 addresses here will be 0.0.0.0.
 	srcIp := net.IP(C.GoBytes(unsafe.Pointer(&spec.src_addr), 4))
 	dstIp := net.IP(C.GoBytes(unsafe.Pointer(&spec.dst_addr), 4))
-	connectionSpec := schema.Map(web100LogEntry["connection_spec"])
-	connectionSpec["local_ip"] = srcIp.String()
-	connectionSpec["local_port"] = int64(spec.src_port)
-	connectionSpec["remote_ip"] = dstIp.String()
-	connectionSpec["remote_port"] = int64(spec.dst_port)
 
+	connSpec.SetString("local_ip", srcIp.String())
+	connSpec.SetInt64("local_port", int64(spec.src_port))
+	connSpec.SetString("remote_ip", dstIp.String())
+	connSpec.SetInt64("remote_port", int64(spec.dst_port))
 	// NOTE: legacy values of local_af are: IPv4 = 0, IPv6 = 1.
-	connectionSpec["local_af"] = int64(0)
+	connSpec.SetInt64("local_af", 0)
 
 	return nil
 }
 
-// snapValues converts all variables in the latest snap record into a results map.
-func (w *Web100) snapValues(logValues map[string]bigquery.Value) error {
+// SnapValues saves all values from the most recent C.web100_snapshot read by
+// Next. Next must be called at least once before calling SnapValues.
+func (w *Web100) SnapValues(snapValues Saver) error {
 	snaplog := (*C.web100_log)(w.snaplog)
 	snap := (*C.web100_snapshot)(w.snap)
-
-	web100snap := schema.Map(logValues["snap"])
 
 	// Parses variables from most recent web100_snapshot data.
 	var w_errno C.int = C.WEB100_ERR_SUCCESS
@@ -236,9 +218,9 @@ func (w *Web100) snapValues(logValues map[string]bigquery.Value) error {
 		value, err := strconv.ParseInt(C.GoString((*C.char)(w.text)), 10, 64)
 		if err != nil {
 			// Leave variable as a string.
-			web100snap[canonicalName] = C.GoString((*C.char)(w.text))
+			snapValues.SetString(canonicalName, C.GoString((*C.char)(w.text)))
 		} else {
-			web100snap[canonicalName] = value
+			snapValues.SetInt64(canonicalName, value)
 		}
 	}
 	return nil
@@ -267,16 +249,4 @@ func (w *Web100) Close() error {
 	w.snaplog = nil
 	w.snap = nil
 	return nil
-}
-
-func LookupError(errnum int) string {
-	return C.GoString(C.web100_strerror(C.int(errnum)))
-}
-
-func PrettyPrint(results map[string]string) {
-	b, err := json.MarshalIndent(results, "", "  ")
-	if err != nil {
-		fmt.Println("error:", err)
-	}
-	fmt.Print(string(b))
 }
