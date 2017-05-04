@@ -43,4 +43,20 @@ var (
 		SW:      "disco_test",
 		INVALID: "invalid",
 	}
+
+	// There is also a mapping of data types to queue names in
+	// queue_pusher.go
 )
+
+// Find the type of data stored in a file from its comlete filename
+func GetDataType(fn string) DataType {
+	fields := TaskPattern.FindStringSubmatch(fn)
+	if fields == nil {
+		return INVALID
+	}
+	dt, ok := DirToDataType[fields[2]]
+	if !ok {
+		return INVALID
+	}
+	return dt
+}
