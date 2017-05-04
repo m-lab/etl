@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/web100"
 )
 
@@ -17,7 +18,7 @@ var (
 	tcpKis   = flag.String("tcp-kis", "tcp-kis.txt", "tcp-kis.txt filename.")
 )
 
-func PrettyPrint(results map[string]bigquery.Value) {
+func prettyPrint(results map[string]bigquery.Value) {
 	b, err := json.MarshalIndent(results, "", "  ")
 	if err != nil {
 		fmt.Println("error:", err)
@@ -55,17 +56,18 @@ func main() {
 	if err != io.EOF {
 		panic(err)
 	}
-	results, err := w.Values()
+
+	snapValues := schema.Web100ValueMap{}
+	err = w.SnapValues(snapValues)
 	if err != nil {
 		panic(err)
 	}
-	PrettyPrint(results)
+	connSpec := schema.Web100ValueMap{}
+	w.ConnectionSpec(connSpec)
+	results := schema.NewWeb100FullRecord(
+		w.LogVersion(), w.LogTime(),
+		(map[string]bigquery.Value)(connSpec),
+		(map[string]bigquery.Value)(snapValues))
 
-	// Get results.
-	// results, err = w.SnapValues(legacyNames)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// PrettyPrint(results)
-	// fmt.Printf("%#v\n", w)
+	prettyPrint(results)
 }
