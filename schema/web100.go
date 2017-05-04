@@ -6,18 +6,24 @@ import (
 	"cloud.google.com/go/bigquery"
 )
 
-// Map performs a type conversion on the given value.
-func Map(v bigquery.Value) map[string]bigquery.Value {
-	switch v.(type) {
-	case map[string]bigquery.Value:
-		return v.(map[string]bigquery.Value)
-	default:
-		return nil
-	}
+// TODO(prod): Create a struct that satisfies the web100.Saver interface?
+
+// Web100ValueMap implements the web100.Saver interface for recording web100 values.
+type Web100ValueMap map[string]bigquery.Value
+
+// SetInt64 saves an int64 in a field with the given name.
+func (s Web100ValueMap) SetInt64(name string, value int64) {
+	s[name] = value
 }
 
-// NewRecord creates an empty full schema record with nested records already in place.
-func NewRecord() map[string]bigquery.Value {
+// SetString saves a string in a field with the given name.
+func (s Web100ValueMap) SetString(name string, value string) {
+	s[name] = value
+}
+
+// NewWeb100FullRecord creates a web100 value map with all supported fields.
+// This is suitable when creating a schema definition for a new bigquery table.
+func NewWeb100FullRecord(version string, logTime int64, connSpec, snapValues map[string]bigquery.Value) map[string]bigquery.Value {
 	return map[string]bigquery.Value{
 		"test_id":  "",
 		"log_time": 0,
@@ -42,17 +48,24 @@ func NewRecord() map[string]bigquery.Value {
 			//  server_geolocation: record
 		},
 		"web100_log_entry": map[string]bigquery.Value{
-			"version":  "",
-			"log_time": 0,
-			"connection_spec": map[string]bigquery.Value{
-				"remote_ip":   "",
-				"remote_port": 0,
-				"local_ip":    "",
-				"local_af":    0,
-				"local_port":  0,
-			},
-			"snap": map[string]bigquery.Value{},
+			"version":         version,
+			"log_time":        logTime,
+			"connection_spec": connSpec,
+			"snap":            snapValues,
 		},
 		// TODO(dev): add paris_traceroute_hop records here or separately?
+	}
+}
+
+// NewWeb100MinimalRecord creates a web100 value map with only the given fields.
+// All undefined fields will be set to null after a BQ insert.
+func NewWeb100MinimalRecord(version string, logTime int64, connSpec, snapValues map[string]bigquery.Value) map[string]bigquery.Value {
+	return map[string]bigquery.Value{
+		"web100_log_entry": map[string]bigquery.Value{
+			"version":         version,
+			"log_time":        logTime,
+			"connection_spec": connSpec,
+			"snap":            snapValues,
+		},
 	}
 }
