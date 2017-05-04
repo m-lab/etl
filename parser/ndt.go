@@ -149,7 +149,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		// parse every 10th snapshot.
 		if count%10 == 0 {
 			// Note: read and discard the values by not saving the Web100ValueMap.
-			err := w.SnapValues(schema.Web100ValueMap{})
+			err := w.SnapshotValues(schema.Web100ValueMap{})
 			if err != nil {
 				metrics.TestCount.With(prometheus.Labels{
 					"table": n.TableName(), "type": "values-err"}).Inc()
@@ -162,7 +162,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 
 	snapValues := schema.Web100ValueMap{}
-	err = w.SnapValues(snapValues)
+	err = w.SnapshotValues(snapValues)
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "values-err"}).Inc()

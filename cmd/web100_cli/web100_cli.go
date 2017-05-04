@@ -58,7 +58,7 @@ func main() {
 	}
 
 	snapValues := schema.Web100ValueMap{}
-	err = w.SnapValues(snapValues)
+	err = w.SnapshotValues(snapValues)
 	if err != nil {
 		panic(err)
 	}
