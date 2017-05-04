@@ -14,6 +14,7 @@ import (
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/web100"
 )
 
@@ -147,7 +148,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		// HACK - just to see how expensive the Values() call is...
 		// parse every 10th snapshot.
 		if count%10 == 0 {
-			_, err := w.Values()
+			// Note: read and discard the values by not saving the Web100ValueMap.
+			err := w.SnapValues(schema.Web100ValueMap{})
 			if err != nil {
 				metrics.TestCount.With(prometheus.Labels{
 					"table": n.TableName(), "type": "values-err"}).Inc()
@@ -158,7 +160,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Extract the values from the last snapshot.
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
-	results, err := w.Values()
+
+	snapValues := schema.Web100ValueMap{}
+	err = w.SnapValues(snapValues)
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "values-err"}).Inc()
@@ -166,8 +170,16 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			tmpFile.Name(), testName, meta["filename"], err)
 		return nil
 	}
-	err = n.inserter.InsertRow(&bq.MapSaver{results})
 
+	connSpec := schema.Web100ValueMap{}
+	w.ConnectionSpec(connSpec)
+
+	results := schema.NewWeb100MinimalRecord(
+		w.LogVersion(), w.LogTime(),
+		(map[string]bigquery.Value)(connSpec),
+		(map[string]bigquery.Value)(snapValues))
+
+	err = n.inserter.InsertRow(&bq.MapSaver{fixValues(results)})
 	if err != nil {
 		metrics.TestCount.With(prometheus.Labels{
 			"table": n.TableName(), "type": "insert-err"}).Inc()
@@ -188,4 +200,18 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 func (n *NDTParser) TableName() string {
 	return n.inserter.TableName()
+}
+
+// fixValues updates web100 log values that need post-processing fix-ups.
+// TODO(dev): does this only apply to NDT or is NPAD also affected?
+func fixValues(r map[string]bigquery.Value) error {
+	// TODO(dev): fix these values.
+	// Fix StartTimeStamp:
+	//  - web100_log_entry.snap.StartTimeStamp: (1000000 * StartTimeStamp + StartTimeUsec)
+	// Fix IPv6 addresses in connection_spec:
+	//  - web100_log_entry.connection_spec.local_ip
+	//  - web100_log_entry.connection_spec.remote_ip
+	// Fix local_af:
+	//  - web100_log_entry.connection_spec.local_af: IPv4 = 0, IPv6 = 1.
+	return r
 }

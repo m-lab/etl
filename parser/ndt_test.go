@@ -7,7 +7,6 @@ import (
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/schema"
 
 	"github.com/kr/pretty"
 
@@ -34,7 +33,7 @@ func TestNDTParser(t *testing.T) {
 	}
 
 	// Extract the values saved to the inserter.
-	actualValues := schema.Map(ins.data[0].(*bq.MapSaver).Values)
+	actualValues := ins.data[0].(*bq.MapSaver).Values
 	expectedValues := map[string]bigquery.Value{
 		"web100_log_entry": map[string]bigquery.Value{
 			"version": "2.5.27 201001301335 net100",
