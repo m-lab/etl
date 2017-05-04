@@ -113,7 +113,7 @@ func Open(filename string, legacyNames map[string]string) (*Web100, error) {
 }
 
 // Next reads the next C.web100_snapshot record from the web100 snaplog and
-// saves it in an internal buffer. Use SnapValues to read the all values from
+// saves it in an internal buffer. Use SnapshotValues to read the all values from
 // the most recently read snapshot.  If Next reaches EOF or another error, the
 // last snapshot is in an undefined state.
 func (w *Web100) Next() error {
@@ -179,9 +179,9 @@ func (w *Web100) ConnectionSpec(connSpec Saver) error {
 	return nil
 }
 
-// SnapValues saves all values from the most recent C.web100_snapshot read by
-// Next. Next must be called at least once before calling SnapValues.
-func (w *Web100) SnapValues(snapValues Saver) error {
+// SnapshotValues saves all values from the most recent C.web100_snapshot read by
+// Next. Next must be called at least once before calling SnapshotValues.
+func (w *Web100) SnapshotValues(snapValues Saver) error {
 	snaplog := (*C.web100_log)(w.snaplog)
 	snap := (*C.web100_snapshot)(w.snap)
 
