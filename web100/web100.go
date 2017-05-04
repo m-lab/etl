@@ -188,15 +188,25 @@ func (w *Web100) SnapshotValues(snapValues Saver) error {
 	// Parses variables from most recent web100_snapshot data.
 	var w_errno C.int = C.WEB100_ERR_SUCCESS
 	group := C.web100_get_log_group(snaplog)
+
+	// The web100 group is a set of web100 variables from a specific agent.
+	// M-Lab snaplogs only ever have a single agent ("local") and group
+	// (whatever the static set of web100 variables read from
+	// /proc/web100/header).
+	//
+	// To extract each web100 variables corresponding to all the variables
+	// in the group, we iterate through each one.
 	for v := C.web100_var_head(group, &w_errno); v != nil; v = C.web100_var_next(v, &w_errno) {
 		if w_errno != C.WEB100_ERR_SUCCESS {
 			return fmt.Errorf(C.GoString(C.web100_strerror(w_errno)))
 		}
 
+		// Extract the web100 variable name and type. This will
+		// correspond to one of the variables defined in tcp-kis.txt.
 		name := C.web100_get_var_name(v)
 		var_type := C.web100_get_var_type(v)
 
-		// Read the raw variable data from the snapshot data.
+		// Read the raw bytes for the variable from the snapshot.
 		errno := C.web100_snap_read(v, snap, w.data)
 		if errno != C.WEB100_ERR_SUCCESS {
 			return fmt.Errorf(C.GoString(C.web100_strerror(errno)))
@@ -207,7 +217,12 @@ func (w *Web100) SnapshotValues(snapValues Saver) error {
 		C.web100_value_to_textn((*C.char)(w.text), C.WEB100_VALUE_LEN_MAX,
 			(C.WEB100_TYPE)(var_type), w.data)
 
-		// Use the canonical variable name.
+		// Use the canonical variable name. The variable name known to
+		// the web100 kernel at run time lagged behind the official
+		// web100 spec. So, some variable names need to be translated
+		// from their legacy form (read from the kernel and written to
+		// the snaplog) to the canonical form (as defined in
+		// tcp-kis.txt).
 		canonicalName := C.GoString(name)
 		if _, ok := w.legacyNames[canonicalName]; ok {
 			canonicalName = w.legacyNames[canonicalName]
@@ -217,7 +232,7 @@ func (w *Web100) SnapshotValues(snapValues Saver) error {
 		// Attempt to convert the current variable to an int64.
 		value, err := strconv.ParseInt(C.GoString((*C.char)(w.text)), 10, 64)
 		if err != nil {
-			// Leave variable as a string.
+			// If it cannot be converted, leave the variable as a string.
 			snapValues.SetString(canonicalName, C.GoString((*C.char)(w.text)))
 		} else {
 			snapValues.SetInt64(canonicalName, value)
