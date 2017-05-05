@@ -1,4 +1,5 @@
 // Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+// The format of test file can be found at https://paris-traceroute.net/.
 package parser
 
 import (
@@ -42,20 +43,16 @@ func (f *PTFileName) GetDate() (string, bool) {
 	return "", false
 }
 
-type FileNameParser interface {
-	GetIPTuple()
-	GetDate()
-}
-
 // MLabSnapshot in legacy code
 type PT struct {
 	test_id              string
 	project              int // 3 for PARIS_TRACEROUTE
 	log_time             int64
 	connection_spec      MLabConnectionSpecification
-	paris_traceroute_hop ParisTracerouteHop
+	paris_traceroute_hop []ParisTracerouteHop
 }
 
+// TODO(prod) Move this to parser/common.go
 type MLabConnectionSpecification struct {
 	server_ip      string
 	server_af      int
@@ -123,7 +120,8 @@ func NewPTParser(ins etl.Inserter) *PTParser {
 	return &PTParser{ins, "/mnt/tmpfs"}
 }
 
-func ProcessAllNodes(all_nodes []Node, server_IP string) []ParisTracerouteHop {
+// ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
+func ProcessAllNodes(all_nodes []Node, server_IP, protocal string) []ParisTracerouteHop {
 	var results []ParisTracerouteHop
 	if len(all_nodes) == 0 {
 		return nil
@@ -134,23 +132,27 @@ func ProcessAllNodes(all_nodes []Node, server_IP string) []ParisTracerouteHop {
 		parent := all_nodes[i].parent
 		if parent == nil {
 			one_hop := &ParisTracerouteHop{
+				protocal:     protocal,
 				dest_ip:      all_nodes[i].ip,
 				des_hostname: all_nodes[i].hostname,
 				rtt:          all_nodes[i].rtts,
 				src_ip:       server_IP,
+				src_af:       2, // for IPv4. IPv6 is 10.
+				dest_af:      2,
 			}
-			fmt.Println(*one_hop)
 			results = append(results, *one_hop)
 			break
 		} else {
 			one_hop := &ParisTracerouteHop{
+				protocal:     protocal,
 				dest_ip:      all_nodes[i].ip,
 				des_hostname: all_nodes[i].hostname,
 				rtt:          all_nodes[i].rtts,
 				src_ip:       parent.ip,
 				src_hostname: parent.hostname,
+				src_af:       2, // for IPv4. IPv6 is 10.
+				dest_af:      2,
 			}
-			fmt.Println(*one_hop)
 			results = append(results, *one_hop)
 		}
 	}
@@ -209,9 +211,113 @@ func GetLogtime(filename PTFileName) int64 {
 }
 
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	file, err := os.Open(testName)
+	hops, err := Parse(meta, testName, rawContent)
 	if err != nil {
 		return err
+	}
+	fmt.Println(len(hops))
+	// Insert hops into BigQuery table.
+	return nil
+}
+
+func ProcessOneTuple(parts []string, protocal string, current_leaves []Node, all_nodes, new_leaves *[]Node) error {
+	if len(parts) != 4 {
+		return errors.New("corrupted input")
+	}
+	if parts[3] != "ms" {
+		return errors.New("Malformed line. Expected 'ms'")
+	}
+	var rtt []float64
+	// Handle tcp or udp, parts[5] is a single number.
+	if protocal == "tcp" || protocal == "udp" {
+		one_rtt, err := strconv.ParseFloat(parts[2], 64)
+		if err == nil {
+			rtt = append(rtt, one_rtt)
+		} else {
+			log.Println("Failed to conver rtt to number with error %v", err)
+			return err
+		}
+	}
+	// Handle icmp, parts[5] has 4 numbers separated by "/"
+	if protocal == "icmp" {
+		nums := strings.Split(parts[2], "/")
+		if len(nums) != 4 {
+			return errors.New("Failed to parse rtts for icmp test. 4 numbers expected")
+		}
+		for _, num := range nums {
+			one_rtt, err := strconv.ParseFloat(num, 64)
+			if err == nil {
+				rtt = append(rtt, one_rtt)
+			} else {
+				fmt.Printf("Failed to conver rtt to number with error %v", err)
+				return err
+			}
+		}
+	}
+	// check whether it is single flow or mulitple flows
+	// sample of multiple flows: (72.14.218.190):0,2,3,4,6,8,10
+	// sample of single flows: (172.25.252.166)
+	ips := strings.Split(parts[1], ":")
+
+	// Check whether it is root node.
+	if len(*all_nodes) == 0 {
+		one_node := &Node{
+			hostname: parts[0],
+			ip:       ips[0][1 : len(ips[0])-1],
+			rtts:     rtt,
+			parent:   nil,
+			flow:     -1,
+		}
+		*all_nodes = append(*all_nodes, *one_node)
+		*new_leaves = append(*new_leaves, *one_node)
+		return nil
+	}
+	if len(ips) == 1 {
+		// For single flow, the new node will be son of all current leaves
+		for _, leaf := range current_leaves {
+			one_node := &Node{
+				hostname: parts[0],
+				ip:       ips[0][1 : len(ips[0])-1],
+				rtts:     rtt,
+				parent:   &leaf,
+				flow:     -1,
+			}
+			*all_nodes = append(*all_nodes, *one_node)
+			if Unique(*one_node, *new_leaves) {
+				*new_leaves = append(*new_leaves, *one_node)
+			}
+		}
+	} else if len(ips) == 2 {
+		// Create a leave for each flow.
+		flows := strings.Split(ips[1], ",")
+		for _, flow := range flows {
+			flow_int, _ := strconv.Atoi(flow)
+
+			for _, leaf := range current_leaves {
+				if leaf.flow == -1 || leaf.flow == flow_int {
+					one_node := &Node{
+						hostname: parts[0],
+						ip:       ips[0][1 : len(ips[0])-1],
+						rtts:     rtt,
+						parent:   &leaf,
+						flow:     flow_int,
+					}
+					*all_nodes = append(*all_nodes, *one_node)
+					if Unique(*one_node, *new_leaves) {
+						*new_leaves = append(*new_leaves, *one_node)
+					}
+				}
+			}
+		}
+	} // Done with multiple flows
+	return nil
+}
+
+// Parse the raw test file into hops ParisTracerouteHop.
+func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]ParisTracerouteHop, error) {
+	file, err := os.Open(testName)
+	if err != nil {
+		return nil, err
 	}
 	defer file.Close()
 
@@ -235,7 +341,6 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		oneLine := strings.TrimSuffix(scanner.Text(), "\n")
-		fmt.Println(oneLine)
 		// Skip initial lines starting with #.
 		if len(oneLine) == 0 || oneLine[0] == '#' {
 			continue
@@ -247,6 +352,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			protocal = ParseFirstLine(oneLine)
 		} else {
 			// Handle each line of test file after the first line.
+			// TODO(dev): use regexp here
 			parts := strings.Fields(oneLine)
 			// Skip line start with "MPLS"
 			if len(parts) < 3 || parts[0] == "MPLS" {
@@ -261,110 +367,20 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			// parts[6] should always be "ms"
 			// if there is parts[7], it should be hostname again like parts[3] ......
 			for i := 3; i < len(parts); i += 4 {
-				if parts[i+3] != "ms" {
-					return errors.New("Malformed line. Expected 'ms'")
+				if len(parts) < i+4 {
+					return nil, errors.New("incompleted hop data.")
 				}
-				var rtt []float64
-				// Handle tcp or udp, parts[5] is a single number.
-				if protocal == "tcp" || protocal == "udp" {
-					fmt.Println(parts[i+2])
-					one_rtt, err := strconv.ParseFloat(parts[i+2], 64)
-					if err == nil {
-						rtt = append(rtt, one_rtt)
-					} else {
-						log.Println("Failed to conver rtt to number with error %v", err)
-						return err
-					}
-				}
-				// Handle icmp, parts[5] has 4 numbers separated by "/"
-				if protocal == "icmp" {
-					nums := strings.Split(parts[i+2], "/")
-					if len(nums) != 4 {
-						return errors.New("Failed to parse rtts for icmp test. 4 numbers expected")
-					}
-					for _, num := range nums {
-						one_rtt, err := strconv.ParseFloat(num, 64)
-						if err == nil {
-							rtt = append(rtt, one_rtt)
-						} else {
-							fmt.Printf("Failed to conver rtt to number with error %v", err)
-							return err
-						}
-					}
-				}
-				// check whether it is single flow or mulitple flows
-				// sample of multiple flows: (72.14.218.190):0,2,3,4,6,8,10
-				// sample of single flows: (172.25.252.166)
-				parts_4 := parts[i+1]
-				ips := strings.Split(parts_4, ":")
-
-				// Check whether it is root node.
-				if len(all_nodes) == 0 {
-					one_node := &Node{
-						hostname: parts[i],
-						ip:       ips[0][1 : len(ips[0])-1],
-						rtts:     rtt,
-						parent:   nil,
-						flow:     -1,
-					}
-					all_nodes = append(all_nodes, *one_node)
-					new_leaves = append(new_leaves, *one_node)
-					break
-				}
-				if len(ips) == 1 {
-					// For single flow, the new node will be son of all current leaves
-					for _, leaf := range current_leaves {
-						one_node := &Node{
-							hostname: parts[i],
-							ip:       ips[0][1 : len(ips[0])-1],
-							rtts:     rtt,
-							parent:   &leaf,
-							flow:     -1,
-						}
-						all_nodes = append(all_nodes, *one_node)
-						if Unique(*one_node, new_leaves) {
-							new_leaves = append(new_leaves, *one_node)
-						}
-					}
-				} else if len(ips) == 2 {
-					// Create a leave for each flow.
-					flows := strings.Split(ips[1], ",")
-					for _, flow := range flows {
-						flow_int, _ := strconv.Atoi(flow)
-
-						for _, leaf := range current_leaves {
-							if leaf.flow == -1 || leaf.flow == flow_int {
-								one_node := &Node{
-									hostname: parts[i],
-									ip:       ips[0][1 : len(ips[0])-1],
-									rtts:     rtt,
-									parent:   &leaf,
-									flow:     flow_int,
-								}
-								all_nodes = append(all_nodes, *one_node)
-								if Unique(*one_node, new_leaves) {
-									new_leaves = append(new_leaves, *one_node)
-								}
-							}
-						}
-					}
-				} // Done with multiple flows
-
+				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
+				ProcessOneTuple(tuple_str, protocal, current_leaves, &all_nodes, &new_leaves)
 			} // Done with a 4-tuple parsing
 		} // Done with one line
 		current_leaves = new_leaves
-		fmt.Println("Here are new leaves")
-		for _, leaf := range current_leaves {
-			fmt.Println(leaf)
-		}
-
 	} // Done with a test file
 
 	if err := scanner.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	// Generate Hops from all_nodes
-	PT_hops := ProcessAllNodes(all_nodes, server_IP)
-	fmt.Println(len(PT_hops))
-	return nil
+	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocal)
+	return PT_hops, nil
 }
