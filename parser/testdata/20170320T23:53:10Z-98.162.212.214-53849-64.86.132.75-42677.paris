@@ -1,0 +1,10 @@
+traceroute [(172.17.94.34:33456) -> (74.125.224.100:33457)], protocol tcp, algo exhaustive, duration 3 s
+ 1  P(6, 6) 172.17.95.252 (172.17.95.252)  0.376 ms
+ 2  P(6, 6) us-mtv-cl4-core1-gigabitethernet1-1.n.corp.google.com (172.25.252.172)  0.407 ms
+ 3  P(6, 6) us-mtv-ply1-bb1-tengigabitethernet2-3.n.corp.google.com (172.25.252.166)  0.501 ms
+ 4  P(6, 6) us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com (172.25.253.46)  0.343 ms
+ 5  P(16, 16) pr01-xe-7-1-0.pao03.net.google.com (72.14.218.190):0,2,3,4,6,8,10  0.530 ms  pr02-xe-3-0-1.pao03.net.google.com (72.14.196.8):1,5,7,9  0.556 ms
+ 6  P(16, 16) bb01-ae3.nuq04.net.google.com (216.239.49.250):0,2,3,4,6,8,10  1.386 ms  bb01-ae7.nuq04.net.google.com (72.14.232.136):1,5,7,9  1.693 ms
+ 7  P(6, 6) sr05-te1-8.nuq04.net.google.com (64.233.174.109)  1.614 ms
+ 8  P(6, 6) 74.125.224.100 (74.125.224.100)  0.895 ms
+
