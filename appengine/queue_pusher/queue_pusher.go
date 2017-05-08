@@ -5,6 +5,7 @@ package pushqueue
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 
@@ -17,13 +18,12 @@ import (
 const defaultMessage = "<html><body>This is not the app you're looking for.</body></html>"
 
 // Requests can only add tasks to one of these whitelisted queue names.
-var queueForType = map[etl.DataType]string {
+var queueForType = map[etl.DataType]string{
 	etl.NDT: "etl-ndt-queue",
-	etl.SS: "etl-sidestream-queue",
-	etl.PT: "etl-traceroute-queue",
-	etl.SW: "etl-disco-queue",
+	etl.SS:  "etl-sidestream-queue",
+	etl.PT:  "etl-traceroute-queue",
+	etl.SW:  "etl-disco-queue",
 }
-
 
 func init() {
 	http.HandleFunc("/", defaultHandler)
@@ -94,8 +94,15 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate filename.
+	fn_data, err := etl.ValidateTestPath(decoded_filename)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
+	}
 	// determine correct queue based on file name.
-	queuename, ok := queueForType[etl.GetDataType(decoded_filename)]
+	queuename, ok := queueForType[fn_data.GetDataType()]
 
 	// Lots of files will be archived that should not be enqueued. Pass
 	// over those files without comment.
