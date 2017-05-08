@@ -53,8 +53,21 @@ func handler(w http.ResponseWriter, r *http.Request) {
 var inFlight int32
 
 // Returns true if request should be rejected.
+// If the max concurrency (MC) exceeds (or matches) the instances*workers, then
+// most requests will be rejected, until the median number of workers is
+// less than the throttle.
+// ** So we should set max instances (MI) * max workers (MW) > max concurrency.
+//
+// We also want max_concurrency high enough that most instances have several
+// jobs.  With MI=20, MW=25, MC=100, the average workers/instance is only 4, and
+// we end up with many instances starved, so AppEngine was removing instances even
+// though the queue throughput was poor.
+// ** So we probably want MC/MI > MW/2, to prevent starvation.
+//
+// For now, assuming:
+//    MC: 180,  MI: 20, MW: 10
 func shouldThrottle() bool {
-	if atomic.AddInt32(&inFlight, 1) > 25 {
+	if atomic.AddInt32(&inFlight, 1) > 10 {
 		atomic.AddInt32(&inFlight, -1)
 		return true
 	}

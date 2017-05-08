@@ -6,12 +6,12 @@ queue:
   target: etl-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
-  rate: 7/s
+  rate: 3/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
   bucket_size: 10
   # Maximum number of concurrent requests.
-  max_concurrent_requests: 200
+  max_concurrent_requests: 180
 
 - name: etl-ndt-queue
   target: etl-ndt-parser
@@ -22,7 +22,7 @@ queue:
   # have very little impact for our environment.
   bucket_size: 10
   # Maximum number of concurrent requests.
-  max_concurrent_requests: 200
+  max_concurrent_requests: 180
 
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
@@ -33,7 +33,7 @@ queue:
   # have very little impact for our environment.
   bucket_size: 10
   # Maximum number of concurrent requests.
-  max_concurrent_requests: 200
+  max_concurrent_requests: 180
 
 - name: etl-sidestream-queue
   target: etl-sidestream-parser
@@ -44,7 +44,7 @@ queue:
   # have very little impact for our environment.
   bucket_size: 10
   # Maximum number of concurrent requests.
-  max_concurrent_requests: 200
+  max_concurrent_requests: 180
 
 - name: etl-disco-queue
   target: etl-disco-parser
@@ -55,7 +55,7 @@ queue:
   # have very little impact for our environment.
   bucket_size: 10
   # Maximum number of concurrent requests.
-  max_concurrent_requests: 200
+  max_concurrent_requests: 180
 
 
 ###################################################################################
