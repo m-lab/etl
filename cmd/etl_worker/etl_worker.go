@@ -65,9 +65,9 @@ var inFlight int32
 // ** So we probably want MC/MI > MW/2, to prevent starvation.
 //
 // For now, assuming:
-//    MC: 200,  MI: 20, MW: 15
+//    MC: 180,  MI: 20, MW: 10
 func shouldThrottle() bool {
-	if atomic.AddInt32(&inFlight, 1) > 15 {
+	if atomic.AddInt32(&inFlight, 1) > 10 {
 		atomic.AddInt32(&inFlight, -1)
 		return true
 	}
@@ -97,11 +97,9 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	defer metrics.WorkerCount.Dec()
 
 	r.ParseForm()
-	// Log any request data other than filename (which is logged below)
+	// Log request data.
 	for key, value := range r.Form {
-		if key != "filename" {
-			log.Printf("Form:   %q == %q\n", key, value)
-		}
+		log.Printf("Form:   %q == %q\n", key, value)
 	}
 
 	// This handles base64 encoding, and requires a gs:// prefix.
