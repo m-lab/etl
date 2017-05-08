@@ -140,7 +140,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []ParisTracer
 				des_hostname: all_nodes[i].hostname,
 				rtt:          all_nodes[i].rtts,
 				src_ip:       server_IP,
-				src_af:       IPv4_AF, // for IPv4. IPv6 is 10.
+				src_af:       IPv4_AF,
 				dest_af:      IPv4_AF,
 			}
 			results = append(results, *one_hop)
@@ -153,7 +153,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []ParisTracer
 				rtt:          all_nodes[i].rtts,
 				src_ip:       parent.ip,
 				src_hostname: parent.hostname,
-				src_af:       IPv4_AF, // for IPv4. IPv6 is 10.
+				src_af:       IPv4_AF,
 				dest_af:      IPv4_AF,
 			}
 			results = append(results, *one_hop)
