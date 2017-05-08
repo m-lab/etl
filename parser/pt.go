@@ -237,8 +237,10 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 	}
 	var rtt []float64
 	//TODO: to use regexp here.
+	switch {
 	// Handle tcp or udp, parts[5] is a single number.
-	if protocol == "tcp" || protocol == "udp" {
+
+	case protocol == "tcp" || protocol == "udp":
 		one_rtt, err := strconv.ParseFloat(parts[2], 64)
 		if err == nil {
 			rtt = append(rtt, one_rtt)
@@ -246,9 +248,9 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 			log.Println("Failed to conver rtt to number with error %v", err)
 			return err
 		}
-	}
-	// Handle icmp, parts[5] has 4 numbers separated by "/"
-	if protocol == "icmp" {
+
+	// Handle icmp, parts[2] has 4 numbers separated by "/"
+	case protocol == "icmp":
 		nums := strings.Split(parts[2], "/")
 		if len(nums) != 4 {
 			return errors.New("Failed to parse rtts for icmp test. 4 numbers expected")
