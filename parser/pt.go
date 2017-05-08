@@ -301,7 +301,10 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 		// Create a leave for each flow.
 		flows := strings.Split(ips[1], ",")
 		for _, flow := range flows {
-			flow_int, _ := strconv.Atoi(flow)
+			flow_int, err := strconv.Atoi(flow)
+			if err != nil {
+				return err
+			}
 
 			for _, leaf := range current_leaves {
 				if leaf.flow == -1 || leaf.flow == flow_int {
