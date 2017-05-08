@@ -267,7 +267,3 @@ func (w *Web100) Close() error {
 	w.snap = nil
 	return nil
 }
-
-func LookupError(errnum int) string {
-	return C.GoString(C.web100_strerror(C.int(errnum)))
-}

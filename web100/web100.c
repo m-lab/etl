@@ -1629,6 +1629,8 @@ web100_snap_from_log(web100_snapshot* snap, web100_log *log)
     if(fscanf(log->fp, "%79s[^\n]", tmpbuf) == EOF) {
 	return EOF;
     }
+
+    // Cleanup the line
     while(1) {
         c = fgetc(log->fp);
         if (c == '\n') {
@@ -1639,7 +1641,6 @@ web100_snap_from_log(web100_snapshot* snap, web100_log *log)
             return EOF;
         }
     }
-    // Cleanup the line (???)
 
     // At this point, we have found a linefeed (\n).
     if( strcmp(tmpbuf,BEGIN_SNAP_DATA) != 0 ){
