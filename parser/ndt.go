@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -48,8 +47,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		} else {
 			testType = "other"
 		}
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": testType}).Inc()
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "ignore").Inc()
 		return nil
 	}
 
@@ -57,8 +56,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// defined in etl_worker.go must guarantee that all files written to
 	// /mnt/tmpfs will fit.
 	if len(rawSnapLog) > 10*1024*1024 {
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": ">10MB"}).Inc()
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, ">10MB").Inc()
 		log.Printf("Ignoring oversize snaplog: %d, %s\n",
 			len(rawSnapLog), testName)
 		metrics.FileSizeHistogram.WithLabelValues(
@@ -71,14 +70,18 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 
 	if len(rawSnapLog) < 32*1024 {
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "<32KB"}).Inc()
+		// TODO - Use separate counter, since this is not unique across
+		// the test.
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "<32KB").Inc()
 		log.Printf("Note: small rawSnapLog: %d, %s\n",
 			len(rawSnapLog), testName)
 	}
 	if len(rawSnapLog) == 4096 {
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "4KB"}).Inc()
+		// TODO - Use separate counter, since this is not unique across
+		// the test.
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "4KB").Inc()
 	}
 
 	metrics.WorkerState.WithLabelValues("ndt").Inc()
@@ -92,8 +95,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	data, err := web100.Asset("tcp-kis.txt")
 	if err != nil {
 		// Asset missing from build.
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "web100.Asset"}).Inc()
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "web100.Asset").Inc()
 		log.Printf("web100.Asset error: %s processing %s from %s\n",
 			err, testName, meta["filename"])
 		return nil
@@ -105,8 +108,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	defer metrics.WorkerState.WithLabelValues("parse-def").Dec()
 	legacyNames, err := web100.ParseWeb100Definitions(b)
 	if err != nil {
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "web100.ParseDef"}).Inc()
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "web100.ParseDef").Inc()
 		log.Printf("web100.ParseDef error: %s processing %s from %s\n",
 			err, testName, meta["filename"])
 		return nil
@@ -116,8 +119,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Write rawSnapLog to /mnt/tmpfs.
 	tmpFile, err := ioutil.TempFile(n.tmpDir, "snaplog-")
 	if err != nil {
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "no-tmp"}).Inc()
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "TmpFile").Inc()
 		log.Printf("Failed to create tmpfile for: %s, when processing: %s\n",
 			testName, meta["filename"])
 		return nil
@@ -127,8 +130,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	for count := 0; count < len(rawSnapLog); count += c {
 		c, err = tmpFile.Write(rawSnapLog)
 		if err != nil {
-			metrics.TestCount.With(prometheus.Labels{
-				"table": n.TableName(), "type": "tmpFile.Write"}).Inc()
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), testType, "tmpFile.Write").Inc()
 			log.Printf("tmpFile.Write error: %s processing: %s from %s\n",
 				err, testName, meta["filename"])
 			return nil
@@ -142,8 +145,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Open the file we created above.
 	w, err := web100.Open(tmpFile.Name(), legacyNames)
 	if err != nil {
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "web100.Open"}).Inc()
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "web100.Open").Inc()
 		// These are mostly "could not parse /proc/web100/header",
 		// with some "file read/write error C"
 		log.Printf("web100.Open error: %s processing %s from %s\n",
@@ -168,21 +171,22 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				// FYI - something like 1/5000 logs typically have these errors.
 				// But they may be associated with specific bad machines.
 				//
-				// TODO - when this is "missing snaplog header", it is usually but
-				// not always unrecoverable.  This is a tiny fraction - 200 / 20M.
-				//
 				// When we see "missing end of header" or
 				// "truncated", then they are usually singletons, so either we
 				// recover or perhaps we get EOF immediately.
-				metrics.TestCount.With(prometheus.Labels{
-					"table": n.TableName(), "type": "w.Next"}).Inc()
+				// TODO - Use separate counter, since this is not unique across
+				// the test.
+				metrics.TestCount.WithLabelValues(
+					n.TableName(), testType, "w.Next").Inc()
 				log.Printf("w.Next error: %s processing snap %d from %s from %s\n",
 					err, count, testName, meta["filename"])
 				// This could either be a bad record, or EOF.
 				badRecords++
 				if badRecords > 10 {
-					metrics.TestCount.With(prometheus.Labels{
-						"table": n.TableName(), "type": "10 bad"}).Inc()
+					// TODO - Use separate counter, since this is not unique across
+					// the test.
+					metrics.TestCount.WithLabelValues(
+						n.TableName(), testType, "badRecords").Inc()
 					// TODO - don't see this in the logs on 5/4.  Not sure why.
 					log.Printf("w.Next 10 bad processing snapshots from %s from %s\n",
 						testName, meta["filename"])
@@ -197,8 +201,10 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			// Note: read and discard the values by not saving the Web100ValueMap.
 			err := w.SnapshotValues(schema.Web100ValueMap{})
 			if err != nil {
-				metrics.TestCount.With(prometheus.Labels{
-					"table": n.TableName(), "type": "w.Values"}).Inc()
+				// TODO - Use separate counter, since this is not unique across
+				// the test.
+				metrics.TestCount.WithLabelValues(
+					n.TableName(), testType, "w.Values").Inc()
 			}
 		}
 	}
@@ -210,8 +216,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	snapValues := schema.Web100ValueMap{}
 	err = w.SnapshotValues(snapValues)
 	if err != nil {
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "values-err"}).Inc()
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "values-err").Inc()
 		log.Printf("Error calling web100 Values(): %s, (%s), when processing: %s\n%s\n",
 			tmpFile.Name(), testName, meta["filename"], err)
 		return nil
@@ -227,14 +233,13 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 	err = n.inserter.InsertRow(&bq.MapSaver{fixValues(results)})
 	if err != nil {
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": "insert-err"}).Inc()
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "insert-err").Inc()
 		// TODO: This is an insert error, that might be recoverable if we try again.
 		return err
 	} else {
-		// TODO - test type should be a separate label, so we can see which files have which errors.
-		metrics.TestCount.With(prometheus.Labels{
-			"table": n.TableName(), "type": testType}).Inc()
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), testType, "ok").Inc()
 		return nil
 	}
 }

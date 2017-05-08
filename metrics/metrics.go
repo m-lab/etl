@@ -71,8 +71,8 @@ var (
 			Name: "etl_task_count",
 			Help: "Number of tasks/archive files processed.",
 		},
-		// Module and Status
-		[]string{"module", "status"},
+		// Go package or filename, and Status
+		[]string{"package", "status"},
 	)
 
 	// Counts the number of tests processed by the parsers..
@@ -86,8 +86,8 @@ var (
 			Name: "etl_test_count",
 			Help: "Number of tests processed.",
 		},
-		// Test type, e.g. s2c, c2s, reject, traceroute, sidestream
-		[]string{"table", "type"},
+		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/
+		[]string{"table", "filetype", "status"},
 	)
 
 	// Counts the number of into BigQuery insert operations.
