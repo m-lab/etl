@@ -63,16 +63,16 @@ var (
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_task_count{worker, status}
+	//   etl_task_count{module, status}
 	// Example usage:
-	//   metrics.TaskCount.WithLabelValues("ndt", "ok").Inc()
+	//   metrics.TaskCount.WithLabelValues("Task", "ok").Inc()
 	TaskCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_task_count",
 			Help: "Number of tasks/archive files processed.",
 		},
-		// Worker type, e.g. ndt, sidestream, ptr, etc.
-		[]string{"worker", "status"},
+		// Module and Status
+		[]string{"module", "status"},
 	)
 
 	// Counts the number of tests processed by the parsers..
