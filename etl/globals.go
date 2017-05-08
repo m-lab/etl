@@ -28,6 +28,9 @@ var (
 )
 
 type DataPath struct {
+	// TODO(dev) Delete unused fields.
+	// They are comprehensive now in anticipation of using them to populate
+	// new fields in the BQ tables.
 	Exp1       string // #2
 	DatePath   string // #3
 	PackedDate string // #4
