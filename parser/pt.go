@@ -89,6 +89,9 @@ type Node struct {
 	flow int
 }
 
+const IPv4_AF int32 = 2
+const IPv6_AF int32 = 10
+
 type ParisTracerouteHop struct {
 	protocol         string
 	src_ip           string
@@ -137,8 +140,8 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []ParisTracer
 				des_hostname: all_nodes[i].hostname,
 				rtt:          all_nodes[i].rtts,
 				src_ip:       server_IP,
-				src_af:       2, // for IPv4. IPv6 is 10.
-				dest_af:      2,
+				src_af:       IPv4_AF, // for IPv4. IPv6 is 10.
+				dest_af:      IPv4_AF,
 			}
 			results = append(results, *one_hop)
 			break
@@ -150,8 +153,8 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []ParisTracer
 				rtt:          all_nodes[i].rtts,
 				src_ip:       parent.ip,
 				src_hostname: parent.hostname,
-				src_af:       2, // for IPv4. IPv6 is 10.
-				dest_af:      2,
+				src_af:       IPv4_AF, // for IPv4. IPv6 is 10.
+				dest_af:      IPv4_AF,
 			}
 			results = append(results, *one_hop)
 		}
@@ -216,7 +219,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 	fmt.Println(len(hops))
-	// Insert hops into BigQuery table.
+	// TODO: Insert hops into BigQuery table.
 	return nil
 }
 
@@ -228,6 +231,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 		return errors.New("Malformed line. Expected 'ms'")
 	}
 	var rtt []float64
+	//TODO: to use regexp here.
 	// Handle tcp or udp, parts[5] is a single number.
 	if protocol == "tcp" || protocol == "udp" {
 		one_rtt, err := strconv.ParseFloat(parts[2], 64)
