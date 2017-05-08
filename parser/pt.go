@@ -281,7 +281,8 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 		*new_leaves = append(*new_leaves, *one_node)
 		return nil
 	}
-	if len(ips) == 1 {
+	switch len(ips) {
+	case 1:
 		// For single flow, the new node will be son of all current leaves
 		for _, leaf := range current_leaves {
 			one_node := &Node{
@@ -296,7 +297,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 				*new_leaves = append(*new_leaves, *one_node)
 			}
 		}
-	} else if len(ips) == 2 {
+	case 2:
 		// Create a leave for each flow.
 		flows := strings.Split(ips[1], ",")
 		for _, flow := range flows {
@@ -318,7 +319,9 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 				}
 			}
 		}
-	} // Done with multiple flows
+	default:
+		return errors.New("Wrong format for IP address.")
+	}
 	return nil
 }
 
