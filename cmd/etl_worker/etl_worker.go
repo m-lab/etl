@@ -2,13 +2,10 @@
 package main
 
 import (
-	"encoding/base64"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"runtime"
-	"strings"
 	"sync/atomic"
 
 	"github.com/m-lab/etl/bq"
@@ -50,36 +47,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprint(w, "Hello world!")
-}
-
-// TODO(dev) Add unit test
-func getFilename(filename string) (string, error) {
-	if strings.HasPrefix(filename, "gs://") {
-		return filename, nil
-	}
-
-	decode, err := base64.StdEncoding.DecodeString(filename)
-	if err != nil {
-		return "", errors.New("invalid file path: " + filename)
-	}
-	fn := string(decode[:])
-	if strings.HasPrefix(fn, "gs://") {
-		return fn, nil
-	}
-
-	return "", errors.New("invalid base64 encoded file path: " + fn)
-}
-
-func getDataType(fn string) etl.DataType {
-	fields := etl.TaskPattern.FindStringSubmatch(fn)
-	if fields == nil {
-		return etl.INVALID
-	}
-	dt, ok := etl.DirToDataType[fields[2]]
-	if !ok {
-		return etl.INVALID
-	}
-	return dt
 }
 
 // Basic throttling to restrict the number of tasks in flight.
