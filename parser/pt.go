@@ -90,7 +90,7 @@ type Node struct {
 }
 
 type ParisTracerouteHop struct {
-	protocal         string
+	protocol         string
 	src_ip           string
 	src_af           int32
 	dest_ip          string
@@ -121,7 +121,7 @@ func NewPTParser(ins etl.Inserter) *PTParser {
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
-func ProcessAllNodes(all_nodes []Node, server_IP, protocal string) []ParisTracerouteHop {
+func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []ParisTracerouteHop {
 	var results []ParisTracerouteHop
 	if len(all_nodes) == 0 {
 		return nil
@@ -132,7 +132,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocal string) []ParisTracer
 		parent := all_nodes[i].parent
 		if parent == nil {
 			one_hop := &ParisTracerouteHop{
-				protocal:     protocal,
+				protocol:     protocol,
 				dest_ip:      all_nodes[i].ip,
 				des_hostname: all_nodes[i].hostname,
 				rtt:          all_nodes[i].rtts,
@@ -144,7 +144,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocal string) []ParisTracer
 			break
 		} else {
 			one_hop := &ParisTracerouteHop{
-				protocal:     protocal,
+				protocol:     protocol,
 				dest_ip:      all_nodes[i].ip,
 				des_hostname: all_nodes[i].hostname,
 				rtt:          all_nodes[i].rtts,
@@ -170,7 +170,7 @@ func Unique(one_node Node, list []Node) bool {
 
 // Handle the first line, like
 // "traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s"
-func ParseFirstLine(oneLine string) (protocal string) {
+func ParseFirstLine(oneLine string) (protocol string) {
 	parts := strings.Split(oneLine, ",")
 	// check protocol
 	// check algo
@@ -187,12 +187,12 @@ func ParseFirstLine(oneLine string) (protocal string) {
 					log.Printf("Unknown protocol")
 					return ""
 				} else {
-					protocal = mm[1]
+					protocol = mm[1]
 				}
 			}
 		}
 	}
-	return protocal
+	return protocol
 }
 
 func GetLogtime(filename PTFileName) int64 {
@@ -220,7 +220,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	return nil
 }
 
-func ProcessOneTuple(parts []string, protocal string, current_leaves []Node, all_nodes, new_leaves *[]Node) error {
+func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all_nodes, new_leaves *[]Node) error {
 	if len(parts) != 4 {
 		return errors.New("corrupted input")
 	}
@@ -229,7 +229,7 @@ func ProcessOneTuple(parts []string, protocal string, current_leaves []Node, all
 	}
 	var rtt []float64
 	// Handle tcp or udp, parts[5] is a single number.
-	if protocal == "tcp" || protocal == "udp" {
+	if protocol == "tcp" || protocol == "udp" {
 		one_rtt, err := strconv.ParseFloat(parts[2], 64)
 		if err == nil {
 			rtt = append(rtt, one_rtt)
@@ -239,7 +239,7 @@ func ProcessOneTuple(parts []string, protocal string, current_leaves []Node, all
 		}
 	}
 	// Handle icmp, parts[5] has 4 numbers separated by "/"
-	if protocal == "icmp" {
+	if protocol == "icmp" {
 		nums := strings.Split(parts[2], "/")
 		if len(nums) != 4 {
 			return errors.New("Failed to parse rtts for icmp test. 4 numbers expected")
@@ -333,7 +333,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
 	is_first_line := true
-	protocal := "icmp"
+	protocol := "icmp"
 	// This var keep all current leaves
 	var current_leaves []Node
 	// This var keep all possible nodes
@@ -349,7 +349,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 		var new_leaves []Node
 		if is_first_line {
 			is_first_line = false
-			protocal = ParseFirstLine(oneLine)
+			protocol = ParseFirstLine(oneLine)
 		} else {
 			// Handle each line of test file after the first line.
 			// TODO(dev): use regexp here
@@ -371,7 +371,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 					return nil, errors.New("incompleted hop data.")
 				}
 				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
-				ProcessOneTuple(tuple_str, protocal, current_leaves, &all_nodes, &new_leaves)
+				ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
 			} // Done with a 4-tuple parsing
 		} // Done with one line
 		current_leaves = new_leaves
@@ -381,6 +381,6 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 		return nil, err
 	}
 	// Generate Hops from all_nodes
-	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocal)
+	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol)
 	return PT_hops, nil
 }
