@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"testing"
@@ -69,6 +70,8 @@ func TestPTParser(t *testing.T) {
 	}
 	for i := 0; i < len(hops); i++ {
 		if !reflect.DeepEqual(hops[i], expected_hops[i]) {
+			fmt.Printf("Here is expected    : %v\n", expected_hops[i])
+			fmt.Printf("Here is what is real: %v\n", hops[i])
 			t.Fatalf("Wrong results for PT hops!")
 		}
 	}

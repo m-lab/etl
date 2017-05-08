@@ -223,6 +223,11 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	return nil
 }
 
+// For each 4 tuples, it is like:
+// parts[0] is the hostname, like "if-ae-10-3.tcore2.DT8-Dallas.as6453.net".
+// parts[1] is IP address like "(66.110.57.41)" or "(72.14.218.190):0,2,3,4,6,8,10"
+// parts[2] are rtt in numbers like "0.298/0.318/0.340/0.016"
+// parts[3] should always be "ms"
 func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all_nodes, new_leaves *[]Node) error {
 	if len(parts) != 4 {
 		return errors.New("corrupted input")
@@ -364,12 +369,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 			}
 
 			// Drop the first 3 parts, like "1  P(6, 6)" because they are useless.
-			// The following parts are grouped into 4 tuples, for each 4 tuples, it is like:
-			// parts[3] is the hostname, like "if-ae-10-3.tcore2.DT8-Dallas.as6453.net".
-			// parts[4] is IP address like "(66.110.57.41)" or "(72.14.218.190):0,2,3,4,6,8,10"
-			// parts[5] are rtt in numbers like "0.298/0.318/0.340/0.016"
-			// parts[6] should always be "ms"
-			// if there is parts[7], it should be hostname again like parts[3] ......
+			// The following parts are grouped into tuples, each with 4 parts:
 			for i := 3; i < len(parts); i += 4 {
 				if len(parts) < i+4 {
 					return nil, errors.New("incompleted hop data.")
