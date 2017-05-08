@@ -63,16 +63,16 @@ var (
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_task_count{worker, status}
+	//   etl_task_count{module, status}
 	// Example usage:
-	//   metrics.TaskCount.WithLabelValues("ndt", "ok").Inc()
+	//   metrics.TaskCount.WithLabelValues("Task", "ok").Inc()
 	TaskCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_task_count",
 			Help: "Number of tasks/archive files processed.",
 		},
-		// Worker type, e.g. ndt, sidestream, ptr, etc.
-		[]string{"worker", "status"},
+		// Go package or filename, and Status
+		[]string{"package", "status"},
 	)
 
 	// Counts the number of tests processed by the parsers..
@@ -86,8 +86,8 @@ var (
 			Name: "etl_test_count",
 			Help: "Number of tests processed.",
 		},
-		// Test type, e.g. s2c, c2s, reject, traceroute, sidestream
-		[]string{"table", "type"},
+		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/
+		[]string{"table", "filetype", "status"},
 	)
 
 	// Counts the number of into BigQuery insert operations.

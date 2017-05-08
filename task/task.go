@@ -50,9 +50,14 @@ func (tt *Task) ProcessAllTests() error {
 			if err == io.EOF {
 				break
 			}
-			// TODO(dev) Handle this error properly!
-			// TODO - fix dataType
-			metrics.TaskCount.WithLabelValues("NDT", "NonEOFError").Inc()
+			// We are seeing several of these per hour, a little more than
+			// one in one thousand files.  duration varies from 10 seconds up to several
+			// minutes.
+			// Example:
+			// filename:gs://m-lab-sandbox/ndt/2016/04/10/20160410T000000Z-mlab1-ord02-ndt-0002.tgz
+			// files:666 duration:1m47.571825351s
+			// err:stream error: stream ID 801; INTERNAL_ERROR
+			// Because of the break, this error is passed up, and counted at the Task level.
 			log.Printf("filename:%s files:%d duration:%v err:%v",
 				tt.meta["filename"], files, time.Since(tt.meta["parse_time"].(time.Time)), err)
 			break
@@ -68,8 +73,7 @@ func (tt *Task) ProcessAllTests() error {
 		err := tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		if err != nil {
 			metrics.TaskCount.WithLabelValues(
-				// TODO - fix dataType
-				"NDT", "ParseAndInsertError").Inc()
+				"Task", "ParseAndInsertError").Inc()
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
 			continue

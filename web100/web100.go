@@ -130,6 +130,8 @@ func (w *Web100) Next() error {
 		return io.EOF
 	}
 	if err != C.WEB100_ERR_SUCCESS {
+		// WEB100_ERR_FILE_TRUNCATED_SNAP_DATA or
+		// WEB100_ERR__MISSING_SNAP_MAGIC
 		return fmt.Errorf(C.GoString(C.web100_strerror(err)))
 	}
 	return nil

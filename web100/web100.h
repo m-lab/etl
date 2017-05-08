@@ -83,6 +83,7 @@ struct web100_connection_spec_v6 {
 #define WEB100_VARNAME_LEN_MAX      32
 
 /* Error codes.  If you update these, be sure to update web100_sys_errlist. */
+// TODO change these to an enum
 #define WEB100_ERR_SUCCESS         0
 #define WEB100_ERR_FILE            1
 #define WEB100_ERR_AGENT_TYPE      2
@@ -94,6 +95,10 @@ struct web100_connection_spec_v6 {
 #define WEB100_ERR_NOGROUP         8
 #define WEB100_ERR_SOCK            9
 #define WEB100_ERR_KERNVER         10
+#define WEB100_ERR_FILE_TRUNCATED_SNAP_DATA 11
+#define WEB100_ERR_LOG_HEADER      12
+#define WEB100_ERR_MISSING_SNAP_MAGIC 13
+#define WEB100_ERR_END_OF_HEADER   14
 
 extern const char* const web100_sys_errlist[];
 extern int               web100_sys_nerr;

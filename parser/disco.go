@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -60,9 +59,6 @@ func NewDiscoParser(ins etl.Inserter) etl.Parser {
 //
 // TODO - optimize this to use the JSON directly, if possible.
 func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	// TODO - handle errors in counts.
-	metrics.TestCount.With(prometheus.Labels{"table": dp.TableName(), "type": "disco"}).Inc()
-
 	meta["testname"] = testName
 	ms := struct {
 		FileName  string `json:"filename, string"`
@@ -77,6 +73,7 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 		ps.Meta = ms
 		err := dec.Decode(&ps)
 		if err != nil {
+			metrics.TestCount.WithLabelValues(dp.TableName(), "disco", "Decode").Inc()
 			// TODO(dev) Should accumulate errors, instead of aborting?
 			return err
 		}
@@ -85,13 +82,19 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 			switch t := err.(type) {
 			case bigquery.PutMultiError:
 				// TODO improve error handling??
+				metrics.TestCount.WithLabelValues(
+					dp.TableName(), "disco", "insert-multi").Inc()
 				log.Printf("%v\n", t[0].Error())
 			default:
+				metrics.TestCount.WithLabelValues(
+					dp.TableName(), "disco", "insert-other").Inc()
 			}
 			// TODO(dev) Should accumulate errors, instead of aborting?
 			return err
 		}
 	}
+	metrics.TestCount.WithLabelValues(dp.TableName(), "disco", "ok").Inc()
+
 	return nil
 }
 

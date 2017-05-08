@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -37,7 +36,7 @@ type NullParser struct {
 }
 
 func (np *NullParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	metrics.TestCount.With(prometheus.Labels{"table": np.TableName(), "type": "null"}).Inc()
+	metrics.TestCount.WithLabelValues("table", "null", "ok").Inc()
 	return nil
 }
 
@@ -58,7 +57,7 @@ func NewTestParser(ins etl.Inserter) etl.Parser {
 }
 
 func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	metrics.TestCount.With(prometheus.Labels{"table": tp.TableName(), "type": "test"}).Inc()
+	metrics.TestCount.WithLabelValues("table", "test", "ok").Inc()
 	log.Printf("Parsing %s", testName)
 	values := make(map[string]bigquery.Value, len(meta)+1)
 	// TODO is there a better way to do this?
