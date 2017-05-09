@@ -240,8 +240,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 	var rtt []float64
 	//TODO: to use regexp here.
 	switch {
-	// Handle tcp or udp, parts[5] is a single number.
-
+	// Handle tcp or udp, parts[2] is a single number.
 	case protocol == "tcp" || protocol == "udp":
 		one_rtt, err := strconv.ParseFloat(parts[2], 64)
 		if err == nil {
@@ -285,6 +284,8 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 		*new_leaves = append(*new_leaves, *one_node)
 		return nil
 	}
+	// There are duplicates in all_nodes, but not in new_leaves.
+	// TODO(dev): consider consolidating these with a repeat count.
 	switch len(ips) {
 	case 1:
 		// For single flow, the new node will be son of all current leaves
