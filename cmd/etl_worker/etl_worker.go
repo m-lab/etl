@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"runtime"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -99,6 +100,24 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	metrics.WorkerCount.Inc()
 	defer metrics.WorkerCount.Dec()
 
+	var err error
+	retryCountStr := r.Header.Get("X-AppEngine-TaskRetryCount")
+	retryCount := 0
+	if retryCountStr != "" {
+		retryCount, err = strconv.Atoi(retryCountStr)
+		if err != nil {
+			log.Printf("Invalid retries string: %s\n", retryCountStr)
+		}
+	}
+	executionCountStr := r.Header.Get("X-AppEngine-TaskExecutionCount")
+	executionCount := 0
+	if executionCountStr != "" {
+		executionCount, err = strconv.Atoi(executionCountStr)
+		if err != nil {
+			log.Printf("Invalid execution count string: %s\n", executionCountStr)
+		}
+	}
+
 	r.ParseForm()
 	// Log request data.
 	for key, value := range r.Form {
@@ -116,7 +135,8 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO(dev): log the originating task queue name from headers.
-	log.Printf("Received filename: %q\n", fn)
+	log.Printf("Received filename: %q  Retries: %d, Executions: %d\n",
+		fn, retryCount, executionCount)
 
 	data, err := etl.ValidateTestPath(fn)
 	if err != nil {
@@ -149,9 +169,9 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	tr, err := storage.NewETLSource(client, fn)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(string(dataType), "ETLSourceError").Inc()
-		log.Printf("Error downloading file: %v", err)
+		log.Printf("Error opening gcs file: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"message": "Problem downloading file."}`)
+		fmt.Fprintf(w, `{"message": "Problem opening gcs file."}`)
 		return
 		// TODO - anything better we could do here?
 	}
