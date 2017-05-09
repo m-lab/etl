@@ -162,6 +162,8 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []ParisTracer
 	return results
 }
 
+// This function was designed for hops with multiple flows. When the source IP are duplicate flows, but the destination IP is
+// single flow IP, those hops will result in just one node in the list.
 func Unique(one_node Node, list []Node) bool {
 	for _, existing_node := range list {
 		if existing_node.hostname == one_node.hostname && existing_node.ip == one_node.ip && existing_node.flow == one_node.flow {
