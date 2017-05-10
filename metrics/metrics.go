@@ -81,7 +81,8 @@ var (
 	// Provides metrics:
 	//   etl_test_count{type}
 	// Example usage:
-	//   metrics.TaskCount.WithLabelValues("s2c").Inc()
+	// metrics.TestCount.WithLabelValues(
+	//	tt.Inserter.TableName(), "s2c", "ok").Inc()
 	TestCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_test_count",

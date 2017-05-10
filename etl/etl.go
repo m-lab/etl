@@ -31,6 +31,7 @@ type InserterParams struct {
 	// These specify the google cloud dataset/table to write to.
 	Dataset    string
 	Table      string
+	Suffix     string        // Table name suffix for templated tables.
 	Timeout    time.Duration // max duration of backend calls.  (for context)
 	BufferSize int           // Number of rows to buffer before writing to backend.
 }

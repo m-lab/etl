@@ -8,7 +8,7 @@ import (
 const start = `^gs://(?P<prefix>.*)/(?P<exp>[^/]*)/`
 const datePath = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
 const dateTime = `(\d{4}[01]\d[0123]\d)T000000Z`
-const mlabN_podNN = `-(mlab\d)-([[:alpha:]]{3}\d{2}-)`
+const mlabN_podNN = `-(mlab\d)-([[:alpha:]]{3}\d[0-9t]-)`
 const exp_NNNN = `(.*)-(\d{4})`
 const suffix = `(?:\.tar|\.tar.gz|\.tgz)$`
 
@@ -95,7 +95,7 @@ var (
 	// Map from data type to BigQuery table name.
 	// TODO - this should be loaded from a config.
 	DataTypeToTable = map[DataType]string{
-		NDT:     "ndt_test_full_schema",
+		NDT:     "ndt_test_daily",
 		SS:      "ss_test",
 		PT:      "pt_test",
 		SW:      "disco_test",

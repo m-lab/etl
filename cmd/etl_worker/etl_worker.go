@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"runtime"
 	"sync/atomic"
+	"time"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -119,9 +120,10 @@ func worker(w http.ResponseWriter, r *http.Request) {
 
 	data, err := etl.ValidateTestPath(fn)
 	if err != nil {
-		log.Printf("Invalid filename: %s\n", fn)
+		log.Printf("Invalid filename: %v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
+		return
 	}
 	dataType := data.GetDataType()
 
@@ -155,7 +157,10 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tr.Close()
 
-	ins, err := bq.NewInserter("mlab_sandbox", dataType)
+	dateFormat := "20060102"
+	date, err := time.Parse(dateFormat, data.PackedDate)
+
+	ins, err := bq.NewInserter("mlab_sandbox", dataType, date)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)
