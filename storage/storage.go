@@ -54,7 +54,7 @@ func (rr *ETLSource) nextHeader(trial int) (*tar.Header, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				"next", strconv.Itoa(trial), "other").Inc()
 		}
-		log.Printf("Next: %v\n", err)
+		log.Printf("nextHeader: %v\n", err)
 	}
 	return h, true, err
 }
@@ -95,6 +95,7 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				phase, strconv.Itoa(trial), "other error").Inc()
 		}
+		log.Printf("nextData: %v\n", err)
 		return nil, true, err
 	}
 
@@ -114,8 +115,10 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 	var data []byte
 	var h *tar.Header
 
+	// Last trial will be after total delay of 16ms + 32ms + ... + 8192ms,
+    // or about 15 seconds.
 	trial := 0
-	delay := 5 * time.Millisecond
+	delay := 16 * time.Millisecond
 	for {
 		trial++
 		var retry bool
@@ -123,7 +126,7 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 		if err == nil {
 			break
 		}
-		if !retry || trial > 10 {
+		if !retry || trial >= 10 {
 			return "", nil, err
 		}
 		// For each trial, increase backoff delay by 2x.
@@ -134,7 +137,7 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 	// Only process regular files.
 	if h.Typeflag == tar.TypeReg {
 		trial = 0
-		delay = 5 * time.Millisecond
+		delay = 16 * time.Millisecond
 		for {
 			trial++
 			var retry bool
@@ -142,7 +145,7 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 			if err == nil {
 				break
 			}
-			if !retry || trial > 10 {
+			if !retry || trial >= 10 {
 				break
 			}
 			// For each trial, increase backoff delay by 2x.
