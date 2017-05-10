@@ -44,8 +44,8 @@ func (tt *Task) ProcessAllTests() error {
 	files := 0
 	nilData := 0
 	// Read each file from the tar
-	for testname, data, err := tt.NextTest(); err != io.EOF; testname, data, err = tt.NextTest() {
-		files += 1
+	for testname, data, trials, err := tt.NextTest(); err != io.EOF; testname, data, trials, err = tt.NextTest() {
+		files++
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -58,8 +58,9 @@ func (tt *Task) ProcessAllTests() error {
 			// files:666 duration:1m47.571825351s
 			// err:stream error: stream ID 801; INTERNAL_ERROR
 			// Because of the break, this error is passed up, and counted at the Task level.
-			log.Printf("filename:%s files:%d duration:%v err:%v",
-				tt.meta["filename"], files, time.Since(tt.meta["parse_time"].(time.Time)), err)
+			log.Printf("filename:%s testname:%s files:%d, trials: %d, duration:%v err:%v",
+				tt.meta["filename"], testname, files, trials,
+				time.Since(tt.meta["parse_time"].(time.Time)), err)
 			break
 		}
 		if data == nil {
