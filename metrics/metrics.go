@@ -21,6 +21,7 @@ func init() {
 	prometheus.MustRegister(WorkerState)
 	prometheus.MustRegister(TaskCount)
 	prometheus.MustRegister(TestCount)
+	prometheus.MustRegister(GCSRetryCount)
 	prometheus.MustRegister(BigQueryInsert)
 	prometheus.MustRegister(DurationHistogram)
 	prometheus.MustRegister(InsertionHistogram)
@@ -88,6 +89,22 @@ var (
 		},
 		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/
 		[]string{"table", "filetype", "status"},
+	)
+
+	// Counts the number of retries on GCS read operations.
+	//
+	// Provides metrics:
+	//   etl_gcs_retry_count{type}
+	// Example usage:
+	// metrics.GCSRetryCount.WithLabelValues(
+	//	TableName(), retries, "ok").Inc()
+	GCSRetryCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_gcs_retry_count",
+			Help: "Number of retries on GCS reads.",
+		},
+		// open/read/zip, num_retries, ok/error/
+		[]string{"phase", "retries", "status"},
 	)
 
 	// Counts the number of into BigQuery insert operations.
