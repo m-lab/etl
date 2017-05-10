@@ -38,7 +38,7 @@ type ETLSource struct {
 
 // Next reads the next test object from the tar file.
 // Returns io.EOF when there are no more tests.
-func (rr *ETLSource) NextTest() (string, []byte, int, error) {
+func (rr *ETLSource) NextTest() (string, []byte, error) {
 	metrics.WorkerState.WithLabelValues("read").Inc()
 	defer metrics.WorkerState.WithLabelValues("read").Dec()
 
@@ -60,11 +60,11 @@ func (rr *ETLSource) NextTest() (string, []byte, int, error) {
 					continue
 				}
 			}
-			return "", nil, trial, err
+			return "", nil, err
 		}
 		if h.Typeflag != tar.TypeReg {
 			// Only process regular files.
-			return h.Name, nil, trial, nil
+			return h.Name, nil, nil
 		}
 
 		// Retrieve the data...
@@ -83,7 +83,7 @@ func (rr *ETLSource) NextTest() (string, []byte, int, error) {
 					continue
 				}
 				// No more retries, so return error.
-				return h.Name, nil, trial, err
+				return h.Name, nil, err
 			}
 			defer zipReader.Close()
 			phase = "read zip"
@@ -108,10 +108,10 @@ func (rr *ETLSource) NextTest() (string, []byte, int, error) {
 				continue
 			}
 			// No more retries, so return error.
-			return h.Name, nil, trial, err
+			return h.Name, nil, err
 		}
 
-		return h.Name, data, trial, nil
+		return h.Name, data, nil
 	}
 }
 

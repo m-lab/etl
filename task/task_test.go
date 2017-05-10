@@ -79,7 +79,7 @@ func TestTarFileInput(t *testing.T) {
 	var prsr TestParser
 	in := bq.NullInserter{}
 	tt := task.NewTask("filename", rdr, &prsr, &in)
-	fn, bb, _, err := tt.NextTest()
+	fn, bb, err := tt.NextTest()
 	if err != nil {
 		t.Error(err)
 	}
@@ -90,7 +90,7 @@ func TestTarFileInput(t *testing.T) {
 		t.Error("Expected biscuits but got ", string(bb))
 	}
 
-	fn, bb, _, err = tt.NextTest()
+	fn, bb, err = tt.NextTest()
 	if err != nil {
 		t.Error(err)
 	}
