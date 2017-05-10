@@ -47,28 +47,35 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 	// TODO - keep track of elapsed time instead of trials ??
 	trial := 0
 	delay := 5 * time.Millisecond
-	phase := "Next"
 	for {
 		trial++
 		// For each trial, increase backoff delay by 2x.
 		delay *= 2
 
+		phase := "next"
 		h, err := rr.Next()
 		if err != nil {
 			if err != io.EOF {
 				if strings.Contains(err.Error(), "unexpected EOF") {
 					metrics.GCSRetryCount.WithLabelValues(
 						phase, strconv.Itoa(trial), "unexpected EOF").Inc()
+					// TODO: These are likely unrecoverable, so we should
+					// just return.
 				} else {
+					// Quite a few of these now, and they seem to be
+					// unrecoverable.
 					metrics.GCSRetryCount.WithLabelValues(
 						phase, strconv.Itoa(trial), "other").Inc()
 				}
+				log.Printf("Next: %v\n", err)
+
 				// Recoverable error, so maybe retry.
 				if trial < 10 {
 					time.Sleep(delay)
 					continue
 				}
 			}
+			log.Printf("10 errors in call to Next: %v\n", err)
 			return "", nil, err
 		}
 		if h.Typeflag != tar.TypeReg {
