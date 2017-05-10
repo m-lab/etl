@@ -36,6 +36,71 @@ type ETLSource struct {
 	io.Closer
 }
 
+// Retrieve next file header.
+// Lots of error handling because of common faults in underlying GCS.
+func (rr *ETLSource) nextHeader(trial int) (*tar.Header, bool, error) {
+	h, err := rr.Next()
+	if err != nil {
+		if err == io.EOF {
+			return nil, false, err
+		} else if strings.Contains(err.Error(), "unexpected EOF") {
+			metrics.GCSRetryCount.WithLabelValues(
+				"next", strconv.Itoa(trial), "unexpected EOF").Inc()
+			// TODO: These are likely unrecoverable, so we should
+			// just return.
+		} else {
+			// Quite a few of these now, and they seem to be
+			// unrecoverable.
+			metrics.GCSRetryCount.WithLabelValues(
+				"next", strconv.Itoa(trial), "other").Inc()
+		}
+		log.Printf("Next: %v\n", err)
+	}
+	return h, true, err
+}
+
+// Retrieve the data for a single file.
+// Lots of error handling because of common faults in underlying GCS.
+// Returns data in byte array, error and boolean regarding whether to retry.
+func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
+	var data []byte
+	var err error
+	var phase string
+	if strings.HasSuffix(strings.ToLower(h.Name), "gz") {
+		// TODO add unit test
+		var zipReader *gzip.Reader
+		zipReader, err = gzip.NewReader(rr)
+		if err != nil {
+			metrics.GCSRetryCount.WithLabelValues(
+				"open zip", strconv.Itoa(trial), "zipReaderError").Inc()
+			log.Printf("zipReaderError: %v in file %s\n", err, h.Name)
+
+			return nil, true, err
+		}
+		defer zipReader.Close()
+		phase = "read zip"
+		data, err = ioutil.ReadAll(zipReader)
+	} else {
+		phase = "read"
+		data, err = ioutil.ReadAll(rr)
+	}
+	if err != nil {
+		if strings.Contains(err.Error(), "stream error") {
+			// We are seeing these very rarely, maybe 1 per hour.
+			// They are non-deterministic, so probably related to GCS problems.
+			metrics.GCSRetryCount.WithLabelValues(
+				phase, strconv.Itoa(trial), "stream error").Inc()
+		} else {
+			// We haven't seen any of these so far (as of May 9)
+			metrics.GCSRetryCount.WithLabelValues(
+				phase, strconv.Itoa(trial), "other error").Inc()
+		}
+		return nil, true, err
+	}
+
+	return data, false, nil
+}
+
 // Next reads the next test object from the tar file.
 // Returns io.EOF when there are no more tests.
 func (rr *ETLSource) NextTest() (string, []byte, error) {
@@ -45,92 +110,49 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 	// Try to get the next file.  We retry multiple times, because sometimes
 	// GCS stalls and produces stream errors.
 	// TODO - keep track of elapsed time instead of trials ??
+	var err error
+	var data []byte
+	var h *tar.Header
+
 	trial := 0
 	delay := 5 * time.Millisecond
 	for {
 		trial++
-		// For each trial, increase backoff delay by 2x.
-		delay *= 2
-
-		phase := "next"
-		h, err := rr.Next()
-		if err != nil {
-			if err != io.EOF {
-				if strings.Contains(err.Error(), "unexpected EOF") {
-					metrics.GCSRetryCount.WithLabelValues(
-						phase, strconv.Itoa(trial), "unexpected EOF").Inc()
-					// TODO: These are likely unrecoverable, so we should
-					// just return.
-				} else {
-					// Quite a few of these now, and they seem to be
-					// unrecoverable.
-					metrics.GCSRetryCount.WithLabelValues(
-						phase, strconv.Itoa(trial), "other").Inc()
-				}
-				log.Printf("Next: %v\n", err)
-
-				// Recoverable error, so maybe retry.
-				if trial < 10 {
-					time.Sleep(delay)
-					continue
-				}
-			}
-			log.Printf("10 errors in call to Next: %v\n", err)
+		var retry bool
+		h, retry, err = rr.nextHeader(trial)
+		if err == nil {
+			break
+		}
+		if !retry || trial > 10 {
 			return "", nil, err
 		}
-		if h.Typeflag != tar.TypeReg {
-			// Only process regular files.
-			return h.Name, nil, nil
-		}
-
-		// Retrieve the data...
-		var data []byte
-		if strings.HasSuffix(strings.ToLower(h.Name), "gz") {
-			phase = "open zip"
-			// TODO add unit test
-			zipReader, err := gzip.NewReader(rr)
-			if err != nil {
-				metrics.GCSRetryCount.WithLabelValues(
-					phase, strconv.Itoa(trial), "zipReaderError").Inc()
-				log.Printf("zipReaderError: %v in file %s\n", err, h.Name)
-
-				// Recoverable error, so maybe retry.
-				if trial < 10 {
-					time.Sleep(delay)
-					continue
-				}
-				// No more retries, so return error.
-				return h.Name, nil, err
-			}
-			defer zipReader.Close()
-			phase = "read zip"
-			data, err = ioutil.ReadAll(zipReader)
-		} else {
-			phase = "read"
-			data, err = ioutil.ReadAll(rr)
-		}
-		if err != nil {
-			if strings.Contains(err.Error(), "stream error") {
-				// We are seeing these very rarely, maybe 1 per hour.
-				// They are non-deterministic, so probably related to GCS problems.
-				metrics.GCSRetryCount.WithLabelValues(
-					phase, strconv.Itoa(trial), "stream error").Inc()
-			} else {
-				// We haven't seen any of these so far (as of May 9)
-				metrics.GCSRetryCount.WithLabelValues(
-					phase, strconv.Itoa(trial), "other error").Inc()
-			}
-			// Recoverable error, so maybe allow retry.
-			if trial < 10 {
-				time.Sleep(delay)
-				continue
-			}
-			// No more retries, so return error.
-			return h.Name, nil, err
-		}
-
-		return h.Name, data, nil
+		// For each trial, increase backoff delay by 2x.
+		delay *= 2
+		time.Sleep(delay)
 	}
+
+	// Only process regular files.
+	if h.Typeflag == tar.TypeReg {
+		trial = 0
+		delay = 5 * time.Millisecond
+		for {
+			trial++
+			var retry bool
+			data, retry, err = rr.nextData(h, trial)
+			if err == nil {
+				break
+			}
+			if !retry || trial > 10 {
+				break
+			}
+			// For each trial, increase backoff delay by 2x.
+			delay *= 2
+			time.Sleep(delay)
+
+		}
+	}
+
+	return h.Name, data, nil
 }
 
 // Compound closer, for use with gzip files.
