@@ -46,17 +46,26 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 	// GCS stalls and produces stream errors.
 	// TODO - keep track of elapsed time instead of trials ??
 	trial := 0
+	delay := 5 * time.Millisecond
 	phase := "Next"
 	for {
 		trial++
+		// For each trial, increase backoff delay by 2x.
+		delay *= 2
 
 		h, err := rr.Next()
 		if err != nil {
 			if err != io.EOF {
-				metrics.GCSRetryCount.WithLabelValues(
-					phase, strconv.Itoa(trial), "NextTest.error").Inc()
+				if strings.Contains(err.Error(), "unexpected EOF") {
+					metrics.GCSRetryCount.WithLabelValues(
+						phase, strconv.Itoa(trial), "unexpected EOF").Inc()
+				} else {
+					metrics.GCSRetryCount.WithLabelValues(
+						phase, strconv.Itoa(trial), "other").Inc()
+				}
 				// Recoverable error, so maybe retry.
 				if trial < 10 {
+					time.Sleep(delay)
 					continue
 				}
 			}
@@ -80,6 +89,7 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 
 				// Recoverable error, so maybe retry.
 				if trial < 10 {
+					time.Sleep(delay)
 					continue
 				}
 				// No more retries, so return error.
@@ -105,6 +115,7 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 			}
 			// Recoverable error, so maybe allow retry.
 			if trial < 10 {
+				time.Sleep(delay)
 				continue
 			}
 			// No more retries, so return error.
@@ -167,6 +178,7 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	if strings.HasSuffix(strings.ToLower(fn), "gz") {
 		// TODO add unit test
 		// NB: This must not be :=, or it creates local rdr.
+		// TODO - add retries with backoff.
 		rdr, err = gzip.NewReader(obj.Body)
 		if err != nil {
 			obj.Body.Close()

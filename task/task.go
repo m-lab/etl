@@ -61,6 +61,9 @@ func (tt *Task) ProcessAllTests() error {
 			log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
 				tt.meta["filename"], testname, files,
 				time.Since(tt.meta["parse_time"].(time.Time)), err)
+
+			metrics.TestCount.WithLabelValues(
+				tt.Inserter.TableName(), "unknown", "NextTest").Inc()
 			break
 		}
 		if data == nil {
