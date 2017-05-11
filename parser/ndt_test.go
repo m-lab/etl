@@ -54,22 +54,32 @@ func TestValidation(t *testing.T) {
 
 func TestNDTParser(t *testing.T) {
 	// Load test data.
-	rawData, err := ioutil.ReadFile("testdata/c2s_snaplog")
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
 	ins := &inMemoryInserter{}
 	parser.TmpDir = "./"
 	n := parser.NewNDTParser(ins)
-	name := `20170509T00:15:13.652804000Z_eb.measurementlab.net:56700.c2s_snaplog`
 
-	meta := map[string]bigquery.Value{"filename": "tarfile.tgz"}
-	err = n.ParseAndInsert(meta, name, rawData)
+	s2cName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:44160.s2c_snaplog`
+	s2cData, err := ioutil.ReadFile(`testdata/` + s2cName)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
+	meta := map[string]bigquery.Value{"filename": "tarfile.tgz"}
+	err = n.ParseAndInsert(meta, s2cName, s2cData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if ins.RowsInBuffer() != 0 {
+		t.Fatalf("Data processed prematurely.")
+	}
+
+	metaName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:53000.meta`
+	metaData, err := ioutil.ReadFile(`testdata/` + metaName)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	err = n.ParseAndInsert(meta, metaName, metaData)
 	if ins.RowsInBuffer() != 1 {
 		t.Fatalf("Failed to insert snaplog data.")
 	}
@@ -83,13 +93,27 @@ func TestNDTParser(t *testing.T) {
 				"RemAddress": "45.56.98.222",
 			},
 			"connection_spec": map[string]bigquery.Value{
-				"local_port": int64(43685),
+				"local_port": int64(40105),
 			},
 		},
 	}
 	if !compare(t, actualValues, expectedValues) {
 		t.Errorf("Missing expected values:")
 		t.Errorf(pretty.Sprint(expectedValues))
+	}
+
+	c2sName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:48716.c2s_snaplog`
+	c2sData, err := ioutil.ReadFile(`testdata/` + c2sName)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	err = n.ParseAndInsert(meta, c2sName, c2sData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if ins.RowsInBuffer() != 2 {
+		t.Fatalf("Failed to insert snaplog data.")
 	}
 }
 
