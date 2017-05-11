@@ -13,6 +13,45 @@ import (
 	"cloud.google.com/go/bigquery"
 )
 
+// A handful of file names from a single ndt tar file.
+var testFileNames []string = []string{
+	`20170509T00:05:13.863119000Z_45.56.98.222.c2s_ndttrace`,
+	`20170509T00:05:13.863119000Z_45.56.98.222.s2c_ndttrace`,
+	`20170509T00:05:13.863119000Z_eb.measurementlab.net:40074.s2c_snaplog`,
+	`20170509T00:05:13.863119000Z_eb.measurementlab.net:43628.c2s_snaplog`,
+	`20170509T00:05:13.863119000Z_eb.measurementlab.net:56986.cputime`,
+	`20170509T00:05:13.863119000Z_eb.measurementlab.net:56986.meta`,
+	`20170509T00:14:43.498114000Z_77.95.64.13.c2s_ndttrace`,
+	`20170509T00:14:43.498114000Z_77.95.64.13.s2c_ndttrace`,
+	`20170509T00:14:43.498114000Z_vm-jcanat-measures.rezopole.net:37625.c2s_snaplog`,
+	`20170509T00:14:43.498114000Z_vm-jcanat-measures.rezopole.net:43519.s2c_snaplog`,
+	`20170509T00:14:43.498114000Z_vm-jcanat-measures.rezopole.net:55712.cputime`,
+	`20170509T00:14:43.498114000Z_vm-jcanat-measures.rezopole.net:55712.meta`,
+	`20170509T00:15:13.652804000Z_45.56.98.222.c2s_ndttrace`,
+	`20170509T00:15:13.652804000Z_45.56.98.222.s2c_ndttrace`,
+	`20170509T00:15:13.652804000Z_eb.measurementlab.net:54794.s2c_snaplog`,
+	`20170509T00:15:13.652804000Z_eb.measurementlab.net:55544.cputime`,
+	`20170509T00:15:13.652804000Z_eb.measurementlab.net:55544.meta`,
+	`20170509T00:15:13.652804000Z_eb.measurementlab.net:56700.c2s_snaplog`,
+	`20170509T00:25:13.399280000Z_45.56.98.222.c2s_ndttrace`,
+	`20170509T00:25:13.399280000Z_45.56.98.222.s2c_ndttrace`,
+	`20170509T00:25:13.399280000Z_eb.measurementlab.net:51680.cputime`,
+	`20170509T00:25:13.399280000Z_eb.measurementlab.net:51680.meta`,
+	`20170509T00:25:13.399280000Z_eb.measurementlab.net:53254.s2c_snaplog`,
+	`20170509T00:25:13.399280000Z_eb.measurementlab.net:57528.c2s_snaplog`,
+	`20170509T00:35:13.681547000Z_45.56.98.222.c2s_ndttrace`,
+	`20170509T00:35:13.681547000Z_45.56.98.222.s2c_ndttrace`,
+	`20170509T00:35:13.681547000Z_eb.measurementlab.net:38296.s2c_snaplog`}
+
+func TestValidation(t *testing.T) {
+	for _, test := range testFileNames {
+		_, err := parser.ParseNDTFileName(test)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+}
+
 func TestNDTParser(t *testing.T) {
 	// Load test data.
 	rawData, err := ioutil.ReadFile("testdata/c2s_snaplog")
@@ -23,7 +62,10 @@ func TestNDTParser(t *testing.T) {
 	ins := &inMemoryInserter{}
 	parser.TmpDir = "./"
 	n := parser.NewNDTParser(ins)
-	err = n.ParseAndInsert(nil, "filename.c2s_snaplog", rawData)
+	name := `20170509T00:15:13.652804000Z_eb.measurementlab.net:56700.c2s_snaplog`
+
+	meta := map[string]bigquery.Value{"filename": "tarfile.tgz"}
+	err = n.ParseAndInsert(meta, name, rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -61,12 +103,14 @@ func compare(t *testing.T, actual map[string]bigquery.Value, expected map[string
 			match = match && compare(t, actual[key].(map[string]bigquery.Value), v)
 		case string:
 			if actual[key].(string) != v {
-				t.Logf("Wrong strings for key %q: got %q; want %q", key, v, actual[key].(string))
+				t.Logf("Wrong strings for key %q: got %q; want %q",
+					key, v, actual[key].(string))
 				match = false
 			}
 		case int64:
 			if actual[key].(int64) != v {
-				t.Logf("Wrong ints for key %q: got %d; want %d", key, v, actual[key].(int64))
+				t.Logf("Wrong ints for key %q: got %d; want %d",
+					key, v, actual[key].(int64))
 				match = false
 			}
 		default:
