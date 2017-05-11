@@ -53,7 +53,6 @@ func NewWeb100FullRecord(version string, logTime int64, connSpec, snapValues map
 			"connection_spec": connSpec,
 			"snap":            snapValues,
 		},
-		// TODO(dev): add paris_traceroute_hop records here or separately?
 	}
 }
 

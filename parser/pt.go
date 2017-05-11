@@ -14,7 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/schema"
 )
 
 type PTFileName struct {
@@ -43,33 +45,6 @@ func (f *PTFileName) GetDate() (string, bool) {
 	return "", false
 }
 
-// MLabSnapshot in legacy code
-type PT struct {
-	test_id              string
-	project              int // 3 for PARIS_TRACEROUTE
-	log_time             int64
-	connection_spec      MLabConnectionSpecification
-	paris_traceroute_hop []ParisTracerouteHop
-}
-
-// TODO(prod) Move this to parser/common.go
-type MLabConnectionSpecification struct {
-	server_ip      string
-	server_af      int
-	client_ip      string
-	client_af      int
-	data_direction int // 0 for SERVER_TO_CLIENT
-}
-
-// Save implements the ValueSaver interface.
-func (i *PT) Save() (map[string]bigquery.Value, string, error) {
-	return map[string]bigquery.Value{
-		"test_id":  i.test_id,
-		"project":  i.project,
-		"log_time": i.log_time,
-	}, "", nil
-}
-
 type PTParser struct {
 	inserter etl.Inserter
 	tmpDir   string
@@ -92,40 +67,13 @@ type Node struct {
 const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 
-type ParisTracerouteHop struct {
-	protocol         string
-	src_ip           string
-	src_af           int32
-	dest_ip          string
-	dest_af          int32
-	src_hostname     string
-	des_hostname     string
-	rtt              []float64
-	src_geolocation  GeolocationIP
-	dest_geolocation GeolocationIP
-}
-
-type GeolocationIP struct {
-	continent_code string
-	country_code   string
-	country_code3  string
-	country_name   string
-	region         string
-	metro_code     int64
-	city           string
-	area_code      int64
-	postal_code    string
-	latitude       float64
-	longitude      float64
-}
-
 func NewPTParser(ins etl.Inserter) *PTParser {
 	return &PTParser{ins, "/mnt/tmpfs"}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
-func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []ParisTracerouteHop {
-	var results []ParisTracerouteHop
+func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []schema.ParisTracerouteHop {
+	var results []schema.ParisTracerouteHop
 	if len(all_nodes) == 0 {
 		return nil
 	}
@@ -134,27 +82,27 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []ParisTracer
 	for i := len(all_nodes) - 1; i >= 0; i-- {
 		parent := all_nodes[i].parent
 		if parent == nil {
-			one_hop := &ParisTracerouteHop{
-				protocol:     protocol,
-				dest_ip:      all_nodes[i].ip,
-				des_hostname: all_nodes[i].hostname,
-				rtt:          all_nodes[i].rtts,
-				src_ip:       server_IP,
-				src_af:       IPv4_AF,
-				dest_af:      IPv4_AF,
+			one_hop := &schema.ParisTracerouteHop{
+				Protocol:     protocol,
+				Dest_ip:      all_nodes[i].ip,
+				Des_hostname: all_nodes[i].hostname,
+				Rtt:          all_nodes[i].rtts,
+				Src_ip:       server_IP,
+				Src_af:       IPv4_AF,
+				Dest_af:      IPv4_AF,
 			}
 			results = append(results, *one_hop)
 			break
 		} else {
-			one_hop := &ParisTracerouteHop{
-				protocol:     protocol,
-				dest_ip:      all_nodes[i].ip,
-				des_hostname: all_nodes[i].hostname,
-				rtt:          all_nodes[i].rtts,
-				src_ip:       parent.ip,
-				src_hostname: parent.hostname,
-				src_af:       IPv4_AF,
-				dest_af:      IPv4_AF,
+			one_hop := &schema.ParisTracerouteHop{
+				Protocol:     protocol,
+				Dest_ip:      all_nodes[i].ip,
+				Des_hostname: all_nodes[i].hostname,
+				Rtt:          all_nodes[i].rtts,
+				Src_ip:       parent.ip,
+				Src_hostname: parent.hostname,
+				Src_af:       IPv4_AF,
+				Dest_af:      IPv4_AF,
 			}
 			results = append(results, *one_hop)
 		}
@@ -215,13 +163,27 @@ func GetLogtime(filename PTFileName) int64 {
 	return t.Unix()
 }
 
+func (pt *PTParser) TableName() string {
+	return pt.inserter.TableName()
+}
+
+func DedupValues(r map[string]bigquery.Value) map[string]bigquery.Value {
+	// TODO(dev): remove the dup in the PT Hops.
+	return r
+}
+
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	hops, err := Parse(meta, testName, rawContent)
+	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent)
 	if err != nil {
 		return err
 	}
-	fmt.Println(len(hops))
-	// TODO: Insert hops into BigQuery table.
+
+	for _, hop := range hops {
+		err := pt.inserter.InsertRow(&bq.MapSaver{DedupValues(schema.NewPTFullRecord(testName, logTime, (*conn_spec).Save(), hop.Save()))})
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -334,22 +296,26 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 }
 
 // Parse the raw test file into hops ParisTracerouteHop.
-func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]ParisTracerouteHop, error) {
+func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
 	file, err := os.Open(testName)
 	if err != nil {
-		return nil, err
+		return nil, 0, nil, err
 	}
 	defer file.Close()
 
 	// Get the logtime
 	fn := PTFileName{name: filepath.Base(testName)}
-
 	dest_IP, _, server_IP, _ := fn.GetIPTuple()
-	fmt.Println(dest_IP)
-	fmt.Println(server_IP)
-
 	t := GetLogtime(fn)
-	fmt.Println(t)
+
+	conn_spec := &schema.MLabConnectionSpecification{
+		Server_ip:      server_IP,
+		Server_af:      IPv4_AF,
+		Client_ip:      dest_IP,
+		Client_af:      IPv4_AF,
+		Data_direction: 0,
+	}
+
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
 	is_first_line := true
@@ -383,7 +349,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 			// The following parts are grouped into tuples, each with 4 parts:
 			for i := 3; i < len(parts); i += 4 {
 				if len(parts) < i+4 {
-					return nil, errors.New("incompleted hop data.")
+					return nil, 0, nil, errors.New("incompleted hop data.")
 				}
 				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
 				ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
@@ -393,9 +359,10 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 	} // Done with a test file
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, 0, nil, err
 	}
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol)
-	return PT_hops, nil
+
+	return PT_hops, t, conn_spec, nil
 }
