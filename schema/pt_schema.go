@@ -104,10 +104,10 @@ func (s PTValueMap) SetString(name string, value string) {
 func NewPTFullRecord(test_id string, logTime int64, connect_spec, hop map[string]bigquery.Value) map[string]bigquery.Value {
 	return map[string]bigquery.Value{
 		"test_id":              test_id,
-		"project":              3,
+		"project":              int32(3),
 		"log_time":             logTime,
 		"connection_spec":      connect_spec,
-		"type":                 2,
+		"type":                 int32(2),
 		"paris_traceroute_hop": hop,
 	}
 }

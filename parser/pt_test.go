@@ -116,7 +116,7 @@ func TestPTInserter(t *testing.T) {
 			"data_direction": int32(0),
 			"server_ip":      "64.86.132.75",
 		},
-		"type": int(2),
+		"type": int32(2),
 		"paris_traceroute_hop": map[string]bigquery.Value{
 			"dest_ip":      "74.125.224.100",
 			"dest_af":      int32(2),
@@ -128,7 +128,7 @@ func TestPTInserter(t *testing.T) {
 			"src_ip":       "64.233.174.109",
 		},
 		"test_id":  "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris",
-		"project":  int(3),
+		"project":  int32(3),
 		"log_time": int64(1490053990),
 	}
 	if !compare(t, actualValues, expectedValues) {
