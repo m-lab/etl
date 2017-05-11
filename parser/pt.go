@@ -172,14 +172,22 @@ func DedupValues(r map[string]bigquery.Value) map[string]bigquery.Value {
 	return r
 }
 
+func CreateTestId(fn string) string {
+	base_name := filepath.Base(fn)
+	// base_name is in format like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+	// test_id is in format like 2017/05/01/mlab1.lga06/20170501T23:58:07Z-72.228.158.51-40835-128.177.119.209-8080.paris.gz
+	// TODO: get site info and add to test_id.
+	return base_name
+}
+
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent)
 	if err != nil {
 		return err
 	}
-
+	test_id := CreateTestId(testName)
 	for _, hop := range hops {
-		err := pt.inserter.InsertRow(&bq.MapSaver{DedupValues(schema.NewPTFullRecord(testName, logTime, (*conn_spec).Save(), hop.Save()))})
+		err := pt.inserter.InsertRow(&bq.MapSaver{DedupValues(schema.NewPTFullRecord(test_id, logTime, (*conn_spec).Save(), hop.Save()))})
 		if err != nil {
 			return err
 		}
