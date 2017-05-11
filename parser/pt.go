@@ -152,7 +152,6 @@ func GetLogtime(filename PTFileName) int64 {
 	date, _ := filename.GetDate()
 	// data is in format like "20170320T23:53:10Z"
 	revised_date := date[0:4] + "-" + date[4:6] + "-" + date[6:18]
-	fmt.Println(revised_date)
 
 	t, err := time.Parse(time.RFC3339, revised_date)
 	if err != nil {
