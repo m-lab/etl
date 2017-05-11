@@ -2,11 +2,12 @@ package parser
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
+	"regexp"
 
 	"cloud.google.com/go/bigquery"
 
@@ -21,6 +22,49 @@ var (
 	TmpDir = "/mnt/tmpfs"
 )
 
+//=========================================================================
+// Test name parsing related stuff.
+//=========================================================================
+
+const dateTime = `^(?P<date>\d{8})T(?P<time>[012]\d:[0-5]\d:\d{2}\.\d{9})Z_`
+const address = `(?P<address>.*)`
+const suffix = `\.(?P<suffix>[a-z2].*)$`
+
+var (
+	// Pattern for any valid test file name
+	testFilePattern = regexp.MustCompile(dateTime + address + suffix)
+
+	startPattern = regexp.MustCompile(dateTime)
+	endPattern   = regexp.MustCompile(suffix)
+)
+
+// testInfo contains all the fields from a valid NDT test file name.
+type testInfo struct {
+	Date    string // The date field from the test file name
+	Time    string // The time field
+	Address string // The remote address field
+	Suffix  string // The filename suffix
+}
+
+func parseNDTFileName(path string) (*testInfo, error) {
+	fields := testFilePattern.FindStringSubmatch(path)
+
+	if fields == nil {
+		if !startPattern.MatchString(path) {
+			return nil, errors.New("Path should begin with yyyymmddThh:mm:ss...Z:" + path)
+		}
+		if !endPattern.MatchString(path) {
+			return nil, errors.New("Path should end in \\.[a-z2].*: " + path)
+		}
+		return nil, errors.New("Invalid test path: " + path)
+	}
+	return &testInfo{fields[1], fields[2], fields[3], fields[4]}, nil
+}
+
+//=========================================================================
+// NDTParser stuff.
+//=========================================================================
+
 type NDTParser struct {
 	inserter etl.Inserter
 	// TODO(prod): eliminate need for tmpfs.
@@ -28,30 +72,45 @@ type NDTParser struct {
 }
 
 func NewNDTParser(ins etl.Inserter) *NDTParser {
-	return &NDTParser{ins, TmpDir}
+	return &NDTParser{inserter: ins, tmpDir: TmpDir}
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
+// Writes rawSnapLog to /mnt/tmpfs.
 // TODO(dev) This is getting big and ugly and needs to be refactored.
 // TODO(prod): do not write to a temporary file; operate on byte array directly.
-// Write rawSnapLog to /mnt/tmpfs.
-func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawSnapLog []byte) error {
-	var testType string
-	if strings.HasSuffix(testName, "c2s_snaplog") {
-		testType = "c2s"
-	} else if strings.HasSuffix(testName, "s2c_snaplog") {
-		testType = "s2c"
-	} else {
-		if strings.HasSuffix(testName, "meta") {
-			testType = "meta"
-		} else {
-			testType = "other"
-		}
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "ignore").Inc()
-		return nil
+func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, content []byte) error {
+	// TODO: We need to collect the c2s, s2c, and meta files, and then process them
+	// together.  If we detect another prefix before getting all three, we should
+	// process the subset that we have.
+
+	info, err := parseNDTFileName(testName)
+	if err != nil {
+		return err
 	}
 
+	var testType string
+	switch info.Suffix {
+	case "c2s_snaplog":
+		testType = "c2s"
+	case "s2c_snaplog":
+		testType = "s2c"
+	case "meta":
+		testType = "meta"
+	case "c2s_ndttrace":
+	case "s2c_ndttrace":
+	case "cputime":
+		return nil
+	default:
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), "unknown", info.Suffix).Inc()
+		return errors.New("Unknown test suffix: " + info.Suffix)
+	}
+
+	return n.processTest(meta, testName, testType, content)
+}
+
+func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string, testType string, rawSnapLog []byte) error {
 	// NOTE: this file size threshold and the number of simultaneous workers
 	// defined in etl_worker.go must guarantee that all files written to
 	// /mnt/tmpfs will fit.
@@ -98,7 +157,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), testType, "web100.Asset").Inc()
 		log.Printf("web100.Asset error: %s processing %s from %s\n",
-			err, testName, meta["filename"])
+			err, testName, meta["filename"].(string))
 		return nil
 	}
 	b := bytes.NewBuffer(data)
@@ -155,14 +214,25 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	defer w.Close()
 
-	// Find the last web100 snapshot.
+	// Seek to either last snapshot, or snapshot 2100 if there are more than that.
+	if !seek(w, n.TableName(), meta["filename"].(string), testName, testType) {
+		// TODO - is there a previous snapshot we can use???
+		return nil
+	}
+
+	return n.getAndInsertValues(w, meta["filename"].(string), testName, testType)
+}
+
+// Find the "last" web100 snapshot.
+// Returns true if valid snapshot found.
+func seek(w *web100.Web100, tableName string, tarFileName string, testName string, testType string) bool {
 	metrics.WorkerState.WithLabelValues("seek").Inc()
 	defer metrics.WorkerState.WithLabelValues("seek").Dec()
 	// Limit to parsing only up to 2100 snapshots.
 	// NOTE: This is different from legacy pipeline!!
 	badRecords := 0
 	for count := 0; count < 2100; count++ {
-		err = w.Next()
+		err := w.Next()
 		if err != nil {
 			if err == io.EOF {
 				// We expect EOF.
@@ -177,20 +247,21 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				// TODO - Use separate counter, since this is not unique across
 				// the test.
 				metrics.TestCount.WithLabelValues(
-					n.TableName(), testType, "w.Next").Inc()
+					tableName, testType, "w.Next").Inc()
 				log.Printf("w.Next error: %s processing snap %d from %s from %s\n",
-					err, count, testName, meta["filename"])
+					err, count, testName, tarFileName)
 				// This could either be a bad record, or EOF.
 				badRecords++
 				if badRecords > 10 {
 					// TODO - Use separate counter, since this is not unique across
 					// the test.
 					metrics.TestCount.WithLabelValues(
-						n.TableName(), testType, "badRecords").Inc()
+						tableName, testType, "badRecords").Inc()
 					// TODO - don't see this in the logs on 5/4.  Not sure why.
 					log.Printf("w.Next 10 bad processing snapshots from %s from %s\n",
-						testName, meta["filename"])
-					return nil
+						testName, tarFileName)
+					// TODO - is there a previous snapshot we can use???
+					return false
 				}
 				continue
 			}
@@ -204,25 +275,29 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				// TODO - Use separate counter, since this is not unique across
 				// the test.
 				metrics.TestCount.WithLabelValues(
-					n.TableName(), testType, "w.Values").Inc()
+					tableName, testType, "w.Values").Inc()
 			}
 		}
 	}
+	return true
+}
 
+func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, testName string, testType string) error {
 	// Extract the values from the last snapshot.
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 
 	snapValues := schema.Web100ValueMap{}
-	err = w.SnapshotValues(snapValues)
+	err := w.SnapshotValues(snapValues)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), testType, "values-err").Inc()
-		log.Printf("Error calling web100 Values(): %s, (%s), when processing: %s\n%s\n",
-			tmpFile.Name(), testName, meta["filename"], err)
+		log.Printf("Error calling web100 Values() in test %s, when processing: %s\n%s\n",
+			testName, tarFileName, err)
 		return nil
 	}
 
+	// TODO(prod) Write a row with this data, even if the snapshot parsing fails?
 	connSpec := schema.Web100ValueMap{}
 	w.ConnectionSpec(connSpec)
 
