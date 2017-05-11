@@ -46,7 +46,7 @@ type testInfo struct {
 	Suffix  string // The filename suffix
 }
 
-func parseNDTFileName(path string) (*testInfo, error) {
+func ParseNDTFileName(path string) (*testInfo, error) {
 	fields := testFilePattern.FindStringSubmatch(path)
 
 	if fields == nil {
@@ -84,7 +84,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// together.  If we detect another prefix before getting all three, we should
 	// process the subset that we have.
 
-	info, err := parseNDTFileName(testName)
+	info, err := ParseNDTFileName(testName)
 	if err != nil {
 		return err
 	}
