@@ -69,6 +69,19 @@ func compare(t *testing.T, actual map[string]bigquery.Value, expected map[string
 				t.Logf("Wrong ints for key %q: got %d; want %d", key, v, actual[key].(int64))
 				match = false
 			}
+		case int32:
+			if actual[key].(int32) != v {
+				t.Logf("Wrong ints for key %q: got %d; want %d", key, v, actual[key].(int32))
+				match = false
+			}
+		case []float64:
+			fmt.Println(v)
+			/*for index, num := range actual[key] {
+				if v[key][index] != num {
+					t.Logf("Wrong float64 for key %q: got %d; want %d", key, v, actual[key][index].(int64))
+					match = false
+				}
+			}*/
 		default:
 			fmt.Printf("Unsupported type. %T\n", v)
 			panic(nil)

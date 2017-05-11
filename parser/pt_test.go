@@ -1,4 +1,4 @@
-package parser
+package parser_test
 
 import (
 	"fmt"
@@ -6,12 +6,17 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
+
+	"cloud.google.com/go/bigquery"
+	"github.com/kr/pretty"
 )
 
 // TODO: IPv6 tests
 func TestGetIPTuple(t *testing.T) {
-	fn1 := PTFileName{name: "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris"}
+	fn1 := parser.PTFileName{Name: "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris"}
 	dest_ip, dest_port, server_ip, server_port := fn1.GetIPTuple()
 	if dest_ip != "98.162.212.214" || dest_port != "53849" || server_ip != "64.86.132.75" || server_port != "42677" {
 		t.Errorf("Wrong file name parsing!\n")
@@ -22,7 +27,7 @@ func TestGetIPTuple(t *testing.T) {
 
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
-	hops, logTime, conn_spec, err := Parse(nil, "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris", rawData)
+	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -84,5 +89,51 @@ func TestPTParser(t *testing.T) {
 			fmt.Printf("Here is what is real: %v\n", hops[i])
 			t.Fatalf("Wrong results for PT hops!")
 		}
+	}
+}
+
+func TestPTInserter(t *testing.T) {
+	ins := &inMemoryInserter{}
+	parser.TmpDir = "./"
+	n := parser.NewPTParser(ins)
+	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
+	if err != nil {
+		t.Fatalf("cannot read testdata.")
+	}
+	err = n.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris", rawData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if ins.RowsInBuffer() != 38 {
+		t.Fatalf("Number of rows in PT table is wrong.")
+	}
+	actualValues := ins.data[0].(*bq.MapSaver).Values
+	expectedValues := map[string]bigquery.Value{
+		"connection_spec": map[string]bigquery.Value{
+			"server_af":      int32(2),
+			"client_ip":      "98.162.212.214",
+			"client_af":      int32(2),
+			"data_direction": int32(0),
+			"server_ip":      "64.86.132.75",
+		},
+		"type": int32(2),
+		"paris_traceroute_hop": map[string]bigquery.Value{
+			"dest_ip":      "74.125.224.100",
+			"dest_af":      int32(2),
+			"des_hostname": "74.125.224.100",
+			"protocol":     "tcp",
+			"src_af":       int32(2),
+			"src_hostname": "sr05-te1-8.nuq04.net.google.com",
+			"rtt":          []float64{0.895},
+			"src_ip":       "64.233.174.109",
+		},
+		"test_id":  "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris",
+		"project":  int32(3),
+		"log_time": int64(1490053990),
+	}
+	fmt.Println(pretty.Sprint(actualValues))
+	if !compare(t, actualValues, expectedValues) {
+		t.Errorf("Missing expected values:")
+		t.Errorf(pretty.Sprint(expectedValues))
 	}
 }

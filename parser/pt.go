@@ -20,14 +20,14 @@ import (
 )
 
 type PTFileName struct {
-	name string
+	Name string
 }
 
 // GetLocalIP parse the filename and return IP.
 // TODO(dev): use regex parser.
 func (f *PTFileName) GetIPTuple() (string, string, string, string) {
-	firstIPStart := strings.IndexByte(f.name, '-')
-	first_segment := f.name[firstIPStart+1 : len(f.name)]
+	firstIPStart := strings.IndexByte(f.Name, '-')
+	first_segment := f.Name[firstIPStart+1 : len(f.Name)]
 	firstPortStart := strings.IndexByte(first_segment, '-')
 	second_segment := first_segment[firstPortStart+1 : len(first_segment)]
 	secondIPStart := strings.IndexByte(second_segment, '-')
@@ -38,9 +38,9 @@ func (f *PTFileName) GetIPTuple() (string, string, string, string) {
 }
 
 func (f *PTFileName) GetDate() (string, bool) {
-	if len(f.name) > 18 {
+	if len(f.Name) > 18 {
 		// Return date string in format "20170320T23:53:10Z"
-		return f.name[0:18], true
+		return f.Name[0:18], true
 	}
 	return "", false
 }
@@ -304,7 +304,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 	defer file.Close()
 
 	// Get the logtime
-	fn := PTFileName{name: filepath.Base(testName)}
+	fn := PTFileName{Name: filepath.Base(testName)}
 	dest_IP, _, server_IP, _ := fn.GetIPTuple()
 	t := GetLogtime(fn)
 
