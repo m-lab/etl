@@ -132,7 +132,8 @@ func TestPTInserter(t *testing.T) {
 			Des_hostname: "74.125.224.100",
 			Rtt:          []float64{0.895},
 		},
-		Type: 2}
+		Type: 2,
+	}
 	if !reflect.DeepEqual(ins.data[0], *expectedValues) {
 		t.Errorf("Not the expected values:")
 	}
