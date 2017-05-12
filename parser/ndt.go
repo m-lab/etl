@@ -65,10 +65,26 @@ func ParseNDTFileName(path string) (*testInfo, error) {
 // NDTParser stuff.
 //=========================================================================
 
+type fileInfoAndData struct {
+	fn   string
+	info testInfo
+	data []byte
+}
+
+// This is the parse info from the .meta file.
+type metaFileData struct {
+}
+
 type NDTParser struct {
 	inserter etl.Inserter
 	// TODO(prod): eliminate need for tmpfs.
 	tmpDir string
+
+	timestamp string // The unique timestamp common across all files in current batch.
+	c2s       *fileInfoAndData
+	s2c       *fileInfoAndData
+
+	meta *metaFileData
 }
 
 func NewNDTParser(ins etl.Inserter) *NDTParser {
@@ -80,37 +96,89 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 // TODO(dev) This is getting big and ugly and needs to be refactored.
 // TODO(prod): do not write to a temporary file; operate on byte array directly.
 func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, content []byte) error {
-	// TODO: We need to collect the c2s, s2c, and meta files, and then process them
-	// together.  If we detect another prefix before getting all three, we should
-	// process the subset that we have.
-
+	// Scraper adds files to tar file in lexical order.  This groups together all
+	// files in a single test, but the order of the files varies because of port number.
+	// If c2s or s2c files precede the .meta file, we must cache them, and process
+	// them only when the .meta file has been processed.
+	// If we detect a new prefix before getting all three, we should log appropriate
+	// information about that, and possibly place error rows in the BQ table.
+	// TODO(prod) Ensure that archive files are also date sorted.
 	info, err := ParseNDTFileName(testName)
 	if err != nil {
+		// TODO - should log and count this.
 		return err
+	}
+
+	if info.Time != n.timestamp {
+		// All files are processed ASAP.  However, if there is ONLY
+		// a data file, or ONLY a meta file, we should log and count that.
+		// TODO Log/count if we never see one of the three files.
+		n.timestamp = info.Time
+		n.s2c = nil
+		n.c2s = nil
+		n.meta = nil
 	}
 
 	var testType string
 	switch info.Suffix {
 	case "c2s_snaplog":
+		if n.c2s != nil {
+			// TODO - report collisions
+		}
 		testType = "c2s"
+		n.c2s = &fileInfoAndData{testName, *info, content}
+		if n.meta != nil {
+			return n.processTest(meta, n.c2s.fn, testType, n.c2s.data)
+		}
 	case "s2c_snaplog":
+		if n.s2c != nil {
+			// TODO - report collisions
+		}
 		testType = "s2c"
+		n.s2c = &fileInfoAndData{testName, *info, content}
+		if n.meta != nil {
+			return n.processTest(meta, n.s2c.fn, testType, n.s2c.data)
+		}
 	case "meta":
+		if n.meta != nil {
+			// TODO - report collisions
+		}
+		n.processMeta(&fileInfoAndData{testName, *info, content})
 		testType = "meta"
+		var err error
+		if n.c2s != nil {
+			err = n.processTest(meta, n.c2s.fn, testType, n.c2s.data)
+		}
+		if n.s2c != nil {
+			s2cErr := n.processTest(meta, n.s2c.fn, testType, n.s2c.data)
+			if s2cErr != nil {
+				// TODO - also handle case of errors on both files
+				return s2cErr
+			}
+		}
+		return err
 	case "c2s_ndttrace":
 	case "s2c_ndttrace":
 	case "cputime":
-		return nil
 	default:
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), "unknown", info.Suffix).Inc()
 		return errors.New("Unknown test suffix: " + info.Suffix)
 	}
 
-	return n.processTest(meta, testName, testType, content)
+	return nil
 }
 
+// Process the meta test data.
+func (n *NDTParser) processMeta(infoAndData *fileInfoAndData) error {
+	// TODO(dev) - actually parse the meta data and use it!
+	n.meta = &metaFileData{}
+	return nil
+}
+
+// processMeta should already have been called and produced valid data in n.meta
 func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string, testType string, rawSnapLog []byte) error {
+
 	// NOTE: this file size threshold and the number of simultaneous workers
 	// defined in etl_worker.go must guarantee that all files written to
 	// /mnt/tmpfs will fit.
