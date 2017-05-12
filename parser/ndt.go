@@ -97,6 +97,31 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 	return &NDTParser{inserter: ins, tmpDir: TmpDir}
 }
 
+// All files are processed ASAP.  However, if there is ONLY
+// a data file, or ONLY a meta file, we should log and count that.
+func (n *NDTParser) reportAnomolies() {
+	switch {
+	case n.meta == nil:
+		if n.s2c != nil {
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), "s2c", "no meta").Inc()
+		}
+		if n.c2s != nil {
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), "c2s", "no meta").Inc()
+		}
+	// Now meta is non-nil
+	case n.s2c == nil && n.c2s == nil:
+		// Meta file but no test file.
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), "meta", "no tests").Inc()
+	// Now meta and at least one test are non-nil
+	default:
+		// We often only get meta + one, so no
+		// need to log this.
+	}
+}
+
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
 // Writes rawSnapLog to /mnt/tmpfs.
 // TODO(dev) This is getting big and ugly and needs to be refactored.
@@ -111,14 +136,15 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// TODO(prod) Ensure that archive files are also date sorted.
 	info, err := ParseNDTFileName(testName)
 	if err != nil {
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), "unknown", "bad filename").Inc()
 		// TODO - should log and count this.
 		return err
 	}
 
 	if info.Time != n.timestamp {
-		// All files are processed ASAP.  However, if there is ONLY
-		// a data file, or ONLY a meta file, we should log and count that.
-		// TODO Log/count if we never see one of the three files.
+		n.reportAnomolies()
+
 		n.timestamp = info.Time
 		n.s2c = nil
 		n.c2s = nil
@@ -128,23 +154,22 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	switch info.Suffix {
 	case "c2s_snaplog":
 		if n.c2s != nil {
-			// TODO - report collisions
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), "c2s", "timestamp collision").Inc()
 		}
 		n.c2s = &fileInfoAndData{testName, *info, content}
-		if n.meta != nil {
-			return n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
-		}
+		return n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
 	case "s2c_snaplog":
 		if n.s2c != nil {
-			// TODO - report collisions
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), "s2c", "timestamp collision").Inc()
 		}
 		n.s2c = &fileInfoAndData{testName, *info, content}
-		if n.meta != nil {
-			return n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
-		}
+		return n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
 	case "meta":
 		if n.meta != nil {
-			// TODO - report collisions
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), "meta", "timestamp collision").Inc()
 		}
 		n.processMeta(&fileInfoAndData{testName, *info, content})
 		var err error
@@ -182,6 +207,10 @@ func (n *NDTParser) processMeta(infoAndData *fileInfoAndData) error {
 
 // processMeta should already have been called and produced valid data in n.meta
 func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string, testType string, rawSnapLog []byte) error {
+	if n.meta == nil {
+		// Defer processing until we get the meta file.
+		return nil
+	}
 
 	// NOTE: this file size threshold and the number of simultaneous workers
 	// defined in etl_worker.go must guarantee that all files written to
