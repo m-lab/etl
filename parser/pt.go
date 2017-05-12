@@ -47,7 +47,6 @@ func (f *PTFileName) GetDate() (string, bool) {
 
 type PTParser struct {
 	inserter etl.Inserter
-	tmpDir   string
 }
 
 type Node struct {
@@ -68,7 +67,7 @@ const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 
 func NewPTParser(ins etl.Inserter) *PTParser {
-	return &PTParser{ins, "/mnt/tmpfs"}
+	return &PTParser{ins}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
@@ -181,13 +180,14 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	test_id := CreateTestId(testName)
 	for _, hop := range hops {
-		var pt_test schema.PT
-		pt_test.Test_id = test_id
-		pt_test.Log_time = logTime
-		pt_test.Connection_spec = *conn_spec
-		pt_test.Paris_traceroute_hop = hop
-		pt_test.Type = int32(2)
-		pt_test.Project = int32(3)
+		pt_test := schema.PT{
+			Test_id:              test_id,
+			Log_time:             logTime,
+			Connection_spec:      *conn_spec,
+			Paris_traceroute_hop: hop,
+			Type:                 int32(2),
+			Project:              int32(3),
+		}
 		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
 			return err

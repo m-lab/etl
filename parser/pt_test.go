@@ -31,11 +31,18 @@ func TestPTParser(t *testing.T) {
 		t.Fatalf("Do not process log time correctly.")
 	}
 
-	expected_cspec := schema.MLabConnectionSpecification{Server_ip: "64.86.132.75", Server_af: 2, Client_ip: "98.162.212.214", Client_af: 2, Data_direction: 0}
+	expected_cspec := schema.MLabConnectionSpecification{
+		Server_ip:      "64.86.132.75",
+		Server_af:      2,
+		Client_ip:      "98.162.212.214",
+		Client_af:      2,
+		Data_direction: 0,
+	}
 	if !reflect.DeepEqual(*conn_spec, expected_cspec) {
 		t.Fatalf("Wrong results for connection spec!")
 	}
 
+	// TODO(dev): reformat these individual values to be more readable.
 	expected_hops := []schema.ParisTracerouteHop{
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "64.233.174.109", Src_af: 2, Dest_ip: "74.125.224.100", Dest_af: 2, Src_hostname: "sr05-te1-8.nuq04.net.google.com", Des_hostname: "74.125.224.100", Rtt: []float64{0.895}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Des_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
