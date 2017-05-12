@@ -26,20 +26,25 @@ var (
 // Test name parsing related stuff.
 //=========================================================================
 
-const dateTime = `^(?P<date>\d{8})T(?P<time>[012]\d:[0-5]\d:\d{2}\.\d{9})Z_`
+// TODO - should this be optional?
+const dateDir = `^(?P<dir>\d{4}/\d{2}/\d{2}/)?`
+const dateField = `(?P<date>\d{8})T`
+const timeField = `(?P<time>[012]\d:[0-6]\d:\d{2}\.\d{1,10})Z_`
 const address = `(?P<address>.*)`
 const suffix = `\.(?P<suffix>[a-z2].*)$`
 
 var (
 	// Pattern for any valid test file name
-	testFilePattern = regexp.MustCompile(dateTime + address + suffix)
+	testFilePattern = regexp.MustCompile(dateDir + dateField + timeField + address + suffix)
 
-	startPattern = regexp.MustCompile(dateTime)
-	endPattern   = regexp.MustCompile(suffix)
+	datePattern = regexp.MustCompile(dateField)
+	timePattern = regexp.MustCompile("T" + timeField)
+	endPattern  = regexp.MustCompile(suffix)
 )
 
 // testInfo contains all the fields from a valid NDT test file name.
 type testInfo struct {
+	DateDir string // Optional leading date yyyy/mm/dd/
 	Date    string // The date field from the test file name
 	Time    string // The time field
 	Address string // The remote address field
@@ -50,15 +55,16 @@ func ParseNDTFileName(path string) (*testInfo, error) {
 	fields := testFilePattern.FindStringSubmatch(path)
 
 	if fields == nil {
-		if !startPattern.MatchString(path) {
-			return nil, errors.New("Path should begin with yyyymmddThh:mm:ss...Z:" + path)
-		}
-		if !endPattern.MatchString(path) {
+		if !datePattern.MatchString(path) {
+			return nil, errors.New("Path should contain yyyymmddT: " + path)
+		} else if !timePattern.MatchString(path) {
+			return nil, errors.New("Path should contain Thh:mm:ss.ff...Z_: " + path)
+		} else if !endPattern.MatchString(path) {
 			return nil, errors.New("Path should end in \\.[a-z2].*: " + path)
 		}
 		return nil, errors.New("Invalid test path: " + path)
 	}
-	return &testInfo{fields[1], fields[2], fields[3], fields[4]}, nil
+	return &testInfo{fields[1], fields[2], fields[3], fields[4], fields[5]}, nil
 }
 
 //=========================================================================

@@ -21,6 +21,12 @@ var testFileNames []string = []string{
 	`20170509T00:05:13.863119000Z_eb.measurementlab.net:43628.c2s_snaplog`,
 	`20170509T00:05:13.863119000Z_eb.measurementlab.net:56986.cputime`,
 	`20170509T00:05:13.863119000Z_eb.measurementlab.net:56986.meta`,
+	`20170509T00:05:13.863119000Z_45.56.98.222.c2s_ndttrace`,
+	`20170509T00:05:13.863119000Z_45.56.98.222.s2c_ndttrace`,
+	`20170509T00:05:13.863119000Z_eb.measurementlab.net:40074.s2c_snaplog`,
+	`20170509T00:05:13.863119000Z_eb.measurementlab.net:43628.c2s_snaplog`,
+	`20170509T00:05:13.863119000Z_eb.measurementlab.net:56986.cputime`,
+	`20170509T00:05:13.863119000Z_eb.measurementlab.net:56986.meta`,
 	`20170509T00:14:43.498114000Z_77.95.64.13.c2s_ndttrace`,
 	`20170509T00:14:43.498114000Z_77.95.64.13.s2c_ndttrace`,
 	`20170509T00:14:43.498114000Z_vm-jcanat-measures.rezopole.net:37625.c2s_snaplog`,
@@ -45,7 +51,7 @@ var testFileNames []string = []string{
 
 func TestValidation(t *testing.T) {
 	for _, test := range testFileNames {
-		_, err := parser.ParseNDTFileName(test)
+		_, err := parser.ParseNDTFileName("2017/05/09/" + test)
 		if err != nil {
 			t.Error(err)
 		}
