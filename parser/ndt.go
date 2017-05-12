@@ -119,38 +119,34 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		n.meta = nil
 	}
 
-	var testType string
 	switch info.Suffix {
 	case "c2s_snaplog":
 		if n.c2s != nil {
 			// TODO - report collisions
 		}
-		testType = "c2s"
 		n.c2s = &fileInfoAndData{testName, *info, content}
 		if n.meta != nil {
-			return n.processTest(meta, n.c2s.fn, testType, n.c2s.data)
+			return n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
 		}
 	case "s2c_snaplog":
 		if n.s2c != nil {
 			// TODO - report collisions
 		}
-		testType = "s2c"
 		n.s2c = &fileInfoAndData{testName, *info, content}
 		if n.meta != nil {
-			return n.processTest(meta, n.s2c.fn, testType, n.s2c.data)
+			return n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
 		}
 	case "meta":
 		if n.meta != nil {
 			// TODO - report collisions
 		}
 		n.processMeta(&fileInfoAndData{testName, *info, content})
-		testType = "meta"
 		var err error
 		if n.c2s != nil {
-			err = n.processTest(meta, n.c2s.fn, testType, n.c2s.data)
+			err = n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
 		}
 		if n.s2c != nil {
-			s2cErr := n.processTest(meta, n.s2c.fn, testType, n.s2c.data)
+			s2cErr := n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
 			if s2cErr != nil {
 				// TODO - also handle case of errors on both files
 				return s2cErr
@@ -173,6 +169,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 func (n *NDTParser) processMeta(infoAndData *fileInfoAndData) error {
 	// TODO(dev) - actually parse the meta data and use it!
 	n.meta = &metaFileData{}
+	metrics.TestCount.WithLabelValues(
+		n.TableName(), "meta", "ok").Inc()
 	return nil
 }
 
