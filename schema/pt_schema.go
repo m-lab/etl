@@ -89,16 +89,6 @@ func (i *PT) Save() map[string]bigquery.Value {
 	}
 }
 
-// SetInt64 saves an int64 in a field with the given name.
-func (s PTValueMap) SetInt64(name string, value int64) {
-	s[name] = value
-}
-
-// SetString saves a string in a field with the given name.
-func (s PTValueMap) SetString(name string, value string) {
-	s[name] = value
-}
-
 // NewPTFullRecord creates a value map with all supported fields.
 // This is suitable when creating a schema definition for a new bigquery table.
 func NewPTFullRecord(test_id string, logTime int64, connect_spec, hop map[string]bigquery.Value) map[string]bigquery.Value {
