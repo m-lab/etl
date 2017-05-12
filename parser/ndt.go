@@ -96,10 +96,13 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 // TODO(dev) This is getting big and ugly and needs to be refactored.
 // TODO(prod): do not write to a temporary file; operate on byte array directly.
 func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, content []byte) error {
+	// Scraper adds files to tar file in lexical order.  This groups together all
+	// files in a single test, but the order of the files varies because of port number.
 	// If c2s or s2c files precede the .meta file, we must cache them, and process
 	// them only when the .meta file has been processed.
 	// If we detect a new prefix before getting all three, we should log appropriate
 	// information about that, and possibly place error rows in the BQ table.
+	// TODO(prod) Ensure that archive files are also date sorted.
 	info, err := ParseNDTFileName(testName)
 	if err != nil {
 		// TODO - should log and count this.
@@ -149,6 +152,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if n.s2c != nil {
 			s2cErr := n.processTest(meta, n.s2c.fn, testType, n.s2c.data)
 			if s2cErr != nil {
+				// TODO - also handle case of errors on both files
 				return s2cErr
 			}
 		}

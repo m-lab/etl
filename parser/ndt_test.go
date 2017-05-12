@@ -58,6 +58,7 @@ func TestNDTParser(t *testing.T) {
 	parser.TmpDir = "./"
 	n := parser.NewNDTParser(ins)
 
+	// TODO(prod) - why are so many of the tests to this endpoint and a few others?
 	s2cName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:44160.s2c_snaplog`
 	s2cData, err := ioutil.ReadFile(`testdata/` + s2cName)
 	if err != nil {
