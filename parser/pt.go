@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/m-lab/etl/bq"
+	//"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/schema"
 )
@@ -166,11 +166,6 @@ func (pt *PTParser) TableName() string {
 	return pt.inserter.TableName()
 }
 
-func DedupValues(r map[string]bigquery.Value) map[string]bigquery.Value {
-	// TODO(dev): remove the dup in the PT Hops.
-	return r
-}
-
 func CreateTestId(fn string) string {
 	base_name := filepath.Base(fn)
 	// base_name is in format like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
@@ -186,7 +181,14 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	test_id := CreateTestId(testName)
 	for _, hop := range hops {
-		err := pt.inserter.InsertRow(&bq.MapSaver{DedupValues(schema.NewPTFullRecord(test_id, logTime, (*conn_spec).Save(), hop.Save()))})
+		var pt_test schema.PT
+		pt_test.Test_id = test_id
+		pt_test.Log_time = logTime
+		pt_test.Connection_spec = *conn_spec
+		pt_test.Paris_traceroute_hop = hop
+		pt_test.Type = int32(2)
+		pt_test.Project = int32(3)
+		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
 			return err
 		}
@@ -303,6 +305,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 }
 
 // Parse the raw test file into hops ParisTracerouteHop.
+// TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
 	file, err := os.Open(testName)
 	if err != nil {

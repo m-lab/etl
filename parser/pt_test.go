@@ -6,12 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
-
-	"cloud.google.com/go/bigquery"
-	"github.com/kr/pretty"
 )
 
 // TODO: IPv6 tests
@@ -107,32 +103,30 @@ func TestPTInserter(t *testing.T) {
 	if ins.RowsInBuffer() != 38 {
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
-	actualValues := ins.data[0].(*bq.MapSaver).Values
-	expectedValues := map[string]bigquery.Value{
-		"connection_spec": map[string]bigquery.Value{
-			"server_af":      int32(2),
-			"client_ip":      "98.162.212.214",
-			"client_af":      int32(2),
-			"data_direction": int32(0),
-			"server_ip":      "64.86.132.75",
+
+	expectedValues := &schema.PT{
+		Test_id:  "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris",
+		Project:  3,
+		Log_time: 1490053990,
+		Connection_spec: schema.MLabConnectionSpecification{
+			Server_ip:      "64.86.132.75",
+			Server_af:      2,
+			Client_ip:      "98.162.212.214",
+			Client_af:      2,
+			Data_direction: 0,
 		},
-		"type": int32(2),
-		"paris_traceroute_hop": map[string]bigquery.Value{
-			"dest_ip":      "74.125.224.100",
-			"dest_af":      int32(2),
-			"des_hostname": "74.125.224.100",
-			"protocol":     "tcp",
-			"src_af":       int32(2),
-			"src_hostname": "sr05-te1-8.nuq04.net.google.com",
-			"rtt":          []float64{0.895},
-			"src_ip":       "64.233.174.109",
+		Paris_traceroute_hop: schema.ParisTracerouteHop{
+			Protocol:     "tcp",
+			Src_ip:       "64.233.174.109",
+			Src_af:       2,
+			Dest_ip:      "74.125.224.100",
+			Dest_af:      2,
+			Src_hostname: "sr05-te1-8.nuq04.net.google.com",
+			Des_hostname: "74.125.224.100",
+			Rtt:          []float64{0.895},
 		},
-		"test_id":  "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris",
-		"project":  int32(3),
-		"log_time": int64(1490053990),
-	}
-	if !compare(t, actualValues, expectedValues) {
-		t.Errorf("Missing expected values:")
-		t.Errorf(pretty.Sprint(expectedValues))
+		Type: 2}
+	if !reflect.DeepEqual(ins.data[0], *expectedValues) {
+		t.Errorf("Not the expected values:")
 	}
 }
