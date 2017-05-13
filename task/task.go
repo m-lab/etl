@@ -75,6 +75,7 @@ func (tt *Task) ProcessAllTests() error {
 		}
 
 		err := tt.Parser.ParseAndInsert(tt.meta, testname, data)
+		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if err != nil {
 			metrics.TaskCount.WithLabelValues(
 				"Task", "ParseAndInsertError").Inc()
