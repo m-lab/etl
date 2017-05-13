@@ -71,10 +71,12 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 		var zipReader *gzip.Reader
 		zipReader, err = gzip.NewReader(rr)
 		if err != nil {
+			if err == io.EOF {
+				return nil, false, err
+			}
 			metrics.GCSRetryCount.WithLabelValues(
 				"open zip", strconv.Itoa(trial), "zipReaderError").Inc()
 			log.Printf("zipReaderError: %v in file %s\n", err, h.Name)
-
 			return nil, true, err
 		}
 		defer zipReader.Close()
@@ -110,13 +112,12 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 
 	// Try to get the next file.  We retry multiple times, because sometimes
 	// GCS stalls and produces stream errors.
-	// TODO - keep track of elapsed time instead of trials ??
 	var err error
 	var data []byte
 	var h *tar.Header
 
 	// Last trial will be after total delay of 16ms + 32ms + ... + 8192ms,
-    // or about 15 seconds.
+	// or about 15 seconds.
 	trial := 0
 	delay := 16 * time.Millisecond
 	for {
@@ -146,6 +147,9 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 				break
 			}
 			if !retry || trial >= 10 {
+				// FYI, it appears that stream errors start in the
+				// nextData phase of reading, but then persist on
+				// the next call to nextHeader.
 				break
 			}
 			// For each trial, increase backoff delay by 2x.
@@ -199,7 +203,7 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 		return nil, errors.New("not tar or tgz: " + uri)
 	}
 
-	obj, err := getObject(client, bucket, fn, 10*time.Minute)
+	obj, err := getObject(client, bucket, fn, 30*time.Minute)
 	if err != nil {
 		return nil, err
 	}

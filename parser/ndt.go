@@ -31,11 +31,13 @@ const dateDir = `^(?P<dir>\d{4}/\d{2}/\d{2}/)?`
 const dateField = `(?P<date>\d{8})T`
 const timeField = `(?P<time>[012]\d:[0-6]\d:\d{2}\.\d{1,10})Z_`
 const address = `(?P<address>.*)`
+const gzSuffix = `\.(?P<suffix>[a-z2].*)\.gz$`
 const suffix = `\.(?P<suffix>[a-z2].*)$`
 
 var (
 	// Pattern for any valid test file name
-	testFilePattern = regexp.MustCompile(dateDir + dateField + timeField + address + suffix)
+	testFilePattern   = regexp.MustCompile(dateDir + dateField + timeField + address + suffix)
+	gzTestFilePattern = regexp.MustCompile(dateDir + dateField + timeField + address + gzSuffix)
 
 	datePattern = regexp.MustCompile(dateField)
 	timePattern = regexp.MustCompile("T" + timeField)
@@ -52,8 +54,12 @@ type testInfo struct {
 }
 
 func ParseNDTFileName(path string) (*testInfo, error) {
-	fields := testFilePattern.FindStringSubmatch(path)
+	fields := gzTestFilePattern.FindStringSubmatch(path)
 
+	if fields == nil {
+		// Try without trailing .gz
+		fields = testFilePattern.FindStringSubmatch(path)
+	}
 	if fields == nil {
 		if !datePattern.MatchString(path) {
 			return nil, errors.New("Path should contain yyyymmddT: " + path)
