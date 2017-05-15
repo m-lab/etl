@@ -105,18 +105,20 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 
 // All files are processed ASAP.  However, if there is ONLY
 // a data file, or ONLY a meta file, we should log and count that.
-func (n *NDTParser) reportAnomolies() {
+func (n *NDTParser) reportAnomolies(tarFileName string) {
 	switch {
 	case n.meta == nil:
 		if n.s2c != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(),
 				"s2c", "no meta").Inc()
+			log.Printf("No meta: %s %s\n", tarFileName, n.s2c.fn)
 		}
 		if n.c2s != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(),
 				"c2s", "no meta").Inc()
+			log.Printf("No meta: %s %s\n", tarFileName, n.c2s.fn)
 		}
 	// Now meta is non-nil
 	case n.s2c == nil && n.c2s == nil:
@@ -124,6 +126,7 @@ func (n *NDTParser) reportAnomolies() {
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), n.inserter.TableSuffix(),
 			"meta", "no tests").Inc()
+		log.Printf("No tests: %s %s\n", tarFileName, n.meta)
 	// Now meta and at least one test are non-nil
 	default:
 		// We often only get meta + one, so no
@@ -153,7 +156,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 
 	if info.Time != n.timestamp {
-		n.reportAnomolies()
+		n.reportAnomolies(meta["filename"].(string))
 
 		n.timestamp = info.Time
 		n.s2c = nil
