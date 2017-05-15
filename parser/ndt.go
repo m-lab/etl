@@ -2,12 +2,16 @@ package parser
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 
@@ -28,6 +32,8 @@ var (
 
 // TODO - should this be optional?
 const dateDir = `^(?P<dir>\d{4}/\d{2}/\d{2}/)?`
+
+// TODO - use time.Parse to parse this part of the filename.
 const dateField = `(?P<date>\d{8})T`
 const timeField = `(?P<time>[012]\d:[0-6]\d:\d{2}\.\d{1,10})Z_`
 const address = `(?P<address>.*)`
@@ -83,10 +89,6 @@ type fileInfoAndData struct {
 	data []byte
 }
 
-// This is the parse info from the .meta file.
-type metaFileData struct {
-}
-
 type NDTParser struct {
 	inserter etl.Inserter
 	// TODO(prod): eliminate need for tmpfs.
@@ -103,41 +105,10 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 	return &NDTParser{inserter: ins, tmpDir: TmpDir}
 }
 
-// All files are processed ASAP.  However, if there is ONLY
-// a data file, or ONLY a meta file, we should log and count that.
-func (n *NDTParser) reportAnomolies(tarFileName string) {
-	switch {
-	case n.meta == nil:
-		if n.s2c != nil {
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), n.inserter.TableSuffix(),
-				"s2c", "no meta").Inc()
-			log.Printf("No meta: %s %s\n", tarFileName, n.s2c.fn)
-		}
-		if n.c2s != nil {
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), n.inserter.TableSuffix(),
-				"c2s", "no meta").Inc()
-			log.Printf("No meta: %s %s\n", tarFileName, n.c2s.fn)
-		}
-	// Now meta is non-nil
-	case n.s2c == nil && n.c2s == nil:
-		// Meta file but no test file.
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			"meta", "no tests").Inc()
-		log.Printf("No tests: %s %s\n", tarFileName, n.meta)
-	// Now meta and at least one test are non-nil
-	default:
-		// We often only get meta + one, so no
-		// need to log this.
-	}
-}
-
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
 // Writes rawSnapLog to /mnt/tmpfs.
 // TODO(prod): do not write to a temporary file; operate on byte array directly.
-func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, content []byte) error {
+func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName string, content []byte) error {
 	// Scraper adds files to tar file in lexical order.  This groups together all
 	// files in a single test, but the order of the files varies because of port number.
 	// If c2s or s2c files precede the .meta file, we must cache them, and process
@@ -155,8 +126,10 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return nil
 	}
 
+	taskFileName := taskInfo["filename"].(string)
+
 	if info.Time != n.timestamp {
-		n.reportAnomolies(meta["filename"].(string))
+		n.reportAnomolies(taskFileName)
 
 		n.timestamp = info.Time
 		n.s2c = nil
@@ -172,7 +145,7 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				"c2s", "timestamp collision").Inc()
 		}
 		n.c2s = &fileInfoAndData{testName, *info, content}
-		n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
+		n.processTest(taskFileName, n.c2s.fn, "c2s", n.c2s.data)
 	case "s2c_snaplog":
 		if n.s2c != nil {
 			metrics.TestCount.WithLabelValues(
@@ -180,19 +153,19 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				"s2c", "timestamp collision").Inc()
 		}
 		n.s2c = &fileInfoAndData{testName, *info, content}
-		n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
+		n.processTest(taskFileName, n.s2c.fn, "s2c", n.s2c.data)
 	case "meta":
 		if n.meta != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(),
 				"meta", "timestamp collision").Inc()
 		}
-		n.processMeta(&fileInfoAndData{testName, *info, content})
+		n.processMeta(testName, content)
 		if n.c2s != nil {
-			n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
+			n.processTest(taskFileName, n.c2s.fn, "c2s", n.c2s.data)
 		}
 		if n.s2c != nil {
-			n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
+			n.processTest(taskFileName, n.s2c.fn, "s2c", n.s2c.data)
 		}
 	case "c2s_ndttrace":
 	case "s2c_ndttrace":
@@ -207,17 +180,133 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	return nil
 }
 
+// This is the parsed info from the .meta file.
+type metaFileData struct {
+	testName    string
+	dateTime    time.Time
+	summaryData []int32
+	tls         bool
+	websockets  bool
+
+	fields map[string]string // All of the string fields.
+}
+
+func newMeta(testName string, fields map[string]string) (*metaFileData, error) {
+	var data metaFileData
+	data.testName = testName
+	data.fields = make(map[string]string, 20)
+	for k, v := range fields {
+		var err error
+		v = strings.TrimSpace(v)
+		switch k {
+		case "Date/Time":
+			data.dateTime, err = time.Parse(
+				"20060102T15:04:05.999999999Z", v)
+		case "tls":
+			data.tls, err = strconv.ParseBool(v)
+		case "websockets":
+			data.websockets, err = strconv.ParseBool(v)
+		case "Summary data":
+			err = json.Unmarshal(
+				[]byte(`{"summaryData":[`+v+`]}`),
+				&data)
+		default:
+			data.fields[k] = v
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &data, nil
+}
+
+func metaToMap(rawContent []byte) (map[string]string, error) {
+	result := make(map[string]string, 20)
+
+	buf := bytes.NewBuffer(rawContent)
+	var err error
+	var line string
+	for {
+		line, err = buf.ReadString('\n')
+		if err != nil {
+			break
+		}
+		kv := strings.SplitN(line, ":", 2)
+		if len(kv) != 2 {
+			// Does this trigger for " * Additional data:"?
+			// TODO Error message or counter?
+			continue
+		}
+		result[kv[0]] = kv[1]
+	}
+	if err != io.EOF {
+		return nil, err
+		// TODO Error message or counter?
+	}
+	return result, nil
+}
+
+// All files are processed ASAP.  However, if there is ONLY
+// a data file, or ONLY a meta file, we should log and count that.
+func (n *NDTParser) reportAnomolies(taskFileName string) {
+	switch {
+	case n.meta == nil:
+		n.meta = &metaFileData{} // Hack to allow processTest to run.
+		if n.s2c != nil {
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), "s2c", "no meta").Inc()
+			log.Printf("No meta: %s %s\n", taskFileName, n.s2c.fn)
+			n.processTest(taskFileName, n.s2c.fn, "s2c", n.s2c.data)
+		}
+		if n.c2s != nil {
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), "c2s", "no meta").Inc()
+			log.Printf("No meta: %s %s\n", taskFileName, n.c2s.fn)
+			n.processTest(taskFileName, n.c2s.fn, "c2s", n.c2s.data)
+		}
+		if n.s2c == nil && n.c2s == nil {
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), "test", "no meta,c2s,s2c").Inc()
+		}
+	// Now meta is non-nil
+	case n.s2c == nil && n.c2s == nil:
+		// Meta file but no test file.
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), "meta", "no tests").Inc()
+		log.Printf("No tests: %s %s\n", taskFileName, n.meta.testName)
+	// Now meta and at least one test are non-nil
+	default:
+		// We often only get meta + one, so no
+		// need to log this.
+	}
+}
+
 // Process the meta test data.
-func (n *NDTParser) processMeta(infoAndData *fileInfoAndData) error {
-	// TODO(dev) - actually parse the meta data and use it!
-	n.meta = &metaFileData{}
+// TODO(dev) - add unit tests
+// See https://cs.corp.google.com/piper///depot/google3/research/mlab/data_conversion/ndt_meta_log_parser_lib.cc?l=16&gs=cpp%253Aresearch_mlab%253A%253Aclass-NDTMetaLogParser%253A%253AParseMetaLogFile(const%2Bbasic_string%253Cchar%252C%2Bstd%253A%253Achar_traits%253Cchar%253E%252C%2Bstd%253A%253Aallocator%253Cchar%253E%2B%253E%2B%2526%252C%2Bresearch_mlab%253A%253AMLabSnapshot%2B*)%2540google3%252Fresearch%252Fmlab%252Fdata_conversion%252Fndt_meta_log_parser_lib.cc%257Cdef&gsn=ParseMetaLogFile&ct=xref_usages
+func (n *NDTParser) processMeta(testName string, content []byte) {
+	mm, err := metaToMap(content)
+	if err != nil {
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), "meta", "error").Inc()
+		log.Println("meta processing error: " + err.Error())
+		return
+	}
+	n.meta, err = newMeta(testName, mm)
+	if err != nil {
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), "meta", "error").Inc()
+		log.Println("meta processing error: " + err.Error())
+		return
+	}
+
 	metrics.TestCount.WithLabelValues(
 		n.TableName(), n.inserter.TableSuffix(), "meta", "ok").Inc()
-	return nil
+	return
 }
 
 // processMeta should already have been called and produced valid data in n.meta
-func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string, testType string, rawSnapLog []byte) {
+func (n *NDTParser) processTest(taskFileName string, testName string, testType string, rawSnapLog []byte) {
 	if n.meta == nil {
 		// Defer processing until we get the meta file.
 		return
@@ -273,7 +362,7 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, "web100.Asset").Inc()
 		log.Printf("web100.Asset error: %s processing %s from %s\n",
-			err, testName, meta["filename"].(string))
+			err, testName, taskFileName)
 		return
 	}
 	b := bytes.NewBuffer(data)
@@ -287,7 +376,7 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, "web100.ParseDef").Inc()
 		log.Printf("web100.ParseDef error: %s processing %s from %s\n",
-			err, testName, meta["filename"])
+			err, testName, taskFileName)
 		return
 	}
 
@@ -299,7 +388,7 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, "TmpFile").Inc()
 		log.Printf("Failed to create tmpfile for: %s, when processing: %s\n",
-			testName, meta["filename"])
+			testName, taskFileName)
 		return
 	}
 
@@ -311,7 +400,7 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 				n.TableName(), n.inserter.TableSuffix(),
 				testType, "tmpFile.Write").Inc()
 			log.Printf("tmpFile.Write error: %s processing: %s from %s\n",
-				err, testName, meta["filename"])
+				err, testName, taskFileName)
 			return
 		}
 	}
@@ -329,18 +418,18 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 		// These are mostly "could not parse /proc/web100/header",
 		// with some "file read/write error C"
 		log.Printf("web100.Open error: %s processing %s from %s\n",
-			err, testName, meta["filename"])
+			err, testName, taskFileName)
 		return
 	}
 	defer w.Close()
 
 	// Seek to either last snapshot, or snapshot 2100 if there are more than that.
-	if !seek(w, n.TableName(), meta["filename"].(string), testName, testType) {
+	if !seek(w, n.TableName(), taskFileName, testName, testType) {
 		// TODO - is there a previous snapshot we can use???
 		return
 	}
 
-	n.getAndInsertValues(w, meta["filename"].(string), testName, testType)
+	n.getAndInsertValues(w, taskFileName, testName, testType)
 }
 
 // Find the "last" web100 snapshot.
