@@ -254,25 +254,27 @@ func (n *NDTParser) reportAnomolies(taskFileName string) {
 		n.meta = &metaFileData{} // Hack to allow processTest to run.
 		if n.s2c != nil {
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), "s2c", "no meta").Inc()
-			log.Printf("No meta: %s %s\n", taskFileName, n.s2c.fn)
+				n.TableName(), n.inserter.TableSuffix(), "s2c", "no meta").Inc()
+			// TODO enable this once noise is reduced.
+			// log.Printf("No meta: %s %s\n", taskFileName, n.s2c.fn)
 			n.processTest(taskFileName, n.s2c.fn, "s2c", n.s2c.data)
 		}
 		if n.c2s != nil {
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), "c2s", "no meta").Inc()
-			log.Printf("No meta: %s %s\n", taskFileName, n.c2s.fn)
+				n.TableName(), n.inserter.TableSuffix(), "c2s", "no meta").Inc()
+			// TODO enable this once noise is reduced.
+			// log.Printf("No meta: %s %s\n", taskFileName, n.c2s.fn)
 			n.processTest(taskFileName, n.c2s.fn, "c2s", n.c2s.data)
 		}
 		if n.s2c == nil && n.c2s == nil {
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), "test", "no meta,c2s,s2c").Inc()
+				n.TableName(), n.inserter.TableSuffix(), "test", "no meta,c2s,s2c").Inc()
 		}
 	// Now meta is non-nil
 	case n.s2c == nil && n.c2s == nil:
 		// Meta file but no test file.
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), "meta", "no tests").Inc()
+			n.TableName(), n.inserter.TableSuffix(), "meta", "no tests").Inc()
 		log.Printf("No tests: %s %s\n", taskFileName, n.meta.testName)
 	// Now meta and at least one test are non-nil
 	default:
