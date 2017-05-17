@@ -98,7 +98,7 @@ type NDTParser struct {
 	c2s       *fileInfoAndData
 	s2c       *fileInfoAndData
 
-	meta *metaFileData
+	metaFile *metaFileData
 }
 
 func NewNDTParser(ins etl.Inserter) *NDTParser {
@@ -134,7 +134,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		n.timestamp = info.Time
 		n.s2c = nil
 		n.c2s = nil
-		n.meta = nil
+		n.metaFile = nil
 	}
 
 	switch info.Suffix {
@@ -155,7 +155,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		n.s2c = &fileInfoAndData{testName, *info, content}
 		n.processTest(taskFileName, n.s2c.fn, "s2c", n.s2c.data)
 	case "meta":
-		if n.meta != nil {
+		if n.metaFile != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(),
 				"meta", "timestamp collision").Inc()
@@ -191,7 +191,7 @@ type metaFileData struct {
 	fields map[string]string // All of the string fields.
 }
 
-func newMeta(testName string, fields map[string]string) (*metaFileData, error) {
+func createMetaFileData(testName string, fields map[string]string) (*metaFileData, error) {
 	var data metaFileData
 	data.testName = testName
 	data.fields = make(map[string]string, 20)
@@ -220,7 +220,7 @@ func newMeta(testName string, fields map[string]string) (*metaFileData, error) {
 	return &data, nil
 }
 
-func metaToMap(rawContent []byte) (map[string]string, error) {
+func parseMetaFile(rawContent []byte) (map[string]string, error) {
 	result := make(map[string]string, 20)
 
 	buf := bytes.NewBuffer(rawContent)
@@ -250,8 +250,8 @@ func metaToMap(rawContent []byte) (map[string]string, error) {
 // a data file, or ONLY a meta file, we should log and count that.
 func (n *NDTParser) reportAnomolies(taskFileName string) {
 	switch {
-	case n.meta == nil:
-		n.meta = &metaFileData{} // Hack to allow processTest to run.
+	case n.metaFile == nil:
+		n.metaFile = &metaFileData{} // Hack to allow processTest to run.
 		if n.s2c != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(), "s2c", "no meta").Inc()
@@ -275,7 +275,7 @@ func (n *NDTParser) reportAnomolies(taskFileName string) {
 		// Meta file but no test file.
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), n.inserter.TableSuffix(), "meta", "no tests").Inc()
-		log.Printf("No tests: %s %s\n", taskFileName, n.meta.testName)
+		log.Printf("No tests: %s %s\n", taskFileName, n.metaFile.testName)
 	// Now meta and at least one test are non-nil
 	default:
 		// We often only get meta + one, so no
@@ -285,19 +285,20 @@ func (n *NDTParser) reportAnomolies(taskFileName string) {
 
 // Process the meta test data.
 // TODO(dev) - add unit tests
-// See https://cs.corp.google.com/piper///depot/google3/research/mlab/data_conversion/ndt_meta_log_parser_lib.cc?l=16&gs=cpp%253Aresearch_mlab%253A%253Aclass-NDTMetaLogParser%253A%253AParseMetaLogFile(const%2Bbasic_string%253Cchar%252C%2Bstd%253A%253Achar_traits%253Cchar%253E%252C%2Bstd%253A%253Aallocator%253Cchar%253E%2B%253E%2B%2526%252C%2Bresearch_mlab%253A%253AMLabSnapshot%2B*)%2540google3%252Fresearch%252Fmlab%252Fdata_conversion%252Fndt_meta_log_parser_lib.cc%257Cdef&gsn=ParseMetaLogFile&ct=xref_usages
+// See ndt_meta_log_parser_lib.cc
 func (n *NDTParser) processMeta(testName string, content []byte) {
-	mm, err := metaToMap(content)
+	// Create a map from the metafile raw content
+	metamap, err := parseMetaFile(content)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), "meta", "error").Inc()
+			n.TableName(), n.inserter.TableSuffix(), "meta", "error").Inc()
 		log.Println("meta processing error: " + err.Error())
 		return
 	}
-	n.meta, err = newMeta(testName, mm)
+	n.metaFile, err = createMetaFileData(testName, metamap)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), "meta", "error").Inc()
+			n.TableName(), n.inserter.TableSuffix(), "meta", "error").Inc()
 		log.Println("meta processing error: " + err.Error())
 		return
 	}
@@ -307,9 +308,12 @@ func (n *NDTParser) processMeta(testName string, content []byte) {
 	return
 }
 
-// processMeta should already have been called and produced valid data in n.meta
+// processTest digests a single s2c or c2s test, and writes a row to the Inserter.
+// processMeta should already have been called and produced valid data in n.metaFile
+// However, we often get s2c and c2s without corresponding meta files.  When this happens,
+// we proceed with an empty metaFile.
 func (n *NDTParser) processTest(taskFileName string, testName string, testType string, rawSnapLog []byte) {
-	if n.meta == nil {
+	if n.metaFile == nil {
 		// Defer processing until we get the meta file.
 		return
 	}
@@ -426,7 +430,7 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 	defer w.Close()
 
 	// Seek to either last snapshot, or snapshot 2100 if there are more than that.
-	if !seek(w, n.TableName(), taskFileName, testName, testType) {
+	if !seek(w, n.TableName(), n.inserter.TableSuffix(), taskFileName, testName, testType) {
 		// TODO - is there a previous snapshot we can use???
 		return
 	}
@@ -436,7 +440,7 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 
 // Find the "last" web100 snapshot.
 // Returns true if valid snapshot found.
-func seek(w *web100.Web100, tableName string, tarFileName string, testName string, testType string) bool {
+func seek(w *web100.Web100, tableName string, suffix string, tarFileName string, testName string, testType string) bool {
 	metrics.WorkerState.WithLabelValues("seek").Inc()
 	defer metrics.WorkerState.WithLabelValues("seek").Dec()
 	// Limit to parsing only up to 2100 snapshots.
@@ -458,7 +462,7 @@ func seek(w *web100.Web100, tableName string, tarFileName string, testName strin
 				// TODO - Use separate counter, since this is not unique across
 				// the test.
 				metrics.TestCount.WithLabelValues(
-					tableName, testType, "w.Next").Inc()
+					tableName, suffix, testType, "w.Next").Inc()
 				log.Printf("w.Next error: %s processing snap %d from %s from %s\n",
 					err, count, testName, tarFileName)
 				// This could either be a bad record, or EOF.
@@ -467,7 +471,7 @@ func seek(w *web100.Web100, tableName string, tarFileName string, testName strin
 					// TODO - Use separate counter, since this is not unique across
 					// the test.
 					metrics.TestCount.WithLabelValues(
-						tableName, testType, "badRecords").Inc()
+						tableName, suffix, testType, "badRecords").Inc()
 					// TODO - don't see this in the logs on 5/4.  Not sure why.
 					log.Printf("w.Next 10 bad processing snapshots from %s from %s\n",
 						testName, tarFileName)
@@ -486,7 +490,7 @@ func seek(w *web100.Web100, tableName string, tarFileName string, testName strin
 				// TODO - Use separate counter, since this is not unique across
 				// the test.
 				metrics.TestCount.WithLabelValues(
-					tableName, testType, "w.Values").Inc()
+					tableName, suffix, testType, "w.Values").Inc()
 			}
 		}
 	}

@@ -203,6 +203,7 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 		return nil, errors.New("not tar or tgz: " + uri)
 	}
 
+	// TODO(prod) Evaluate whether this is long enough.
 	obj, err := getObject(client, bucket, fn, 30*time.Minute)
 	if err != nil {
 		return nil, err
