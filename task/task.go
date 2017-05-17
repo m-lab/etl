@@ -63,7 +63,8 @@ func (tt *Task) ProcessAllTests() error {
 				time.Since(tt.meta["parse_time"].(time.Time)), err)
 
 			metrics.TestCount.WithLabelValues(
-				tt.Inserter.TableName(), "unknown", "unrecovered").Inc()
+				tt.Inserter.TableBase(), tt.Inserter.TableSuffix(),
+				"unknown", "unrecovered").Inc()
 			break
 		}
 		if data == nil {

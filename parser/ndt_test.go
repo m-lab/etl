@@ -189,7 +189,13 @@ func (in *inMemoryInserter) InsertRows(data []interface{}) error {
 func (in *inMemoryInserter) Flush() error {
 	return nil
 }
-func (in *inMemoryInserter) TableName() string {
+func (in *inMemoryInserter) TableBase() string {
+	return "ndt_test"
+}
+func (in *inMemoryInserter) TableSuffix() string {
+	return ""
+}
+func (in *inMemoryInserter) FullTableName() string {
 	return "ndt_test"
 }
 func (in *inMemoryInserter) Dataset() string {

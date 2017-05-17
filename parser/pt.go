@@ -162,7 +162,7 @@ func GetLogtime(filename PTFileName) int64 {
 }
 
 func (pt *PTParser) TableName() string {
-	return pt.inserter.TableName()
+	return pt.inserter.TableBase()
 }
 
 func CreateTestId(fn string) string {

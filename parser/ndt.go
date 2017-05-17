@@ -110,17 +110,20 @@ func (n *NDTParser) reportAnomolies() {
 	case n.meta == nil:
 		if n.s2c != nil {
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), "s2c", "no meta").Inc()
+				n.TableName(), n.inserter.TableSuffix(),
+				"s2c", "no meta").Inc()
 		}
 		if n.c2s != nil {
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), "c2s", "no meta").Inc()
+				n.TableName(), n.inserter.TableSuffix(),
+				"c2s", "no meta").Inc()
 		}
 	// Now meta is non-nil
 	case n.s2c == nil && n.c2s == nil:
 		// Meta file but no test file.
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), "meta", "no tests").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			"meta", "no tests").Inc()
 	// Now meta and at least one test are non-nil
 	default:
 		// We often only get meta + one, so no
@@ -142,7 +145,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	info, err := ParseNDTFileName(testName)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), "unknown", "bad filename").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			"unknown", "bad filename").Inc()
 		// TODO - should log and count this.
 		log.Printf("%v", err)
 		return nil
@@ -161,21 +165,24 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	case "c2s_snaplog":
 		if n.c2s != nil {
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), "c2s", "timestamp collision").Inc()
+				n.TableName(), n.inserter.TableSuffix(),
+				"c2s", "timestamp collision").Inc()
 		}
 		n.c2s = &fileInfoAndData{testName, *info, content}
 		n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
 	case "s2c_snaplog":
 		if n.s2c != nil {
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), "s2c", "timestamp collision").Inc()
+				n.TableName(), n.inserter.TableSuffix(),
+				"s2c", "timestamp collision").Inc()
 		}
 		n.s2c = &fileInfoAndData{testName, *info, content}
 		n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
 	case "meta":
 		if n.meta != nil {
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), "meta", "timestamp collision").Inc()
+				n.TableName(), n.inserter.TableSuffix(),
+				"meta", "timestamp collision").Inc()
 		}
 		n.processMeta(&fileInfoAndData{testName, *info, content})
 		if n.c2s != nil {
@@ -189,8 +196,9 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	case "cputime":
 	default:
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), "unknown", info.Suffix).Inc()
-		log.Println("Unknown test suffix: " + info.Suffix)
+			n.TableName(), n.inserter.TableSuffix(),
+			"unknown", info.Suffix).Inc()
+		return errors.New("Unknown test suffix: " + info.Suffix)
 	}
 
 	return nil
@@ -201,7 +209,7 @@ func (n *NDTParser) processMeta(infoAndData *fileInfoAndData) error {
 	// TODO(dev) - actually parse the meta data and use it!
 	n.meta = &metaFileData{}
 	metrics.TestCount.WithLabelValues(
-		n.TableName(), "meta", "ok").Inc()
+		n.TableName(), n.inserter.TableSuffix(), "meta", "ok").Inc()
 	return nil
 }
 
@@ -217,7 +225,8 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 	// /mnt/tmpfs will fit.
 	if len(rawSnapLog) > 10*1024*1024 {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, ">10MB").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, ">10MB").Inc()
 		log.Printf("Ignoring oversize snaplog: %d, %s\n",
 			len(rawSnapLog), testName)
 		metrics.FileSizeHistogram.WithLabelValues(
@@ -233,7 +242,8 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 		// TODO - Use separate counter, since this is not unique across
 		// the test.
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "<32KB").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, "<32KB").Inc()
 		log.Printf("Note: small rawSnapLog: %d, %s\n",
 			len(rawSnapLog), testName)
 	}
@@ -241,7 +251,8 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 		// TODO - Use separate counter, since this is not unique across
 		// the test.
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "4KB").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, "4KB").Inc()
 	}
 
 	metrics.WorkerState.WithLabelValues("ndt").Inc()
@@ -256,7 +267,8 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 	if err != nil {
 		// Asset missing from build.
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "web100.Asset").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, "web100.Asset").Inc()
 		log.Printf("web100.Asset error: %s processing %s from %s\n",
 			err, testName, meta["filename"].(string))
 		return
@@ -269,7 +281,8 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 	legacyNames, err := web100.ParseWeb100Definitions(b)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "web100.ParseDef").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, "web100.ParseDef").Inc()
 		log.Printf("web100.ParseDef error: %s processing %s from %s\n",
 			err, testName, meta["filename"])
 		return
@@ -280,7 +293,8 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 	tmpFile, err := ioutil.TempFile(n.tmpDir, "snaplog-")
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "TmpFile").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, "TmpFile").Inc()
 		log.Printf("Failed to create tmpfile for: %s, when processing: %s\n",
 			testName, meta["filename"])
 		return
@@ -291,7 +305,8 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 		c, err = tmpFile.Write(rawSnapLog)
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), testType, "tmpFile.Write").Inc()
+				n.TableName(), n.inserter.TableSuffix(),
+				testType, "tmpFile.Write").Inc()
 			log.Printf("tmpFile.Write error: %s processing: %s from %s\n",
 				err, testName, meta["filename"])
 			return
@@ -306,7 +321,8 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 	w, err := web100.Open(tmpFile.Name(), legacyNames)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "web100.Open").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, "web100.Open").Inc()
 		// These are mostly "could not parse /proc/web100/header",
 		// with some "file read/write error C"
 		log.Printf("web100.Open error: %s processing %s from %s\n",
@@ -392,7 +408,8 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, tes
 	err := w.SnapshotValues(snapValues)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "values-err").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, "values-err").Inc()
 		log.Printf("Error calling web100 Values() in test %s, when processing: %s\n%s\n",
 			testName, tarFileName, err)
 		return
@@ -410,19 +427,21 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, tes
 	err = n.inserter.InsertRow(&bq.MapSaver{fixValues(results)})
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "insert-err").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, "insert-err").Inc()
 		// TODO: This is an insert error, that might be recoverable if we try again.
 		log.Println("%v", err)
 		return
 	} else {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "ok").Inc()
+			n.TableName(), n.inserter.TableSuffix(),
+			testType, "ok").Inc()
 		return
 	}
 }
 
 func (n *NDTParser) TableName() string {
-	return n.inserter.TableName()
+	return n.inserter.TableBase()
 }
 
 // fixValues updates web100 log values that need post-processing fix-ups.

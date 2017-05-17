@@ -15,7 +15,6 @@
 package bq
 
 import (
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -36,7 +35,7 @@ func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inse
 	table := etl.DataTypeToTable[dt]
 	if time.Since(partition) < 30*24*time.Hour {
 		// If within past 30 days, we can stream directly to partition.
-		table += "$" + partition.Format("20060102")
+		suffix = "$" + partition.Format("20060102")
 	} else {
 		// Otherwise, we use a templated table, and must merge it later.
 		suffix = "_" + partition.Format("20060102")
@@ -52,8 +51,16 @@ func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inse
 func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
 	if uploader == nil {
 		client := MustGetClient(params.Timeout)
-		u := client.Dataset(params.Dataset).Table(params.Table).Uploader()
-		u.TableTemplateSuffix = params.Suffix
+		table := params.Table
+		if params.Suffix[0] == '$' {
+			// Suffix starting with $ is just a partition spec.
+			table += params.Suffix
+		}
+		u := client.Dataset(params.Dataset).Table(table).Uploader()
+		if params.Suffix[0] == '_' {
+			// Suffix starting with _ is a template suffix.
+			u.TableTemplateSuffix = params.Suffix
+		}
 		uploader = u
 	}
 	in := BQInserter{params: params, uploader: uploader, timeout: params.Timeout}
@@ -156,8 +163,16 @@ func (in *BQInserter) Flush() error {
 	return err
 }
 
-func (in *BQInserter) TableName() string {
-	return in.params.Table + in.params.Suffix
+func (in *BQInserter) FullTableName() string {
+	return in.TableBase() + in.TableSuffix()
+}
+func (in *BQInserter) TableBase() string {
+	return in.params.Table
+}
+
+// The $ or _ suffix.
+func (in *BQInserter) TableSuffix() string {
+	return in.params.Suffix
 }
 func (in *BQInserter) Dataset() string {
 	return in.params.Dataset
@@ -213,6 +228,6 @@ func (dw DurationWrapper) Flush() error {
 		status = "fail"
 	}
 	metrics.InsertionHistogram.WithLabelValues(
-		dw.TableName(), status).Observe(time.Since(t).Seconds())
+		dw.TableBase(), status).Observe(time.Since(t).Seconds())
 	return err
 }
