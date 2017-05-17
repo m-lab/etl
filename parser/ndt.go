@@ -389,8 +389,8 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, "TmpFile").Inc()
-		log.Printf("Failed to create tmpfile for: %s, when processing: %s\n",
-			testName, taskFileName)
+		log.Printf("Failed to create tmpfile for: %s in %s, when processing: %s\n",
+			testName, n.tmpDir, taskFileName)
 		return
 	}
 
