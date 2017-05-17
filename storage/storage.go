@@ -54,7 +54,7 @@ func (rr *ETLSource) nextHeader(trial int) (*tar.Header, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				"next", strconv.Itoa(trial), "other").Inc()
 		}
-		log.Printf("Next: %v\n", err)
+		log.Printf("nextHeader: %v\n", err)
 	}
 	return h, true, err
 }
@@ -71,10 +71,12 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 		var zipReader *gzip.Reader
 		zipReader, err = gzip.NewReader(rr)
 		if err != nil {
+			if err == io.EOF {
+				return nil, false, err
+			}
 			metrics.GCSRetryCount.WithLabelValues(
 				"open zip", strconv.Itoa(trial), "zipReaderError").Inc()
 			log.Printf("zipReaderError: %v in file %s\n", err, h.Name)
-
 			return nil, true, err
 		}
 		defer zipReader.Close()
@@ -95,6 +97,7 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				phase, strconv.Itoa(trial), "other error").Inc()
 		}
+		log.Printf("nextData: %v\n", err)
 		return nil, true, err
 	}
 
@@ -109,13 +112,14 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 
 	// Try to get the next file.  We retry multiple times, because sometimes
 	// GCS stalls and produces stream errors.
-	// TODO - keep track of elapsed time instead of trials ??
 	var err error
 	var data []byte
 	var h *tar.Header
 
+	// Last trial will be after total delay of 16ms + 32ms + ... + 8192ms,
+	// or about 15 seconds.
 	trial := 0
-	delay := 5 * time.Millisecond
+	delay := 16 * time.Millisecond
 	for {
 		trial++
 		var retry bool
@@ -123,7 +127,7 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 		if err == nil {
 			break
 		}
-		if !retry || trial > 10 {
+		if !retry || trial >= 10 {
 			return "", nil, err
 		}
 		// For each trial, increase backoff delay by 2x.
@@ -134,7 +138,7 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 	// Only process regular files.
 	if h.Typeflag == tar.TypeReg {
 		trial = 0
-		delay = 5 * time.Millisecond
+		delay = 16 * time.Millisecond
 		for {
 			trial++
 			var retry bool
@@ -142,7 +146,10 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 			if err == nil {
 				break
 			}
-			if !retry || trial > 10 {
+			if !retry || trial >= 10 {
+				// FYI, it appears that stream errors start in the
+				// nextData phase of reading, but then persist on
+				// the next call to nextHeader.
 				break
 			}
 			// For each trial, increase backoff delay by 2x.
@@ -196,7 +203,7 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 		return nil, errors.New("not tar or tgz: " + uri)
 	}
 
-	obj, err := getObject(client, bucket, fn, 10*time.Minute)
+	obj, err := getObject(client, bucket, fn, 30*time.Minute)
 	if err != nil {
 		return nil, err
 	}

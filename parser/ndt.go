@@ -31,11 +31,13 @@ const dateDir = `^(?P<dir>\d{4}/\d{2}/\d{2}/)?`
 const dateField = `(?P<date>\d{8})T`
 const timeField = `(?P<time>[012]\d:[0-6]\d:\d{2}\.\d{1,10})Z_`
 const address = `(?P<address>.*)`
+const gzSuffix = `\.(?P<suffix>[a-z2].*)\.gz$`
 const suffix = `\.(?P<suffix>[a-z2].*)$`
 
 var (
 	// Pattern for any valid test file name
-	testFilePattern = regexp.MustCompile(dateDir + dateField + timeField + address + suffix)
+	testFilePattern   = regexp.MustCompile(dateDir + dateField + timeField + address + suffix)
+	gzTestFilePattern = regexp.MustCompile(dateDir + dateField + timeField + address + gzSuffix)
 
 	datePattern = regexp.MustCompile(dateField)
 	timePattern = regexp.MustCompile("T" + timeField)
@@ -52,8 +54,12 @@ type testInfo struct {
 }
 
 func ParseNDTFileName(path string) (*testInfo, error) {
-	fields := testFilePattern.FindStringSubmatch(path)
+	fields := gzTestFilePattern.FindStringSubmatch(path)
 
+	if fields == nil {
+		// Try without trailing .gz
+		fields = testFilePattern.FindStringSubmatch(path)
+	}
 	if fields == nil {
 		if !datePattern.MatchString(path) {
 			return nil, errors.New("Path should contain yyyymmddT: " + path)
@@ -124,7 +130,6 @@ func (n *NDTParser) reportAnomolies() {
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
 // Writes rawSnapLog to /mnt/tmpfs.
-// TODO(dev) This is getting big and ugly and needs to be refactored.
 // TODO(prod): do not write to a temporary file; operate on byte array directly.
 func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, content []byte) error {
 	// Scraper adds files to tar file in lexical order.  This groups together all
@@ -139,7 +144,8 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), "unknown", "bad filename").Inc()
 		// TODO - should log and count this.
-		return err
+		log.Printf("%v", err)
+		return nil
 	}
 
 	if info.Time != n.timestamp {
@@ -158,39 +164,33 @@ func (n *NDTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				n.TableName(), "c2s", "timestamp collision").Inc()
 		}
 		n.c2s = &fileInfoAndData{testName, *info, content}
-		return n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
+		n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
 	case "s2c_snaplog":
 		if n.s2c != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), "s2c", "timestamp collision").Inc()
 		}
 		n.s2c = &fileInfoAndData{testName, *info, content}
-		return n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
+		n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
 	case "meta":
 		if n.meta != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), "meta", "timestamp collision").Inc()
 		}
 		n.processMeta(&fileInfoAndData{testName, *info, content})
-		var err error
 		if n.c2s != nil {
-			err = n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
+			n.processTest(meta, n.c2s.fn, "c2s", n.c2s.data)
 		}
 		if n.s2c != nil {
-			s2cErr := n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
-			if s2cErr != nil {
-				// TODO - also handle case of errors on both files
-				return s2cErr
-			}
+			n.processTest(meta, n.s2c.fn, "s2c", n.s2c.data)
 		}
-		return err
 	case "c2s_ndttrace":
 	case "s2c_ndttrace":
 	case "cputime":
 	default:
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), "unknown", info.Suffix).Inc()
-		return errors.New("Unknown test suffix: " + info.Suffix)
+		log.Println("Unknown test suffix: " + info.Suffix)
 	}
 
 	return nil
@@ -206,10 +206,10 @@ func (n *NDTParser) processMeta(infoAndData *fileInfoAndData) error {
 }
 
 // processMeta should already have been called and produced valid data in n.meta
-func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string, testType string, rawSnapLog []byte) error {
+func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string, testType string, rawSnapLog []byte) {
 	if n.meta == nil {
 		// Defer processing until we get the meta file.
-		return nil
+		return
 	}
 
 	// NOTE: this file size threshold and the number of simultaneous workers
@@ -222,7 +222,7 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 			len(rawSnapLog), testName)
 		metrics.FileSizeHistogram.WithLabelValues(
 			"huge").Observe(float64(len(rawSnapLog)))
-		return nil
+		return
 	} else {
 		// Record the file size.
 		metrics.FileSizeHistogram.WithLabelValues(
@@ -259,7 +259,7 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 			n.TableName(), testType, "web100.Asset").Inc()
 		log.Printf("web100.Asset error: %s processing %s from %s\n",
 			err, testName, meta["filename"].(string))
-		return nil
+		return
 	}
 	b := bytes.NewBuffer(data)
 
@@ -272,7 +272,7 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 			n.TableName(), testType, "web100.ParseDef").Inc()
 		log.Printf("web100.ParseDef error: %s processing %s from %s\n",
 			err, testName, meta["filename"])
-		return nil
+		return
 	}
 
 	// TODO(prod): do not write to a temporary file; operate on byte array directly.
@@ -283,7 +283,7 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 			n.TableName(), testType, "TmpFile").Inc()
 		log.Printf("Failed to create tmpfile for: %s, when processing: %s\n",
 			testName, meta["filename"])
-		return nil
+		return
 	}
 
 	c := 0
@@ -294,7 +294,7 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 				n.TableName(), testType, "tmpFile.Write").Inc()
 			log.Printf("tmpFile.Write error: %s processing: %s from %s\n",
 				err, testName, meta["filename"])
-			return nil
+			return
 		}
 	}
 
@@ -311,17 +311,17 @@ func (n *NDTParser) processTest(meta map[string]bigquery.Value, testName string,
 		// with some "file read/write error C"
 		log.Printf("web100.Open error: %s processing %s from %s\n",
 			err, testName, meta["filename"])
-		return nil
+		return
 	}
 	defer w.Close()
 
 	// Seek to either last snapshot, or snapshot 2100 if there are more than that.
 	if !seek(w, n.TableName(), meta["filename"].(string), testName, testType) {
 		// TODO - is there a previous snapshot we can use???
-		return nil
+		return
 	}
 
-	return n.getAndInsertValues(w, meta["filename"].(string), testName, testType)
+	n.getAndInsertValues(w, meta["filename"].(string), testName, testType)
 }
 
 // Find the "last" web100 snapshot.
@@ -383,7 +383,7 @@ func seek(w *web100.Web100, tableName string, tarFileName string, testName strin
 	return true
 }
 
-func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, testName string, testType string) error {
+func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, testName string, testType string) {
 	// Extract the values from the last snapshot.
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
@@ -395,7 +395,7 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, tes
 			n.TableName(), testType, "values-err").Inc()
 		log.Printf("Error calling web100 Values() in test %s, when processing: %s\n%s\n",
 			testName, tarFileName, err)
-		return nil
+		return
 	}
 
 	// TODO(prod) Write a row with this data, even if the snapshot parsing fails?
@@ -412,11 +412,12 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, tes
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), testType, "insert-err").Inc()
 		// TODO: This is an insert error, that might be recoverable if we try again.
-		return err
+		log.Println("%v", err)
+		return
 	} else {
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), testType, "ok").Inc()
-		return nil
+		return
 	}
 }
 
