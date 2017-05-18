@@ -7,10 +7,12 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -33,7 +35,7 @@ var (
 // TODO - should this be optional?
 const dateDir = `^(?P<dir>\d{4}/\d{2}/\d{2}/)?`
 
-// TODO(NOW) - use time.Parse to parse this part of the filename.
+// TODO - use time.Parse to parse this part of the filename.
 const dateField = `(?P<date>\d{8})T`
 const timeField = `(?P<time>[012]\d:[0-6]\d:\d{2}\.\d{1,10})Z_`
 const address = `(?P<address>.*)`
@@ -223,14 +225,37 @@ func (mfd *metaFileData) PopulateConnSpec(connSpec *schema.Web100ValueMap) {
 		}
 	}
 	s, ok := mfd.fields["server_ip"]
+	// TODO - extract function for this stanza
 	if ok && s != "" {
-		// TODO Parse the ip address and set the AF field.
-		connSpec.SetInt64("server_af", 0)
+		connSpec.SetString("server_ip", s)
+		ip := net.ParseIP(s)
+		if ip == nil {
+			// TODO - log/metric
+		} else {
+			if ip.To4() != nil {
+				connSpec.SetString("server_ip", ip.String())
+				connSpec.SetInt64("server_af", syscall.AF_INET)
+			} else if ip.To16() != nil {
+				connSpec.SetString("server_ip", ip.String())
+				connSpec.SetInt64("server_af", syscall.AF_INET6)
+			}
+		}
 	}
 	s, ok = mfd.fields["client_ip"]
 	if ok && s != "" {
-		// TODO Parse the ip address and set the AF field.
-		connSpec.SetInt64("client_af", 0)
+		connSpec.SetString("client_ip", s)
+		ip := net.ParseIP(s)
+		if ip == nil {
+			// TODO - log/metric
+		} else {
+			if ip.To4() != nil {
+				connSpec.SetString("client_ip", ip.String())
+				connSpec.SetInt64("client_af", syscall.AF_INET)
+			} else if ip.To16() != nil {
+				connSpec.SetString("client_ip", ip.String())
+				connSpec.SetInt64("client_af", syscall.AF_INET6)
+			}
+		}
 	}
 }
 
