@@ -122,7 +122,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 			n.TableName(), n.inserter.TableSuffix(),
 			"unknown", "bad filename").Inc()
 		// TODO - should log and count this.
-		log.Printf("%v", err)
+		log.Println(err)
 		return nil
 	}
 
@@ -143,6 +143,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(),
 				"c2s", "timestamp collision").Inc()
+			log.Printf("Collision: %s and %s\n", n.c2s.fn, testName)
 		}
 		n.c2s = &fileInfoAndData{testName, *info, content}
 		n.processTest(taskFileName, n.c2s.fn, "c2s", n.c2s.data)
@@ -151,6 +152,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(),
 				"s2c", "timestamp collision").Inc()
+			log.Printf("Collision: %s and %s\n", n.s2c.fn, testName)
 		}
 		n.s2c = &fileInfoAndData{testName, *info, content}
 		n.processTest(taskFileName, n.s2c.fn, "s2c", n.s2c.data)
@@ -285,6 +287,7 @@ func (n *NDTParser) reportAnomolies(taskFileName string) {
 
 // Process the meta test data.
 // TODO(dev) - add unit tests
+// TODO(prod) - For tests that include a meta file, should respect the test filenames.
 // See ndt_meta_log_parser_lib.cc
 func (n *NDTParser) processMeta(testName string, content []byte) {
 	// Create a map from the metafile raw content
@@ -322,6 +325,8 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 	// defined in etl_worker.go must guarantee that all files written to
 	// /mnt/tmpfs will fit.
 	if len(rawSnapLog) > 10*1024*1024 {
+		metrics.FunnyTests.WithLabelValues(
+			n.TableName(), testType, ">10MB").Inc()
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, ">10MB").Inc()
@@ -336,27 +341,25 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 			"normal").Observe(float64(len(rawSnapLog)))
 	}
 
-	if len(rawSnapLog) < 32*1024 {
+	if len(rawSnapLog) < 16*1024 {
 		// TODO - Use separate counter, since this is not unique across
 		// the test.
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, "<32KB").Inc()
+		metrics.FunnyTests.WithLabelValues(
+			n.TableName(), testType, "<16KB").Inc()
 		log.Printf("Note: small rawSnapLog: %d, %s\n",
 			len(rawSnapLog), testName)
 	}
 	if len(rawSnapLog) == 4096 {
 		// TODO - Use separate counter, since this is not unique across
 		// the test.
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, "4KB").Inc()
+		metrics.FunnyTests.WithLabelValues(
+			n.TableName(), testType, "4KB").Inc()
 	}
 
 	metrics.WorkerState.WithLabelValues("ndt").Inc()
 	defer metrics.WorkerState.WithLabelValues("ndt").Dec()
 
-	// TODO(dev): only do this once.
+	// TODO(prod): only do this once.
 	// Parse the tcp-kis.txt web100 variable definition file.
 	metrics.WorkerState.WithLabelValues("asset").Inc()
 	defer metrics.WorkerState.WithLabelValues("asset").Dec()
@@ -412,7 +415,7 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 	}
 
 	tmpFile.Sync()
-	// TODO(dev): log possible remove errors.
+	// TODO(prod): log possible remove errors.
 	defer os.Remove(tmpFile.Name())
 
 	// Open the file we created above.
@@ -528,7 +531,7 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, tes
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, "insert-err").Inc()
 		// TODO: This is an insert error, that might be recoverable if we try again.
-		log.Println("%v", err)
+		log.Println("insert-err: " + err.Error())
 		return
 	} else {
 		metrics.TestCount.WithLabelValues(

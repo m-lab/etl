@@ -76,7 +76,7 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			}
 			metrics.GCSRetryCount.WithLabelValues(
 				"open zip", strconv.Itoa(trial), "zipReaderError").Inc()
-			log.Printf("zipReaderError: %v in file %s\n", err, h.Name)
+			log.Printf("zipReaderError(%d): %v in file %s\n", trial, err, h.Name)
 			return nil, true, err
 		}
 		defer zipReader.Close()
@@ -87,6 +87,7 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 		data, err = ioutil.ReadAll(rr)
 	}
 	if err != nil {
+		// These errors seem to be recoverable, at least with zip files.
 		if strings.Contains(err.Error(), "stream error") {
 			// We are seeing these very rarely, maybe 1 per hour.
 			// They are non-deterministic, so probably related to GCS problems.
@@ -97,7 +98,7 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				phase, strconv.Itoa(trial), "other error").Inc()
 		}
-		log.Printf("nextData: %v\n", err)
+		log.Printf("nextData(%d): %v\n", trial, err)
 		return nil, true, err
 	}
 

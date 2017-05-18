@@ -83,6 +83,8 @@ var (
 	// Example usage:
 	// metrics.TestCount.WithLabelValues(
 	//	tt.Inserter.TableBase(), tt.Inserter.TableSuffix(), "s2c", "ok").Inc()
+	// TODO(2017) Remove suffix field, and use a more scalable solution, perhaps bigquery
+	// table to store operations metrics.
 	TestCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_test_count",
@@ -90,6 +92,24 @@ var (
 		},
 		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/
 		[]string{"table", "suffix", "filetype", "status"},
+	)
+
+	// Counts the number of tests processed by the parsers..
+	//
+	// Provides metrics:
+	//   etl_test_count{type}
+	// Example usage:
+	// metrics.FunnyTests.WithLabelValues(
+	//	tt.Inserter.TableBase(), "s2c", "<16KB").Inc()
+	// TODO(2017) Remove suffix field, and use a more scalable solution, perhaps bigquery
+	// table to store operations metrics.
+	FunnyTests = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_funny_tests",
+			Help: "Counts of anomolous tests.",
+		},
+		// ndt/pt/ss, s2c/c2s/meta, big/small/corrupt/
+		[]string{"table", "filetype", "anomoly"},
 	)
 
 	// Counts the number of retries on GCS read operations.
