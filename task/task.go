@@ -93,6 +93,6 @@ func (tt *Task) ProcessAllTests() error {
 		log.Printf("%v", err)
 	}
 	// TODO - make this debug or remove
-	log.Printf("%d files, %d nil data, %d rows", files, nilData, tt.Count())
+	log.Printf("%s: %d files, %d nil data, %d rows", tt.FullTableName(), files, nilData, tt.Count())
 	return err
 }

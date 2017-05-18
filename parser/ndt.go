@@ -199,7 +199,43 @@ type metaFileData struct {
 	fields map[string]string // All of the string fields.
 }
 
+const (
+	CLIENT_TO_SERVER = 0
+	SERVER_TO_CLIENT = 1
+)
+
+var fieldPairs = map[string]string{
+	"server IP address":       "server_ip",
+	"server hostname":         "server_hostname",
+	"server kernel version":   "server_kernel_version",
+	"client IP address":       "client_ip",
+	"client hostname":         "client_hostname",
+	"client OS name":          "client_os",
+	"client_browser name":     "client_browser",
+	"client_application name": "client_application",
+}
+
+func (mfd *metaFileData) PopulateConnSpec(connSpec *schema.Web100ValueMap) {
+	for k, v := range fieldPairs {
+		s, ok := mfd.fields[k]
+		if ok && s != "" {
+			connSpec.SetString(v, s)
+		}
+	}
+	s, ok := mfd.fields["server_ip"]
+	if ok && s != "" {
+		// TODO Parse the ip address and set the AF field.
+		connSpec.SetInt64("server_af", 0)
+	}
+	s, ok = mfd.fields["client_ip"]
+	if ok && s != "" {
+		// TODO Parse the ip address and set the AF field.
+		connSpec.SetInt64("client_af", 0)
+	}
+}
+
 // createMetaFileData uses the key:value pairs to populate the interpreted fields.
+// TODO(dev) - more unit tests?
 func createMetaFileData(testName string, fields map[string]string) (*metaFileData, error) {
 	var data metaFileData
 	data.testName = testName
@@ -524,13 +560,24 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, tes
 	}
 
 	// TODO(prod) Write a row with this data, even if the snapshot parsing fails?
-	connSpec := schema.Web100ValueMap{}
-	w.ConnectionSpec(connSpec)
+	nestedConnSpec := schema.Web100ValueMap{}
+	w.ConnectionSpec(nestedConnSpec)
 
 	results := schema.NewWeb100MinimalRecord(
 		w.LogVersion(), w.LogTime(),
-		(map[string]bigquery.Value)(connSpec),
+		(map[string]bigquery.Value)(nestedConnSpec),
 		(map[string]bigquery.Value)(snapValues))
+
+	connSpec := schema.EmptyConnectionSpec()
+	n.metaFile.PopulateConnSpec(connSpec)
+	switch testType {
+	case "c2s":
+		connSpec.SetInt64("data_direction", CLIENT_TO_SERVER)
+	case "s2c":
+		connSpec.SetInt64("data_direction", SERVER_TO_CLIENT)
+	default:
+	}
+	results["connection_spec"] = connSpec
 
 	err = n.inserter.InsertRow(&bq.MapSaver{fixValues(results)})
 	if err != nil {

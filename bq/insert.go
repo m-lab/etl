@@ -199,8 +199,14 @@ func (in *NullInserter) InsertRows(data []interface{}) error {
 func (in *NullInserter) Flush() error {
 	return nil
 }
-func (in *NullInserter) TableName() string {
-	return ""
+func (in *NullInserter) FullTableName() string {
+	return "base_suffix"
+}
+func (in *NullInserter) TableBase() string {
+	return "base"
+}
+func (in *NullInserter) TableSuffix() string {
+	return "_suffix"
 }
 func (in *NullInserter) Dataset() string {
 	return ""
