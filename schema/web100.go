@@ -32,7 +32,6 @@ func NewWeb100FullRecord(version string, logTime int64, connSpec, snapValues map
 	return Web100ValueMap{
 		"test_id":  "",
 		"log_time": 0,
-		// TODO(prod): parse the *.meta files for this data?
 		// Can this be part of the metadata service?
 		"connection_spec": FullConnectionSpec(),
 		"web100_log_entry": map[string]bigquery.Value{
@@ -52,7 +51,6 @@ func NewWeb100Skeleton() Web100ValueMap {
 		"web100_log_entry": Web100ValueMap{
 			"connection_spec": Web100ValueMap{},
 		},
-		// TODO(dev): add paris_traceroute_hop records here or separately?
 	}
 }
 
