@@ -81,14 +81,15 @@ var (
 	// Provides metrics:
 	//   etl_test_count{type}
 	// Example usage:
-	//   metrics.TaskCount.WithLabelValues("s2c").Inc()
+	// metrics.TestCount.WithLabelValues(
+	//	tt.Inserter.TableBase(), tt.Inserter.TableSuffix(), "s2c", "ok").Inc()
 	TestCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_test_count",
 			Help: "Number of tests processed.",
 		},
 		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/
-		[]string{"table", "filetype", "status"},
+		[]string{"table", "suffix", "filetype", "status"},
 	)
 
 	// Counts the number of retries on GCS read operations.

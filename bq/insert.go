@@ -30,10 +30,20 @@ import (
 // For now, 10K per row times 100 results is 1MB, which is an order of
 // magnitude below our 10MB max, so 100 might not be such a bad
 // default.
-func NewInserter(dataset string, dt etl.DataType) (etl.Inserter, error) {
+func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inserter, error) {
+	suffix := ""
+	table := etl.DataTypeToTable[dt]
+	if time.Since(partition) < 30*24*time.Hour {
+		// If within past 30 days, we can stream directly to partition.
+		suffix = "$" + partition.Format("20060102")
+	} else {
+		// Otherwise, we use a templated table, and must merge it later.
+		suffix = "_" + partition.Format("20060102")
+	}
+
 	return NewBQInserter(
-		etl.InserterParams{dataset, etl.DataTypeToTable[dt],
-			15 * time.Minute, 500}, nil)
+		etl.InserterParams{Dataset: dataset, Table: table, Suffix: suffix,
+			Timeout: 15 * time.Minute, BufferSize: 500}, nil)
 }
 
 // TODO - improve the naming between here and NewInserter.
@@ -41,13 +51,24 @@ func NewInserter(dataset string, dt etl.DataType) (etl.Inserter, error) {
 func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
 	if uploader == nil {
 		client := MustGetClient(params.Timeout)
-		uploader = client.Dataset(params.Dataset).Table(params.Table).Uploader()
+		table := params.Table
+		if params.Suffix[0] == '$' {
+			// Suffix starting with $ is just a partition spec.
+			table += params.Suffix
+		}
+		u := client.Dataset(params.Dataset).Table(table).Uploader()
+		if params.Suffix[0] == '_' {
+			// Suffix starting with _ is a template suffix.
+			u.TableTemplateSuffix = params.Suffix
+		}
+		uploader = u
 	}
 	in := BQInserter{params: params, uploader: uploader, timeout: params.Timeout}
 	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	return &in, nil
 }
 
+//===============================================================================
 var (
 	clientOnce sync.Once // This avoids a race on setting bqClient.
 	bqClient   *bigquery.Client
@@ -70,7 +91,7 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 	return bqClient
 }
 
-//----------------------------------------------------------------------------
+//===============================================================================
 
 // Generic implementation of bq.ValueSaver, based on map.  This avoids extra
 // conversion steps in the bigquery library (except for the JSON conversion).
@@ -142,8 +163,16 @@ func (in *BQInserter) Flush() error {
 	return err
 }
 
-func (in *BQInserter) TableName() string {
+func (in *BQInserter) FullTableName() string {
+	return in.TableBase() + in.TableSuffix()
+}
+func (in *BQInserter) TableBase() string {
 	return in.params.Table
+}
+
+// The $ or _ suffix.
+func (in *BQInserter) TableSuffix() string {
+	return in.params.Suffix
 }
 func (in *BQInserter) Dataset() string {
 	return in.params.Dataset
@@ -199,6 +228,6 @@ func (dw DurationWrapper) Flush() error {
 		status = "fail"
 	}
 	metrics.InsertionHistogram.WithLabelValues(
-		dw.TableName(), status).Observe(time.Since(t).Seconds())
+		dw.TableBase(), status).Observe(time.Since(t).Seconds())
 	return err
 }

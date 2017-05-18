@@ -15,8 +15,13 @@ type Inserter interface {
 	InsertRows(data []interface{}) error
 	// Flush flushes any rows in the buffer out to bigquery.
 	Flush() error
-	// TableName name of the BQ table that the uploader pushes to.
-	TableName() string
+	// Base Table name of the BQ table that the uploader pushes to.
+	TableBase() string
+	// Table name suffix of the BQ table that the uploader pushes to.
+	TableSuffix() string
+	// Full table name of the BQ table that the uploader pushes to,
+	// including $YYYYMMNN, or _YYYYMMNN
+	FullTableName() string
 	// Dataset name of the BQ dataset containing the table.
 	Dataset() string
 	// Count returns the count of rows currently in the buffer.
@@ -29,8 +34,10 @@ type Inserter interface {
 type InserterParams struct {
 	// The project comes from os.GetEnv("GCLOUD_PROJECT")
 	// These specify the google cloud dataset/table to write to.
-	Dataset    string
-	Table      string
+	Dataset string
+	Table   string
+	// Suffix may be an actual _YYYYMMDD or partition $YYYYMMDD
+	Suffix     string        // Table name suffix for templated tables or partitions.
 	Timeout    time.Duration // max duration of backend calls.  (for context)
 	BufferSize int           // Number of rows to buffer before writing to backend.
 }

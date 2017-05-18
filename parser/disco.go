@@ -73,7 +73,9 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 		ps.Meta = ms
 		err := dec.Decode(&ps)
 		if err != nil {
-			metrics.TestCount.WithLabelValues(dp.TableName(), "disco", "Decode").Inc()
+			metrics.TestCount.WithLabelValues(
+				dp.TableName(), dp.inserter.TableSuffix(),
+				"disco", "Decode").Inc()
 			// TODO(dev) Should accumulate errors, instead of aborting?
 			return err
 		}
@@ -83,21 +85,24 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 			case bigquery.PutMultiError:
 				// TODO improve error handling??
 				metrics.TestCount.WithLabelValues(
-					dp.TableName(), "disco", "insert-multi").Inc()
+					dp.TableName(), dp.inserter.TableSuffix(),
+					"disco", "insert-multi").Inc()
 				log.Printf("%v\n", t[0].Error())
 			default:
 				metrics.TestCount.WithLabelValues(
-					dp.TableName(), "disco", "insert-other").Inc()
+					dp.TableName(), dp.inserter.TableSuffix(),
+					"disco", "insert-other").Inc()
 			}
 			// TODO(dev) Should accumulate errors, instead of aborting?
 			return err
 		}
 	}
-	metrics.TestCount.WithLabelValues(dp.TableName(), "disco", "ok").Inc()
+	metrics.TestCount.WithLabelValues(dp.TableName(), dp.inserter.TableSuffix(),
+		"disco", "ok").Inc()
 
 	return nil
 }
 
 func (dp *DiscoParser) TableName() string {
-	return dp.inserter.TableName()
+	return dp.inserter.TableBase()
 }
