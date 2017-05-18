@@ -27,13 +27,13 @@ var (
 )
 
 //=========================================================================
-// Test name parsing related stuff.
+// NDT Test filename parsing related stuff.
 //=========================================================================
 
 // TODO - should this be optional?
 const dateDir = `^(?P<dir>\d{4}/\d{2}/\d{2}/)?`
 
-// TODO - use time.Parse to parse this part of the filename.
+// TODO(NOW) - use time.Parse to parse this part of the filename.
 const dateField = `(?P<date>\d{8})T`
 const timeField = `(?P<time>[012]\d:[0-6]\d:\d{2}\.\d{1,10})Z_`
 const address = `(?P<address>.*)`
@@ -95,8 +95,11 @@ type NDTParser struct {
 	tmpDir string
 
 	timestamp string // The unique timestamp common across all files in current batch.
-	c2s       *fileInfoAndData
-	s2c       *fileInfoAndData
+
+	// TODO(dev) Sometimes NDT writes multiple copies of c2s or s2c.  We need to save them
+	// and use only the one identified in meta file.
+	c2s *fileInfoAndData
+	s2c *fileInfoAndData
 
 	metaFile *metaFileData
 }
@@ -129,7 +132,10 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	taskFileName := taskInfo["filename"].(string)
 
 	if info.Time != n.timestamp {
-		n.reportAnomolies(taskFileName)
+		// All files are processed ASAP.  However, if there is ONLY
+		// a data file, or ONLY a meta file, we have to process the
+		// test files anyway.
+		n.handleAnomolies(taskFileName)
 
 		n.timestamp = info.Time
 		n.s2c = nil
@@ -193,6 +199,7 @@ type metaFileData struct {
 	fields map[string]string // All of the string fields.
 }
 
+// createMetaFileData uses the key:value pairs to populate the interpreted fields.
 func createMetaFileData(testName string, fields map[string]string) (*metaFileData, error) {
 	var data metaFileData
 	data.testName = testName
@@ -222,6 +229,7 @@ func createMetaFileData(testName string, fields map[string]string) (*metaFileDat
 	return &data, nil
 }
 
+// parseMetaFile converts the raw content into key value map.
 func parseMetaFile(rawContent []byte) (map[string]string, error) {
 	result := make(map[string]string, 20)
 
@@ -248,9 +256,8 @@ func parseMetaFile(rawContent []byte) (map[string]string, error) {
 	return result, nil
 }
 
-// All files are processed ASAP.  However, if there is ONLY
-// a data file, or ONLY a meta file, we should log and count that.
-func (n *NDTParser) reportAnomolies(taskFileName string) {
+// In the case that we are missing one or more files, report and handle gracefully.
+func (n *NDTParser) handleAnomolies(taskFileName string) {
 	switch {
 	case n.metaFile == nil:
 		n.metaFile = &metaFileData{} // Hack to allow processTest to run.

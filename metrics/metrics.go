@@ -94,15 +94,14 @@ var (
 		[]string{"table", "suffix", "filetype", "status"},
 	)
 
-	// Counts the number of tests processed by the parsers..
+	// Counts of anomolies in tests.  Generally these are non-terminal, so the
+	// test also shows up in TestCount with status ok.
 	//
 	// Provides metrics:
-	//   etl_test_count{type}
+	//   etl_funny_tests{type}
 	// Example usage:
 	// metrics.FunnyTests.WithLabelValues(
 	//	tt.Inserter.TableBase(), "s2c", "<16KB").Inc()
-	// TODO(2017) Remove suffix field, and use a more scalable solution, perhaps bigquery
-	// table to store operations metrics.
 	FunnyTests = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_funny_tests",
