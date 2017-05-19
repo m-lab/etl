@@ -266,6 +266,19 @@ func createMetaFileData(testName string, fields map[string]string) (*metaFileDat
 }
 
 // parseMetaFile converts the raw content into key value map.
+// Meta file has .meta suffix, and contains mostly key value pairs separated by ':', some with no value, e.g.
+// Date/Time: 20170512T17:55:18.538553000Z
+// c2s_snaplog file: 20170512T17:55:18.538553000Z_94.197.121.150.threembb.co.uk:54430.c2s_snaplog.gz
+// ...
+// server IP address:
+// server hostname: mlab1.lhr01.measurement-lab.org
+// ...
+// Summary data: 0,0,2952,0,0,0,...
+// * Additional data:
+// tls: true
+// websockets: true
+//
+// Notable exception is the * Additional data: line, which also parses as a key value pair, but isn't.
 func parseMetaFile(rawContent []byte) (map[string]string, error) {
 	result := make(map[string]string, 20)
 
@@ -283,11 +296,12 @@ func parseMetaFile(rawContent []byte) (map[string]string, error) {
 			// TODO Error message or counter?
 			continue
 		}
+		// TODO(dev) - filter out binary data that sometimes shows up in corrupted files.
 		result[kv[0]] = kv[1]
 	}
 	if err != io.EOF {
-		return nil, err
 		// TODO Error message or counter?
+		return nil, err
 	}
 	return result, nil
 }

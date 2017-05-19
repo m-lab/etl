@@ -16,11 +16,6 @@ func (s Web100ValueMap) SetInt64(name string, value int64) {
 	s[name] = value
 }
 
-// SetInt64 saves an int64 in a field with the given name.
-func (s Web100ValueMap) SetFloat64(name string, value float64) {
-	s[name] = value
-}
-
 // SetString saves a string in a field with the given name.
 func (s Web100ValueMap) SetString(name string, value string) {
 	s[name] = value

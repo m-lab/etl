@@ -50,7 +50,7 @@ var (
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_worker_count
+	//   etl_worker_count{state}
 	// Example usage:
 	//   metrics.WorkerState.WithLabelValues("flush").Inc() / .Dec()
 	WorkerState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -64,7 +64,7 @@ var (
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_task_count{module, status}
+	//   etl_task_count{package, status}
 	// Example usage:
 	//   metrics.TaskCount.WithLabelValues("Task", "ok").Inc()
 	TaskCount = prometheus.NewCounterVec(
@@ -79,7 +79,7 @@ var (
 	// Counts the number of tests processed by the parsers..
 	//
 	// Provides metrics:
-	//   etl_test_count{type}
+	//   etl_test_count{table, suffix, filetype, status}
 	// Example usage:
 	// metrics.TestCount.WithLabelValues(
 	//	tt.Inserter.TableBase(), tt.Inserter.TableSuffix(), "s2c", "ok").Inc()
@@ -98,7 +98,7 @@ var (
 	// test also shows up in TestCount with status ok.
 	//
 	// Provides metrics:
-	//   etl_funny_tests{type}
+	//   etl_funny_tests{table, filetype, anomoly}
 	// Example usage:
 	// metrics.FunnyTests.WithLabelValues(
 	//	tt.Inserter.TableBase(), "s2c", "<16KB").Inc()
@@ -130,7 +130,7 @@ var (
 	// Counts the number of into BigQuery insert operations.
 	//
 	// Provides metrics:
-	//   etl_worker_bigquery_insert_total{worker, status}
+	//   etl_worker_bigquery_insert_total{table, status}
 	// Usage example:
 	//   metrics.BigQueryInsert.WithLabelValues("ndt", "200").Inc()
 	BigQueryInsert = prometheus.NewCounterVec(
@@ -139,7 +139,7 @@ var (
 			Help: "Number of BigQuery insert operations.",
 		},
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
-		[]string{"worker", "status"},
+		[]string{"table", "status"},
 	)
 
 	// A histogram of bigquery insertion times. The buckets should use
