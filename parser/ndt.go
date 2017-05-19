@@ -36,29 +36,31 @@ var (
 const dateDir = `^(?P<dir>\d{4}/\d{2}/\d{2}/)?`
 
 // TODO - use time.Parse to parse this part of the filename.
-const dateField = `(?P<date>\d{8})T`
-const timeField = `(?P<time>[012]\d:[0-6]\d:\d{2}\.\d{1,10})Z_`
+const dateField = `(?P<date>\d{8})`
+const timeField = `(?P<time>[012]\d:[0-6]\d:\d{2}\.\d{1,10})`
 const address = `(?P<address>.*)`
-const gzSuffix = `\.(?P<suffix>[a-z2].*)\.gz$`
-const suffix = `\.(?P<suffix>[a-z2].*)$`
+const suffix = `(?P<suffix>[a-z2].*)`
 
 var (
 	// Pattern for any valid test file name
-	testFilePattern   = regexp.MustCompile(dateDir + dateField + timeField + address + suffix)
-	gzTestFilePattern = regexp.MustCompile(dateDir + dateField + timeField + address + gzSuffix)
+	testFilePattern = regexp.MustCompile(
+		"^" + dateDir + dateField + "T" + timeField + "Z_" + address + `\.` + suffix + "$")
+	gzTestFilePattern = regexp.MustCompile(
+		"^" + dateDir + dateField + "T" + timeField + "Z_" + address + `\.` + suffix + `\.gz$`)
 
 	datePattern = regexp.MustCompile(dateField)
-	timePattern = regexp.MustCompile("T" + timeField)
-	endPattern  = regexp.MustCompile(suffix)
+	timePattern = regexp.MustCompile("T" + timeField + "Z_")
+	endPattern  = regexp.MustCompile(suffix + `$`)
 )
 
 // testInfo contains all the fields from a valid NDT test file name.
 type testInfo struct {
-	DateDir string // Optional leading date yyyy/mm/dd/
-	Date    string // The date field from the test file name
-	Time    string // The time field
-	Address string // The remote address field
-	Suffix  string // The filename suffix
+	DateDir   string    // Optional leading date yyyy/mm/dd/
+	Date      string    // The date field from the test file name
+	Time      string    // The time field
+	Address   string    // The remote address field
+	Suffix    string    // The filename suffix
+	Timestamp time.Time // The parsed timestamp, with microsecond resolution
 }
 
 func ParseNDTFileName(path string) (*testInfo, error) {
@@ -78,7 +80,12 @@ func ParseNDTFileName(path string) (*testInfo, error) {
 		}
 		return nil, errors.New("Invalid test path: " + path)
 	}
-	return &testInfo{fields[1], fields[2], fields[3], fields[4], fields[5]}, nil
+	timestamp, err := time.Parse("20060102T15:04:05.999999999Z_", fields[2]+"T"+fields[3]+"Z_")
+	if err != nil {
+		log.Println(fields[2] + "T" + fields[3] + "   " + err.Error())
+		return nil, errors.New("Invalid test path: " + path)
+	}
+	return &testInfo{fields[1], fields[2], fields[3], fields[4], fields[5], timestamp}, nil
 }
 
 //=========================================================================
@@ -97,6 +104,7 @@ type NDTParser struct {
 	tmpDir string
 
 	timestamp string // The unique timestamp common across all files in current batch.
+	time      time.Time
 
 	// TODO(dev) Sometimes NDT writes multiple copies of c2s or s2c.  We need to save them
 	// and use only the one identified in meta file.
@@ -154,7 +162,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 			log.Printf("Collision: %s and %s\n", n.c2s.fn, testName)
 		}
 		n.c2s = &fileInfoAndData{testName, *info, content}
-		n.processTest(taskFileName, n.c2s.fn, "c2s", n.c2s.data)
+		n.processTest(taskFileName, n.c2s, "c2s")
 	case "s2c_snaplog":
 		if n.s2c != nil {
 			metrics.TestCount.WithLabelValues(
@@ -163,7 +171,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 			log.Printf("Collision: %s and %s\n", n.s2c.fn, testName)
 		}
 		n.s2c = &fileInfoAndData{testName, *info, content}
-		n.processTest(taskFileName, n.s2c.fn, "s2c", n.s2c.data)
+		n.processTest(taskFileName, n.s2c, "s2c")
 	case "meta":
 		if n.metaFile != nil {
 			metrics.TestCount.WithLabelValues(
@@ -172,10 +180,10 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		}
 		n.processMeta(testName, content)
 		if n.c2s != nil {
-			n.processTest(taskFileName, n.c2s.fn, "c2s", n.c2s.data)
+			n.processTest(taskFileName, n.c2s, "c2s")
 		}
 		if n.s2c != nil {
-			n.processTest(taskFileName, n.s2c.fn, "s2c", n.s2c.data)
+			n.processTest(taskFileName, n.s2c, "s2c")
 		}
 	case "c2s_ndttrace":
 	case "s2c_ndttrace":
@@ -261,6 +269,7 @@ func (mfd *metaFileData) PopulateConnSpec(connSpec *schema.Web100ValueMap) {
 
 // createMetaFileData uses the key:value pairs to populate the interpreted fields.
 // TODO(dev) - more unit tests?
+// TODO(dev) - move to separate file - meta.go
 func createMetaFileData(testName string, fields map[string]string) (*metaFileData, error) {
 	var data metaFileData
 	data.testName = testName
@@ -304,6 +313,7 @@ func createMetaFileData(testName string, fields map[string]string) (*metaFileDat
 // websockets: true
 //
 // Notable exception is the * Additional data: line, which also parses as a key value pair, but isn't.
+// TODO pass fileInfoAndData
 func parseMetaFile(rawContent []byte) (map[string]string, error) {
 	result := make(map[string]string, 20)
 
@@ -341,14 +351,14 @@ func (n *NDTParser) handleAnomolies(taskFileName string) {
 				n.TableName(), n.inserter.TableSuffix(), "s2c", "no meta").Inc()
 			// TODO enable this once noise is reduced.
 			// log.Printf("No meta: %s %s\n", taskFileName, n.s2c.fn)
-			n.processTest(taskFileName, n.s2c.fn, "s2c", n.s2c.data)
+			n.processTest(taskFileName, n.s2c, "s2c")
 		}
 		if n.c2s != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(), "c2s", "no meta").Inc()
 			// TODO enable this once noise is reduced.
 			// log.Printf("No meta: %s %s\n", taskFileName, n.c2s.fn)
-			n.processTest(taskFileName, n.c2s.fn, "c2s", n.c2s.data)
+			n.processTest(taskFileName, n.c2s, "c2s")
 		}
 		if n.s2c == nil && n.c2s == nil {
 			metrics.TestCount.WithLabelValues(
@@ -397,7 +407,7 @@ func (n *NDTParser) processMeta(testName string, content []byte) {
 // processMeta should already have been called and produced valid data in n.metaFile
 // However, we often get s2c and c2s without corresponding meta files.  When this happens,
 // we proceed with an empty metaFile.
-func (n *NDTParser) processTest(taskFileName string, testName string, testType string, rawSnapLog []byte) {
+func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, testType string) {
 	if n.metaFile == nil {
 		// Defer processing until we get the meta file.
 		return
@@ -406,32 +416,32 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 	// NOTE: this file size threshold and the number of simultaneous workers
 	// defined in etl_worker.go must guarantee that all files written to
 	// /mnt/tmpfs will fit.
-	if len(rawSnapLog) > 10*1024*1024 {
+	if len(test.data) > 10*1024*1024 {
 		metrics.FunnyTests.WithLabelValues(
 			n.TableName(), testType, ">10MB").Inc()
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, ">10MB").Inc()
 		log.Printf("Ignoring oversize snaplog: %d, %s\n",
-			len(rawSnapLog), testName)
+			len(test.data), test.fn)
 		metrics.FileSizeHistogram.WithLabelValues(
-			"huge").Observe(float64(len(rawSnapLog)))
+			"huge").Observe(float64(len(test.data)))
 		return
 	} else {
 		// Record the file size.
 		metrics.FileSizeHistogram.WithLabelValues(
-			"normal").Observe(float64(len(rawSnapLog)))
+			"normal").Observe(float64(len(test.data)))
 	}
 
-	if len(rawSnapLog) < 16*1024 {
+	if len(test.data) < 16*1024 {
 		// TODO - Use separate counter, since this is not unique across
 		// the test.
 		metrics.FunnyTests.WithLabelValues(
 			n.TableName(), testType, "<16KB").Inc()
 		log.Printf("Note: small rawSnapLog: %d, %s\n",
-			len(rawSnapLog), testName)
+			len(test.data), test.fn)
 	}
-	if len(rawSnapLog) == 4096 {
+	if len(test.data) == 4096 {
 		// TODO - Use separate counter, since this is not unique across
 		// the test.
 		metrics.FunnyTests.WithLabelValues(
@@ -453,7 +463,7 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, "web100.Asset").Inc()
 		log.Printf("web100.Asset error: %s processing %s from %s\n",
-			err, testName, taskFileName)
+			err, test.fn, taskFileName)
 		return
 	}
 	b := bytes.NewBuffer(data)
@@ -467,7 +477,7 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, "web100.ParseDef").Inc()
 		log.Printf("web100.ParseDef error: %s processing %s from %s\n",
-			err, testName, taskFileName)
+			err, test.fn, taskFileName)
 		return
 	}
 
@@ -479,19 +489,19 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, "TmpFile").Inc()
 		log.Printf("Failed to create tmpfile for: %s in %s, when processing: %s\n",
-			testName, n.tmpDir, taskFileName)
+			test.fn, n.tmpDir, taskFileName)
 		return
 	}
 
 	c := 0
-	for count := 0; count < len(rawSnapLog); count += c {
-		c, err = tmpFile.Write(rawSnapLog)
+	for count := 0; count < len(test.data); count += c {
+		c, err = tmpFile.Write(test.data)
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(),
 				testType, "tmpFile.Write").Inc()
 			log.Printf("tmpFile.Write error: %s processing: %s from %s\n",
-				err, testName, taskFileName)
+				err, test.fn, taskFileName)
 			return
 		}
 	}
@@ -509,23 +519,23 @@ func (n *NDTParser) processTest(taskFileName string, testName string, testType s
 		// These are mostly "could not parse /proc/web100/header",
 		// with some "file read/write error C"
 		log.Printf("web100.Open error: %s processing %s from %s\n",
-			err, testName, taskFileName)
+			err, test.fn, taskFileName)
 		return
 	}
 	defer w.Close()
 
 	// Seek to either last snapshot, or snapshot 2100 if there are more than that.
-	if !seek(w, n.TableName(), n.inserter.TableSuffix(), taskFileName, testName, testType) {
+	if !seek(w, n.TableName(), n.inserter.TableSuffix(), taskFileName, test.fn, testType) {
 		// TODO - is there a previous snapshot we can use???
 		return
 	}
 
-	n.getAndInsertValues(w, taskFileName, testName, testType)
+	n.getAndInsertValues(w, taskFileName, test, testType)
 }
 
 // Find the "last" web100 snapshot.
 // Returns true if valid snapshot found.
-func seek(w *web100.Web100, tableName string, suffix string, tarFileName string, testName string, testType string) bool {
+func seek(w *web100.Web100, tableName string, suffix string, taskFileName string, testName string, testType string) bool {
 	metrics.WorkerState.WithLabelValues("seek").Inc()
 	defer metrics.WorkerState.WithLabelValues("seek").Dec()
 	// Limit to parsing only up to 2100 snapshots.
@@ -549,7 +559,7 @@ func seek(w *web100.Web100, tableName string, suffix string, tarFileName string,
 				metrics.TestCount.WithLabelValues(
 					tableName, suffix, testType, "w.Next").Inc()
 				log.Printf("w.Next error: %s processing snap %d from %s from %s\n",
-					err, count, testName, tarFileName)
+					err, count, testName, taskFileName)
 				// This could either be a bad record, or EOF.
 				badRecords++
 				if badRecords > 10 {
@@ -559,7 +569,7 @@ func seek(w *web100.Web100, tableName string, suffix string, tarFileName string,
 						tableName, suffix, testType, "badRecords").Inc()
 					// TODO - don't see this in the logs on 5/4.  Not sure why.
 					log.Printf("w.Next 10 bad processing snapshots from %s from %s\n",
-						testName, tarFileName)
+						testName, taskFileName)
 					// TODO - is there a previous snapshot we can use???
 					return false
 				}
@@ -582,7 +592,7 @@ func seek(w *web100.Web100, tableName string, suffix string, tarFileName string,
 	return true
 }
 
-func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, testName string, testType string) {
+func (n *NDTParser) getAndInsertValues(w *web100.Web100, taskFileName string, test *fileInfoAndData, testType string) {
 	// Extract the values from the last snapshot.
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
@@ -594,7 +604,7 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, tes
 			n.TableName(), n.inserter.TableSuffix(),
 			testType, "values-err").Inc()
 		log.Printf("Error calling web100 Values() in test %s, when processing: %s\n%s\n",
-			testName, tarFileName, err)
+			test.fn, taskFileName, err)
 		return
 	}
 
@@ -607,6 +617,8 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, tarFileName string, tes
 		(map[string]bigquery.Value)(nestedConnSpec),
 		(map[string]bigquery.Value)(snapValues))
 
+	results["test_id"] = test.fn
+	results["log_time"] = test.info.Timestamp.Unix()
 	connSpec := schema.EmptyConnectionSpec()
 	n.metaFile.PopulateConnSpec(connSpec)
 	switch testType {
