@@ -20,7 +20,7 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 		// TODO - substitute appropriate parsers here and below.
 		return NewTestParser(ins)
 	case etl.PT:
-		return NewTestParser(ins)
+		return NewPTParser(ins)
 	case etl.SW:
 		return NewDiscoParser(ins)
 	default:
