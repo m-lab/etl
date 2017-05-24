@@ -507,7 +507,7 @@ func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, test
 	}
 
 	tmpFile.Sync()
-	// TODO(prod): log possible remove errors.
+	// TODO(prod): Do we ever see remove errors?  Should log them.
 	defer os.Remove(tmpFile.Name())
 
 	// Open the file we created above.
@@ -540,7 +540,6 @@ func seek(w *web100.Web100, tableName string, suffix string, taskFileName string
 	defer metrics.WorkerState.WithLabelValues("seek").Dec()
 	// Limit to parsing only up to 2100 snapshots.
 	// NOTE: This is different from legacy pipeline!!
-	badRecords := 0
 	for count := 0; count < 2100; count++ {
 		err := w.Next()
 		if err != nil {
@@ -549,31 +548,16 @@ func seek(w *web100.Web100, tableName string, suffix string, taskFileName string
 				break
 			} else {
 				// FYI - something like 1/5000 logs typically have these errors.
-				// But they may be associated with specific bad machines.
-				//
-				// When we see "missing end of header" or
-				// "truncated", then they are usually singletons, so either we
-				// recover or perhaps we get EOF immediately.
-				// TODO - Use separate counter, since this is not unique across
-				// the test.
+				// They are things like "missing snaplog header" or "truncated".
+				// They may be associated with specific bad machines.
+				// We originally tried to get past the error, but this sometimes
+				// results in corrupted data, so probably better to terminate
+				// on this kind of error.
 				metrics.TestCount.WithLabelValues(
 					tableName, suffix, testType, "w.Next").Inc()
 				log.Printf("w.Next error: %s processing snap %d from %s from %s\n",
 					err, count, testName, taskFileName)
-				// This could either be a bad record, or EOF.
-				badRecords++
-				if badRecords > 10 {
-					// TODO - Use separate counter, since this is not unique across
-					// the test.
-					metrics.TestCount.WithLabelValues(
-						tableName, suffix, testType, "badRecords").Inc()
-					// TODO - don't see this in the logs on 5/4.  Not sure why.
-					log.Printf("w.Next 10 bad processing snapshots from %s from %s\n",
-						testName, taskFileName)
-					// TODO - is there a previous snapshot we can use???
-					return false
-				}
-				continue
+				return false
 			}
 		}
 		// HACK - just to see how expensive the Values() call is...

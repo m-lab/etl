@@ -15,6 +15,7 @@
 package bq
 
 import (
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -61,6 +62,9 @@ func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Insert
 			// Suffix starting with _ is a template suffix.
 			u.TableTemplateSuffix = params.Suffix
 		}
+		// This avoids problems when a single row of the insert has invalid
+		// data.  We then have to carefully parse the returned error object.
+		u.SkipInvalidRows = true
 		uploader = u
 	}
 	in := BQInserter{params: params, uploader: uploader, timeout: params.Timeout}
@@ -113,6 +117,8 @@ type BQInserter struct {
 	timeout  time.Duration
 	rows     []interface{}
 	inserted int // Number of rows successfully inserted.
+	badRows  int // Number of row failures.
+	failures int // Number of complete insert failures.
 }
 
 // Caller should check error, and take appropriate action before calling again.
@@ -144,6 +150,43 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 	return nil
 }
 
+func (in *BQInserter) HandleInsertErrors(err error) error {
+	switch typedErr := err.(type) {
+	case bigquery.PutMultiError:
+		if len(typedErr) == len(in.rows) {
+			// TODO What if there is only one row in the request?
+			log.Printf("%v\n", err)
+			metrics.ErrorCount.WithLabelValues(
+				in.TableBase(), "failed insert").Inc()
+			in.failures += 1
+		} else {
+			// Handle each error individually.
+			// TODO Should we try to handle large numbers of row errors?
+			for _, rowError := range typedErr {
+				// These are rowInsertionErrors
+				log.Printf("%v\n", rowError)
+				// rowError.Errors is a MultiError
+				for _, oneErr := range rowError.Errors {
+					log.Printf("Insert error: %v\n", oneErr)
+					metrics.ErrorCount.WithLabelValues(
+						in.TableBase(), "insert row error").Inc()
+				}
+			}
+		}
+		in.inserted += len(in.rows) - len(typedErr)
+		in.badRows += len(typedErr)
+		err = nil
+	default:
+		log.Printf("Unhandled insert error %v\n", typedErr)
+		metrics.ErrorCount.WithLabelValues(
+			in.TableBase(), "other insert error").Inc()
+		err = nil
+	}
+	// Allocate new slice of rows.  Any failed rows are lost.
+	in.rows = make([]interface{}, 0, in.params.BufferSize)
+	return err
+}
+
 // TODO(dev) Should have a recovery mechanism for failed inserts.
 func (in *BQInserter) Flush() error {
 	metrics.WorkerState.WithLabelValues("flush").Inc()
@@ -160,8 +203,8 @@ func (in *BQInserter) Flush() error {
 		in.inserted += len(in.rows)
 		in.rows = make([]interface{}, 0, in.params.BufferSize)
 	} else {
-		// TODO(prod) Add some debugging help here.
-		// TODO(prod) Interpret the error message and take appropriate action.
+		// This adjusts the inserted count, failure count, and updates in.rows.
+		err = in.HandleInsertErrors(err)
 	}
 	return err
 }
