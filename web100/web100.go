@@ -240,6 +240,8 @@ func (w *Web100) SnapshotValues(snapValues Saver) error {
 				snapValues.SetString(canonicalName, C.GoString((*C.char)(w.text)))
 			} else if e.Err == strconv.ErrRange {
 				log.Println("Range error: " + e.Num)
+				// On a range error, ParseInt returns the best legal value,
+				// i.e., MaxInt64, or MinInt64, so we just use that value.
 				snapValues.SetInt64(canonicalName, value)
 			}
 		} else {
