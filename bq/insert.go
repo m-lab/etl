@@ -159,6 +159,9 @@ func (in *BQInserter) Flush() error {
 	if err == nil {
 		in.inserted += len(in.rows)
 		in.rows = make([]interface{}, 0, in.params.BufferSize)
+	} else {
+		// TODO(prod) Add some debugging help here.
+		// TODO(prod) Interpret the error message and take appropriate action.
 	}
 	return err
 }

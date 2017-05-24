@@ -234,8 +234,16 @@ func (w *Web100) SnapshotValues(snapValues Saver) error {
 		// Attempt to convert the current variable to an int64.
 		value, err := strconv.ParseInt(C.GoString((*C.char)(w.text)), 10, 64)
 		if err != nil {
-			// If it cannot be converted, leave the variable as a string.
-			snapValues.SetString(canonicalName, C.GoString((*C.char)(w.text)))
+			e := err.(*strconv.NumError)
+			if e.Err == strconv.ErrSyntax {
+				// If it cannot be converted, leave the variable as a string.
+				snapValues.SetString(canonicalName, C.GoString((*C.char)(w.text)))
+			} else if e.Err == strconv.ErrRange {
+				log.Println("Range error: " + e.Num)
+				// On a range error, ParseInt returns the best legal value,
+				// i.e., MaxInt64, or MinInt64, so we just use that value.
+				snapValues.SetInt64(canonicalName, value)
+			}
 		} else {
 			snapValues.SetInt64(canonicalName, value)
 		}
