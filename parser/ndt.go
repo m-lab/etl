@@ -507,7 +507,7 @@ func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, test
 	}
 
 	tmpFile.Sync()
-	// TODO(prod): log possible remove errors.
+	// TODO(prod): Do we ever see remove errors?  Should log them.
 	defer os.Remove(tmpFile.Name())
 
 	// Open the file we created above.

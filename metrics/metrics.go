@@ -21,6 +21,7 @@ func init() {
 	prometheus.MustRegister(WorkerState)
 	prometheus.MustRegister(TaskCount)
 	prometheus.MustRegister(TestCount)
+	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(GCSRetryCount)
 	prometheus.MustRegister(BigQueryInsert)
 	prometheus.MustRegister(DurationHistogram)
@@ -92,6 +93,21 @@ var (
 		},
 		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/
 		[]string{"table", "suffix", "filetype", "status"},
+	)
+
+	// Counts the all types of errors.
+	//
+	// Provides metrics:
+	//   etl_error_count{parser, kind}
+	// Example usage:
+	//   metrics.ErrorCount.WithLabelValues("NDT", "insert").Inc()
+	ErrorCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_error_count",
+			Help: "Number of errors.",
+		},
+		// Parser type, error description.
+		[]string{"parser", "kind"},
 	)
 
 	// Counts of anomolies in tests.  Generally these are non-terminal, so the

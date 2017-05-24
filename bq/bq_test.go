@@ -156,3 +156,29 @@ func TestBufferingAndFlushing(t *testing.T) {
 	}
 
 }
+
+// Just manual testing for now - need to assert something useful.
+func TestHandleInsertErrors(t *testing.T) {
+	in, e := bq.NewBQInserter(
+		etl.InserterParams{"dataset", "table", "", time.Minute, 5},
+		fake.NewFakeUploader())
+	if e != nil {
+		log.Printf("%v\n", e)
+		t.Fatal()
+	}
+
+	rie := bigquery.RowInsertionError{InsertID: "1234", RowIndex: 123}
+	var bqe bigquery.Error
+	bqe.Location = "location"
+	bqe.Message = "message"
+	bqe.Reason = "invalid"
+	// This is a little wierd.  MultiError we receive from insert contain
+	// *bigquery.Error.  So that is what we test here.
+	rie.Errors = append(rie.Errors, &bqe)
+
+	var pme bigquery.PutMultiError
+	pme = append(pme, rie)
+	in.(*bq.BQInserter).HandleInsertErrors(pme)
+
+    // TODO - assert something.
+}
