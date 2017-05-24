@@ -98,16 +98,16 @@ var (
 	// Counts the all types of errors.
 	//
 	// Provides metrics:
-	//   etl_error_count{parser, kind}
+	//   etl_error_count{table, kind}
 	// Example usage:
-	//   metrics.ErrorCount.WithLabelValues("NDT", "insert").Inc()
+	//   metrics.ErrorCount.WithLabelValues(TableName(), "insert").Inc()
 	ErrorCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_error_count",
 			Help: "Number of errors.",
 		},
 		// Parser type, error description.
-		[]string{"parser", "kind"},
+		[]string{"table", "kind"},
 	)
 
 	// Counts of anomolies in tests.  Generally these are non-terminal, so the
