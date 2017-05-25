@@ -7,6 +7,7 @@ import (
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/schema"
 
 	"github.com/kr/pretty"
 
@@ -93,13 +94,13 @@ func TestNDTParser(t *testing.T) {
 
 	// Extract the values saved to the inserter.
 	actualValues := ins.data[0].(*bq.MapSaver).Values
-	expectedValues := map[string]bigquery.Value{
-		"web100_log_entry": map[string]bigquery.Value{
+	expectedValues := schema.Web100ValueMap{
+		"web100_log_entry": schema.Web100ValueMap{
 			"version": "2.5.27 201001301335 net100",
-			"snap": map[string]bigquery.Value{
+			"snap": schema.Web100ValueMap{
 				"RemAddress": "45.56.98.222",
 			},
-			"connection_spec": map[string]bigquery.Value{
+			"connection_spec": schema.Web100ValueMap{
 				"local_port": int64(40105),
 			},
 		},
@@ -126,12 +127,12 @@ func TestNDTParser(t *testing.T) {
 
 // compare recursively checks whether actual values equal values in the expected values.
 // The expected values may be a subset of the actual values, but not a superset.
-func compare(t *testing.T, actual map[string]bigquery.Value, expected map[string]bigquery.Value) bool {
+func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100ValueMap) bool {
 	match := true
 	for key, value := range expected {
 		switch v := value.(type) {
-		case map[string]bigquery.Value:
-			match = match && compare(t, actual[key].(map[string]bigquery.Value), v)
+		case schema.Web100ValueMap:
+			match = match && compare(t, actual[key].(schema.Web100ValueMap), v)
 		case string:
 			if actual[key].(string) != v {
 				t.Logf("Wrong strings for key %q: got %q; want %q",
