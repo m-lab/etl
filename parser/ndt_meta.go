@@ -17,15 +17,15 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
-// metaFileData is the parsed info from the .meta file.
-type metaFileData struct {
-	testName    string
-	dateTime    time.Time
-	summaryData []int32 // Note: this is ignored in the legacy pipeline.
-	tls         bool
-	websockets  bool
+// MetaFileData is the parsed info from the .meta file.
+type MetaFileData struct {
+	TestName    string
+	DateTime    time.Time
+	SummaryData []int32 // Note: this is ignored in the legacy pipeline.
+	Tls         bool
+	Websockets  bool
 
-	fields map[string]string // All of the string fields.
+	Fields map[string]string // All of the string fields.
 }
 
 const (
@@ -59,19 +59,19 @@ func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
 	}
 }
 
-func (mfd *metaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
+func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 	for k, v := range fieldPairs {
-		s, ok := mfd.fields[k]
+		s, ok := mfd.Fields[k]
 		if ok && s != "" {
 			connSpec.SetString(v, s)
 		}
 	}
-	s, ok := mfd.fields["server_ip"]
+	s, ok := mfd.Fields["server_ip"]
 	// TODO - extract function for this stanza
 	if ok && s != "" {
 		handleIP(connSpec, "server", s)
 	}
-	s, ok = mfd.fields["client_ip"]
+	s, ok = mfd.Fields["client_ip"]
 	if ok && s != "" {
 		handleIP(connSpec, "client", s)
 	}
@@ -80,27 +80,27 @@ func (mfd *metaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 // createMetaFileData uses the key:value pairs to populate the interpreted fields.
 // TODO(dev) - more unit tests?
 // TODO(dev) - move to separate file - meta.go
-func createMetaFileData(testName string, fields map[string]string) (*metaFileData, error) {
-	var data metaFileData
-	data.testName = testName
-	data.fields = make(map[string]string, 20)
+func createMetaFileData(testName string, fields map[string]string) (*MetaFileData, error) {
+	var data MetaFileData
+	data.TestName = testName
+	data.Fields = make(map[string]string, 20)
 	for k, v := range fields {
 		var err error
 		v = strings.TrimSpace(v)
 		switch k {
 		case "Date/Time":
-			data.dateTime, err = time.Parse(
+			data.DateTime, err = time.Parse(
 				"20060102T15:04:05.999999999Z", v)
 		case "tls":
-			data.tls, err = strconv.ParseBool(v)
+			data.Tls, err = strconv.ParseBool(v)
 		case "websockets":
-			data.websockets, err = strconv.ParseBool(v)
+			data.Websockets, err = strconv.ParseBool(v)
 		case "Summary data":
 			err = json.Unmarshal(
-				[]byte(`{"summaryData":[`+v+`]}`),
+				[]byte(`{"SummaryData":[`+v+`]}`),
 				&data)
 		default:
-			data.fields[k] = v
+			data.Fields[k] = v
 		}
 		if err != nil {
 			return nil, err
@@ -155,24 +155,24 @@ func parseMetaFile(rawContent []byte) (map[string]string, error) {
 // TODO(dev) - add unit tests
 // TODO(prod) - For tests that include a meta file, should respect the test filenames.
 // See ndt_meta_log_parser_lib.cc
-func (n *NDTParser) ProcessMeta(testName string, content []byte) {
+func ProcessMetaFile(tableName string, suffix string, testName string, content []byte) *MetaFileData {
 	// Create a map from the metafile raw content
 	metamap, err := parseMetaFile(content)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(), "meta", "error").Inc()
+			tableName, suffix, "meta", "error").Inc()
 		log.Println("meta processing error: " + err.Error())
-		return
+		return nil
 	}
-	n.metaFile, err = createMetaFileData(testName, metamap)
+	metaFile, err := createMetaFileData(testName, metamap)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(), "meta", "error").Inc()
+			tableName, suffix, "meta", "error").Inc()
 		log.Println("meta processing error: " + err.Error())
-		return
+		return nil
 	}
 
 	metrics.TestCount.WithLabelValues(
-		n.TableName(), n.inserter.TableSuffix(), "meta", "ok").Inc()
-	return
+		tableName, suffix, "meta", "ok").Inc()
+	return metaFile
 }

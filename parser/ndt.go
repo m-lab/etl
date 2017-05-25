@@ -106,7 +106,7 @@ type NDTParser struct {
 	c2s *fileInfoAndData
 	s2c *fileInfoAndData
 
-	metaFile *metaFileData
+	metaFile *MetaFileData
 }
 
 func NewNDTParser(ins etl.Inserter) *NDTParser {
@@ -173,7 +173,8 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 				n.TableName(), n.inserter.TableSuffix(),
 				"meta", "timestamp collision").Inc()
 		}
-		n.ProcessMeta(testName, content)
+		n.metaFile = ProcessMetaFile(
+			n.TableName(), n.inserter.TableSuffix(), testName, content)
 		if n.c2s != nil {
 			n.processTest(taskFileName, n.c2s, "c2s")
 		}
@@ -197,7 +198,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 func (n *NDTParser) handleAnomolies(taskFileName string) {
 	switch {
 	case n.metaFile == nil:
-		n.metaFile = &metaFileData{} // Hack to allow processTest to run.
+		n.metaFile = &MetaFileData{} // Hack to allow processTest to run.
 		if n.s2c != nil {
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), n.inserter.TableSuffix(), "s2c", "no meta").Inc()
@@ -221,7 +222,7 @@ func (n *NDTParser) handleAnomolies(taskFileName string) {
 		// Meta file but no test file.
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), n.inserter.TableSuffix(), "meta", "no tests").Inc()
-		log.Printf("No tests: %s %s\n", taskFileName, n.metaFile.testName)
+		log.Printf("No tests: %s %s\n", taskFileName, n.metaFile.TestName)
 	// Now meta and at least one test are non-nil
 	default:
 		// We often only get meta + one, so no
@@ -230,7 +231,7 @@ func (n *NDTParser) handleAnomolies(taskFileName string) {
 }
 
 // processTest digests a single s2c or c2s test, and writes a row to the Inserter.
-// ProcessMeta should already have been called and produced valid data in n.metaFile
+// ProcessMetaFile should already have been called and produced valid data in n.metaFile
 // However, we often get s2c and c2s without corresponding meta files.  When this happens,
 // we proceed with an empty metaFile.
 func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, testType string) {
