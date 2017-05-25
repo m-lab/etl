@@ -173,7 +173,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 				n.TableName(), n.inserter.TableSuffix(),
 				"meta", "timestamp collision").Inc()
 		}
-		n.processMeta(testName, content)
+		n.ProcessMeta(testName, content)
 		if n.c2s != nil {
 			n.processTest(taskFileName, n.c2s, "c2s")
 		}
@@ -230,7 +230,7 @@ func (n *NDTParser) handleAnomolies(taskFileName string) {
 }
 
 // processTest digests a single s2c or c2s test, and writes a row to the Inserter.
-// processMeta should already have been called and produced valid data in n.metaFile
+// ProcessMeta should already have been called and produced valid data in n.metaFile
 // However, we often get s2c and c2s without corresponding meta files.  When this happens,
 // we proceed with an empty metaFile.
 func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, testType string) {
@@ -430,7 +430,7 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, taskFileName string, te
 	results["test_id"] = test.fn
 	results["log_time"] = test.info.Timestamp.Unix()
 	connSpec := schema.EmptyConnectionSpec()
-	n.metaFile.PopulateConnSpec(*connSpec)
+	n.metaFile.PopulateConnSpec(connSpec)
 	switch testType {
 	case "c2s":
 		connSpec.SetInt64("data_direction", CLIENT_TO_SERVER)

@@ -1,5 +1,7 @@
 package parser
 
+// ndt_meta.go contains code for processing the ndt .meta files.
+
 import (
 	"bytes"
 	"encoding/json"
@@ -15,11 +17,11 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
-// This is the parsed info from the .meta file.
+// metaFileData is the parsed info from the .meta file.
 type metaFileData struct {
 	testName    string
 	dateTime    time.Time
-	summaryData []int32
+	summaryData []int32 // Note: this is ignored in the legacy pipeline.
 	tls         bool
 	websockets  bool
 
@@ -42,6 +44,21 @@ var fieldPairs = map[string]string{
 	"client_application name": "client_application",
 }
 
+func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
+	connSpec.SetString(prefix+"_ip", ipString)
+	ip := net.ParseIP(ipString)
+	if ip == nil {
+		// TODO - log/metric
+	} else {
+		connSpec.SetString(prefix+"_ip", ip.String())
+		if ip.To4() != nil {
+			connSpec.SetInt64(prefix+"_af", syscall.AF_INET)
+		} else if ip.To16() != nil {
+			connSpec.SetInt64(prefix+"_af", syscall.AF_INET6)
+		}
+	}
+}
+
 func (mfd *metaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 	for k, v := range fieldPairs {
 		s, ok := mfd.fields[k]
@@ -52,35 +69,11 @@ func (mfd *metaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 	s, ok := mfd.fields["server_ip"]
 	// TODO - extract function for this stanza
 	if ok && s != "" {
-		connSpec.SetString("server_ip", s)
-		ip := net.ParseIP(s)
-		if ip == nil {
-			// TODO - log/metric
-		} else {
-			if ip.To4() != nil {
-				connSpec.SetString("server_ip", ip.String())
-				connSpec.SetInt64("server_af", syscall.AF_INET)
-			} else if ip.To16() != nil {
-				connSpec.SetString("server_ip", ip.String())
-				connSpec.SetInt64("server_af", syscall.AF_INET6)
-			}
-		}
+		handleIP(connSpec, "server", s)
 	}
 	s, ok = mfd.fields["client_ip"]
 	if ok && s != "" {
-		connSpec.SetString("client_ip", s)
-		ip := net.ParseIP(s)
-		if ip == nil {
-			// TODO - log/metric
-		} else {
-			if ip.To4() != nil {
-				connSpec.SetString("client_ip", ip.String())
-				connSpec.SetInt64("client_af", syscall.AF_INET)
-			} else if ip.To16() != nil {
-				connSpec.SetString("client_ip", ip.String())
-				connSpec.SetInt64("client_af", syscall.AF_INET6)
-			}
-		}
+		handleIP(connSpec, "client", s)
 	}
 }
 
@@ -158,11 +151,11 @@ func parseMetaFile(rawContent []byte) (map[string]string, error) {
 	return result, nil
 }
 
-// Process the meta test data.
+// ProcessMeta parses the .meta file.
 // TODO(dev) - add unit tests
 // TODO(prod) - For tests that include a meta file, should respect the test filenames.
 // See ndt_meta_log_parser_lib.cc
-func (n *NDTParser) processMeta(testName string, content []byte) {
+func (n *NDTParser) ProcessMeta(testName string, content []byte) {
 	// Create a map from the metafile raw content
 	metamap, err := parseMetaFile(content)
 	if err != nil {
