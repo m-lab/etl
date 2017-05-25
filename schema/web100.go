@@ -49,8 +49,8 @@ func NewWeb100Skeleton() Web100ValueMap {
 	}
 }
 
-func FullConnectionSpec() *Web100ValueMap {
-	return &Web100ValueMap{
+func FullConnectionSpec() Web100ValueMap {
+	return Web100ValueMap{
 		"server_ip":             "",
 		"server_af":             0,
 		"server_hostname":       "",
@@ -69,15 +69,15 @@ func FullConnectionSpec() *Web100ValueMap {
 	}
 }
 
-func EmptyConnectionSpec() *Web100ValueMap {
-	return &Web100ValueMap{
+func EmptyConnectionSpec() Web100ValueMap {
+	return Web100ValueMap{
 		"client_geolocation": EmptyGeolocation(),
 		"server_geolocation": EmptyGeolocation(),
 	}
 }
 
-func FullGeolocation() *Web100ValueMap {
-	return &Web100ValueMap{
+func FullGeolocation() Web100ValueMap {
+	return Web100ValueMap{
 		"continent_code": "",
 		"country_code":   "",
 		"country_code3":  "",
@@ -92,8 +92,8 @@ func FullGeolocation() *Web100ValueMap {
 	}
 }
 
-func EmptyGeolocation() *Web100ValueMap {
-	return &Web100ValueMap{}
+func EmptyGeolocation() Web100ValueMap {
+	return Web100ValueMap{}
 }
 
 // NewWeb100MinimalRecord creates a web100 value map with only the given fields.
