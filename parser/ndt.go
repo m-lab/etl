@@ -429,7 +429,25 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, taskFileName string, te
 		(map[string]bigquery.Value)(snapValues))
 
 	results["test_id"] = test.fn
-	results["log_time"] = test.info.Timestamp.Unix()
+	results["task_filename"] = taskFileName
+	// This is the timestamp parsed from the filename.
+	lt, err := test.info.Timestamp.MarshalText()
+	if err != nil {
+		log.Println(err)
+		metrics.ErrorCount.WithLabelValues(
+			n.inserter.TableBase(), "log_time marshal error").Inc()
+	} else {
+		results["log_time"] = string(lt)
+	}
+	now, err := time.Now().MarshalText()
+	if err != nil {
+		log.Println(err)
+		metrics.ErrorCount.WithLabelValues(
+			n.inserter.TableBase(), "parse_time marshal error").Inc()
+	} else {
+		results["parse_time"] = string(now)
+	}
+
 	connSpec := schema.EmptyConnectionSpec()
 	n.metaFile.PopulateConnSpec(connSpec)
 	switch testType {
@@ -441,7 +459,8 @@ func (n *NDTParser) getAndInsertValues(w *web100.Web100, taskFileName string, te
 	}
 	results["connection_spec"] = connSpec
 
-	err = n.inserter.InsertRow(&bq.MapSaver{fixValues(results)})
+	fixValues(results)
+	err = n.inserter.InsertRow(&bq.MapSaver{results})
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), n.inserter.TableSuffix(),
@@ -463,14 +482,38 @@ func (n *NDTParser) TableName() string {
 
 // fixValues updates web100 log values that need post-processing fix-ups.
 // TODO(dev): does this only apply to NDT or is NPAD also affected?
-func fixValues(r map[string]bigquery.Value) map[string]bigquery.Value {
-	// TODO(dev): fix these values.
-	// Fix StartTimeStamp:
-	//  - web100_log_entry.snap.StartTimeStamp: (1000000 * StartTimeStamp + StartTimeUsec)
-	// Fix IPv6 addresses in connection_spec:
-	//  - web100_log_entry.connection_spec.local_ip
-	//  - web100_log_entry.connection_spec.remote_ip
-	// Fix local_af:
+func fixValues(r schema.Web100ValueMap) {
+	logEntry := r.GetMap([]string{"web100_log_entry"})
+
+	// Always substitute, unless for some reason the snapshot value is missing.
+	logEntry.SubstituteString(false, []string{"connection_spec", "local_ip"},
+		[]string{"snap", "LocalAddress"})
+	logEntry.SubstituteString(false, []string{"connection_spec", "remote_ip"},
+		[]string{"snap", "RemAddress"})
+	logEntry.SubstituteInt64(false, []string{"connection_spec", "local_af"},
+		[]string{"snap", "LocalAddressType"})
+
+	// Only substitute these if they are null, (because the .meta file was missing).
+	r.SubstituteString(true, []string{"connection_spec", "server_ip"},
+		[]string{"web100_log_entry", "connection_spec", "local_ip"})
+	r.SubstituteInt64(true, []string{"connection_spec", "server_af"},
+		[]string{"web100_log_entry", "connection_spec", "local_af"})
+	r.SubstituteString(true, []string{"connection_spec", "client_ip"},
+		[]string{"web100_log_entry", "connection_spec", "remote_ip"})
+	r.SubstituteInt64(true, []string{"connection_spec", "client_af"},
+		[]string{"web100_log_entry", "connection_spec", "local_af"})
+
+	snap := logEntry.GetMap([]string{"snap"})
+	start, ok := snap.GetInt64([]string{"StartTimeStamp"})
+	if ok {
+		start = 1000000 * start
+		usec, ok := snap.GetInt64([]string{"StartTimeUsec"})
+		if ok {
+			start += usec
+		}
+		snap.SetInt64("StartTimeStamp", start)
+	}
+
+	// Fix local_af ?
 	//  - web100_log_entry.connection_spec.local_af: IPv4 = 0, IPv6 = 1.
-	return r
 }
