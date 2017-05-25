@@ -1,6 +1,14 @@
 [
       { "name": "test_id", "type": "STRING"},
-      { "name": "log_time", "type": "INTEGER"},
+      { "name": "task_filename", "type": "STRING"},
+      { "name": "parse_time", "type": "TIMESTAMP"},
+      { "name": "log_time", "type": "TIMESTAMP"},
+      {
+        "fields": [
+          { "name": "no_meta", "type": "BOOLEAN"},
+          { "name": "snaplog_error", "type": "BOOLEAN"},
+          { "name": "num_snaps", "type": "INTEGER"}
+        ], "name": "anomolies", "type": "RECORD"},
       {
         "fields": [
           { "name": "client_af", "type": "INTEGER"},
