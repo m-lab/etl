@@ -153,8 +153,8 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 func (in *BQInserter) HandleInsertErrors(err error) error {
 	switch typedErr := err.(type) {
 	case bigquery.PutMultiError:
-		if len(typedErr) == len(in.rows) {
-			// TODO What if there is only one row in the request?
+		// If ALL rows failed, and number of rows is large, just report single failure.
+		if len(typedErr) > 10 && len(typedErr) == len(in.rows) {
 			log.Printf("%v\n", err)
 			metrics.ErrorCount.WithLabelValues(
 				in.TableBase(), "failed insert").Inc()

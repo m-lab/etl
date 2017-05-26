@@ -2,7 +2,10 @@
 // schema for web100 tests.
 package schema
 
+// TODO(prod) Improve unit test coverage.
 import (
+	"log"
+
 	"cloud.google.com/go/bigquery"
 )
 
@@ -10,6 +13,67 @@ import (
 
 // Web100ValueMap implements the web100.Saver interface for recording web100 values.
 type Web100ValueMap map[string]bigquery.Value
+
+// Returns the contained map, or nil if it doesn't exist.
+func (vm Web100ValueMap) Get(name string) Web100ValueMap {
+	wl, ok := vm[name]
+	if !ok {
+		return nil
+	}
+	return wl.(Web100ValueMap)
+}
+
+// Get the string at a path in the nested map.  Return value, true if found,
+// or nil, false if not found.
+func (vm Web100ValueMap) GetString(path []string) (string, bool) {
+	if len(path) <= 1 {
+		val, ok := vm[path[0]]
+		if ok {
+			return val.(string), ok
+		} else {
+			return "", ok
+		}
+	} else {
+		next := vm.Get(path[0])
+		if next != nil {
+			return next.GetString(path[1:])
+		} else {
+			return "", false
+		}
+	}
+}
+
+// Get the int64 at a path in the nested map.  Return value, true if found,
+// or 0, false if not found.
+func (vm Web100ValueMap) GetInt64(path []string) (int64, bool) {
+	if len(path) <= 1 {
+		val, ok := vm[path[0]]
+		if ok {
+			return val.(int64), ok
+		} else {
+			return 0, ok
+		}
+	} else {
+		next := vm.Get(path[0])
+		if next != nil {
+			return next.GetInt64(path[1:])
+		} else {
+			return 0, false
+		}
+	}
+}
+
+// Get the int64 at a path in the nested map.  Return value or nil.
+func (vm Web100ValueMap) GetMap(path []string) Web100ValueMap {
+	if len(path) == 0 {
+		return vm
+	}
+	next := vm.Get(path[0])
+	if next == nil {
+		return next
+	}
+	return next.GetMap(path[1:])
+}
 
 // SetInt64 saves an int64 in a field with the given name.
 func (s Web100ValueMap) SetInt64(name string, value int64) {
@@ -19,6 +83,44 @@ func (s Web100ValueMap) SetInt64(name string, value int64) {
 // SetString saves a string in a field with the given name.
 func (s Web100ValueMap) SetString(name string, value string) {
 	s[name] = value
+}
+
+func (r Web100ValueMap) SubstituteString(onlyIfNull bool, target []string, source []string) {
+	m := r.GetMap(target[:len(target)-1])
+	if m == nil {
+		// Error ?
+		log.Printf("No such path: %v\n", target)
+		return
+	}
+	if _, notNull := m[target[len(target)-1]]; onlyIfNull && notNull {
+		// All good
+		return
+	}
+	value, ok := r.GetString(source)
+	if !ok {
+		log.Printf("Source not available: %v\n", source)
+		return
+	}
+	m[target[len(target)-1]] = value
+}
+
+func (r Web100ValueMap) SubstituteInt64(onlyIfNull bool, target []string, source []string) {
+	m := r.GetMap(target[:len(target)-1])
+	if m == nil {
+		// Error ?
+		log.Printf("No such path: %v\n", target)
+		return
+	}
+	if _, notNull := m[target[len(target)-1]]; onlyIfNull && notNull {
+		// All good
+		return
+	}
+	value, ok := r.GetInt64(source)
+	if !ok {
+		log.Printf("Source not available: %v\n", source)
+		return
+	}
+	m[target[len(target)-1]] = value
 }
 
 // NewWeb100FullRecord creates a web100 value map with all supported fields.
@@ -98,12 +200,12 @@ func EmptyGeolocation() Web100ValueMap {
 
 // NewWeb100MinimalRecord creates a web100 value map with only the given fields.
 // All undefined fields will be set to null after a BQ insert.
-func NewWeb100MinimalRecord(version string, logTime int64, connSpec, snapValues map[string]bigquery.Value) map[string]bigquery.Value {
-	return map[string]bigquery.Value{
-		"web100_log_entry": map[string]bigquery.Value{
+func NewWeb100MinimalRecord(version string, logTime int64, connSpec, snapValues Web100ValueMap) Web100ValueMap {
+	return Web100ValueMap{
+		"web100_log_entry": Web100ValueMap{
 			"version":         version,
 			"log_time":        logTime,
-			"connection_spec": connSpec,
+			"connection_spec": connSpec, // TODO - deprecate connection_spec here.
 			"snap":            snapValues,
 		},
 	}

@@ -1,6 +1,16 @@
 [
       { "name": "test_id", "type": "STRING"},
-      { "name": "log_time", "type": "INTEGER"},
+      { "name": "task_filename", "type": "STRING"},
+      { "name": "parse_time", "type": "TIMESTAMP"},
+      { "name": "log_time", "type": "TIMESTAMP"},
+      { "name": "blacklist_flags", "type": "INTEGER", "description": "Deprecated.  Use flag in anomolies record instead."},
+      {
+        "fields": [
+          { "name": "no_meta", "type": "BOOLEAN"},
+          { "name": "snaplog_error", "type": "BOOLEAN"},
+          { "name": "num_snaps", "type": "INTEGER"},
+          { "name": "blacklist_flags", "type": "INTEGER"}
+        ], "name": "anomolies", "type": "RECORD", "description": "Anomolies associated with test"},
       {
         "fields": [
           { "name": "client_af", "type": "INTEGER"},
@@ -56,12 +66,12 @@
               { "name": "local_port", "type": "INTEGER"},
               { "name": "remote_ip", "type": "STRING"},
               { "name": "remote_port", "type": "INTEGER"}
-            ], "name": "connection_spec", "type": "RECORD"},
+            ], "name": "connection_spec", "type": "RECORD", "description": "Deprecated.  Use top level connection_spec"},
           {
             "fields": [
               { "name": "AbruptTimeouts", "type": "INTEGER"},
               { "name": "ActiveOpen", "type": "INTEGER"},
-              { "name": "CERcvd", "type": "INTEGER"},
+	      { "name": "CERcvd", "type": "INTEGER"},
               { "name": "CongAvoid", "type": "INTEGER"},
               { "name": "CongOverCount", "type": "INTEGER"},
               { "name": "CongSignals", "type": "INTEGER"},
