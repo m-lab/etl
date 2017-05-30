@@ -59,7 +59,8 @@ const char web100_quiet = 0;
 
 // We disable all write code, because we don't need it, but it is useful to
 // keep the code to facilitate synchronizing with upstream source code.
-#define INCLUDE_WRITE 0
+// To include the excluded code, uncomment this line.
+// #define INCLUDE_WRITE
 
 /*
  * Array of error code -> string mappings, in the style of sys_errlist.
@@ -268,7 +269,7 @@ _web100_agent_attach_header(FILE *header, int *w_errno)
     return agent;
 }
 
-#if INCLUDE_WRITE
+#ifdef INCLUDE_WRITE
 
 static web100_agent*
 _web100_agent_attach_local(int *w_errno)
@@ -323,7 +324,7 @@ _web100_agent_attach_log(FILE *header, int *w_errno)
     return agent;
 }
 
-#if INCLUDE_WRITE
+#ifdef INCLUDE_WRITE
 static int
 refresh_connections(web100_agent *agent)
 {
@@ -461,7 +462,7 @@ web100_strerror(int errnum)
 }
 
 
-#if INCLUDE_WRITE
+#ifdef INCLUDE_WRITE
 web100_agent*
 web100_attach(int type, void *data, int *w_errno)
 {
@@ -983,7 +984,7 @@ web100_snap(web100_snapshot *snap)
 }
 
 
-#if INCLUDE_WRITE
+#ifdef INCLUDE_WRITE
 /*@
 web100_raw_read - read a variable from a connection into a buffer
 @*/
@@ -1081,6 +1082,7 @@ web100_snap_read(web100_var *var, web100_snapshot *snap, void *buf)
 }
 
 
+#ifdef INCLUDE_WRITE
 /*@
 web100_delta_any - produce the delta of a variable between two snapshots
 @*/
@@ -1129,6 +1131,7 @@ web100_snap_data_copy(web100_snapshot *dest, web100_snapshot *src)
 
     return WEB100_ERR_SUCCESS;
 }
+#endif  // INCLUDE_WRITE
 
 
 /*@
@@ -1365,7 +1368,7 @@ web100_get_connection_spec_v6(web100_connection* connection, struct web100_conne
 
 // Exclude code we don't use, but keep it here to facilitate comparison
 // with upstream source code.
-#if INCLUDE_WRITE
+#ifdef INCLUDE_WRITE
 web100_log*
 web100_log_open_write(char *logname, web100_connection *conn,
 		      web100_group *group, int *w_errno)
