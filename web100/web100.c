@@ -57,6 +57,10 @@ const char web100_quiet = 1;
 const char web100_quiet = 0;
 #endif
 
+// We disable all write code, because we don't need it, but it is useful to
+// keep the code to facilitate synchronizing with upstream source code.
+#define INCLUDE_WRITE 0
+
 /*
  * Array of error code -> string mappings, in the style of sys_errlist.
  * Must be kept in sync with the defined errors in web100.h.
@@ -129,7 +133,6 @@ size_from_type(WEB100_TYPE type)
         return 0;
     }
 }
-
 
 /*
  * web100_attach_local - Initializes the provided agent with the information
@@ -265,6 +268,7 @@ _web100_agent_attach_header(FILE *header, int *w_errno)
     return agent;
 }
 
+#if INCLUDE_WRITE
 
 static web100_agent*
 _web100_agent_attach_local(int *w_errno)
@@ -300,6 +304,7 @@ _web100_agent_attach_local(int *w_errno)
 
     return agent;
 }
+#endif  // INCLUDE_WRITE
 
 
 static web100_agent*
@@ -318,7 +323,7 @@ _web100_agent_attach_log(FILE *header, int *w_errno)
     return agent;
 }
 
-
+#if INCLUDE_WRITE
 static int
 refresh_connections(web100_agent *agent)
 {
@@ -427,6 +432,7 @@ refresh_connections(web100_agent *agent)
     return WEB100_ERR_SUCCESS;
 }
 
+#endif  // INCLUDE_WRITE
 
 /*
  * PUBLIC FUNCTIONS
@@ -455,6 +461,7 @@ web100_strerror(int errnum)
 }
 
 
+#if INCLUDE_WRITE
 web100_agent*
 web100_attach(int type, void *data, int *w_errno)
 {
@@ -466,7 +473,7 @@ web100_attach(int type, void *data, int *w_errno)
         return NULL;
     }
 }
-
+#endif  // INCLUDE_WRITE
 
 void
 web100_detach(web100_agent *agent)
@@ -502,7 +509,6 @@ web100_detach(web100_agent *agent)
 
     free(agent);
 }
-
 
 web100_group*
 web100_group_head(web100_agent *agent, int *w_errno)
@@ -613,6 +619,7 @@ web100_var_find(web100_group *group, const char *name, int *w_errno)
 }
 
 
+#if  INCLUDE_WRITE
 /*@
 web100_group_var_find - Find both group and var for a given variable name in agent
 @*/
@@ -643,7 +650,6 @@ web100_agent_find_var_and_group(web100_agent* agent, const char* name,
     // *w_errno = WEB100_ERR_NOVAR;
     return WEB100_ERR_NOVAR;
 }
-
 
 web100_connection*
 web100_connection_head(web100_agent *agent, int *w_errno)
@@ -825,7 +831,6 @@ web100_connection_from_socket(web100_agent *agent, int sockfd, int *w_errno)
     }
 }
 
-
 int
 web100_connection_data_copy(web100_connection *dest, web100_connection *src, int *w_errno)
 {
@@ -870,6 +875,7 @@ web100_connection_free_local_copy(web100_connection *conn)
     free(conn);
     return WEB100_ERR_SUCCESS;
 }
+#endif  // INCLUDE_WRITE
 
 /*@
 web100_snapshot_alloc - allocate a snapshot
@@ -977,6 +983,7 @@ web100_snap(web100_snapshot *snap)
 }
 
 
+#if INCLUDE_WRITE
 /*@
 web100_raw_read - read a variable from a connection into a buffer
 @*/
@@ -1013,7 +1020,6 @@ web100_raw_read(web100_var *var, web100_connection *conn, void *buf)
 
     return WEB100_ERR_SUCCESS;
 }
-
 
 /*@
 web100_raw_write - write a variable into a connection from a buffer
@@ -1056,7 +1062,7 @@ web100_raw_write(web100_var *var, web100_connection *conn, void *buf)
 
     return WEB100_ERR_SUCCESS;
 }
-
+#endif  // INCLUDE_WRITE
 
 /*@
 web100_snap_read - read a variable from a snapshot into a buffer
@@ -1357,6 +1363,9 @@ web100_get_connection_spec_v6(web100_connection* connection, struct web100_conne
 #define MAX_TMP_BUF_SIZE    80
 #define WEB100_LOG_CID      -1       /* A dummy CID  */
 
+// Exclude code we don't use, but keep it here to facilitate comparison
+// with upstream source code.
+#if INCLUDE_WRITE
 web100_log*
 web100_log_open_write(char *logname, web100_connection *conn,
 		      web100_group *group, int *w_errno)
@@ -1482,6 +1491,7 @@ web100_log_write(web100_log *log, web100_snapshot *snap)
 
     return WEB100_ERR_SUCCESS;
 }
+#endif  // INCLUDE_WRITE
 
 web100_log*
 web100_log_open_read(char *logname, int *w_errno)
