@@ -24,7 +24,7 @@ import (
 //   /read\n
 //   \n----End-Of-Header---- -1 -1\n
 //   log_time
-//   group_name
+//   group_name (currently "read")
 //   connection spec (binary)
 //
 //   ...
@@ -70,6 +70,16 @@ const (
 	WEB100_TYPE_OCTET
 	WEB100_NUM_TYPES
 )
+
+type AddrType int
+
+const (
+	WEB100_ADDRTYPE_UNKNOWN AddrType = iota
+	WEB100_ADDRTYPE_IPV4
+	WEB100_ADDRTYPE_IPV6
+	WEB100_ADDRTYPE_DNS = 16
+)
+
 const (
 	WEB100_TYPE_IP_ADDRESS = WEB100_TYPE_INET_ADDRESS_IPV4 /* Deprecated */
 	WEB100_TYPE_UNSIGNED16 = WEB100_TYPE_INET_PORT_NUMBER  /* Deprecated */
@@ -102,7 +112,6 @@ func init() {
 	if err != nil {
 		panic("error parsing tcp-kis.txt")
 	}
-	fmt.Printf("LegacyNames has %d entries.\n", len(legacyNames))
 }
 
 type Variable struct {
@@ -119,7 +128,7 @@ func NewVariable(s *string) (*Variable, error) {
 	n, err := fmt.Sscanln(*s, &name, &offset, &typ, &length)
 
 	if err != nil {
-		fmt.Printf("%v, %d: %s\n", err, n, *s)
+		fmt.Printf("NewVariable Error %v, %d: %s\n", err, n, *s)
 		return nil, err
 	}
 	if VarType(typ) > WEB100_TYPE_OCTET || VarType(typ) < WEB100_TYPE_INTEGER {
@@ -163,6 +172,7 @@ type SnapLog struct {
 	// much larger
 	raw []byte
 
+	Version   string
 	LogTime   uint32
 	GroupName string
 
@@ -246,7 +256,7 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	buf := bytes.NewBuffer(raw)
 
 	// First, the version, etc.
-	_, err := buf.ReadString('\n')
+	version, err := buf.ReadString('\n')
 	if err != nil {
 		return nil, err
 	}
@@ -286,15 +296,21 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 		return nil, errors.New("Too few bytes for logTime")
 	}
 	logTime := binary.LittleEndian.Uint32(t)
-	fmt.Println(logTime)
 
+	// The web100 group is a set of web100 variables from a specific agent.
+	// M-Lab snaplogs only ever have a single agent ("local") and group.
+	// The group is typically "read", but the header typically also includes
+	// "spec" and "tune".
 	gn := make([]byte, GROUPNAME_LEN_MAX)
 	n, err = buf.Read(gn)
 	if err != nil || n != GROUPNAME_LEN_MAX {
 		return nil, errors.New("Too few bytes for groupName")
 	}
-	groupName := string(gn)
-	fmt.Println(groupName)
+	groupName := strings.SplitN(string(gn), "\000", 2)[0]
+	if groupName != "read" {
+		fmt.Println(groupName)
+		return nil, errors.New("Only 'read' group is supported")
+	}
 
 	connSpecOffset := len(raw) - buf.Len()
 	connSpec, err := parseConnectionSpec(buf)
@@ -304,7 +320,7 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 
 	bodyOffset := len(raw) - buf.Len()
 
-	slog := SnapLog{raw: raw, LogTime: logTime, GroupName: groupName,
+	slog := SnapLog{raw: raw, Version: version, LogTime: logTime, GroupName: groupName,
 		ConnSpecOffset: connSpecOffset, BodyOffset: bodyOffset,
 		Spec: spec, Body: body, Tune: tune, ConnSpec: connSpec}
 
@@ -355,13 +371,24 @@ func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
 		return Snapshot{}, errors.New("Missing BeginSnapData")
 	}
 
-	return Snapshot{raw: sl.raw[offset+len(BEGIN_SNAP_DATA) : offset+sl.Body.RecordLength],
+	// We use the Body field group, as that is what is always used for NDT snapshots.
+	// This may be incorrect for use in other settings.
+	// TODO - why do we need the +1 here????
+	return Snapshot{raw: sl.raw[offset+len(BEGIN_SNAP_DATA)+1 : offset+sl.Body.RecordLength],
 		fields: &sl.Body}, nil
 }
 
 // TODO URGENT - unit tests for this!!
 func Save(field *Variable, data []byte, snapValues Saver) error {
+	// Use the canonical variable name. The variable name known to the web100
+	// kernel at run time lagged behind the official web100 spec. So, some
+	// variable names need to be translated from their legacy form (read from
+	// the kernel and written to the snaplog) to the canonical form (as defined
+	// in tcp-kis.txt).
 	canonicalName := field.Name
+	if canonicalName[0] == '_' {
+		//return nil
+	}
 	if legacy, ok := legacyNames[canonicalName]; ok {
 		canonicalName = legacy
 	}
@@ -376,8 +403,9 @@ func Save(field *Variable, data []byte, snapValues Saver) error {
 			snapValues.SetInt64(canonicalName, int64(val))
 		}
 	case WEB100_TYPE_INET_ADDRESS_IPV4:
-		// TODO 4 unsigned char
-		panic("Unimplemented")
+		snapValues.SetString(canonicalName,
+			fmt.Sprintf("%d.%d.%d.%d",
+				data[0], data[1], data[2], data[3]))
 	case WEB100_TYPE_COUNTER32:
 		fallthrough
 	case WEB100_TYPE_GAUGE32:
@@ -394,7 +422,24 @@ func Save(field *Variable, data []byte, snapValues Saver) error {
 	case WEB100_TYPE_INET_ADDRESS:
 		fallthrough
 	case WEB100_TYPE_INET_ADDRESS_IPV6:
-		panic("Unimplemented")
+		switch AddrType(data[16]) {
+		case WEB100_ADDRTYPE_IPV4:
+			snapValues.SetString(canonicalName,
+				fmt.Sprintf("%d.%d.%d.%d",
+					data[0], data[1], data[2], data[3]))
+		case WEB100_ADDRTYPE_UNKNOWN:
+			fallthrough
+		case WEB100_ADDRTYPE_IPV6:
+			snapValues.SetString(canonicalName, fmt.Sprintf(
+				"%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x",
+				data[0], data[1], data[2], data[3],
+				data[4], data[5], data[6], data[7],
+				data[8], data[9], data[10], data[11],
+				data[12], data[13], data[14], data[15]))
+		default:
+			// TODO error
+			snapValues.SetString(canonicalName, fmt.Sprintf("%d", data[16]))
+		}
 	case WEB100_TYPE_STR32:
 		// TODO - is there a better way?
 		snapValues.SetString(canonicalName, strings.SplitN(string(data), "\000", 2)[0])
@@ -411,15 +456,6 @@ func Save(field *Variable, data []byte, snapValues Saver) error {
 // Next. Next must be called at least once before calling SnapshotValues.
 func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 	// Parses variables from most recent web100_snapshot data.
-
-	// The web100 group is a set of web100 variables from a specific agent.
-	// M-Lab snaplogs only ever have a single agent ("local") and group
-	// (whatever the static set of web100 variables read from
-	// /proc/web100/header).  The group is typically "read", but the header
-	// typically also includes "spec" and "tune".
-	//
-	// To extract each web100 variables corresponding to all the variables
-	// in the group, we iterate through the FieldSet
 	var field Variable
 	for _, field = range snap.fields.Fields {
 		// Extract the web100 variable name and type. This will
@@ -427,47 +463,5 @@ func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 		// TODO handle canonical names
 		Save(&field, snap.raw[field.Offset:field.Offset+field.Length], snapValues)
 	}
-	/*
-
-			errno := C.web100_snap_read(v, snap, w.data)
-			if errno != C.WEB100_ERR_SUCCESS {
-				return fmt.Errorf(C.GoString(C.web100_strerror(errno)))
-			}
-
-			// Convert raw w.data into a string based on var_type.
-			// TODO(prod): reimplement web100_value_to_textn to operate on Go types.
-			C.web100_value_to_textn((*C.char)(w.text), C.WEB100_VALUE_LEN_MAX,
-				(C.WEB100_TYPE)(var_type), w.data)
-
-			// Use the canonical variable name. The variable name known to
-			// the web100 kernel at run time lagged behind the official
-			// web100 spec. So, some variable names need to be translated
-			// from their legacy form (read from the kernel and written to
-			// the snaplog) to the canonical form (as defined in
-			// tcp-kis.txt).
-			canonicalName := C.GoString(name)
-			if _, ok := w.legacyNames[canonicalName]; ok {
-				canonicalName = w.legacyNames[canonicalName]
-			}
-
-			// TODO(dev): are there any cases where we need unsigned int64?
-			// Attempt to convert the current variable to an int64.
-			value, err := strconv.ParseInt(C.GoString((*C.char)(w.text)), 10, 64)
-			if err != nil {
-				e := err.(*strconv.NumError)
-				if e.Err == strconv.ErrSyntax {
-					// If it cannot be converted, leave the variable as a string.
-					snapValues.SetString(canonicalName, C.GoString((*C.char)(w.text)))
-				} else if e.Err == strconv.ErrRange {
-					log.Println("Range error: " + e.Num)
-					// On a range error, ParseInt returns the best legal value,
-					// i.e., MaxInt64, or MinInt64, so we just use that value.
-					snapValues.SetInt64(canonicalName, value)
-				}
-			} else {
-				snapValues.SetInt64(canonicalName, value)
-			}
-		}
-	*/
 	return nil
 }
