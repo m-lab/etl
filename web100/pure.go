@@ -1,11 +1,13 @@
 package web100
 
 import (
+	"C"
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // TODO - resolve use of Record, Snapshot, slog, snap, etc.
@@ -66,11 +68,17 @@ const (
 	WEB100_TYPE_INET_ADDRESS_IPV6
 	WEB100_TYPE_STR32
 	WEB100_TYPE_OCTET
+	WEB100_NUM_TYPES
 )
 const (
 	WEB100_TYPE_IP_ADDRESS = WEB100_TYPE_INET_ADDRESS_IPV4 /* Deprecated */
 	WEB100_TYPE_UNSIGNED16 = WEB100_TYPE_INET_PORT_NUMBER  /* Deprecated */
 )
+
+var Web100Sizes = [WEB100_NUM_TYPES + 1]byte{
+	4 /*INTEGER*/, 4 /*INTEGER32*/, 4 /*IPV4*/, 4 /*COUNTER32*/, 4, /*GAUGE32*/
+	4 /*UNSIGNED32*/, 4, /*TIME_TICKS*/
+	8 /*COUNTER64*/, 2 /*PORT_NUM*/, 17, 17, 32 /*STR32*/, 1 /*OCTET*/, 0}
 
 // Once consuming the header, we know the names and sizes of all fields, and the
 // size of each record, which is len(BEGIN_SNAP_DATA) + 1 + sum(field lengths)
@@ -148,6 +156,8 @@ type SnapLog struct {
 	Body           FieldSet
 	Tune           FieldSet
 
+	// Use with caution.  Generally should use connection spec from .meta file or
+	// from snapshot instead.
 	ConnSpec ConnectionSpec
 }
 
@@ -285,6 +295,11 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	return &slog, nil
 }
 
+func (sl *SnapLog) SnapCount() int {
+	total := len(sl.raw) - sl.BodyOffset
+	return total / sl.Body.RecordLength
+}
+
 func (sl *SnapLog) Validate() error {
 	// Verify that body starts with BEGIN
 	first := string(sl.raw[sl.BodyOffset : sl.BodyOffset+len(BEGIN_SNAP_DATA)])
@@ -295,21 +310,144 @@ func (sl *SnapLog) Validate() error {
 	// Verify that body size is integer multiple of body record length.
 	total := len(sl.raw) - sl.BodyOffset
 	if total%sl.Body.RecordLength != 0 {
-		return errors.New("Body is not multiple of Body.RecordLength")
+		return errors.New("Body length is not multiple of Body.RecordLength")
 	}
 
 	// Verify that last record is good quality
+	numSnapshots := sl.SnapCount()
+	lastOffset := sl.BodyOffset + (numSnapshots-1)*sl.Body.RecordLength
+	lastBegin := string(sl.raw[lastOffset : lastOffset+len(BEGIN_SNAP_DATA)])
+	if lastBegin != BEGIN_SNAP_DATA {
+		return errors.New("Missing last BeginSnapData")
+	}
 
+	// lastSnap := slog.Snapshot(numSnapshots - 1)
 	// Verify that last record is in a TCP end state?
 	return nil
 }
 
 type Snapshot struct {
-	raw []byte // The raw data, NOT including the BEGIN_SNAP_HEADER
+	// Just the raw data, without BEGIN_SNAP_DATA.
+	raw    []byte    // The raw data, NOT including the BEGIN_SNAP_HEADER
+	fields *FieldSet // The fieldset describing the raw contents.
 }
 
 // Returns the snapshot at index n, or error if n is not a valid index, or data is corrupted.
-func (slog *SnapLog) Snapshot(n int) (Snapshot, error) {
-	// TODO
-	return Snapshot{}, nil
+func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
+	offset := sl.BodyOffset + n*sl.Body.RecordLength
+	if string(sl.raw[offset:offset+len(BEGIN_SNAP_DATA)]) != BEGIN_SNAP_DATA {
+		return Snapshot{}, errors.New("Missing BeginSnapData")
+	}
+
+	return Snapshot{raw: sl.raw[offset+len(BEGIN_SNAP_DATA) : offset+sl.Body.RecordLength],
+		fields: &sl.Body}, nil
+}
+
+// TODO URGENT - unit tests for this!!
+func Save(field *Variable, data []byte, snapValues Saver) error {
+	switch field.Type {
+	case WEB100_TYPE_INTEGER:
+		fallthrough
+	case WEB100_TYPE_INTEGER32:
+		val := binary.LittleEndian.Uint32(data)
+		if val >= 1<<31 {
+			snapValues.SetInt64(field.Name, int64(val)-(int64(1)<<32))
+		} else {
+			snapValues.SetInt64(field.Name, int64(val))
+		}
+	case WEB100_TYPE_INET_ADDRESS_IPV4:
+		// TODO 4 unsigned char
+		panic("Unimplemented")
+	case WEB100_TYPE_COUNTER32:
+		fallthrough
+	case WEB100_TYPE_GAUGE32:
+		fallthrough
+	case WEB100_TYPE_UNSIGNED32:
+		fallthrough
+	case WEB100_TYPE_TIME_TICKS:
+		snapValues.SetInt64(field.Name, int64(binary.LittleEndian.Uint32(data)))
+	case WEB100_TYPE_COUNTER64:
+		// This conversion to signed may cause overflow panic!
+		snapValues.SetInt64(field.Name, int64(binary.LittleEndian.Uint64(data)))
+	case WEB100_TYPE_INET_PORT_NUMBER:
+		snapValues.SetInt64(field.Name, int64(binary.LittleEndian.Uint16(data)))
+	case WEB100_TYPE_INET_ADDRESS:
+		fallthrough
+	case WEB100_TYPE_INET_ADDRESS_IPV6:
+		panic("Unimplemented")
+	case WEB100_TYPE_STR32:
+		// TODO - is there a better way?
+		snapValues.SetString(field.Name, strings.SplitN(string(data), "\000", 2)[0])
+	case WEB100_TYPE_OCTET:
+		// TODO - use byte array?
+		snapValues.SetInt64(field.Name, int64(data[0]))
+	default:
+		return errors.New("Invalid field type")
+	}
+	return nil
+}
+
+// SnapshotValues saves all values from the most recent C.web100_snapshot read by
+// Next. Next must be called at least once before calling SnapshotValues.
+func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
+	// Parses variables from most recent web100_snapshot data.
+
+	// The web100 group is a set of web100 variables from a specific agent.
+	// M-Lab snaplogs only ever have a single agent ("local") and group
+	// (whatever the static set of web100 variables read from
+	// /proc/web100/header).  The group is typically "read", but the header
+	// typically also includes "spec" and "tune".
+	//
+	// To extract each web100 variables corresponding to all the variables
+	// in the group, we iterate through the FieldSet
+	var field Variable
+	for _, field = range snap.fields.Fields {
+		// Extract the web100 variable name and type. This will
+		// correspond to one of the variables defined in tcp-kis.txt.
+		// TODO handle canonical names
+		Save(&field, snap.raw[field.Offset:field.Offset+field.Length], snapValues)
+	}
+	/*
+
+			errno := C.web100_snap_read(v, snap, w.data)
+			if errno != C.WEB100_ERR_SUCCESS {
+				return fmt.Errorf(C.GoString(C.web100_strerror(errno)))
+			}
+
+			// Convert raw w.data into a string based on var_type.
+			// TODO(prod): reimplement web100_value_to_textn to operate on Go types.
+			C.web100_value_to_textn((*C.char)(w.text), C.WEB100_VALUE_LEN_MAX,
+				(C.WEB100_TYPE)(var_type), w.data)
+
+			// Use the canonical variable name. The variable name known to
+			// the web100 kernel at run time lagged behind the official
+			// web100 spec. So, some variable names need to be translated
+			// from their legacy form (read from the kernel and written to
+			// the snaplog) to the canonical form (as defined in
+			// tcp-kis.txt).
+			canonicalName := C.GoString(name)
+			if _, ok := w.legacyNames[canonicalName]; ok {
+				canonicalName = w.legacyNames[canonicalName]
+			}
+
+			// TODO(dev): are there any cases where we need unsigned int64?
+			// Attempt to convert the current variable to an int64.
+			value, err := strconv.ParseInt(C.GoString((*C.char)(w.text)), 10, 64)
+			if err != nil {
+				e := err.(*strconv.NumError)
+				if e.Err == strconv.ErrSyntax {
+					// If it cannot be converted, leave the variable as a string.
+					snapValues.SetString(canonicalName, C.GoString((*C.char)(w.text)))
+				} else if e.Err == strconv.ErrRange {
+					log.Println("Range error: " + e.Num)
+					// On a range error, ParseInt returns the best legal value,
+					// i.e., MaxInt64, or MinInt64, so we just use that value.
+					snapValues.SetInt64(canonicalName, value)
+				}
+			} else {
+				snapValues.SetInt64(canonicalName, value)
+			}
+		}
+	*/
+	return nil
 }

@@ -34,6 +34,7 @@ func TestHeaderParsing(t *testing.T) {
 	fmt.Printf("%d %x\n", slog.Spec.RecordLength, slog.ConnSpecOffset)
 	fmt.Printf("%d %x\n", slog.Body.RecordLength, slog.BodyOffset)
 	fmt.Printf("%x\n", slog.Body.RecordLength+slog.BodyOffset)
+	fmt.Printf("%+v\n", slog.ConnSpec)
 
 	if slog.LogTime != 1494337516 {
 		t.Error("Incorrect LogTime.")
