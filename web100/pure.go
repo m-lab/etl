@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
-	"github.com/m-lab/etl/schema"
 )
 
 // Need to:
@@ -111,53 +109,65 @@ func NewVariable(s *string) (*Variable, error) {
 // The header structure, containing all info from the header.
 type FieldSet struct {
 	Fields       []Variable
-	RecordLength int // Total length of record, including BEGIN_SNAP_DATA
+	FieldMap     map[string]int // Map from field name to index in Fields.
+	RecordLength int            // Total length of record, including BEGIN_SNAP_DATA
 }
 
 // Find returns the variable of a given name, or nil.
-func (h *FieldSet) Find(name string) *Variable {
-	return nil
+func (fs *FieldSet) Find(name string) *Variable {
+	index, ok := fs.FieldMap[name]
+	if !ok {
+		return nil
+	}
+	return &fs.Fields[index]
 }
 
 type SnapLog struct {
-	raw  []byte // The entire raw contents of the file.  Possibly very large.
-	Spec FieldSet
-	Body FieldSet
-	Tune FieldSet
-	// Connection spec here?
-	Buf *bytes.Buffer
+	// The entire raw contents of the file.  Generally 1.5 MB, but may be
+	// much larger
+	raw []byte
+
+	ConnSpecOffset int // Offset in bytes of the ConnSpec
+	BodyOffset     int // Offset in bytes of the first snapshot
+	Spec           FieldSet
+	Body           FieldSet
+	Tune           FieldSet
+
+	ConnSpec map[string]interface{}
 }
 
-func (log *SnapLog) ParseFields(fields *FieldSet, preamble string, terminator string) error {
-	pre, err := log.Buf.ReadString('\n')
+func parseFields(buf *bytes.Buffer, preamble string, terminator string) (FieldSet, error) {
+	fields := FieldSet{FieldMap: make(map[string]int)}
+	pre, err := buf.ReadString('\n')
 	if err != nil {
-		return err
+		return fields, err
 	}
 	if pre != preamble {
-		return errors.New("Expected preamble: " +
+		return fields, errors.New("Expected preamble: " +
 			preamble[:len(preamble)-2] + " != " + pre[:len(pre)-2])
 	}
 
 	for {
-		line, err := log.Buf.ReadString('\n')
+		line, err := buf.ReadString('\n')
 		// TODO - choose a better line length limit?
 		if err != nil || len(line) > 200 {
 			if err == io.EOF {
-				return errors.New("Encountered EOF")
+				return fields, errors.New("Encountered EOF")
 			} else {
-				return errors.New("Corrupted header")
+				return fields, errors.New("Corrupted header")
 			}
 		}
 		if line == terminator {
-			return nil
+			return fields, nil
 		}
 		v, err := NewVariable(&line)
 		if err != nil {
-			return err
+			return fields, err
 		}
 		if fields.RecordLength != v.Offset {
-			return errors.New("Bad offset at " + line[:len(line)-2])
+			return fields, errors.New("Bad offset at " + line[:len(line)-2])
 		}
+		fields.FieldMap[v.Name] = len(fields.Fields)
 		fields.Fields = append(fields.Fields, *v)
 		fields.RecordLength += v.Length
 	}
@@ -165,16 +175,15 @@ func (log *SnapLog) ParseFields(fields *FieldSet, preamble string, terminator st
 
 // Wraps a byte array in a SnapLog.  Returns error if there are problems.
 func NewSnapLog(raw []byte) (*SnapLog, error) {
-	log := SnapLog{raw: raw, Buf: bytes.NewBuffer(raw)}
+	buf := bytes.NewBuffer(raw)
 
-	// TODO Parse the header
 	// First, the version, etc.
-	_, err := log.Buf.ReadString('\n')
+	_, err := buf.ReadString('\n')
 	if err != nil {
 		return nil, err
 	}
 	// Empty line
-	empty, err := log.Buf.ReadString('\n')
+	empty, err := buf.ReadString('\n')
 	if err != nil {
 		return nil, err
 	}
@@ -182,37 +191,39 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 		fmt.Printf("%v\n", []byte(empty))
 		return nil, errors.New("Expected empty string")
 	}
-	err = log.ParseFields(&log.Spec, "/spec\n", "\n")
+
+	spec, err := parseFields(buf, "/spec\n", "\n")
 	if err != nil {
 		return nil, err
 	}
 
-	err = log.ParseFields(&log.Body, "/read\n", "\n")
+	body, err := parseFields(buf, "/read\n", "\n")
 	if err != nil {
 		return nil, err
 	}
 
-	err = log.ParseFields(&log.Tune, "/tune\n", END_OF_HEADER)
+	tune, err := parseFields(buf, "/tune\n", END_OF_HEADER)
 	if err != nil {
 		return nil, err
 	}
+
 	// Now, parse the connection spec.
+	connSpecOffset := len(raw) - buf.Len()
 	// ...
 	//
-	return &log, nil
+	bodyOffset := len(raw) - buf.Len()
+
+	slog := SnapLog{raw: raw, ConnSpecOffset: connSpecOffset, BodyOffset: bodyOffset,
+		Spec: spec, Body: body, Tune: tune, ConnSpec: nil}
+
+	return &slog, nil
 }
 
 type Snapshot struct {
 	raw []byte // The raw data, NOT including the BEGIN_SNAP_HEADER
 }
 
-// Returns the snapshot at index n, or possibly error if n is not a valid index.
-func (log *SnapLog) Snapshot(n int) (Snapshot, error) {
+// Returns the snapshot at index n, or error if n is not a valid index, or data is corrupted.
+func (slog *SnapLog) Snapshot(n int) (Snapshot, error) {
 	return Snapshot{}, nil
-}
-
-// Convert to map suitable for writing to bigquery.
-// TODO - may drop the canonical param, and incorporate that into the Header.
-func (log *Snapshot) ToMap(canonical map[string]string) (schema.Web100ValueMap, error) {
-	return nil, nil
 }

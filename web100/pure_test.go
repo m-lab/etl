@@ -31,6 +31,6 @@ func TestWeb100(t *testing.T) {
 		fmt.Printf("Record length %d\n", log.Body.RecordLength)
 		t.Error("Wrong record length.")
 	}
-	fmt.Println(log.Buf.Len())
-
+	fmt.Println(log.BodyOffset)
+	fmt.Println(log.ConnSpecOffset)
 }
