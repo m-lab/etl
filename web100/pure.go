@@ -2,17 +2,24 @@ package web100
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
+	"io"
 
 	"github.com/m-lab/etl/schema"
 )
 
 // Need to:
 // 1. Read the header
-//   blah blah blah e.g.  "2.5.27 201001301335 net100../spec"
+//   blah blah blah e.g.  "2.5.27 201001301335 net100\n"
+//   "\n"
+//   /spec\n
 //   name%20offset%20WEB100_TYPE%20length\n (separated by spaces, term by \n)
 //   ...
 //   ...
-//   \n----End-Of-Header----\n
+//   \n\n
+//   /read\n
+//   \n----End-Of-Header---- -1 -1\n
 //   log_time
 //   group_name
 //   connection spec (binary)
@@ -36,8 +43,8 @@ import (
 //00000cc0  61 74 61 2d 2d 2d 2d 0a  00 00 00 00 71 46 71 46  |ata----.....qFqF|
 
 const (
-	BEGIN_SNAP_DATA = `----Begin-Snap-Data----` // Plus a newline?
-	END_OF_HEADER   = `----End-Of-Header----`   // No newline.
+	BEGIN_SNAP_DATA = "----Begin-Snap-Data----"           // Plus a newline?
+	END_OF_HEADER   = "\x00----End-Of-Header---- -1 -1\n" // No newline.
 )
 
 type VarType int
@@ -78,30 +85,155 @@ type Variable struct {
 	Length int
 }
 
+func NewVariable(s *string) (*Variable, error) {
+	// TODO - use regular expression ??
+	var name string
+	var length, typ, offset int
+	n, err := fmt.Sscanln(*s, &name, &offset, &typ, &length)
+
+	if err != nil {
+		fmt.Printf("%v, %d: %s\n", err, n, *s)
+		return nil, err
+	}
+	if VarType(typ) > WEB100_TYPE_OCTET || VarType(typ) < WEB100_TYPE_INTEGER {
+		return nil, errors.New(fmt.Sprintf("Invalid type field: %d\n", typ))
+	}
+	vt := VarType(typ)
+	if length < 1 || length > 17 {
+		return nil, errors.New(fmt.Sprintf("Invalid length field: %d\n", length))
+	}
+
+	// TODO - validate length to type consistency.
+	// TODO - validate offset and sum of lengths
+	return &Variable{name, offset, vt, length}, nil
+}
+
 // The header structure, containing all info from the header.
-type Header struct {
+type FieldSet struct {
 	Fields       []Variable
 	RecordLength int // Total length of record, including BEGIN_SNAP_DATA
 }
 
 // Find returns the variable of a given name, or nil.
-func (h *Header) Find(name string) *Variable {
+func (h *FieldSet) Find(name string) *Variable {
 	return nil
 }
 
 type SnapLog struct {
-	raw    []byte // The entire raw contents of the file.  Possibly very large.
-	header Header
-	buf    *bytes.Buffer
+	raw      []byte // The entire raw contents of the file.  Possibly very large.
+	ConnSpec FieldSet
+	Header   FieldSet
+	// Connection spec here?
+	Buf *bytes.Buffer
 }
 
 // Wraps a byte array in a SnapLog.  Returns error if there are problems.
-func NewSnapLog(raw []byte) (SnapLog, error) {
-	log := SnapLog{raw, Header{}, bytes.NewBuffer(raw)}
+func NewSnapLog(raw []byte) (*SnapLog, error) {
+	log := SnapLog{raw, FieldSet{}, FieldSet{}, bytes.NewBuffer(raw)}
 
 	// TODO Parse the header
+	// First, the version, etc.
+	_, err := log.Buf.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	// Empty line
+	empty, err := log.Buf.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	if empty != "\n" {
+		fmt.Printf("%v\n", []byte(empty))
+		return nil, errors.New("Expected empty string")
+	}
+	// "spec"
+	spec, err := log.Buf.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	if spec != "/spec\n" {
+		return nil, errors.New("Expected spec: " + spec)
+	}
 
-	return log, nil
+	// Connection spec variables
+	// TODO - pull out common code.
+	for {
+		line, err := log.Buf.ReadString('\n')
+		if err != nil || len(line) > 200 {
+			if err == io.EOF {
+				return nil, errors.New("Encountered EOF")
+			} else {
+				return nil, errors.New("Corrupted header")
+			}
+		}
+		if line == "\n" { // empty line before /read
+			break
+		}
+		v, err := NewVariable(&line)
+		if err != nil {
+			return nil, err
+		}
+		log.ConnSpec.Fields = append(log.ConnSpec.Fields, *v)
+		log.ConnSpec.RecordLength += v.Length
+	}
+	fmt.Println("Now looking for /read")
+	read, err := log.Buf.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	if read != "/read\n" {
+		return nil, errors.New("Expected read: " + read)
+	}
+
+	for {
+		line, err := log.Buf.ReadString('\n')
+		if err != nil || len(line) > 200 {
+			if err == io.EOF {
+				return nil, errors.New("Encountered EOF")
+			} else {
+				return nil, errors.New("Corrupted header")
+			}
+		}
+		if line == "\n" { // empty line before /tune
+			break
+		}
+		v, err := NewVariable(&line)
+		if err != nil {
+			return nil, err
+		}
+		log.Header.Fields = append(log.Header.Fields, *v)
+		log.Header.RecordLength += v.Length
+	}
+	fmt.Println("Now looking for /tune")
+	tune, err := log.Buf.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	if tune != "/tune\n" {
+		return nil, errors.New("Expected tune: " + tune)
+	}
+
+	for {
+		line, err := log.Buf.ReadString('\n')
+		if err != nil || len(line) > 200 {
+			if err == io.EOF {
+				return nil, errors.New("Encountered EOF")
+			} else {
+				return nil, errors.New("Corrupted header")
+			}
+		}
+		if line == END_OF_HEADER {
+			break
+		}
+		_, err = NewVariable(&line)
+		if err != nil {
+			return nil, err
+		}
+	}
+	// Now, parse the connection spec.
+	// ...
+	//
+	return &log, nil
 }
 
 type Snapshot struct {
