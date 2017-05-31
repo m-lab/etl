@@ -23,12 +23,12 @@ func TestWeb100(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	if len(log.Header.Fields) != 142 {
-		fmt.Printf("%d %v\n", len(log.Header.Fields), log.Header)
+	if len(log.Body.Fields) != 142 {
+		fmt.Printf("%d %v\n", len(log.Body.Fields), log.Body)
 		t.Error("Wrong number of fields.")
 	}
-	if log.Header.RecordLength != 645 {
-		fmt.Printf("Record length %d\n", log.Header.RecordLength)
+	if log.Body.RecordLength != 645 {
+		fmt.Printf("Record length %d\n", log.Body.RecordLength)
 		t.Error("Wrong record length.")
 	}
 	fmt.Println(log.Buf.Len())
