@@ -89,6 +89,22 @@ var Web100Sizes = [WEB100_NUM_TYPES + 1]byte{
 // Or we might just want to inspect a handful of fields to see if they have changes.
 //
 
+var legacyNames map[string]string
+
+func init() {
+	data, err := Asset("tcp-kis.txt")
+	if err != nil {
+		panic("tcp-kis.txt not found")
+	}
+	b := bytes.NewBuffer(data)
+
+	legacyNames, err = ParseWeb100Definitions(b)
+	if err != nil {
+		panic("error parsing tcp-kis.txt")
+	}
+	fmt.Printf("LegacyNames has %d entries.\n", len(legacyNames))
+}
+
 type Variable struct {
 	Name   string // TODO - canonical, or name from header?
 	Offset int    // Offset, beyond the BEGIN_SNAP_HEADER and newline.
@@ -345,15 +361,19 @@ func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
 
 // TODO URGENT - unit tests for this!!
 func Save(field *Variable, data []byte, snapValues Saver) error {
+	canonicalName := field.Name
+	if legacy, ok := legacyNames[canonicalName]; ok {
+		canonicalName = legacy
+	}
 	switch field.Type {
 	case WEB100_TYPE_INTEGER:
 		fallthrough
 	case WEB100_TYPE_INTEGER32:
 		val := binary.LittleEndian.Uint32(data)
 		if val >= 1<<31 {
-			snapValues.SetInt64(field.Name, int64(val)-(int64(1)<<32))
+			snapValues.SetInt64(canonicalName, int64(val)-(int64(1)<<32))
 		} else {
-			snapValues.SetInt64(field.Name, int64(val))
+			snapValues.SetInt64(canonicalName, int64(val))
 		}
 	case WEB100_TYPE_INET_ADDRESS_IPV4:
 		// TODO 4 unsigned char
@@ -365,22 +385,22 @@ func Save(field *Variable, data []byte, snapValues Saver) error {
 	case WEB100_TYPE_UNSIGNED32:
 		fallthrough
 	case WEB100_TYPE_TIME_TICKS:
-		snapValues.SetInt64(field.Name, int64(binary.LittleEndian.Uint32(data)))
+		snapValues.SetInt64(canonicalName, int64(binary.LittleEndian.Uint32(data)))
 	case WEB100_TYPE_COUNTER64:
 		// This conversion to signed may cause overflow panic!
-		snapValues.SetInt64(field.Name, int64(binary.LittleEndian.Uint64(data)))
+		snapValues.SetInt64(canonicalName, int64(binary.LittleEndian.Uint64(data)))
 	case WEB100_TYPE_INET_PORT_NUMBER:
-		snapValues.SetInt64(field.Name, int64(binary.LittleEndian.Uint16(data)))
+		snapValues.SetInt64(canonicalName, int64(binary.LittleEndian.Uint16(data)))
 	case WEB100_TYPE_INET_ADDRESS:
 		fallthrough
 	case WEB100_TYPE_INET_ADDRESS_IPV6:
 		panic("Unimplemented")
 	case WEB100_TYPE_STR32:
 		// TODO - is there a better way?
-		snapValues.SetString(field.Name, strings.SplitN(string(data), "\000", 2)[0])
+		snapValues.SetString(canonicalName, strings.SplitN(string(data), "\000", 2)[0])
 	case WEB100_TYPE_OCTET:
 		// TODO - use byte array?
-		snapValues.SetInt64(field.Name, int64(data[0]))
+		snapValues.SetInt64(canonicalName, int64(data[0]))
 	default:
 		return errors.New("Invalid field type")
 	}
