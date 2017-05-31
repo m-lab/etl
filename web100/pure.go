@@ -120,16 +120,52 @@ func (h *FieldSet) Find(name string) *Variable {
 }
 
 type SnapLog struct {
-	raw      []byte // The entire raw contents of the file.  Possibly very large.
-	ConnSpec FieldSet
-	Header   FieldSet
+	raw  []byte // The entire raw contents of the file.  Possibly very large.
+	Spec FieldSet
+	Body FieldSet
+	Tune FieldSet
 	// Connection spec here?
 	Buf *bytes.Buffer
 }
 
+func (log *SnapLog) ParseFields(fields *FieldSet, preamble string, terminator string) error {
+	pre, err := log.Buf.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	if pre != preamble {
+		return errors.New("Expected preamble: " +
+			preamble[:len(preamble)-2] + " != " + pre[:len(pre)-2])
+	}
+
+	for {
+		line, err := log.Buf.ReadString('\n')
+		// TODO - choose a better line length limit?
+		if err != nil || len(line) > 200 {
+			if err == io.EOF {
+				return errors.New("Encountered EOF")
+			} else {
+				return errors.New("Corrupted header")
+			}
+		}
+		if line == terminator {
+			return nil
+		}
+		v, err := NewVariable(&line)
+		if err != nil {
+			return err
+		}
+		if fields.RecordLength != v.Offset {
+			return errors.New("Bad offset at " + line[:len(line)-2])
+		}
+		fields.Fields = append(fields.Fields, *v)
+		fields.RecordLength += v.Length
+	}
+}
+
 // Wraps a byte array in a SnapLog.  Returns error if there are problems.
 func NewSnapLog(raw []byte) (*SnapLog, error) {
-	log := SnapLog{raw, FieldSet{}, FieldSet{}, bytes.NewBuffer(raw)}
+	log := SnapLog{raw: raw, Buf: bytes.NewBuffer(raw)}
 
 	// TODO Parse the header
 	// First, the version, etc.
@@ -146,89 +182,19 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 		fmt.Printf("%v\n", []byte(empty))
 		return nil, errors.New("Expected empty string")
 	}
-	// "spec"
-	spec, err := log.Buf.ReadString('\n')
+	err = log.ParseFields(&log.Spec, "/spec\n", "\n")
 	if err != nil {
 		return nil, err
 	}
-	if spec != "/spec\n" {
-		return nil, errors.New("Expected spec: " + spec)
-	}
 
-	// Connection spec variables
-	// TODO - pull out common code.
-	for {
-		line, err := log.Buf.ReadString('\n')
-		if err != nil || len(line) > 200 {
-			if err == io.EOF {
-				return nil, errors.New("Encountered EOF")
-			} else {
-				return nil, errors.New("Corrupted header")
-			}
-		}
-		if line == "\n" { // empty line before /read
-			break
-		}
-		v, err := NewVariable(&line)
-		if err != nil {
-			return nil, err
-		}
-		log.ConnSpec.Fields = append(log.ConnSpec.Fields, *v)
-		log.ConnSpec.RecordLength += v.Length
-	}
-	fmt.Println("Now looking for /read")
-	read, err := log.Buf.ReadString('\n')
+	err = log.ParseFields(&log.Body, "/read\n", "\n")
 	if err != nil {
 		return nil, err
 	}
-	if read != "/read\n" {
-		return nil, errors.New("Expected read: " + read)
-	}
 
-	for {
-		line, err := log.Buf.ReadString('\n')
-		if err != nil || len(line) > 200 {
-			if err == io.EOF {
-				return nil, errors.New("Encountered EOF")
-			} else {
-				return nil, errors.New("Corrupted header")
-			}
-		}
-		if line == "\n" { // empty line before /tune
-			break
-		}
-		v, err := NewVariable(&line)
-		if err != nil {
-			return nil, err
-		}
-		log.Header.Fields = append(log.Header.Fields, *v)
-		log.Header.RecordLength += v.Length
-	}
-	fmt.Println("Now looking for /tune")
-	tune, err := log.Buf.ReadString('\n')
+	err = log.ParseFields(&log.Tune, "/tune\n", END_OF_HEADER)
 	if err != nil {
 		return nil, err
-	}
-	if tune != "/tune\n" {
-		return nil, errors.New("Expected tune: " + tune)
-	}
-
-	for {
-		line, err := log.Buf.ReadString('\n')
-		if err != nil || len(line) > 200 {
-			if err == io.EOF {
-				return nil, errors.New("Encountered EOF")
-			} else {
-				return nil, errors.New("Corrupted header")
-			}
-		}
-		if line == END_OF_HEADER {
-			break
-		}
-		_, err = NewVariable(&line)
-		if err != nil {
-			return nil, err
-		}
 	}
 	// Now, parse the connection spec.
 	// ...
