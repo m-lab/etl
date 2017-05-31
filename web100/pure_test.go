@@ -1,12 +1,18 @@
 package web100_test
 
 import (
+	//"fmt"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"testing"
 
 	"github.com/m-lab/etl/web100"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 func TestValidation(t *testing.T) {
 }
@@ -24,17 +30,13 @@ func TestHeaderParsing(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	if len(slog.Body.Fields) != 142 {
-		fmt.Printf("%d %v\n", len(slog.Body.Fields), slog.Body)
+		log.Printf("%d %v\n", len(slog.Body.Fields), slog.Body)
 		t.Error("Wrong number of fields.")
 	}
 	if slog.Body.RecordLength != 669 {
-		fmt.Printf("Record length %d\n", slog.Body.RecordLength)
+		log.Printf("Record length %d\n", slog.Body.RecordLength)
 		t.Error("Wrong record length.")
 	}
-	fmt.Printf("%d %x\n", slog.Spec.RecordLength, slog.ConnSpecOffset)
-	fmt.Printf("%d %x\n", slog.Body.RecordLength, slog.BodyOffset)
-	fmt.Printf("%x\n", slog.Body.RecordLength+slog.BodyOffset)
-	fmt.Printf("%+v\n", slog.ConnSpec)
 
 	if slog.LogTime != 1494337516 {
 		t.Error("Incorrect LogTime.")
@@ -42,6 +44,17 @@ func TestHeaderParsing(t *testing.T) {
 	if err = slog.Validate(); err != nil {
 		t.Error(err)
 	}
+}
+
+type Saver struct {
+}
+
+func (s *Saver) SetString(name string, val string) {
+	fmt.Printf("%s: %s\n", name, val)
+}
+
+func (s *Saver) SetInt64(name string, val int64) {
+	fmt.Printf("%s: %d\n", name, val)
 }
 
 func TestSnapshotContent(t *testing.T) {
@@ -55,6 +68,8 @@ func TestSnapshotContent(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	_, err = slog.Snapshot(1)
+	snapshot, err := slog.Snapshot(0)
+	var saver Saver
+	snapshot.SnapshotValues(&saver)
 
 }
