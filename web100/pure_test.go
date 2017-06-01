@@ -27,19 +27,19 @@ func TestHeaderParsing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	if len(slog.Body.Fields) != 142 {
-		log.Printf("%d %v\n", len(slog.Body.Fields), slog.Body)
+	if slog.SnapshotNumFields() != 142 {
+		log.Printf("%d\n", slog.SnapshotNumFields)
 		t.Error("Wrong number of fields.")
 	}
-	if slog.Body.RecordLength != 669 {
-		log.Printf("Record length %d\n", slog.Body.RecordLength)
+	if slog.SnapshotNumBytes() != 669 {
+		log.Printf("Record length %d\n", slog.SnapshotNumBytes)
 		t.Error("Wrong record length.")
 	}
 
 	if slog.LogTime != 1494337516 {
 		t.Error("Incorrect LogTime.")
 	}
-	if err = slog.Validate(); err != nil {
+	if err = slog.ValidateSnapshots(); err != nil {
 		t.Error(err)
 	}
 }

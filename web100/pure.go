@@ -13,9 +13,8 @@ import (
 
 // TODO - resolve use of Record, Snapshot, slog, snap, etc.
 
-// Need to:
-// 1. Read the header
-//   e.g. "2.5.27 201001301335 net100\n"
+// Snaplog files look like:
+//   "2.5.27 201001301335 net100\n"
 //   \n
 //   /spec\n
 //   name%20offset%20WEB100_TYPE%20length\n (separated by spaces, term by \n)
@@ -23,20 +22,26 @@ import (
 //   ...
 //   \n  // blank line
 //   /read\n
+//   ...
+//   /tune\n
+//   ...
 //   \n----End-Of-Header---- -1 -1\n
 //   log_time
 //   group_name (currently "read")
 //   connection spec (binary)
-//
+//   ----Begin-Snap-Data----\n
 //   ...
-//   \n----Begin-Snap-Data----\n
+//   ----Begin-Snap-Data----\n
 //   ...
+//   ----Begin-Snap-Data----\n
+//   ...
+//   EOF
 // It appears that the file is expected to end at the end of a snap data
 // with no tag to indicate the end - just EOF.
 //
 //00000000  32 2e 35 2e 32 37 20 32  30 31 30 30 31 33 30 31  |2.5.27 201001301|
 //00000010  33 33 35 20 6e 65 74 31  30 30 0a 0a 2f 73 70 65  |335 net100../spe|
-
+//...
 //00000c50  4c 69 6d 43 77 6e 64 20  34 30 20 34 20 34 0a 00  |LimCwnd 40 4 4..|
 //00000c60  2d 2d 2d 2d 45 6e 64 2d  4f 66 2d 48 65 61 64 65  |----End-Of-Heade|
 //00000c70  72 2d 2d 2d 2d 20 2d 31  20 2d 31 0a 8a 57 12 59  |r---- -1 -1..W.Y|
@@ -46,6 +51,26 @@ import (
 //00000cb0  2d 2d 2d 2d 42 65 67 69  6e 2d 53 6e 61 70 2d 44  |----Begin-Snap-D|
 //00000cc0  61 74 61 2d 2d 2d 2d 0a  00 00 00 00 71 46 71 46  |ata----.....qFqF|
 
+//=================================================================================
+// LegacyNames provides the mapping from old names (in snaplog files) to new
+// canonical names.
+// This is exported so that SideStream parser can use it easily.
+var LegacyNames map[string]string
+
+func init() {
+	data, err := Asset("tcp-kis.txt")
+	if err != nil {
+		panic("tcp-kis.txt not found")
+	}
+	b := bytes.NewBuffer(data)
+
+	LegacyNames, err = ParseWeb100Definitions(b)
+	if err != nil {
+		panic("error parsing tcp-kis.txt")
+	}
+}
+
+//=================================================================================
 const (
 	BEGIN_SNAP_DATA   = "----Begin-Snap-Data----\n"
 	END_OF_HEADER     = "\x00----End-Of-Header---- -1 -1\n"
@@ -53,10 +78,10 @@ const (
 	VARNAME_LEN_MAX   = 32
 )
 
-type VarType int
+type varType int
 
 const (
-	WEB100_TYPE_INTEGER VarType = iota
+	WEB100_TYPE_INTEGER varType = iota
 	WEB100_TYPE_INTEGER32
 	WEB100_TYPE_INET_ADDRESS_IPV4
 	WEB100_TYPE_COUNTER32
@@ -72,10 +97,10 @@ const (
 	WEB100_NUM_TYPES
 )
 
-type AddrType int
+type addrType int
 
 const (
-	WEB100_ADDRTYPE_UNKNOWN AddrType = iota
+	WEB100_ADDRTYPE_UNKNOWN addrType = iota
 	WEB100_ADDRTYPE_IPV4
 	WEB100_ADDRTYPE_IPV6
 	WEB100_ADDRTYPE_DNS = 16
@@ -86,55 +111,43 @@ const (
 	WEB100_TYPE_UNSIGNED16 = WEB100_TYPE_INET_PORT_NUMBER  /* Deprecated */
 )
 
-var Web100Sizes = [WEB100_NUM_TYPES + 1]byte{
+var web100Sizes = [WEB100_NUM_TYPES + 1]byte{
 	4 /*INTEGER*/, 4 /*INTEGER32*/, 4 /*IPV4*/, 4 /*COUNTER32*/, 4, /*GAUGE32*/
 	4 /*UNSIGNED32*/, 4, /*TIME_TICKS*/
 	8 /*COUNTER64*/, 2 /*PORT_NUM*/, 17, 17, 32 /*STR32*/, 1 /*OCTET*/, 0}
 
-var legacyNames map[string]string
+//=================================================================================
 
-func init() {
-	data, err := Asset("tcp-kis.txt")
-	if err != nil {
-		panic("tcp-kis.txt not found")
-	}
-	b := bytes.NewBuffer(data)
-
-	legacyNames, err = ParseWeb100Definitions(b)
-	if err != nil {
-		panic("error parsing tcp-kis.txt")
-	}
+// variable is a representation of a Web100 field specifications, as they appear
+// in snaplog headers.
+type variable struct {
+	Name   string  // Encoded field name (before conversion to canonicalName)
+	Offset int     // Offset, beyond the BEGIN_SNAP_HEADER
+	Type   varType // Web100 type of the field
+	Size   int     // Size, in bytes, of the raw data field.
 }
 
-//-------------------------------------------------------------------------------
-type Variable struct {
-	Name   string // TODO - canonical, or name from header?
-	Offset int    // Offset, beyond the BEGIN_SNAP_HEADER and newline.
-	Type   VarType
-	Length int
-}
-
-func NewVariable(s *string) (*Variable, error) {
+func Newvariable(s *string) (*variable, error) {
 	// TODO - use regular expression ??
 	var name string
 	var length, typ, offset int
 	n, err := fmt.Sscanln(*s, &name, &offset, &typ, &length)
 
 	if err != nil {
-		fmt.Printf("NewVariable Error %v, %d: %s\n", err, n, *s)
+		fmt.Printf("Newvariable Error %v, %d: %s\n", err, n, *s)
 		return nil, err
 	}
-	if VarType(typ) > WEB100_TYPE_OCTET || VarType(typ) < WEB100_TYPE_INTEGER {
+	if varType(typ) > WEB100_TYPE_OCTET || varType(typ) < WEB100_TYPE_INTEGER {
 		return nil, errors.New(fmt.Sprintf("Invalid type field: %d\n", typ))
 	}
-	vt := VarType(typ)
+	vt := varType(typ)
 	if length < 1 || length > 17 {
 		return nil, errors.New(fmt.Sprintf("Invalid length field: %d\n", length))
 	}
 
 	// TODO - validate length to type consistency.
 	// TODO - validate offset and sum of lengths
-	return &Variable{name, offset, vt, length}, nil
+	return &variable{name, offset, vt, length}, nil
 }
 
 // IPFromBytes handles the 17 byte web100 IP address fields.
@@ -142,7 +155,7 @@ func IPFromBytes(data []byte) (net.IP, error) {
 	if len(data) != 17 {
 		return net.IP{}, errors.New("Wrong number of bytes")
 	}
-	switch AddrType(data[16]) {
+	switch addrType(data[16]) {
 	case WEB100_ADDRTYPE_IPV4:
 		return net.IPv4(data[0], data[1], data[2], data[3]), nil
 	case WEB100_ADDRTYPE_IPV6:
@@ -155,7 +168,7 @@ func IPFromBytes(data []byte) (net.IP, error) {
 }
 
 // TODO URGENT - unit tests for this!!
-func (v *Variable) Save(data []byte, snapValues Saver) error {
+func (v *variable) Save(data []byte, snapValues Saver) error {
 	// Ignore deprecated fields.
 	if v.Name[0] == '_' {
 		return nil
@@ -166,7 +179,7 @@ func (v *Variable) Save(data []byte, snapValues Saver) error {
 	// the kernel and written to the snaplog) to the canonical form (as defined
 	// in tcp-kis.txt).
 	canonicalName := v.Name
-	if legacy, ok := legacyNames[canonicalName]; ok {
+	if legacy, ok := LegacyNames[canonicalName]; ok {
 		canonicalName = legacy
 	}
 	switch v.Type {
@@ -217,15 +230,15 @@ func (v *Variable) Save(data []byte, snapValues Saver) error {
 }
 
 //=================================================================================
-// The header structure, containing all info from the header.
-type FieldSet struct {
-	Fields       []Variable
-	FieldMap     map[string]int // Map from field name to index in Fields.
-	RecordLength int            // Total length of record, including preamble, e.g. BEGIN_SNAP_DATA
+// fieldSet provides the ordered list of Web100 variable specifications.
+type fieldSet struct {
+	Fields   []variable
+	FieldMap map[string]int // Map from field name to index in Fields.
+	Length   int            // Total length of record, including preamble, e.g. BEGIN_SNAP_DATA
 }
 
 // Find returns the variable of a given name, or nil.
-func (fs *FieldSet) Find(name string) *Variable {
+func (fs *fieldSet) Find(name string) *variable {
 	index, ok := fs.FieldMap[name]
 	if !ok {
 		return nil
@@ -233,15 +246,17 @@ func (fs *FieldSet) Find(name string) *Variable {
 	return &fs.Fields[index]
 }
 
-//-------------------------------------------------------------------------------
-type ConnectionSpec struct {
+//=================================================================================
+// ConnectionSpec is used to
+type connectionSpec struct {
 	DestPort uint16
 	SrcPort  uint16
-	DestAddr []byte
+	DestAddr []byte // 4 byte IP address.  0.0.0.0 for ipv6
 	SrcAddr  []byte
 }
 
-//-------------------------------------------------------------------------------
+//=================================================================================
+// SnapLog encapsulates the raw data and all elements of the header.
 type SnapLog struct {
 	// The entire raw contents of the file.  Generally 1.5MB, but may be much larger
 	raw []byte
@@ -250,19 +265,34 @@ type SnapLog struct {
 	LogTime   uint32
 	GroupName string
 
-	ConnSpecOffset int // Offset in bytes of the ConnSpec
-	BodyOffset     int // Offset in bytes of the first snapshot
-	Spec           FieldSet
-	Body           FieldSet
-	Tune           FieldSet
+	connSpecOffset int // Offset in bytes of the ConnSpec
+	bodyOffset     int // Offset in bytes of the first snapshot
+	spec           fieldSet
+	// The primary field set used by snapshots
+	// The name "read" is ugly, but that is the name of the web100 header section.
+	read fieldSet
+	tune fieldSet
 
 	// Use with caution.  Generally should use connection spec from .meta file or
 	// from snapshot instead.
-	ConnSpec ConnectionSpec
+	connSpec connectionSpec
 }
 
-func parseFields(buf *bytes.Buffer, preamble string, terminator string) (FieldSet, error) {
-	fields := FieldSet{FieldMap: make(map[string]int)}
+// SnapshotNumBytes returns the length of snapshot records, including preamble.
+// Used only for testing.
+func (sl *SnapLog) SnapshotNumBytes() int {
+	return sl.read.Length
+}
+
+// SnapshotNumBytes returns the total number of snapshot fields.
+// Used only for testing.
+func (sl *SnapLog) SnapshotNumFields() int {
+	return len(sl.read.Fields)
+}
+
+// parseFields parses the newline separated web100 variable types from the header.
+func parseFields(buf *bytes.Buffer, preamble string, terminator string) (fieldSet, error) {
+	fields := fieldSet{FieldMap: make(map[string]int)}
 	pre, err := buf.ReadString('\n')
 	if err != nil {
 		return fields, err
@@ -285,26 +315,27 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (FieldSe
 		if line == terminator {
 			return fields, nil
 		}
-		v, err := NewVariable(&line)
+		v, err := Newvariable(&line)
 		if err != nil {
 			return fields, err
 		}
-		if fields.RecordLength != v.Offset {
+		if fields.Length != v.Offset {
 			return fields, errors.New("Bad offset at " + line[:len(line)-2])
 		}
 		fields.FieldMap[v.Name] = len(fields.Fields)
 		fields.Fields = append(fields.Fields, *v)
-		fields.RecordLength += v.Length
+		fields.Length += v.Size
 	}
 }
 
-func parseConnectionSpec(buf *bytes.Buffer) (ConnectionSpec, error) {
+// parseConnectionSpec parses the 16 byte binary connection spec field from the header.
+func parseConnectionSpec(buf *bytes.Buffer) (connectionSpec, error) {
 	// The web100 snaplog only correctly represents ipv4 addresses.
 	// But try to read it anyway.
 	raw := make([]byte, 16)
 	n, err := buf.Read(raw)
 	if err != nil || n < 16 {
-		return ConnectionSpec{}, errors.New("Too few bytes for connection spec")
+		return connectionSpec{}, errors.New("Too few bytes for connection spec")
 	}
 	dstPort := binary.LittleEndian.Uint16(raw[0:2])
 	// WARNING - the web100 code seemingly depends on a 32 bit architecture.
@@ -314,7 +345,7 @@ func parseConnectionSpec(buf *bytes.Buffer) (ConnectionSpec, error) {
 	srcPort := binary.LittleEndian.Uint16(raw[8:10])
 	srcAddr := raw[12:16]
 
-	return ConnectionSpec{DestPort: dstPort, SrcPort: srcPort,
+	return connectionSpec{DestPort: dstPort, SrcPort: srcPort,
 		DestAddr: dstAddr, SrcAddr: srcAddr}, nil
 }
 
@@ -343,11 +374,11 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 		return nil, err
 	}
 
-	body, err := parseFields(buf, "/read\n", "\n")
+	read, err := parseFields(buf, "/read\n", "\n")
 	if err != nil {
 		return nil, err
 	}
-	body.RecordLength += len(BEGIN_SNAP_DATA)
+	read.Length += len(BEGIN_SNAP_DATA)
 
 	// The terminator here does NOT start with \n.  8-(
 	tune, err := parseFields(buf, "/tune\n", END_OF_HEADER)
@@ -389,40 +420,35 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	bodyOffset := len(raw) - buf.Len()
 
 	slog := SnapLog{raw: raw, Version: version, LogTime: logTime, GroupName: groupName,
-		ConnSpecOffset: connSpecOffset, BodyOffset: bodyOffset,
-		Spec: spec, Body: body, Tune: tune, ConnSpec: connSpec}
+		connSpecOffset: connSpecOffset, bodyOffset: bodyOffset,
+		spec: spec, read: read, tune: tune, connSpec: connSpec}
 
 	return &slog, nil
 }
 
+// SnapCount returns the number of valid snapshots.
 func (sl *SnapLog) SnapCount() int {
-	total := len(sl.raw) - sl.BodyOffset
-	return total / sl.Body.RecordLength
+	total := len(sl.raw) - sl.bodyOffset
+	return total / sl.read.Length
 }
 
-func (sl *SnapLog) Validate() error {
-	// Verify that body starts with BEGIN
-	first := string(sl.raw[sl.BodyOffset : sl.BodyOffset+len(BEGIN_SNAP_DATA)])
-	if first != BEGIN_SNAP_DATA {
-		return errors.New("Missing first BeginSnapData")
+// ValidateSnapshots checks whether the first and last snapshots are valid and complete.
+func (sl *SnapLog) ValidateSnapshots() error {
+	// Valid first snapshot?
+	_, err := sl.Snapshot(0)
+	if err != nil {
+		return err
 	}
-
+	// Valid last snapshot?
+	_, err = sl.Snapshot(sl.SnapCount() - 1)
+	if err != nil {
+		return err
+	}
 	// Verify that body size is integer multiple of body record length.
-	total := len(sl.raw) - sl.BodyOffset
-	if total%sl.Body.RecordLength != 0 {
-		return errors.New("Body length is not multiple of Body.RecordLength")
+	total := len(sl.raw) - sl.bodyOffset
+	if total%sl.read.Length != 0 {
+		return errors.New("Last snapshot truncated.")
 	}
-
-	// Verify that last record is good quality
-	numSnapshots := sl.SnapCount()
-	lastOffset := sl.BodyOffset + (numSnapshots-1)*sl.Body.RecordLength
-	lastBegin := string(sl.raw[lastOffset : lastOffset+len(BEGIN_SNAP_DATA)])
-	if lastBegin != BEGIN_SNAP_DATA {
-		return errors.New("Missing last BeginSnapData")
-	}
-
-	// lastSnap := slog.Snapshot(numSnapshots - 1)
-	// Verify that last record is in a TCP end state?
 	return nil
 }
 
@@ -430,39 +456,37 @@ func (sl *SnapLog) Validate() error {
 type Snapshot struct {
 	// Just the raw data, without BEGIN_SNAP_DATA.
 	raw    []byte    // The raw data, NOT including the BEGIN_SNAP_HEADER
-	fields *FieldSet // The fieldset describing the raw contents.
+	fields *fieldSet // The fieldset describing the raw contents.
 }
 
 // Returns the snapshot at index n, or error if n is not a valid index, or data is corrupted.
 func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
-	if n > sl.SnapCount() {
-		return Snapshot{}, errors.New("Invalid snapshot index")
+	if n > sl.SnapCount()-1 {
+		return Snapshot{}, errors.New(fmt.Sprintf("Invalid snapshot index %d", n))
 	}
-	offset := sl.BodyOffset + n*sl.Body.RecordLength
-	if string(sl.raw[offset:offset+len(BEGIN_SNAP_DATA)]) != BEGIN_SNAP_DATA {
+	offset := sl.bodyOffset + n*sl.read.Length
+	begin := string(sl.raw[offset : offset+len(BEGIN_SNAP_DATA)])
+	if begin != BEGIN_SNAP_DATA {
 		return Snapshot{}, errors.New("Missing BeginSnapData")
 	}
 
-	// We use the Body field group, as that is what is always used for NDT snapshots.
+	// We use the "/read" field group, as that is what is always used for NDT snapshots.
 	// This may be incorrect for use in other settings.
-	// TODO - why do we need the +1 here????
-	return Snapshot{raw: sl.raw[offset+len(BEGIN_SNAP_DATA) : offset+sl.Body.RecordLength],
-		fields: &sl.Body}, nil
+	return Snapshot{raw: sl.raw[offset+len(BEGIN_SNAP_DATA) : offset+sl.read.Length],
+		fields: &sl.read}, nil
 }
 
-// SnapshotValues saves all values from the most recent C.web100_snapshot read by
-// Next. Next must be called at least once before calling SnapshotValues.
+// SnapshotValues writes all values into the provided Saver.
 func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 	if snap.raw == nil {
 		return errors.New("Empty/Invalid Snaplog")
 	}
-	// Parses variables from most recent web100_snapshot data.
-	var field Variable
+	var field variable
 	for _, field = range snap.fields.Fields {
 		// Extract the web100 variable name and type. This will
 		// correspond to one of the variables defined in tcp-kis.txt.
 		// TODO handle canonical names
-		field.Save(snap.raw[field.Offset:field.Offset+field.Length], snapValues)
+		field.Save(snap.raw[field.Offset:field.Offset+field.Size], snapValues)
 	}
 	return nil
 }
