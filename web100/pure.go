@@ -1,7 +1,6 @@
 package web100
 
 import (
-	"C"
 	"bytes"
 	"encoding/binary"
 	"errors"
@@ -11,10 +10,24 @@ import (
 	"strings"
 )
 
-// TODO - resolve use of Record, Snapshot, slog, snap, etc.
+// NOTES:
+//  This implementation relies on some apparent invariants that may or may not
+//  be true across all NDT snaplogs.  The invariants are checked, and if they are
+//  not actually true, we should see errors in processing our archives.
+//
+// TODO
+//  With the new parser, it is now (probably) easy to identify where a log is
+//  corrupted, and possibly make use of all the snapshots up to that point.
+//  We probably should take advantage of this somehow.
+//
+// Terminology:
+//   Snapshot: a single Web100 snapshot.
+//   snap or snapshot - variable name for a single snapshot.
+//   SnapLog: a full log containing typically 2000 or so Snapshots.
+//   slog or snaplog - variable name for a SnapLog.
 
-// Snaplog files look like:
-//   "2.5.27 201001301335 net100\n"
+// SnapLog files look like:
+//   "2.5.27 201001301335 net100\n"  // version string
 //   \n
 //   /spec\n
 //   name%20offset%20WEB100_TYPE%20length\n (separated by spaces, term by \n)
@@ -81,6 +94,8 @@ const (
 type varType int
 
 const (
+	// The ordering here is important, as it reflects the type values
+	// defined by the web100 libraries.  Do not change ordering.
 	WEB100_TYPE_INTEGER varType = iota
 	WEB100_TYPE_INTEGER32
 	WEB100_TYPE_INET_ADDRESS_IPV4
@@ -100,6 +115,8 @@ const (
 type addrType int
 
 const (
+	// The ordering here is important, as it reflects the type values
+	// defined by the web100 libraries.  Do not change ordering.
 	WEB100_ADDRTYPE_UNKNOWN addrType = iota
 	WEB100_ADDRTYPE_IPV4
 	WEB100_ADDRTYPE_IPV6
@@ -234,7 +251,9 @@ func (v *variable) Save(data []byte, snapValues Saver) error {
 type fieldSet struct {
 	Fields   []variable
 	FieldMap map[string]int // Map from field name to index in Fields.
-	Length   int            // Total length of record, including preamble, e.g. BEGIN_SNAP_DATA
+	// Total length of each record, in bytes, including preamble, e.g. BEGIN_SNAP_DATA
+	// For example, for the standard "/read" snapshot record, the length is 669 bytes.
+	Length int
 }
 
 // Find returns the variable of a given name, or nil.
@@ -276,6 +295,16 @@ type SnapLog struct {
 	// Use with caution.  Generally should use connection spec from .meta file or
 	// from snapshot instead.
 	connSpec connectionSpec
+}
+
+func (sl *SnapLog) ConnectionSpecValues(saver Saver) {
+	saver.SetInt64("local_af", int64(0))
+	src := sl.connSpec.SrcAddr
+	saver.SetString("local_ip", net.IPv4(src[0], src[1], src[2], src[3]).String())
+	saver.SetInt64("local_port", int64(sl.connSpec.SrcPort))
+	dst := sl.connSpec.DestAddr
+	saver.SetString("remote_ip", net.IPv4(dst[0], dst[1], dst[2], dst[3]).String())
+	saver.SetInt64("remote_port", int64(sl.connSpec.DestPort))
 }
 
 // SnapshotNumBytes returns the length of snapshot records, including preamble.
@@ -358,6 +387,8 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	if err != nil {
 		return nil, err
 	}
+	version = strings.Split(version, "\n")[0]
+
 	// Empty line
 	empty, err := buf.ReadString('\n')
 	if err != nil {
