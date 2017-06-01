@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"reflect"
 	"testing"
 
 	"github.com/m-lab/etl/web100"
@@ -109,8 +110,10 @@ func TestSnapshotContent(t *testing.T) {
 	saver := NewSimpleSaver()
 	snapshot.SnapshotValues(&saver)
 
-	fmt.Printf("%+v\n", saver)
-
 	old := OldRead(1000)
-	fmt.Printf("%+v\n", old)
+	if !reflect.DeepEqual(old, saver) {
+		t.Error("Does not match old output")
+		fmt.Printf("%+v\n", saver)
+		fmt.Printf("%+v\n", old)
+	}
 }
