@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 )
 
@@ -46,7 +47,7 @@ import (
 //00000cc0  61 74 61 2d 2d 2d 2d 0a  00 00 00 00 71 46 71 46  |ata----.....qFqF|
 
 const (
-	BEGIN_SNAP_DATA   = "----Begin-Snap-Data----"           // Plus a newline?
+	BEGIN_SNAP_DATA   = "----Begin-Snap-Data----\n"         // Plus a newline?
 	END_OF_HEADER     = "\x00----End-Of-Header---- -1 -1\n" // No newline.
 	GROUPNAME_LEN_MAX = 32
 	VARNAME_LEN_MAX   = 32
@@ -114,6 +115,7 @@ func init() {
 	}
 }
 
+//-------------------------------------------------------------------------------
 type Variable struct {
 	Name   string // TODO - canonical, or name from header?
 	Offset int    // Offset, beyond the BEGIN_SNAP_HEADER and newline.
@@ -144,6 +146,86 @@ func NewVariable(s *string) (*Variable, error) {
 	return &Variable{name, offset, vt, length}, nil
 }
 
+// IPFromBytes handles the 17 byte web100 IP address fields.
+func IPFromBytes(data []byte) (net.IP, error) {
+	if len(data) != 17 {
+		return net.IP{}, errors.New("Wrong number of bytes")
+	}
+	switch AddrType(data[16]) {
+	case WEB100_ADDRTYPE_IPV4:
+		return net.IPv4(data[0], data[1], data[2], data[3]), nil
+	case WEB100_ADDRTYPE_IPV6:
+		return net.IP(data[:16]), nil
+	case WEB100_ADDRTYPE_UNKNOWN:
+		fallthrough
+	default:
+		return nil, errors.New("Invalid IP encoding")
+	}
+}
+
+// TODO URGENT - unit tests for this!!
+func (v *Variable) Save(data []byte, snapValues Saver) error {
+	// Ignore deprecated fields.
+	if v.Name[0] == '_' {
+		return nil
+	}
+	// Use the canonical variable name. The variable name known to the web100
+	// kernel at run time lagged behind the official web100 spec. So, some
+	// variable names need to be translated from their legacy form (read from
+	// the kernel and written to the snaplog) to the canonical form (as defined
+	// in tcp-kis.txt).
+	canonicalName := v.Name
+	if legacy, ok := legacyNames[canonicalName]; ok {
+		canonicalName = legacy
+	}
+	switch v.Type {
+	case WEB100_TYPE_INTEGER:
+		fallthrough
+	case WEB100_TYPE_INTEGER32:
+		val := binary.LittleEndian.Uint32(data)
+		if val >= 1<<31 {
+			snapValues.SetInt64(canonicalName, int64(val)-(int64(1)<<32))
+		} else {
+			snapValues.SetInt64(canonicalName, int64(val))
+		}
+	case WEB100_TYPE_INET_ADDRESS_IPV4:
+		snapValues.SetString(canonicalName,
+			fmt.Sprintf("%d.%d.%d.%d",
+				data[0], data[1], data[2], data[3]))
+	case WEB100_TYPE_COUNTER32:
+		fallthrough
+	case WEB100_TYPE_GAUGE32:
+		fallthrough
+	case WEB100_TYPE_UNSIGNED32:
+		fallthrough
+	case WEB100_TYPE_TIME_TICKS:
+		snapValues.SetInt64(canonicalName, int64(binary.LittleEndian.Uint32(data)))
+	case WEB100_TYPE_COUNTER64:
+		// This conversion to signed may cause overflow panic!
+		snapValues.SetInt64(canonicalName, int64(binary.LittleEndian.Uint64(data)))
+	case WEB100_TYPE_INET_PORT_NUMBER:
+		snapValues.SetInt64(canonicalName, int64(binary.LittleEndian.Uint16(data)))
+	case WEB100_TYPE_INET_ADDRESS:
+		fallthrough
+	case WEB100_TYPE_INET_ADDRESS_IPV6:
+		ip, err := IPFromBytes(data)
+		if err != nil {
+			return err
+		}
+		snapValues.SetString(canonicalName, ip.String())
+	case WEB100_TYPE_STR32:
+		// TODO - is there a better way?
+		snapValues.SetString(canonicalName, strings.SplitN(string(data), "\000", 2)[0])
+	case WEB100_TYPE_OCTET:
+		// TODO - use byte array?
+		snapValues.SetInt64(canonicalName, int64(data[0]))
+	default:
+		return errors.New("Invalid field type")
+	}
+	return nil
+}
+
+//=================================================================================
 // The header structure, containing all info from the header.
 type FieldSet struct {
 	Fields       []Variable
@@ -160,6 +242,7 @@ func (fs *FieldSet) Find(name string) *Variable {
 	return &fs.Fields[index]
 }
 
+//-------------------------------------------------------------------------------
 type ConnectionSpec struct {
 	DestPort uint16
 	SrcPort  uint16
@@ -167,6 +250,7 @@ type ConnectionSpec struct {
 	SrcAddr  []byte
 }
 
+//-------------------------------------------------------------------------------
 type SnapLog struct {
 	// The entire raw contents of the file.  Generally 1.5 MB, but may be
 	// much larger
@@ -244,14 +328,7 @@ func parseConnectionSpec(buf *bytes.Buffer) (ConnectionSpec, error) {
 		DestAddr: dstAddr, SrcAddr: srcAddr}, nil
 }
 
-/*struct web100_connection_spec {
-    u_int16_t dst_port;
-    u_int32_t dst_addr;
-    u_int16_t src_port;
-    u_int32_t src_addr;
-};*/
-
-// Wraps a byte array in a SnapLog.  Returns error if there are problems.
+// NewSnapLog creates a SnapLog from a byte array.  Returns error if there are problems.
 func NewSnapLog(raw []byte) (*SnapLog, error) {
 	buf := bytes.NewBuffer(raw)
 
@@ -280,9 +357,7 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	if err != nil {
 		return nil, err
 	}
-	// There seems to be a null character at the end of each record, so
-	// add one to the length.
-	body.RecordLength += len(BEGIN_SNAP_DATA) + 1
+	body.RecordLength += len(BEGIN_SNAP_DATA)
 
 	tune, err := parseFields(buf, "/tune\n", END_OF_HEADER)
 	if err != nil {
@@ -358,6 +433,7 @@ func (sl *SnapLog) Validate() error {
 	return nil
 }
 
+//=================================================================================
 type Snapshot struct {
 	// Just the raw data, without BEGIN_SNAP_DATA.
 	raw    []byte    // The raw data, NOT including the BEGIN_SNAP_HEADER
@@ -374,82 +450,8 @@ func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
 	// We use the Body field group, as that is what is always used for NDT snapshots.
 	// This may be incorrect for use in other settings.
 	// TODO - why do we need the +1 here????
-	return Snapshot{raw: sl.raw[offset+len(BEGIN_SNAP_DATA)+1 : offset+sl.Body.RecordLength],
+	return Snapshot{raw: sl.raw[offset+len(BEGIN_SNAP_DATA) : offset+sl.Body.RecordLength],
 		fields: &sl.Body}, nil
-}
-
-// TODO URGENT - unit tests for this!!
-func Save(field *Variable, data []byte, snapValues Saver) error {
-	// Use the canonical variable name. The variable name known to the web100
-	// kernel at run time lagged behind the official web100 spec. So, some
-	// variable names need to be translated from their legacy form (read from
-	// the kernel and written to the snaplog) to the canonical form (as defined
-	// in tcp-kis.txt).
-	canonicalName := field.Name
-	if canonicalName[0] == '_' {
-		//return nil
-	}
-	if legacy, ok := legacyNames[canonicalName]; ok {
-		canonicalName = legacy
-	}
-	switch field.Type {
-	case WEB100_TYPE_INTEGER:
-		fallthrough
-	case WEB100_TYPE_INTEGER32:
-		val := binary.LittleEndian.Uint32(data)
-		if val >= 1<<31 {
-			snapValues.SetInt64(canonicalName, int64(val)-(int64(1)<<32))
-		} else {
-			snapValues.SetInt64(canonicalName, int64(val))
-		}
-	case WEB100_TYPE_INET_ADDRESS_IPV4:
-		snapValues.SetString(canonicalName,
-			fmt.Sprintf("%d.%d.%d.%d",
-				data[0], data[1], data[2], data[3]))
-	case WEB100_TYPE_COUNTER32:
-		fallthrough
-	case WEB100_TYPE_GAUGE32:
-		fallthrough
-	case WEB100_TYPE_UNSIGNED32:
-		fallthrough
-	case WEB100_TYPE_TIME_TICKS:
-		snapValues.SetInt64(canonicalName, int64(binary.LittleEndian.Uint32(data)))
-	case WEB100_TYPE_COUNTER64:
-		// This conversion to signed may cause overflow panic!
-		snapValues.SetInt64(canonicalName, int64(binary.LittleEndian.Uint64(data)))
-	case WEB100_TYPE_INET_PORT_NUMBER:
-		snapValues.SetInt64(canonicalName, int64(binary.LittleEndian.Uint16(data)))
-	case WEB100_TYPE_INET_ADDRESS:
-		fallthrough
-	case WEB100_TYPE_INET_ADDRESS_IPV6:
-		switch AddrType(data[16]) {
-		case WEB100_ADDRTYPE_IPV4:
-			snapValues.SetString(canonicalName,
-				fmt.Sprintf("%d.%d.%d.%d",
-					data[0], data[1], data[2], data[3]))
-		case WEB100_ADDRTYPE_UNKNOWN:
-			fallthrough
-		case WEB100_ADDRTYPE_IPV6:
-			snapValues.SetString(canonicalName, fmt.Sprintf(
-				"%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x",
-				data[0], data[1], data[2], data[3],
-				data[4], data[5], data[6], data[7],
-				data[8], data[9], data[10], data[11],
-				data[12], data[13], data[14], data[15]))
-		default:
-			// TODO error
-			snapValues.SetString(canonicalName, fmt.Sprintf("%d", data[16]))
-		}
-	case WEB100_TYPE_STR32:
-		// TODO - is there a better way?
-		snapValues.SetString(canonicalName, strings.SplitN(string(data), "\000", 2)[0])
-	case WEB100_TYPE_OCTET:
-		// TODO - use byte array?
-		snapValues.SetInt64(canonicalName, int64(data[0]))
-	default:
-		return errors.New("Invalid field type")
-	}
-	return nil
 }
 
 // SnapshotValues saves all values from the most recent C.web100_snapshot read by
@@ -461,7 +463,7 @@ func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 		// Extract the web100 variable name and type. This will
 		// correspond to one of the variables defined in tcp-kis.txt.
 		// TODO handle canonical names
-		Save(&field, snap.raw[field.Offset:field.Offset+field.Length], snapValues)
+		field.Save(snap.raw[field.Offset:field.Offset+field.Length], snapValues)
 	}
 	return nil
 }

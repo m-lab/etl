@@ -1,7 +1,7 @@
 package web100_test
 
 import (
-	//"fmt"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,8 +10,20 @@ import (
 	"github.com/m-lab/etl/web100"
 )
 
+var legacyNames map[string]string
+
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	data, err := web100.Asset("tcp-kis.txt")
+	if err != nil {
+		panic("tcp-kis.txt not found")
+	}
+	b := bytes.NewBuffer(data)
+
+	legacyNames, err = web100.ParseWeb100Definitions(b)
+	if err != nil {
+		panic("error parsing tcp-kis.txt")
+	}
 }
 
 func TestValidation(t *testing.T) {
@@ -46,15 +58,40 @@ func TestHeaderParsing(t *testing.T) {
 	}
 }
 
-type Saver struct {
+type SimpleSaver struct {
+	Integers map[string]int64
+	Strings  map[string]string
 }
 
-func (s *Saver) SetString(name string, val string) {
-	fmt.Printf("%s: %s\n", name, val)
+func NewSimpleSaver() SimpleSaver {
+	return SimpleSaver{make(map[string]int64), make(map[string]string)}
 }
 
-func (s *Saver) SetInt64(name string, val int64) {
-	fmt.Printf("%s: %d\n", name, val)
+func (s SimpleSaver) SetString(name string, val string) {
+	s.Strings[name] = val
+}
+
+func (s SimpleSaver) SetInt64(name string, val int64) {
+	s.Integers[name] = val
+}
+
+func OldRead(n int) SimpleSaver {
+	c2sName := `testdata/20170509T13:45:13.590210000Z_eb.measurementlab.net:48716.c2s_snaplog`
+	w, err := web100.Open(c2sName, legacyNames)
+	if err != nil {
+		panic("Couldn't open snaplog file")
+	}
+	defer w.Close()
+
+	for count := 0; count < 2100; count++ {
+		err := w.Next()
+		if err != nil {
+			panic("Next failed")
+		}
+	}
+	saver := NewSimpleSaver()
+	err = w.SnapshotValues(saver)
+	return saver
 }
 
 func TestSnapshotContent(t *testing.T) {
@@ -68,8 +105,12 @@ func TestSnapshotContent(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	snapshot, err := slog.Snapshot(0)
-	var saver Saver
+	snapshot, err := slog.Snapshot(1000)
+	saver := NewSimpleSaver()
 	snapshot.SnapshotValues(&saver)
 
+	fmt.Printf("%+v\n", saver)
+
+	old := OldRead(1000)
+	fmt.Printf("%+v\n", old)
 }
