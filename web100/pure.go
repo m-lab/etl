@@ -15,13 +15,13 @@ import (
 
 // Need to:
 // 1. Read the header
-//   blah blah blah e.g.  "2.5.27 201001301335 net100\n"
-//   "\n"
+//   e.g. "2.5.27 201001301335 net100\n"
+//   \n
 //   /spec\n
 //   name%20offset%20WEB100_TYPE%20length\n (separated by spaces, term by \n)
 //   ...
 //   ...
-//   \n\n
+//   \n  // blank line
 //   /read\n
 //   \n----End-Of-Header---- -1 -1\n
 //   log_time
@@ -47,8 +47,8 @@ import (
 //00000cc0  61 74 61 2d 2d 2d 2d 0a  00 00 00 00 71 46 71 46  |ata----.....qFqF|
 
 const (
-	BEGIN_SNAP_DATA   = "----Begin-Snap-Data----\n"         // Plus a newline?
-	END_OF_HEADER     = "\x00----End-Of-Header---- -1 -1\n" // No newline.
+	BEGIN_SNAP_DATA   = "----Begin-Snap-Data----\n"
+	END_OF_HEADER     = "\x00----End-Of-Header---- -1 -1\n"
 	GROUPNAME_LEN_MAX = 32
 	VARNAME_LEN_MAX   = 32
 )
@@ -90,15 +90,6 @@ var Web100Sizes = [WEB100_NUM_TYPES + 1]byte{
 	4 /*INTEGER*/, 4 /*INTEGER32*/, 4 /*IPV4*/, 4 /*COUNTER32*/, 4, /*GAUGE32*/
 	4 /*UNSIGNED32*/, 4, /*TIME_TICKS*/
 	8 /*COUNTER64*/, 2 /*PORT_NUM*/, 17, 17, 32 /*STR32*/, 1 /*OCTET*/, 0}
-
-// Once consuming the header, we know the names and sizes of all fields, and the
-// size of each record, which is len(BEGIN_SNAP_DATA) + 1 + sum(field lengths)
-//
-// We might want to just find diffs from one record to the next.  If delta is nil
-// then nothing interesting has happened.
-//
-// Or we might just want to inspect a handful of fields to see if they have changes.
-//
 
 var legacyNames map[string]string
 
@@ -252,8 +243,7 @@ type ConnectionSpec struct {
 
 //-------------------------------------------------------------------------------
 type SnapLog struct {
-	// The entire raw contents of the file.  Generally 1.5 MB, but may be
-	// much larger
+	// The entire raw contents of the file.  Generally 1.5MB, but may be much larger
 	raw []byte
 
 	Version   string
@@ -284,8 +274,8 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (FieldSe
 
 	for {
 		line, err := buf.ReadString('\n')
-		// TODO - choose a better line length limit?
-		if err != nil || len(line) > 200 {
+		// line length is max var name size, plus 20 bytes for the 3 numeric fields.
+		if err != nil || len(line) > VARNAME_LEN_MAX+20 {
 			if err == io.EOF {
 				return fields, errors.New("Encountered EOF")
 			} else {
@@ -347,11 +337,11 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 		return nil, errors.New("Expected empty string")
 	}
 
+	// TODO - do these header elements always come in this order.
 	spec, err := parseFields(buf, "/spec\n", "\n")
 	if err != nil {
 		return nil, err
 	}
-	spec.RecordLength += 0
 
 	body, err := parseFields(buf, "/read\n", "\n")
 	if err != nil {
@@ -359,12 +349,13 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	}
 	body.RecordLength += len(BEGIN_SNAP_DATA)
 
+	// The terminator here does NOT start with \n.  8-(
 	tune, err := parseFields(buf, "/tune\n", END_OF_HEADER)
 	if err != nil {
 		return nil, err
 	}
 
-	// Read the timestamp and groupname
+	// Read the timestamp.
 	t := make([]byte, 4)
 	n, err := buf.Read(t)
 	if err != nil || n < 4 {
@@ -372,6 +363,7 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	}
 	logTime := binary.LittleEndian.Uint32(t)
 
+	// Read the group name.
 	// The web100 group is a set of web100 variables from a specific agent.
 	// M-Lab snaplogs only ever have a single agent ("local") and group.
 	// The group is typically "read", but the header typically also includes
@@ -381,6 +373,7 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	if err != nil || n != GROUPNAME_LEN_MAX {
 		return nil, errors.New("Too few bytes for groupName")
 	}
+	// The groupname is a C char*, terminated with a null character.
 	groupName := strings.SplitN(string(gn), "\000", 2)[0]
 	if groupName != "read" {
 		fmt.Println(groupName)
@@ -442,6 +435,9 @@ type Snapshot struct {
 
 // Returns the snapshot at index n, or error if n is not a valid index, or data is corrupted.
 func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
+	if n > sl.SnapCount() {
+		return Snapshot{}, errors.New("Invalid snapshot index")
+	}
 	offset := sl.BodyOffset + n*sl.Body.RecordLength
 	if string(sl.raw[offset:offset+len(BEGIN_SNAP_DATA)]) != BEGIN_SNAP_DATA {
 		return Snapshot{}, errors.New("Missing BeginSnapData")
@@ -457,6 +453,9 @@ func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
 // SnapshotValues saves all values from the most recent C.web100_snapshot read by
 // Next. Next must be called at least once before calling SnapshotValues.
 func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
+	if snap.raw == nil {
+		return errors.New("Empty/Invalid Snaplog")
+	}
 	// Parses variables from most recent web100_snapshot data.
 	var field Variable
 	for _, field = range snap.fields.Fields {
