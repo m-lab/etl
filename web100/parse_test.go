@@ -1,8 +1,10 @@
-package web100
+package web100_test
 
 import (
 	"bytes"
 	"testing"
+
+	"github.com/m-lab/etl/web100"
 )
 
 // shortTcpKisTxt is a snippet from the tcp-kis.txt file. It includes variables with
@@ -53,7 +55,7 @@ func TestParseWeb100Definitions(t *testing.T) {
 	}
 
 	r := bytes.NewBufferString(shortTcpKisTxt)
-	actualNames, err := ParseWeb100Definitions(r)
+	actualNames, err := web100.ParseWeb100Definitions(r)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
