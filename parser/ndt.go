@@ -310,7 +310,8 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 				n.TableName(), suffix, testType, "snapshot").Inc()
 			return
 		}
-		snap.SnapshotValues(schema.Web100ValueMap{})
+		// Proper sizing avoids evacuate, saving about 20%, excluding BQ code.
+		snap.SnapshotValues(schema.EmptySnap())
 		if err != nil {
 			// TODO - Use separate counter, since this is not unique across
 			// the test.
@@ -332,7 +333,7 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 			n.TableName(), suffix, testType, "snapshot").Inc()
 		return
 	}
-	snapValues := schema.Web100ValueMap{}
+	snapValues := schema.EmptySnap()
 	snap.SnapshotValues(snapValues)
 	if err != nil {
 		// TODO - Use separate counter, since this is not unique across
@@ -346,7 +347,7 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 
 	// TODO(prod) Write a row with this data, even if the snapshot parsing fails?
 	// TODO URGENT
-	nestedConnSpec := schema.Web100ValueMap{}
+	nestedConnSpec := make(schema.Web100ValueMap, 6)
 	snaplog.ConnectionSpecValues(nestedConnSpec)
 
 	results := schema.NewWeb100MinimalRecord(

@@ -140,13 +140,17 @@ func NewWeb100FullRecord(version string, logTime int64, connSpec, snapValues map
 	}
 }
 
-// NewWeb100FullRecord creates a web100 value map with all supported fields.
-// This is suitable when creating a schema definition for a new bigquery table.
+func EmptySnap() Web100ValueMap {
+	return make(Web100ValueMap, 150)
+}
+
+// NewWeb100Skeleton creates the tree structure, with no leaf fields.
 func NewWeb100Skeleton() Web100ValueMap {
 	return Web100ValueMap{
 		"connection_spec": EmptyConnectionSpec(),
 		"web100_log_entry": Web100ValueMap{
-			"connection_spec": Web100ValueMap{},
+			"connection_spec": make(Web100ValueMap, 4),
+			"snap":            EmptySnap(),
 		},
 	}
 }
@@ -195,7 +199,7 @@ func FullGeolocation() Web100ValueMap {
 }
 
 func EmptyGeolocation() Web100ValueMap {
-	return Web100ValueMap{}
+	return make(Web100ValueMap, 12)
 }
 
 // NewWeb100MinimalRecord creates a web100 value map with only the given fields.
