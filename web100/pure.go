@@ -26,7 +26,11 @@ import (
 //   SnapLog: a full log containing typically 2000 or so Snapshots.
 //   slog or snaplog - variable name for a SnapLog.
 
-// SnapLog files look like:
+// SnapLog file overview.
+//   The text portion of snaplog headers appear to be identical to the contents of
+//   /proc/web100/header (on web100 patched kernels).
+//
+// In summary, the files look like:
 //   "2.5.27 201001301335 net100\n"  // version string
 //   \n
 //   /spec\n
@@ -124,9 +128,21 @@ const (
 )
 
 var web100Sizes = [WEB100_NUM_TYPES + 1]int{
-	4 /*INTEGER*/, 4 /*INTEGER32*/, 4 /*IPV4*/, 4 /*COUNTER32*/, 4, /*GAUGE32*/
-	4 /*UNSIGNED32*/, 4, /*TIME_TICKS*/
-	8 /*COUNTER64*/, 2 /*PORT_NUM*/, 17, 17, 32 /*STR32*/, 1 /*OCTET*/, 0}
+	4,  /*INTEGER*/
+	4,  /*INTEGER32*/
+	4,  /*IPV4*/
+	4,  /*COUNTER32*/
+	4,  /*GAUGE32*/
+	4,  /*UNSIGNED32*/
+	4,  /*TIME_TICKS*/
+	8,  /*COUNTER64*/
+	2,  /*PORT_NUM*/
+	17, /*INET_ADDRESS*/
+	17, /*INET_ADDRESS_IPV6*/
+	32, /*STR32*/
+	1,  /*OCTET*/
+	0,
+}
 
 //=================================================================================
 
@@ -262,7 +278,9 @@ func (fs *fieldSet) Find(name string) *variable {
 }
 
 //=================================================================================
-// ConnectionSpec is used to
+// connectionSpec holds the 4-tuple info from the header, and may be used to
+// populate the connection_spec field of the web100_log_entry.  It does not support
+// ipv6, so it is of limited use.
 type connectionSpec struct {
 	DestPort uint16
 	SrcPort  uint16
@@ -316,15 +334,18 @@ func (sl *SnapLog) SnapshotNumFields() int {
 }
 
 // parseFields parses the newline separated web100 variable types from the header.
-func parseFields(buf *bytes.Buffer, preamble string, terminator string) (fieldSet, error) {
-	fields := fieldSet{FieldMap: make(map[string]int)}
+func parseFields(buf *bytes.Buffer, preamble string, terminator string) (*fieldSet, error) {
+	fields := new(fieldSet)
+	fields.FieldMap = make(map[string]int)
+
 	pre, err := buf.ReadString('\n')
 	if err != nil {
-		return fields, err
+		return nil, err
 	}
 	if pre != preamble {
-		return fields, errors.New("Expected preamble: " +
-			preamble[:len(preamble)-2] + " != " + pre[:len(pre)-2])
+		return nil, errors.New("Expected preamble: " +
+			// Strip terminal \n from each string for readability.
+			preamble[:len(preamble)-1] + " != " + pre[:len(pre)-1])
 	}
 
 	for {
@@ -332,9 +353,9 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (fieldSe
 		// line length is max var name size, plus 20 bytes for the 3 numeric fields.
 		if err != nil || len(line) > VARNAME_LEN_MAX+20 {
 			if err == io.EOF {
-				return fields, errors.New("Encountered EOF")
+				return nil, errors.New("Encountered EOF")
 			} else {
-				return fields, errors.New("Corrupted header")
+				return nil, errors.New("Corrupted header")
 			}
 		}
 		if line == terminator {
@@ -342,10 +363,10 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (fieldSe
 		}
 		v, err := NewVariable(line)
 		if err != nil {
-			return fields, err
+			return nil, err
 		}
 		if fields.Length != v.Offset {
-			return fields, errors.New("Bad offset at " + line[:len(line)-2])
+			return nil, errors.New("Bad offset at " + line[:len(line)-2])
 		}
 		fields.FieldMap[v.Name] = len(fields.Fields)
 		fields.Fields = append(fields.Fields, *v)
@@ -356,16 +377,17 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (fieldSe
 // parseConnectionSpec parses the 16 byte binary connection spec field from the header.
 func parseConnectionSpec(buf *bytes.Buffer) (connectionSpec, error) {
 	// The web100 snaplog only correctly represents ipv4 addresses.
-	// But try to read it anyway.
+	// If the later parts of the log are corrupt, this may be all we get,
+	// so for now, read it anyway.
 	raw := make([]byte, 16)
 	n, err := buf.Read(raw)
 	if err != nil || n < 16 {
 		return connectionSpec{}, errors.New("Too few bytes for connection spec")
 	}
-	dstPort := binary.LittleEndian.Uint16(raw[0:2])
 	// WARNING - the web100 code seemingly depends on a 32 bit architecture.
 	// There is no "packed" directive for the web100_connection_spec, and the
 	// fields all seem to be 32 bit aligned.
+	dstPort := binary.LittleEndian.Uint16(raw[0:2])
 	dstAddr := raw[4:8]
 	srcPort := binary.LittleEndian.Uint16(raw[8:10])
 	srcAddr := raw[12:16]
@@ -448,7 +470,7 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 
 	slog := SnapLog{raw: raw, Version: version, LogTime: logTime, GroupName: groupName,
 		connSpecOffset: connSpecOffset, bodyOffset: bodyOffset,
-		spec: spec, read: read, tune: tune, connSpec: connSpec}
+		spec: *spec, read: *read, tune: *tune, connSpec: connSpec}
 
 	return &slog, nil
 }
@@ -510,9 +532,7 @@ func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 	}
 	var field variable
 	for _, field = range snap.fields.Fields {
-		// Extract the web100 variable name and type. This will
-		// correspond to one of the variables defined in tcp-kis.txt.
-		// TODO handle canonical names
+		// Interpret and save the web100 field value.
 		field.Save(snap.raw[field.Offset:field.Offset+field.Size], snapValues)
 	}
 	return nil

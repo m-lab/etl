@@ -1,5 +1,9 @@
 package web100_test
 
+// TODO - consider adding selected tests from
+// gs://m-lab/ndt/2016/11/01/20161101T000000Z-mlab1-syd01-ndt-0002.tgz
+// to test some of the anomoly cases.
+
 import (
 	"encoding/json"
 	"fmt"
