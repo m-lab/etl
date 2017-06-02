@@ -143,35 +143,39 @@ func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100V
 		case schema.Web100ValueMap:
 			match = match && compare(t, act.(schema.Web100ValueMap), v)
 		case string:
-			if actual[key].(string) != v {
+			if act.(string) != v {
 				t.Logf("Wrong strings for key %q: got %q; want %q",
 					key, v, act.(string))
 				match = false
 			}
 		case int64:
-			if actual[key].(int64) != v {
+			if act.(int64) != v {
 				t.Logf("Wrong ints for key %q: got %d; want %d",
 					key, v, act.(int64))
 				match = false
 			}
 		case int32:
-			if actual[key].(int32) != v {
-				t.Logf("Wrong ints for key %q: got %d; want %d", key, v, actual[key].(int32))
+			if act.(int32) != v {
+				t.Logf("Wrong ints for key %q: got %d; want %d",
+					key, v, act.(int32))
 				match = false
 			}
 		case int:
-			if actual[key].(int) != v {
-				t.Logf("Wrong ints for key %q: got %d; want %d", key, v, actual[key].(int))
+			if act.(int) != v {
+				t.Logf("Wrong ints for key %q: got %d; want %d",
+					key, v, act.(int))
 				match = false
 			}
 		case []float64:
-			if len(v) != len(actual[key].([]float64)) {
-				t.Logf("Wrong floats for key %q: got %d; want %d", key, v, actual[key].([]float64))
+			if len(v) != len(act.([]float64)) {
+				t.Logf("Wrong floats for key %q: got %d; want %d",
+					key, v, act.([]float64))
 				match = false
 			}
 			for i := range v {
-				if v[i] != actual[key].([]float64)[i] {
-					t.Logf("Wrong floats for key %q: got %d; want %d", key, v, actual[key].([]float64))
+				if v[i] != act.([]float64)[i] {
+					t.Logf("Wrong floats for key %q: got %d; want %d",
+						key, v, act.([]float64))
 					match = false
 				}
 			}
