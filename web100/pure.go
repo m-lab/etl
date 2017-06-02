@@ -65,10 +65,10 @@ import (
 //00000cc0  61 74 61 2d 2d 2d 2d 0a  00 00 00 00 71 46 71 46  |ata----.....qFqF|
 
 //=================================================================================
-// LegacyNames provides the mapping from old names (in snaplog files) to new
+// CanonicalNames provides the mapping from old names (in snaplog files) to new
 // canonical names.
 // This is exported so that SideStream parser can use it easily.
-var LegacyNames map[string]string
+var CanonicalNames map[string]string
 
 func init() {
 	data, err := Asset("tcp-kis.txt")
@@ -77,7 +77,7 @@ func init() {
 	}
 	b := bytes.NewBuffer(data)
 
-	LegacyNames, err = ParseWeb100Definitions(b)
+	CanonicalNames, err = ParseWeb100Definitions(b)
 	if err != nil {
 		panic("error parsing tcp-kis.txt")
 	}
@@ -123,12 +123,7 @@ const (
 	WEB100_ADDRTYPE_DNS = 16
 )
 
-const (
-	WEB100_TYPE_IP_ADDRESS = WEB100_TYPE_INET_ADDRESS_IPV4 /* Deprecated */
-	WEB100_TYPE_UNSIGNED16 = WEB100_TYPE_INET_PORT_NUMBER  /* Deprecated */
-)
-
-var web100Sizes = [WEB100_NUM_TYPES + 1]byte{
+var web100Sizes = [WEB100_NUM_TYPES + 1]int{
 	4 /*INTEGER*/, 4 /*INTEGER32*/, 4 /*IPV4*/, 4 /*COUNTER32*/, 4, /*GAUGE32*/
 	4 /*UNSIGNED32*/, 4, /*TIME_TICKS*/
 	8 /*COUNTER64*/, 2 /*PORT_NUM*/, 17, 17, 32 /*STR32*/, 1 /*OCTET*/, 0}
@@ -144,26 +139,25 @@ type variable struct {
 	Size   int     // Size, in bytes, of the raw data field.
 }
 
-func Newvariable(s *string) (*variable, error) {
+func NewVariable(s string) (*variable, error) {
 	// TODO - use regular expression ??
 	var name string
 	var length, typ, offset int
-	n, err := fmt.Sscanln(*s, &name, &offset, &typ, &length)
+	n, err := fmt.Sscanln(s, &name, &offset, &typ, &length)
 
 	if err != nil {
-		fmt.Printf("Newvariable Error %v, %d: %s\n", err, n, *s)
+		fmt.Printf("NewVariable Error %v, %d: %s\n", err, n, s)
 		return nil, err
 	}
-	if varType(typ) > WEB100_TYPE_OCTET || varType(typ) < WEB100_TYPE_INTEGER {
+	vt := varType(typ)
+	if vt > WEB100_TYPE_OCTET || vt < WEB100_TYPE_INTEGER {
 		return nil, errors.New(fmt.Sprintf("Invalid type field: %d\n", typ))
 	}
-	vt := varType(typ)
-	if length < 1 || length > 17 {
-		return nil, errors.New(fmt.Sprintf("Invalid length field: %d\n", length))
+	if length != web100Sizes[vt] {
+		return nil, errors.New(fmt.Sprintf("Invalid length for %s field: %d\n",
+			name, length))
 	}
 
-	// TODO - validate length to type consistency.
-	// TODO - validate offset and sum of lengths
 	return &variable{name, offset, vt, length}, nil
 }
 
@@ -185,6 +179,8 @@ func IPFromBytes(data []byte) (net.IP, error) {
 }
 
 // TODO URGENT - unit tests for this!!
+// Save interprets data according to the receiver type, and saves the result to snapValues.
+// Most of the types are unused, but included here for completeness.
 func (v *variable) Save(data []byte, snapValues Saver) error {
 	// Ignore deprecated fields.
 	if v.Name[0] == '_' {
@@ -196,7 +192,7 @@ func (v *variable) Save(data []byte, snapValues Saver) error {
 	// the kernel and written to the snaplog) to the canonical form (as defined
 	// in tcp-kis.txt).
 	canonicalName := v.Name
-	if legacy, ok := LegacyNames[canonicalName]; ok {
+	if legacy, ok := CanonicalNames[canonicalName]; ok {
 		canonicalName = legacy
 	}
 	switch v.Type {
@@ -204,8 +200,8 @@ func (v *variable) Save(data []byte, snapValues Saver) error {
 		fallthrough
 	case WEB100_TYPE_INTEGER32:
 		val := binary.LittleEndian.Uint32(data)
-		if val >= 1<<31 {
-			snapValues.SetInt64(canonicalName, int64(val)-(int64(1)<<32))
+		if val >= 0x7FFFFFFF {
+			snapValues.SetInt64(canonicalName, int64(val)-0x100000000)
 		} else {
 			snapValues.SetInt64(canonicalName, int64(val))
 		}
@@ -344,7 +340,7 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (fieldSe
 		if line == terminator {
 			return fields, nil
 		}
-		v, err := Newvariable(&line)
+		v, err := NewVariable(line)
 		if err != nil {
 			return fields, err
 		}

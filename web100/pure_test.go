@@ -166,3 +166,28 @@ func TestSnapshot201704(t *testing.T) {
 		"20170430T11:54:26.658288000Z_p508486E9.dip0.t-ipconnect.de:53088.s2c_snaplog",
 		1900)
 }
+
+func TestNewVar(t *testing.T) {
+	_, err := web100.NewVariable("foo 1 1 1")
+	if err == nil {
+		t.Error("Should have returned error")
+	}
+	// An INTEGER32 type
+	v, err := web100.NewVariable("foo 0 1 4")
+	if err != nil {
+		t.Error(err.Error())
+	}
+	saver := NewSimpleSaver()
+	v.Save([]byte{1, 2, 3, 4}, saver)
+	if saver.Integers["foo"] != 0x04030201 {
+		t.Error(fmt.Sprintf("Actual: %x", saver.Integers["foo"]))
+	}
+	v.Save([]byte{0xff, 0xff, 0xff, 0xff}, saver)
+	if saver.Integers["foo"] != -1 {
+		t.Error(fmt.Sprintf("Actual: %x", saver.Integers["foo"]))
+	}
+
+	//	4 /*INTEGER*/, 4 /*INTEGER32*/, 4 /*IPV4*/, 4 /*COUNTER32*/, 4, /*GAUGE32*/
+	//	4 /*UNSIGNED32*/, 4, /*TIME_TICKS*/
+	//	8 /*COUNTER64*/, 2 /*PORT_NUM*/, 17, 17, 32 /*STR32*/, 1 /*OCTET*/, 0}
+}
