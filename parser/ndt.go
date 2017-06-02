@@ -290,6 +290,15 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 			n.TableName(), suffix, testType, "snaplog").Inc()
 		return
 	}
+
+	err = snaplog.ValidateSnapshots()
+	if err != nil {
+		log.Printf("Error in test %s, when processing: %s\n%s\n",
+			test.fn, taskFileName, err)
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), suffix, testType, "truncated").Inc()
+	}
+
 	// HACK - just to see how expensive the Values() call is...
 	// parse ALL the snapshots.
 	for count := 0; count < snaplog.SnapCount() && count < 2100; count++ {
@@ -330,7 +339,7 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 		// the test.
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), suffix, testType, "snapValues").Inc()
-		log.Printf("Error calling web100 Values() in test %s, when processing: %s\n%s\n",
+		log.Printf("Error calling SnapshotValues() in test %s, when processing: %s\n%s\n",
 			test.fn, taskFileName, err)
 		return
 	}
