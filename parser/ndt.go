@@ -1,12 +1,8 @@
 package parser
 
 import (
-	"bytes"
 	"errors"
-	"io"
-	"io/ioutil"
 	"log"
-	"os"
 	"regexp"
 	"time"
 
@@ -278,153 +274,74 @@ func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, test
 	metrics.WorkerState.WithLabelValues("ndt").Inc()
 	defer metrics.WorkerState.WithLabelValues("ndt").Dec()
 
-	// TODO(prod): only do this once.
-	// Parse the tcp-kis.txt web100 variable definition file.
-	metrics.WorkerState.WithLabelValues("asset").Inc()
-	defer metrics.WorkerState.WithLabelValues("asset").Dec()
-
-	data, err := web100.Asset("tcp-kis.txt")
-	if err != nil {
-		// Asset missing from build.
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, "web100.Asset").Inc()
-		log.Printf("web100.Asset error: %s processing %s from %s\n",
-			err, test.fn, taskFileName)
-		return
-	}
-	b := bytes.NewBuffer(data)
-
-	// These unfortunately nest.
-	metrics.WorkerState.WithLabelValues("parse-def").Inc()
-	defer metrics.WorkerState.WithLabelValues("parse-def").Dec()
-	legacyNames, err := web100.ParseWeb100Definitions(b)
-	if err != nil {
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, "web100.ParseDef").Inc()
-		log.Printf("web100.ParseDef error: %s processing %s from %s\n",
-			err, test.fn, taskFileName)
-		return
-	}
-
-	// TODO(prod): do not write to a temporary file; operate on byte array directly.
-	// Write rawSnapLog to /mnt/tmpfs.
-	tmpFile, err := ioutil.TempFile(n.tmpDir, "snaplog-")
-	if err != nil {
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, "TmpFile").Inc()
-		log.Printf("Failed to create tmpfile for: %s in %s, when processing: %s\n",
-			test.fn, n.tmpDir, taskFileName)
-		return
-	}
-
-	c := 0
-	for count := 0; count < len(test.data); count += c {
-		c, err = tmpFile.Write(test.data)
-		if err != nil {
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), n.inserter.TableSuffix(),
-				testType, "tmpFile.Write").Inc()
-			log.Printf("tmpFile.Write error: %s processing: %s from %s\n",
-				err, test.fn, taskFileName)
-			return
-		}
-	}
-
-	tmpFile.Sync()
-	// TODO(prod): Do we ever see remove errors?  Should log them.
-	defer os.Remove(tmpFile.Name())
-
-	// Open the file we created above.
-	w, err := web100.Open(tmpFile.Name(), legacyNames)
-	if err != nil {
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, "web100.Open").Inc()
-		// These are mostly "could not parse /proc/web100/header",
-		// with some "file read/write error C"
-		log.Printf("web100.Open error: %s processing %s from %s\n",
-			err, test.fn, taskFileName)
-		return
-	}
-	defer w.Close()
-
-	// Seek to either last snapshot, or snapshot 2100 if there are more than that.
-	if !seek(w, n.TableName(), n.inserter.TableSuffix(), taskFileName, test.fn, testType) {
-		// TODO - is there a previous snapshot we can use???
-		return
-	}
-
-	n.getAndInsertValues(w, taskFileName, test, testType)
+	n.getAndInsertValues(taskFileName, test, testType)
 }
 
-// Find the "last" web100 snapshot.
-// Returns true if valid snapshot found.
-func seek(w *web100.Web100, tableName string, suffix string, taskFileName string, testName string, testType string) bool {
-	metrics.WorkerState.WithLabelValues("seek").Inc()
-	defer metrics.WorkerState.WithLabelValues("seek").Dec()
-	// Limit to parsing only up to 2100 snapshots.
-	// NOTE: This is different from legacy pipeline!!
-	for count := 0; count < 2100; count++ {
-		err := w.Next()
-		if err != nil {
-			if err == io.EOF {
-				// We expect EOF.
-				break
-			} else {
-				// FYI - something like 1/5000 logs typically have these errors.
-				// They are things like "missing snaplog header" or "truncated".
-				// They may be associated with specific bad machines.
-				// We originally tried to get past the error, but this sometimes
-				// results in corrupted data, so probably better to terminate
-				// on this kind of error.
-				metrics.TestCount.WithLabelValues(
-					tableName, suffix, testType, "w.Next").Inc()
-				log.Printf("w.Next error: %s processing snap %d from %s from %s\n",
-					err, count, testName, taskFileName)
-				return false
-			}
-		}
-		// HACK - just to see how expensive the Values() call is...
-		// parse every 10th snapshot.
-		if count%10 == 0 {
-			// Note: read and discard the values by not saving the Web100ValueMap.
-			err := w.SnapshotValues(schema.Web100ValueMap{})
-			if err != nil {
-				// TODO - Use separate counter, since this is not unique across
-				// the test.
-				metrics.TestCount.WithLabelValues(
-					tableName, suffix, testType, "w.Values").Inc()
-			}
-		}
-	}
-	return true
-}
-
-func (n *NDTParser) getAndInsertValues(w *web100.Web100, taskFileName string, test *fileInfoAndData, testType string) {
+func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndData, testType string) {
 	// Extract the values from the last snapshot.
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 
-	snapValues := schema.Web100ValueMap{}
-	err := w.SnapshotValues(snapValues)
+	snaplog, err := web100.NewSnapLog(test.data)
 	if err != nil {
+		// TODO - Use separate counter, since this is not unique across
+		// the test.
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, "values-err").Inc()
+			n.TableName(), suffix, testType, "snaplog").Inc()
+		return
+	}
+	// HACK - just to see how expensive the Values() call is...
+	// parse ALL the snapshots.
+	for count := 0; count < snaplog.SnapCount() && count < 2100; count++ {
+		snap, err := snaplog.Snapshot(count)
+		if err != nil {
+			// TODO - Use separate counter, since this is not unique across
+			// the test.
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), suffix, testType, "snapshot").Inc()
+			return
+		}
+		snap.SnapshotValues(schema.Web100ValueMap{})
+		if err != nil {
+			// TODO - Use separate counter, since this is not unique across
+			// the test.
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), suffix, testType, "snapValues").Inc()
+			return
+		}
+	}
+
+	last := snaplog.SnapCount() - 1
+	if last > 2100 {
+		last = 2100
+	}
+	snap, err := snaplog.Snapshot(last)
+	if err != nil {
+		// TODO - Use separate counter, since this is not unique across
+		// the test.
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), suffix, testType, "snapshot").Inc()
+		return
+	}
+	snapValues := schema.Web100ValueMap{}
+	snap.SnapshotValues(snapValues)
+	if err != nil {
+		// TODO - Use separate counter, since this is not unique across
+		// the test.
+		metrics.TestCount.WithLabelValues(
+			n.TableName(), suffix, testType, "snapValues").Inc()
 		log.Printf("Error calling web100 Values() in test %s, when processing: %s\n%s\n",
 			test.fn, taskFileName, err)
 		return
 	}
 
 	// TODO(prod) Write a row with this data, even if the snapshot parsing fails?
+	// TODO URGENT
 	nestedConnSpec := schema.Web100ValueMap{}
-	w.ConnectionSpec(nestedConnSpec)
+	snaplog.ConnectionSpecValues(nestedConnSpec)
 
 	results := schema.NewWeb100MinimalRecord(
-		w.LogVersion(), w.LogTime(),
+		snaplog.Version, int64(snaplog.LogTime),
 		(map[string]bigquery.Value)(nestedConnSpec),
 		(map[string]bigquery.Value)(snapValues))
 

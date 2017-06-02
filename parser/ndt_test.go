@@ -101,7 +101,11 @@ func TestNDTParser(t *testing.T) {
 				"RemAddress": "45.56.98.222",
 			},
 			"connection_spec": schema.Web100ValueMap{
-				"local_port": int64(40105),
+				"local_ip":    "213.208.152.37",
+				"local_port":  int64(40105),
+				"remote_ip":   "45.56.98.222",
+				"remote_port": int64(44160),
+				"local_af":    int64(1),
 			},
 		},
 	}
@@ -130,19 +134,24 @@ func TestNDTParser(t *testing.T) {
 func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100ValueMap) bool {
 	match := true
 	for key, value := range expected {
+		act, ok := actual[key]
+		if !ok {
+			t.Logf("The actual data is missing a key: %s", key)
+			return false
+		}
 		switch v := value.(type) {
 		case schema.Web100ValueMap:
-			match = match && compare(t, actual[key].(schema.Web100ValueMap), v)
+			match = match && compare(t, act.(schema.Web100ValueMap), v)
 		case string:
 			if actual[key].(string) != v {
 				t.Logf("Wrong strings for key %q: got %q; want %q",
-					key, v, actual[key].(string))
+					key, v, act.(string))
 				match = false
 			}
 		case int64:
 			if actual[key].(int64) != v {
 				t.Logf("Wrong ints for key %q: got %d; want %d",
-					key, v, actual[key].(int64))
+					key, v, act.(int64))
 				match = false
 			}
 		case int32:
