@@ -160,19 +160,19 @@ func ProcessMetaFile(tableName string, suffix string, testName string, content [
 	metamap, err := parseMetaFile(content)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			tableName, suffix, "meta", "error").Inc()
+			tableName, "meta", "error").Inc()
 		log.Println("meta processing error: " + err.Error())
 		return nil
 	}
 	metaFile, err := createMetaFileData(testName, metamap)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			tableName, suffix, "meta", "error").Inc()
+			tableName, "meta", "error").Inc()
 		log.Println("meta processing error: " + err.Error())
 		return nil
 	}
 
 	metrics.TestCount.WithLabelValues(
-		tableName, suffix, "meta", "ok").Inc()
+		tableName, "meta", "ok").Inc()
 	return metaFile
 }

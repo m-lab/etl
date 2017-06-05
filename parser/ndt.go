@@ -123,8 +123,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	info, err := ParseNDTFileName(testName)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			"unknown", "bad filename").Inc()
+			n.TableName(), "unknown", "bad filename").Inc()
 		// TODO - should log and count this.
 		log.Println(err)
 		return nil
@@ -147,27 +146,24 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	switch info.Suffix {
 	case "c2s_snaplog":
 		if n.c2s != nil {
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), n.inserter.TableSuffix(),
-				"c2s", "timestamp collision").Inc()
+			metrics.WarningCount.WithLabelValues(
+				n.TableName(), "c2s", "timestamp collision").Inc()
 			log.Printf("Collision: %s and %s\n", n.c2s.fn, testName)
 		}
 		n.c2s = &fileInfoAndData{testName, *info, content}
 		n.processTest(taskFileName, n.c2s, "c2s")
 	case "s2c_snaplog":
 		if n.s2c != nil {
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), n.inserter.TableSuffix(),
-				"s2c", "timestamp collision").Inc()
+			metrics.WarningCount.WithLabelValues(
+				n.TableName(), "s2c", "timestamp collision").Inc()
 			log.Printf("Collision: %s and %s\n", n.s2c.fn, testName)
 		}
 		n.s2c = &fileInfoAndData{testName, *info, content}
 		n.processTest(taskFileName, n.s2c, "s2c")
 	case "meta":
 		if n.metaFile != nil {
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), n.inserter.TableSuffix(),
-				"meta", "timestamp collision").Inc()
+			metrics.WarningCount.WithLabelValues(
+				n.TableName(), "meta", "timestamp collision").Inc()
 		}
 		n.metaFile = ProcessMetaFile(
 			n.TableName(), n.inserter.TableSuffix(), testName, content)
@@ -182,8 +178,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	case "cputime":
 	default:
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			"unknown", info.Suffix).Inc()
+			n.TableName(), "unknown", "unknown suffix").Inc()
 		return errors.New("Unknown test suffix: " + info.Suffix)
 	}
 
@@ -196,28 +191,28 @@ func (n *NDTParser) handleAnomolies(taskFileName string) {
 	case n.metaFile == nil:
 		n.metaFile = &MetaFileData{} // Hack to allow processTest to run.
 		if n.s2c != nil {
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), n.inserter.TableSuffix(), "s2c", "no meta").Inc()
+			metrics.WarningCount.WithLabelValues(
+				n.TableName(), "s2c", "no meta").Inc()
 			// TODO enable this once noise is reduced.
 			// log.Printf("No meta: %s %s\n", taskFileName, n.s2c.fn)
 			n.processTest(taskFileName, n.s2c, "s2c")
 		}
 		if n.c2s != nil {
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), n.inserter.TableSuffix(), "c2s", "no meta").Inc()
+			metrics.WarningCount.WithLabelValues(
+				n.TableName(), "c2s", "no meta").Inc()
 			// TODO enable this once noise is reduced.
 			// log.Printf("No meta: %s %s\n", taskFileName, n.c2s.fn)
 			n.processTest(taskFileName, n.c2s, "c2s")
 		}
 		if n.s2c == nil && n.c2s == nil {
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), n.inserter.TableSuffix(), "test", "no meta,c2s,s2c").Inc()
+			metrics.WarningCount.WithLabelValues(
+				n.TableName(), "test", "no meta,c2s,s2c").Inc()
 		}
 	// Now meta is non-nil
 	case n.s2c == nil && n.c2s == nil:
 		// Meta file but no test file.
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(), "meta", "no tests").Inc()
+		metrics.WarningCount.WithLabelValues(
+			n.TableName(), "meta", "no tests").Inc()
 		log.Printf("No tests: %s %s\n", taskFileName, n.metaFile.TestName)
 	// Now meta and at least one test are non-nil
 	default:
@@ -240,11 +235,8 @@ func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, test
 	// defined in etl_worker.go must guarantee that all files written to
 	// /mnt/tmpfs will fit.
 	if len(test.data) > 10*1024*1024 {
-		metrics.FunnyTests.WithLabelValues(
+		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, ">10MB").Inc()
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, ">10MB").Inc()
 		log.Printf("Ignoring oversize snaplog: %d, %s\n",
 			len(test.data), test.fn)
 		metrics.FileSizeHistogram.WithLabelValues(
@@ -257,17 +249,13 @@ func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, test
 	}
 
 	if len(test.data) < 16*1024 {
-		// TODO - Use separate counter, since this is not unique across
-		// the test.
-		metrics.FunnyTests.WithLabelValues(
+		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "<16KB").Inc()
 		log.Printf("Note: small rawSnapLog: %d, %s\n",
 			len(test.data), test.fn)
 	}
 	if len(test.data) == 4096 {
-		// TODO - Use separate counter, since this is not unique across
-		// the test.
-		metrics.FunnyTests.WithLabelValues(
+		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "4KB").Inc()
 	}
 
@@ -284,19 +272,17 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 
 	snaplog, err := web100.NewSnapLog(test.data)
 	if err != nil {
-		// TODO - Use separate counter, since this is not unique across
-		// the test.
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), suffix, testType, "snaplog").Inc()
+		metrics.ErrorCount.WithLabelValues(
+			n.TableName(), testType, "snaplog failure").Inc()
 		return
 	}
 
 	err = snaplog.ValidateSnapshots()
 	if err != nil {
-		log.Printf("Error in test %s, when processing: %s\n%s\n",
+		log.Printf("ValidateSnapshots failed for %s, when processing: %s\n%s\n",
 			test.fn, taskFileName, err)
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), suffix, testType, "truncated").Inc()
+		metrics.WarningCount.WithLabelValues(
+			n.TableName(), testType, "validate failed").Inc()
 	}
 
 	// HACK - just to see how expensive the Values() call is...
@@ -304,19 +290,15 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 	for count := 0; count < snaplog.SnapCount() && count < 2100; count++ {
 		snap, err := snaplog.Snapshot(count)
 		if err != nil {
-			// TODO - Use separate counter, since this is not unique across
-			// the test.
 			metrics.TestCount.WithLabelValues(
-				n.TableName(), suffix, testType, "snapshot").Inc()
+				n.TableName(), testType, "snapshot failure").Inc()
 			return
 		}
 		// Proper sizing avoids evacuate, saving about 20%, excluding BQ code.
 		snap.SnapshotValues(schema.EmptySnap())
 		if err != nil {
-			// TODO - Use separate counter, since this is not unique across
-			// the test.
-			metrics.TestCount.WithLabelValues(
-				n.TableName(), suffix, testType, "snapValues").Inc()
+			metrics.ErrorCount.WithLabelValues(
+				n.TableName(), testType, "snapValues failure").Inc()
 			return
 		}
 	}
@@ -330,7 +312,7 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 		// TODO - Use separate counter, since this is not unique across
 		// the test.
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), suffix, testType, "snapshot").Inc()
+			n.TableName(), testType, "final snapshot failure").Inc()
 		return
 	}
 	snapValues := schema.EmptySnap()
@@ -339,14 +321,13 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 		// TODO - Use separate counter, since this is not unique across
 		// the test.
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), suffix, testType, "snapValues").Inc()
+			n.TableName(), testType, "final snapValues failure").Inc()
 		log.Printf("Error calling SnapshotValues() in test %s, when processing: %s\n%s\n",
 			test.fn, taskFileName, err)
 		return
 	}
 
 	// TODO(prod) Write a row with this data, even if the snapshot parsing fails?
-	// TODO URGENT
 	nestedConnSpec := make(schema.Web100ValueMap, 6)
 	snaplog.ConnectionSpecValues(nestedConnSpec)
 
@@ -390,15 +371,13 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 	err = n.inserter.InsertRow(&bq.MapSaver{results})
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, "insert-err").Inc()
+			n.TableName(), testType, "insert-err").Inc()
 		// TODO: This is an insert error, that might be recoverable if we try again.
 		log.Println("insert-err: " + err.Error())
 		return
 	} else {
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), n.inserter.TableSuffix(),
-			testType, "ok").Inc()
+			n.TableName(), testType, "ok").Inc()
 		return
 	}
 }

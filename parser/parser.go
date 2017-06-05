@@ -36,7 +36,7 @@ type NullParser struct {
 }
 
 func (np *NullParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	metrics.TestCount.WithLabelValues("table", "suffix", "null", "ok").Inc()
+	metrics.TestCount.WithLabelValues("table", "null", "ok").Inc()
 	return nil
 }
 
@@ -57,7 +57,7 @@ func NewTestParser(ins etl.Inserter) etl.Parser {
 }
 
 func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	metrics.TestCount.WithLabelValues("table", "suffix", "test", "ok").Inc()
+	metrics.TestCount.WithLabelValues("table", "test", "ok").Inc()
 	log.Printf("Parsing %s", testName)
 	values := make(map[string]bigquery.Value, len(meta)+1)
 	// TODO is there a better way to do this?
