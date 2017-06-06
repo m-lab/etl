@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	//"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/schema"
 )
@@ -80,26 +79,26 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []schema.Pari
 		parent := all_nodes[i].parent
 		if parent == nil {
 			one_hop := &schema.ParisTracerouteHop{
-				Protocol:     protocol,
-				Dest_ip:      all_nodes[i].ip,
+				Protocol:      protocol,
+				Dest_ip:       all_nodes[i].ip,
 				Dest_hostname: all_nodes[i].hostname,
-				Rtt:          all_nodes[i].rtts,
-				Src_ip:       server_IP,
-				Src_af:       IPv4_AF,
-				Dest_af:      IPv4_AF,
+				Rtt:           all_nodes[i].rtts,
+				Src_ip:        server_IP,
+				Src_af:        IPv4_AF,
+				Dest_af:       IPv4_AF,
 			}
 			results = append(results, *one_hop)
 			break
 		} else {
 			one_hop := &schema.ParisTracerouteHop{
-				Protocol:     protocol,
-				Dest_ip:      all_nodes[i].ip,
+				Protocol:      protocol,
+				Dest_ip:       all_nodes[i].ip,
 				Dest_hostname: all_nodes[i].hostname,
-				Rtt:          all_nodes[i].rtts,
-				Src_ip:       parent.ip,
-				Src_hostname: parent.hostname,
-				Src_af:       IPv4_AF,
-				Dest_af:      IPv4_AF,
+				Rtt:           all_nodes[i].rtts,
+				Src_ip:        parent.ip,
+				Src_hostname:  parent.hostname,
+				Src_af:        IPv4_AF,
+				Dest_af:       IPv4_AF,
 			}
 			results = append(results, *one_hop)
 		}
@@ -188,7 +187,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
-                        log.Printf("herehere%v\n", err)
+			log.Printf("herehere%v\n", err)
 			return err
 		}
 	}
@@ -306,7 +305,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
-        log.Printf("%s", testName)
+	log.Printf("%s", testName)
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
@@ -330,7 +329,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 	// This var keep all possible nodes
 	var all_nodes []Node
 
-        for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
+	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
 		// Skip initial lines starting with #.
 		if len(oneLine) == 0 || oneLine[0] == '#' {
