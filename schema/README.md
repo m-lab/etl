@@ -9,5 +9,8 @@ create a new table by invoking (while logged in to the appropriate project):
 
     bq mk --time_partitioning_type=DAY --schema ndt.json -t mlab_sandbox.ndt_test_daily
 
+or
+    bq mk --time_partitioning_type=DAY --schema pt.json -t mlab_sandbox.pt_test
+
 As of May 2017, there are differences between the legacy and NDT schema that may
 need to be addressed.

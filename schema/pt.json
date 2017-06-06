@@ -1,0 +1,89 @@
+[
+      { "name": "test_id", "type": "STRING"},
+      { "name": "project", "type": "INTEGER"},
+      { "name": "log_time", "type": "TIMESTAMP"},
+      { "name": "type", "type": "INTEGER"},
+      {
+        "fields": [
+          { "name": "client_af", "type": "INTEGER"},
+          { "name": "client_application", "type": "STRING"},
+          { "name": "client_browser", "type": "STRING"},
+          { "name": "client_hostname", "type": "STRING"},
+          { "name": "client_ip", "type": "STRING"},
+          { "name": "client_kernel_version", "type": "STRING"},
+          { "name": "client_os", "type": "STRING"},
+          { "name": "client_version", "type": "STRING"},
+          { "name": "data_direction", "type": "INTEGER"},
+          { "name": "server_af", "type": "INTEGER"},
+          { "name": "server_hostname", "type": "STRING"},
+          { "name": "server_ip", "type": "STRING"},
+          { "name": "server_kernel_version", "type": "STRING"},
+          {
+            "fields": [
+              { "name": "area_code", "type": "INTEGER"},
+              { "name": "city", "type": "STRING"},
+              { "name": "continent_code", "type": "STRING"},
+              { "name": "country_code", "type": "STRING"},
+              { "name": "country_code3", "type": "STRING"},
+              { "name": "country_name", "type": "STRING"},
+              { "name": "latitude", "type": "FLOAT"},
+              { "name": "longitude", "type": "FLOAT"},
+              { "name": "metro_code", "type": "INTEGER"},
+              { "name": "postal_code", "type": "STRING"},
+              { "name": "region", "type": "STRING"}
+            ], "name": "client_geolocation", "type": "RECORD"},
+          {
+            "fields": [
+              { "name": "area_code", "type": "INTEGER"},
+              { "name": "city", "type": "STRING"},
+              { "name": "continent_code", "type": "STRING"},
+              { "name": "country_code", "type": "STRING"},
+              { "name": "country_code3", "type": "STRING"},
+              { "name": "country_name", "type": "STRING"},
+              { "name": "latitude", "type": "FLOAT"},
+              { "name": "longitude", "type": "FLOAT"},
+              { "name": "metro_code", "type": "INTEGER"},
+              { "name": "postal_code", "type": "STRING"},
+              { "name": "region", "type": "STRING"}
+            ], "name": "server_geolocation", "type": "RECORD"}
+        ], "name": "connection_spec", "type": "RECORD"},
+      {
+        "fields": [
+              { "name": "protocol", "type": "STRING"},
+              { "name": "src_ip", "type": "STRING"},
+              { "name": "src_af", "type": "INTEGER"},
+              { "name": "src_hostname", "type": "STRING"},
+              {
+                "fields": [
+                  { "name": "area_code", "type": "INTEGER"},
+                  { "name": "city", "type": "STRING"},
+                  { "name": "continent_code", "type": "STRING"},
+                  { "name": "country_code", "type": "STRING"},
+                  { "name": "country_code3", "type": "STRING"},
+                  { "name": "country_name", "type": "STRING"},
+                  { "name": "latitude", "type": "FLOAT"},
+                  { "name": "longitude", "type": "FLOAT"},
+                  { "name": "metro_code", "type": "INTEGER"},
+                  { "name": "postal_code", "type": "STRING"},
+                  { "name": "region", "type": "STRING"}
+                ], "name": "src_geolocation", "type": "RECORD"},
+              { "name": "dest_ip", "type": "STRING"},
+              { "name": "dest_af", "type": "INTEGER"},
+              { "name": "dest_hostname", "type": "STRING"},
+              {
+                "fields": [
+                  { "name": "area_code", "type": "INTEGER"},
+                  { "name": "city", "type": "STRING"},
+                  { "name": "continent_code", "type": "STRING"},
+                  { "name": "country_code", "type": "STRING"},
+                  { "name": "country_code3", "type": "STRING"},
+                  { "name": "country_name", "type": "STRING"},
+                  { "name": "latitude", "type": "FLOAT"},
+                  { "name": "longitude", "type": "FLOAT"},
+                  { "name": "metro_code", "type": "INTEGER"},
+                  { "name": "postal_code", "type": "STRING"},
+                  { "name": "region", "type": "STRING"}
+                ], "name": "dest_geolocation", "type": "RECORD"},
+              { "name": "rtt", "type": "FLOAT", "mode": "repeated"}
+        ], "name": "paris_traceroute_hop", "type": "RECORD"}
+]
