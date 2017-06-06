@@ -16,7 +16,7 @@ package bq
 
 import (
 	"log"
-	//"os"
+	"os"
 	"sync"
 	"time"
 
@@ -87,8 +87,9 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 		ctx, _ := context.WithTimeout(context.Background(), timeout)
 		// Heavyweight!
 		var err error
-		//bqClient, err = bigquery.NewClient(ctx, os.Getenv("GCLOUD_PROJECT"))
-                bqClient, err = bigquery.NewClient(ctx, "mlab-sandbox")
+		bqClient, err = bigquery.NewClient(ctx, os.Getenv("GCLOUD_PROJECT"))
+                // Used for localhost debug
+                //bqClient, err = bigquery.NewClient(ctx, "mlab-sandbox")
 		if err != nil {
 			panic(err.Error())
 		}

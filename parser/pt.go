@@ -3,12 +3,10 @@
 package parser
 
 import (
-	//"bufio"
 	"cloud.google.com/go/bigquery"
 	"errors"
 	"fmt"
 	"log"
-	//"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -309,11 +307,6 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
         log.Printf("%s", testName)
-	//file, err := os.Open(testName)
-	//if err != nil {
-	//	return nil, 0, nil, err
-	//}
-	//defer file.Close()
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
@@ -336,9 +329,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 	var current_leaves []Node
 	// This var keep all possible nodes
 	var all_nodes []Node
-	//scanner := bufio.NewScanner(file)
-        //scanner := bufio.NewScanner(rawContent)
-	//for scanner.Scan() {
+
         for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
 		// Skip initial lines starting with #.
@@ -372,9 +363,6 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 		current_leaves = new_leaves
 	} // Done with a test file
 
-	//if err := scanner.Err(); err != nil {
-	//	return nil, 0, nil, err
-	//}
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol)
 
