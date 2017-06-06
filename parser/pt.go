@@ -3,12 +3,12 @@
 package parser
 
 import (
-	"bufio"
+	//"bufio"
 	"cloud.google.com/go/bigquery"
 	"errors"
 	"fmt"
 	"log"
-	"os"
+	//"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -84,7 +84,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []schema.Pari
 			one_hop := &schema.ParisTracerouteHop{
 				Protocol:     protocol,
 				Dest_ip:      all_nodes[i].ip,
-				Des_hostname: all_nodes[i].hostname,
+				Dest_hostname: all_nodes[i].hostname,
 				Rtt:          all_nodes[i].rtts,
 				Src_ip:       server_IP,
 				Src_af:       IPv4_AF,
@@ -96,7 +96,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []schema.Pari
 			one_hop := &schema.ParisTracerouteHop{
 				Protocol:     protocol,
 				Dest_ip:      all_nodes[i].ip,
-				Des_hostname: all_nodes[i].hostname,
+				Dest_hostname: all_nodes[i].hostname,
 				Rtt:          all_nodes[i].rtts,
 				Src_ip:       parent.ip,
 				Src_hostname: parent.hostname,
@@ -190,6 +190,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
+                        log.Printf("herehere%v\n", err)
 			return err
 		}
 	}
@@ -307,11 +308,12 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
-	file, err := os.Open(testName)
-	if err != nil {
-		return nil, 0, nil, err
-	}
-	defer file.Close()
+        log.Printf("%s", testName)
+	//file, err := os.Open(testName)
+	//if err != nil {
+	//	return nil, 0, nil, err
+	//}
+	//defer file.Close()
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
@@ -334,9 +336,11 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 	var current_leaves []Node
 	// This var keep all possible nodes
 	var all_nodes []Node
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		oneLine := strings.TrimSuffix(scanner.Text(), "\n")
+	//scanner := bufio.NewScanner(file)
+        //scanner := bufio.NewScanner(rawContent)
+	//for scanner.Scan() {
+        for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
+		oneLine := strings.TrimSuffix(oneLine, "\n")
 		// Skip initial lines starting with #.
 		if len(oneLine) == 0 || oneLine[0] == '#' {
 			continue
@@ -359,7 +363,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 			// The following parts are grouped into tuples, each with 4 parts:
 			for i := 3; i < len(parts); i += 4 {
 				if len(parts) < i+4 {
-					return nil, 0, nil, errors.New("incompleted hop data.")
+					break
 				}
 				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
 				ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
@@ -368,9 +372,9 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 		current_leaves = new_leaves
 	} // Done with a test file
 
-	if err := scanner.Err(); err != nil {
-		return nil, 0, nil, err
-	}
+	//if err := scanner.Err(); err != nil {
+	//	return nil, 0, nil, err
+	//}
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol)
 

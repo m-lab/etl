@@ -17,14 +17,14 @@ type GeolocationIP struct {
 }
 
 type ParisTracerouteHop struct {
-	Protocol     string    `json:"protocal, string"`
-	Src_ip       string    `json:"src_ip, string"`
-	Src_af       int32     `json:"src_af, int32"`
-	Dest_ip      string    `json:"dest_ip, string"`
-	Dest_af      int32     `json:"dest_af, int32"`
-	Src_hostname string    `json:"src_hostname, string"`
-	Des_hostname string    `json:"des_hostname, string"`
-	Rtt          []float64 `json:"rtt, []float64"`
+	Protocol      string    `json:"protocal, string"`
+	Src_ip        string    `json:"src_ip, string"`
+	Src_af        int32     `json:"src_af, int32"`
+	Dest_ip       string    `json:"dest_ip, string"`
+	Dest_af       int32     `json:"dest_af, int32"`
+	Src_hostname  string    `json:"src_hostname, string"`
+	Dest_hostname string    `json:"dest_hostname, string"`
+	Rtt           []float64 `json:"rtt, []float64"`
 }
 
 type MLabConnectionSpecification struct {
