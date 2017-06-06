@@ -67,6 +67,13 @@ import (
 //00000ca0  71 46 00 00 97 37 eb cc  bf d4 00 00 c2 74 55 cb  |qF...7.......tU.|
 //00000cb0  2d 2d 2d 2d 42 65 67 69  6e 2d 53 6e 61 70 2d 44  |----Begin-Snap-D|
 //00000cc0  61 74 61 2d 2d 2d 2d 0a  00 00 00 00 71 46 71 46  |ata----.....qFqF|
+//
+// Performance
+//   This code is roughly 10 times faster than the web100 library based code.  It
+//   avoids conversion of integers to text and back, file io, nasty inner fgetc loops.
+//   If we use this in ndt.go to parse ALL snapshot records, we end up spending about
+//   25% of the time doing ReadFrom (including decompression), 66% doing getAndInsertValues,
+//   including 23% mapassign, and 12% mapassign2_faststr.
 
 //=================================================================================
 // CanonicalNames provides the mapping from old names (in snaplog files) to new
@@ -156,7 +163,6 @@ type variable struct {
 }
 
 func NewVariable(s string) (*variable, error) {
-	// TODO - use regular expression ??
 	var name string
 	var length, typ, offset int
 	n, err := fmt.Sscanln(s, &name, &offset, &typ, &length)

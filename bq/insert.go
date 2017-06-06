@@ -157,7 +157,7 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 		if len(typedErr) > 10 && len(typedErr) == len(in.rows) {
 			log.Printf("%v\n", err)
 			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "failed insert").Inc()
+				in.TableBase(), "unknown", "failed insert").Inc()
 			in.failures += 1
 		} else {
 			// Handle each error individually.
@@ -169,7 +169,7 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 				for _, oneErr := range rowError.Errors {
 					log.Printf("Insert error: %v\n", oneErr)
 					metrics.ErrorCount.WithLabelValues(
-						in.TableBase(), "insert row error").Inc()
+						in.TableBase(), "unknown", "insert row error").Inc()
 				}
 			}
 		}
@@ -179,7 +179,7 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 	default:
 		log.Printf("Unhandled insert error %v\n", typedErr)
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "other insert error").Inc()
+			in.TableBase(), "unknown", "other insert error").Inc()
 		err = nil
 	}
 	// Allocate new slice of rows.  Any failed rows are lost.

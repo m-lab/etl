@@ -22,6 +22,7 @@ func init() {
 	prometheus.MustRegister(TaskCount)
 	prometheus.MustRegister(TestCount)
 	prometheus.MustRegister(ErrorCount)
+	prometheus.MustRegister(WarningCount)
 	prometheus.MustRegister(GCSRetryCount)
 	prometheus.MustRegister(BigQueryInsert)
 	prometheus.MustRegister(DurationHistogram)
@@ -77,54 +78,50 @@ var (
 		[]string{"package", "status"},
 	)
 
-	// Counts the number of tests processed by the parsers..
+	// Counts the number of tests successfully processed by the parsers.
 	//
 	// Provides metrics:
-	//   etl_test_count{table, suffix, filetype, status}
+	//   etl_test_count{table, filetype, status}
 	// Example usage:
 	// metrics.TestCount.WithLabelValues(
-	//	tt.Inserter.TableBase(), tt.Inserter.TableSuffix(), "s2c", "ok").Inc()
-	// TODO(2017) Remove suffix field, and use a more scalable solution, perhaps bigquery
-	// table to store operations metrics.
+	//	tt.Inserter.TableBase(), "s2c", "ok").Inc()
 	TestCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_test_count",
 			Help: "Number of tests processed.",
 		},
 		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/
-		[]string{"table", "suffix", "filetype", "status"},
+		[]string{"table", "filetype", "status"},
 	)
 
-	// Counts the all types of errors.
+	// Counts the all warnings that do NOT result in test loss.
 	//
 	// Provides metrics:
-	//   etl_error_count{table, kind}
+	//   etl_warning_count{table, filetype, kind}
 	// Example usage:
-	//   metrics.ErrorCount.WithLabelValues(TableName(), "insert").Inc()
+	//   metrics.WarningCount.WithLabelValues(TableName(), "s2c", "small test").Inc()
+	WarningCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_warning_count",
+			Help: "Warnings that do not result in test loss.",
+		},
+		// Parser type, error description.
+		[]string{"table", "filetype", "kind"},
+	)
+
+	// Counts the all errors that result in test loss.
+	//
+	// Provides metrics:
+	//   etl_error_count{table, filetype, kind}
+	// Example usage:
+	//   metrics.ErrorCount.WithLabelValues(TableName(), s2c, "insert").Inc()
 	ErrorCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_error_count",
-			Help: "Number of errors.",
+			Help: "Errors that cause test loss.",
 		},
 		// Parser type, error description.
-		[]string{"table", "kind"},
-	)
-
-	// Counts of anomolies in tests.  Generally these are non-terminal, so the
-	// test also shows up in TestCount with status ok.
-	//
-	// Provides metrics:
-	//   etl_funny_tests{table, filetype, anomoly}
-	// Example usage:
-	// metrics.FunnyTests.WithLabelValues(
-	//	tt.Inserter.TableBase(), "s2c", "<16KB").Inc()
-	FunnyTests = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "etl_funny_tests",
-			Help: "Counts of anomolous tests.",
-		},
-		// ndt/pt/ss, s2c/c2s/meta, big/small/corrupt/
-		[]string{"table", "filetype", "anomoly"},
+		[]string{"table", "filetype", "kind"},
 	)
 
 	// Counts the number of retries on GCS read operations.

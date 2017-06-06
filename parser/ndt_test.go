@@ -62,7 +62,6 @@ func TestValidation(t *testing.T) {
 func TestNDTParser(t *testing.T) {
 	// Load test data.
 	ins := &inMemoryInserter{}
-	parser.TmpDir = "./"
 	n := parser.NewNDTParser(ins)
 
 	// TODO(prod) - why are so many of the tests to this endpoint and a few others?
@@ -101,7 +100,11 @@ func TestNDTParser(t *testing.T) {
 				"RemAddress": "45.56.98.222",
 			},
 			"connection_spec": schema.Web100ValueMap{
-				"local_port": int64(40105),
+				"local_ip":    "213.208.152.37",
+				"local_port":  int64(40105),
+				"remote_ip":   "45.56.98.222",
+				"remote_port": int64(44160),
+				"local_af":    int64(1),
 			},
 		},
 	}
@@ -130,39 +133,48 @@ func TestNDTParser(t *testing.T) {
 func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100ValueMap) bool {
 	match := true
 	for key, value := range expected {
+		act, ok := actual[key]
+		if !ok {
+			t.Logf("The actual data is missing a key: %s", key)
+			return false
+		}
 		switch v := value.(type) {
 		case schema.Web100ValueMap:
-			match = match && compare(t, actual[key].(schema.Web100ValueMap), v)
+			match = match && compare(t, act.(schema.Web100ValueMap), v)
 		case string:
-			if actual[key].(string) != v {
+			if act.(string) != v {
 				t.Logf("Wrong strings for key %q: got %q; want %q",
-					key, v, actual[key].(string))
+					key, v, act.(string))
 				match = false
 			}
 		case int64:
-			if actual[key].(int64) != v {
+			if act.(int64) != v {
 				t.Logf("Wrong ints for key %q: got %d; want %d",
-					key, v, actual[key].(int64))
+					key, v, act.(int64))
 				match = false
 			}
 		case int32:
-			if actual[key].(int32) != v {
-				t.Logf("Wrong ints for key %q: got %d; want %d", key, v, actual[key].(int32))
+			if act.(int32) != v {
+				t.Logf("Wrong ints for key %q: got %d; want %d",
+					key, v, act.(int32))
 				match = false
 			}
 		case int:
-			if actual[key].(int) != v {
-				t.Logf("Wrong ints for key %q: got %d; want %d", key, v, actual[key].(int))
+			if act.(int) != v {
+				t.Logf("Wrong ints for key %q: got %d; want %d",
+					key, v, act.(int))
 				match = false
 			}
 		case []float64:
-			if len(v) != len(actual[key].([]float64)) {
-				t.Logf("Wrong floats for key %q: got %d; want %d", key, v, actual[key].([]float64))
+			if len(v) != len(act.([]float64)) {
+				t.Logf("Wrong floats for key %q: got %d; want %d",
+					key, v, act.([]float64))
 				match = false
 			}
 			for i := range v {
-				if v[i] != actual[key].([]float64)[i] {
-					t.Logf("Wrong floats for key %q: got %d; want %d", key, v, actual[key].([]float64))
+				if v[i] != act.([]float64)[i] {
+					t.Logf("Wrong floats for key %q: got %d; want %d",
+						key, v, act.([]float64))
 					match = false
 				}
 			}
