@@ -97,7 +97,7 @@ var (
 	// Counts the all warnings that do NOT result in test loss.
 	//
 	// Provides metrics:
-	//   etl_warning_count{table, kind}
+	//   etl_warning_count{table, filetype, kind}
 	// Example usage:
 	//   metrics.WarningCount.WithLabelValues(TableName(), "s2c", "small test").Inc()
 	WarningCount = prometheus.NewCounterVec(
@@ -112,7 +112,7 @@ var (
 	// Counts the all errors that result in test loss.
 	//
 	// Provides metrics:
-	//   etl_error_count{table, kind}
+	//   etl_error_count{table, filetype, kind}
 	// Example usage:
 	//   metrics.ErrorCount.WithLabelValues(TableName(), s2c, "insert").Inc()
 	ErrorCount = prometheus.NewCounterVec(

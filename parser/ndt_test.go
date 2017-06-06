@@ -62,7 +62,6 @@ func TestValidation(t *testing.T) {
 func TestNDTParser(t *testing.T) {
 	// Load test data.
 	ins := &inMemoryInserter{}
-	parser.TmpDir = "./"
 	n := parser.NewNDTParser(ins)
 
 	// TODO(prod) - why are so many of the tests to this endpoint and a few others?
