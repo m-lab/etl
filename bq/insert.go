@@ -133,6 +133,7 @@ func (in *BQInserter) InsertRow(data interface{}) error {
 func (in *BQInserter) InsertRows(data []interface{}) error {
 	metrics.WorkerState.WithLabelValues("insert").Inc()
 	defer metrics.WorkerState.WithLabelValues("insert").Dec()
+
 	for len(data)+len(in.rows) >= in.params.BufferSize {
 		// space >= len(data)
 		space := cap(in.rows) - len(in.rows)
