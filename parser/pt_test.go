@@ -97,7 +97,6 @@ func TestPTParser(t *testing.T) {
 
 func TestPTInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
-	parser.TmpDir = "./"
 	n := parser.NewPTParser(ins)
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
 	if err != nil {
