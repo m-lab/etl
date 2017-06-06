@@ -88,8 +88,6 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 		// Heavyweight!
 		var err error
 		bqClient, err = bigquery.NewClient(ctx, os.Getenv("GCLOUD_PROJECT"))
-                // Used for localhost debug
-                //bqClient, err = bigquery.NewClient(ctx, "mlab-sandbox")
 		if err != nil {
 			panic(err.Error())
 		}
@@ -144,7 +142,6 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 		err := in.Flush()
 		if err != nil {
 			// TODO - handle errors in middle better?
-                        log.Printf("%v\n", err)
 			return err
 		}
 	}
@@ -206,7 +203,6 @@ func (in *BQInserter) Flush() error {
 		in.rows = make([]interface{}, 0, in.params.BufferSize)
 	} else {
 		// This adjusts the inserted count, failure count, and updates in.rows.
-                log.Printf("%v\n", err)
 		err = in.HandleInsertErrors(err)
 	}
 	return err
