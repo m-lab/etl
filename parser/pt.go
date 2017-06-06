@@ -187,7 +187,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
-			log.Printf("%v\n", err)
+			log.Printf("Insert error: %v\n", err)
 			return err
 		}
 	}
@@ -305,7 +305,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
-	log.Printf("%s", testName)
+	// log.Printf("%s", testName)
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
@@ -352,11 +352,11 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 			// Drop the first 3 parts, like "1  P(6, 6)" because they are useless.
 			// The following parts are grouped into tuples, each with 4 parts:
 			for i := 3; i < len(parts); i += 4 {
-				if len(parts) < i+4 {
-					break
-				}
 				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
 				ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
+				// Skip over any error codes for now. These are after the "ms" and start with '!'.
+				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i += 1 {
+				}
 			} // Done with a 4-tuple parsing
 		} // Done with one line
 		current_leaves = new_leaves
