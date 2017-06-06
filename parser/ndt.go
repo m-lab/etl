@@ -15,8 +15,18 @@ import (
 	"github.com/m-lab/etl/web100"
 )
 
-var (
-	TmpDir = "/mnt/tmpfs"
+const (
+	// Some snaplogs are very large, and we don't want to parse the entire
+	// snaplog, when there is no value.  However, although the nominal test
+	// length is 10 seconds, many tests collect snaplogs up to about 13 seconds,
+	// to avoid race conditions in the collection.  So, we will process up
+	// to 2800 snapshots, which corresponds to 14 seconds, and should be long
+	// after the data transfer has completed.
+	//
+	// TODO - in future, we should probably detect when the connection state changes
+	// from established, as there is little reason to parse snapshots beyond that
+	// point.
+	MAX_NUM_SNAPSHOTS = 2800
 )
 
 //=========================================================================
@@ -91,14 +101,10 @@ type fileInfoAndData struct {
 
 type NDTParser struct {
 	inserter etl.Inserter
-	// TODO(prod): eliminate need for tmpfs.
-	tmpDir string
 
 	timestamp string // The unique timestamp common across all files in current batch.
 	time      time.Time
 
-	// TODO(dev) Sometimes NDT writes multiple copies of c2s or s2c.  We need to save them
-	// and use only the one identified in meta file.
 	c2s *fileInfoAndData
 	s2c *fileInfoAndData
 
@@ -106,12 +112,10 @@ type NDTParser struct {
 }
 
 func NewNDTParser(ins etl.Inserter) *NDTParser {
-	return &NDTParser{inserter: ins, tmpDir: TmpDir}
+	return &NDTParser{inserter: ins}
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
-// Writes rawSnapLog to /mnt/tmpfs.
-// TODO(prod): do not write to a temporary file; operate on byte array directly.
 func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName string, content []byte) error {
 	// Scraper adds files to tar file in lexical order.  This groups together all
 	// files in a single test, but the order of the files varies because of port number.
@@ -124,7 +128,6 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), "unknown", "bad filename").Inc()
-		// TODO - should log and count this.
 		log.Println(err)
 		return nil
 	}
@@ -135,6 +138,8 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		// All files are processed ASAP.  However, if there is ONLY
 		// a data file, or ONLY a meta file, we have to process the
 		// test files anyway.
+		// TODO(dev) Handle case where we don't get a meta file on the last
+		// test in a task.
 		n.handleAnomolies(taskFileName)
 
 		n.timestamp = info.Time
@@ -146,20 +151,34 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	switch info.Suffix {
 	case "c2s_snaplog":
 		if n.c2s != nil {
-			metrics.WarningCount.WithLabelValues(
-				n.TableName(), "c2s", "timestamp collision").Inc()
-			log.Printf("Collision: %s and %s\n", n.c2s.fn, testName)
+			// There are name collisions when rsync collects both the
+			// original file and the gzipped file.  We don't care about
+			// those, but should detect other kinds of collisions.
+			if (n.c2s.fn+".gz") != testName &&
+				(testName+".gz") != n.c2s.fn {
+				metrics.WarningCount.WithLabelValues(
+					n.TableName(), "c2s", "timestamp collision").Inc()
+				log.Printf("Collision: %s and %s\n", n.c2s.fn, testName)
+			}
+		} else {
+			// We only take action on the first file, to avoid dups.
+			n.c2s = &fileInfoAndData{testName, *info, content}
+			n.processTest(taskFileName, n.c2s, "c2s")
 		}
-		n.c2s = &fileInfoAndData{testName, *info, content}
-		n.processTest(taskFileName, n.c2s, "c2s")
 	case "s2c_snaplog":
 		if n.s2c != nil {
-			metrics.WarningCount.WithLabelValues(
-				n.TableName(), "s2c", "timestamp collision").Inc()
-			log.Printf("Collision: %s and %s\n", n.s2c.fn, testName)
+			// See comments above.
+			if (n.s2c.fn+".gz") != testName &&
+				(testName+".gz") != n.s2c.fn {
+				metrics.WarningCount.WithLabelValues(
+					n.TableName(), "s2c", "timestamp collision").Inc()
+				log.Printf("Collision: %s and %s\n", n.s2c.fn, testName)
+			}
+		} else {
+			// We only take action on the first file, to avoid dups.
+			n.s2c = &fileInfoAndData{testName, *info, content}
+			n.processTest(taskFileName, n.s2c, "s2c")
 		}
-		n.s2c = &fileInfoAndData{testName, *info, content}
-		n.processTest(taskFileName, n.s2c, "s2c")
 	case "meta":
 		if n.metaFile != nil {
 			metrics.WarningCount.WithLabelValues(
@@ -193,15 +212,13 @@ func (n *NDTParser) handleAnomolies(taskFileName string) {
 		if n.s2c != nil {
 			metrics.WarningCount.WithLabelValues(
 				n.TableName(), "s2c", "no meta").Inc()
-			// TODO enable this once noise is reduced.
-			// log.Printf("No meta: %s %s\n", taskFileName, n.s2c.fn)
+			// TODO Add a log once noise is reduced.
 			n.processTest(taskFileName, n.s2c, "s2c")
 		}
 		if n.c2s != nil {
 			metrics.WarningCount.WithLabelValues(
 				n.TableName(), "c2s", "no meta").Inc()
-			// TODO enable this once noise is reduced.
-			// log.Printf("No meta: %s %s\n", taskFileName, n.c2s.fn)
+			// TODO Add a log once noise is reduced.
 			n.processTest(taskFileName, n.c2s, "c2s")
 		}
 		if n.s2c == nil && n.c2s == nil {
@@ -287,7 +304,7 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 
 	// HACK - just to see how expensive the Values() call is...
 	// parse ALL the snapshots.
-	for count := 0; count < snaplog.SnapCount() && count < 2100; count++ {
+	for count := 0; count < snaplog.SnapCount() && count < MAX_NUM_SNAPSHOTS; count++ {
 		snap, err := snaplog.Snapshot(count)
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
@@ -304,13 +321,13 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 	}
 
 	last := snaplog.SnapCount() - 1
-	if last > 2100 {
-		last = 2100
+	if last > MAX_NUM_SNAPSHOTS {
+		last = MAX_NUM_SNAPSHOTS
 	}
 	snap, err := snaplog.Snapshot(last)
 	if err != nil {
-		// TODO - Use separate counter, since this is not unique across
-		// the test.
+		metrics.ErrorCount.WithLabelValues(
+			n.TableName(), testType, "final snapshot failure").Inc()
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), testType, "final snapshot failure").Inc()
 		return
@@ -318,8 +335,8 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 	snapValues := schema.EmptySnap()
 	snap.SnapshotValues(snapValues)
 	if err != nil {
-		// TODO - Use separate counter, since this is not unique across
-		// the test.
+		metrics.ErrorCount.WithLabelValues(
+			n.TableName(), testType, "final snapValues failure").Inc()
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), testType, "final snapValues failure").Inc()
 		log.Printf("Error calling SnapshotValues() in test %s, when processing: %s\n%s\n",
@@ -357,6 +374,8 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 	}
 
 	connSpec := schema.EmptyConnectionSpec()
+	// TODO - metaFile is currently used only to populate the connection spec.
+	// Should we be using it for anything else?
 	n.metaFile.PopulateConnSpec(connSpec)
 	switch testType {
 	case "c2s":
@@ -368,9 +387,10 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 	results["connection_spec"] = connSpec
 
 	fixValues(results)
+	// TODO fix InsertRow so that we can distinguish errors from prior rows.
 	err = n.inserter.InsertRow(&bq.MapSaver{results})
 	if err != nil {
-		metrics.TestCount.WithLabelValues(
+		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, "insert-err").Inc()
 		// TODO: This is an insert error, that might be recoverable if we try again.
 		log.Println("insert-err: " + err.Error())
