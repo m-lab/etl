@@ -187,7 +187,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
-			log.Printf("herehere%v\n", err)
+			log.Printf("%v\n", err)
 			return err
 		}
 	}
