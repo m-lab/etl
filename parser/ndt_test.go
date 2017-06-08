@@ -61,7 +61,7 @@ func TestValidation(t *testing.T) {
 
 func TestNDTParser(t *testing.T) {
 	// Load test data.
-	ins := &inMemoryInserter{}
+	ins := newInMemoryInserter()
 	n := parser.NewNDTParser(ins)
 
 	// TODO(prod) - why are so many of the tests to this endpoint and a few others?
@@ -72,7 +72,7 @@ func TestNDTParser(t *testing.T) {
 	}
 
 	meta := map[string]bigquery.Value{"filename": "tarfile.tgz"}
-	err = n.ParseAndInsert(meta, s2cName, s2cData)
+	err = n.ParseAndInsert(meta, s2cName+".gz", s2cData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -87,8 +87,14 @@ func TestNDTParser(t *testing.T) {
 	}
 
 	err = n.ParseAndInsert(meta, metaName, metaData)
-	if ins.RowsInBuffer() != 1 {
-		t.Fatalf("Failed to insert snaplog data.")
+	// Nothing should happen (with this parser) until new test group or Flush.
+	if ins.Accepted() != 0 {
+		t.Fatalf("Data processed prematurely.")
+	}
+
+	n.Flush()
+	if ins.Accepted() != 1 {
+		t.Fatalf(fmt.Sprintf("Failed to insert snaplog data. %d", ins.Accepted()))
 	}
 
 	// Extract the values saved to the inserter.
@@ -119,11 +125,12 @@ func TestNDTParser(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	err = n.ParseAndInsert(meta, c2sName, c2sData)
+	err = n.ParseAndInsert(meta, c2sName+".gz", c2sData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if ins.RowsInBuffer() != 2 {
+	n.Flush()
+	if ins.Accepted() != 2 {
 		t.Fatalf("Failed to insert snaplog data.")
 	}
 }
@@ -192,6 +199,11 @@ type inMemoryInserter struct {
 	committed int
 }
 
+func newInMemoryInserter() *inMemoryInserter {
+	data := make([]interface{}, 0)
+	return &inMemoryInserter{data, 0}
+}
+
 func (in *inMemoryInserter) InsertRow(data interface{}) error {
 	in.data = append(in.data, data)
 	return nil
@@ -201,8 +213,7 @@ func (in *inMemoryInserter) InsertRows(data []interface{}) error {
 	return nil
 }
 func (in *inMemoryInserter) Flush() error {
-	in.committed += len(in.data)
-	in.data = make([]interface{}, 0)
+	in.committed = len(in.data)
 	return nil
 }
 func (in *inMemoryInserter) TableBase() string {
@@ -218,10 +229,10 @@ func (in *inMemoryInserter) Dataset() string {
 	return ""
 }
 func (in *inMemoryInserter) RowsInBuffer() int {
-	return len(in.data)
+	return len(in.data) - in.committed
 }
 func (in *inMemoryInserter) Accepted() int {
-	return len(in.data) + in.committed
+	return len(in.data)
 }
 func (in *inMemoryInserter) Committed() int {
 	return in.committed
