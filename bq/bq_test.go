@@ -57,8 +57,8 @@ func xTestRealPartitionInsert(t *testing.T) {
 		t.Error(err)
 	}
 
-	if in.Count() != 3 {
-		t.Error("Should have inserted three rows")
+	if in.Accepted() != 3 {
+		t.Error("Should have accepted three rows")
 	}
 	in.Flush()
 }
@@ -84,8 +84,8 @@ func TestBasicInsert(t *testing.T) {
 		t.Error(err)
 	}
 
-	if in.Count() != 3 {
-		t.Error("Should have inserted three rows")
+	if in.Accepted() != 3 {
+		t.Error("Should have accepted three rows")
 	}
 	in.Flush()
 }
@@ -119,8 +119,8 @@ func TestBufferingAndFlushing(t *testing.T) {
 	if in.RowsInBuffer() != 0 {
 		t.Error("RowsInBuffer = ", in.RowsInBuffer())
 	}
-	if in.Count() != 3 {
-		t.Error("Count = ", in.Count())
+	if in.Accepted() != 3 {
+		t.Error("Accepted = ", in.Accepted())
 	}
 
 	// Insert two more rows, which should NOT trigger a flush.
@@ -130,8 +130,8 @@ func TestBufferingAndFlushing(t *testing.T) {
 	if in.RowsInBuffer() != 2 {
 		t.Error("RowsInBuffer = ", in.RowsInBuffer())
 	}
-	if in.Count() != 5 {
-		t.Error("Count = ", in.Count())
+	if in.Accepted() != 5 {
+		t.Error("Accepted = ", in.Accepted())
 	}
 
 	// Insert two more rows, which should trigger a flush, and leave one
@@ -142,8 +142,8 @@ func TestBufferingAndFlushing(t *testing.T) {
 	if in.RowsInBuffer() != 1 {
 		t.Error("RowsInBuffer = ", in.RowsInBuffer())
 	}
-	if in.Count() != 7 {
-		t.Error("Count = ", in.Count())
+	if in.Accepted() != 7 {
+		t.Error("Accepted = ", in.Accepted())
 	}
 
 	// Flush the final row.
@@ -151,8 +151,8 @@ func TestBufferingAndFlushing(t *testing.T) {
 	if in.RowsInBuffer() != 0 {
 		t.Error("RowsInBuffer = ", in.RowsInBuffer())
 	}
-	if in.Count() != 7 {
-		t.Error("Count = ", in.Count())
+	if in.Accepted() != 7 {
+		t.Error("Count = ", in.Accepted())
 	}
 
 }
@@ -180,5 +180,5 @@ func TestHandleInsertErrors(t *testing.T) {
 	pme = append(pme, rie)
 	in.(*bq.BQInserter).HandleInsertErrors(pme)
 
-    // TODO - assert something.
+	// TODO - assert something.
 }

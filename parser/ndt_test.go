@@ -188,7 +188,8 @@ func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100V
 }
 
 type inMemoryInserter struct {
-	data []interface{}
+	data      []interface{}
+	committed int
 }
 
 func (in *inMemoryInserter) InsertRow(data interface{}) error {
@@ -200,6 +201,8 @@ func (in *inMemoryInserter) InsertRows(data []interface{}) error {
 	return nil
 }
 func (in *inMemoryInserter) Flush() error {
+	in.committed += len(in.data)
+	in.data = make([]interface{}, 0)
 	return nil
 }
 func (in *inMemoryInserter) TableBase() string {
@@ -217,6 +220,12 @@ func (in *inMemoryInserter) Dataset() string {
 func (in *inMemoryInserter) RowsInBuffer() int {
 	return len(in.data)
 }
-func (in *inMemoryInserter) Count() int {
-	return len(in.data)
+func (in *inMemoryInserter) Accepted() int {
+	return len(in.data) + in.committed
+}
+func (in *inMemoryInserter) Committed() int {
+	return in.committed
+}
+func (in *inMemoryInserter) Failed() int {
+	return 0
 }

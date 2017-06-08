@@ -11,7 +11,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage" // TODO - would be better not to have this.
@@ -57,8 +56,18 @@ func MakeTestSource(t *testing.T) *storage.ETLSource {
 }
 
 type TestParser struct {
-	etl.Parser
+	parser.FakeRowStats
 	files []string
+}
+
+func (tp *TestParser) TableName() string {
+	return "test-table"
+}
+func (tp *TestParser) FullTableName() string {
+	return "test-table"
+}
+func (tp *TestParser) Flush() error {
+	return nil
 }
 
 // TODO - pass testName through to BQ inserter?
@@ -67,18 +76,17 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 	return nil
 }
 
-func (tp *TestParser) TableName() string {
-	return "test"
-}
-
 // TODO(dev) - add unit tests for tgz and tar.gz files
 // TODO(dev) - add good comments
 func TestTarFileInput(t *testing.T) {
 	rdr := MakeTestSource(t)
 
-	var prsr TestParser
-	in := bq.NullInserter{}
-	tt := task.NewTask("filename", rdr, &prsr, &in)
+	var prsr etl.Parser
+	prsr = &TestParser{}
+	var tp = prsr.(*TestParser)
+
+	// TODO - in := bq.NullInserter{}
+	tt := task.NewTask("filename", rdr, prsr)
 	fn, bb, err := tt.NextTest()
 	if err != nil {
 		t.Error(err)
@@ -104,14 +112,14 @@ func TestTarFileInput(t *testing.T) {
 	// Reset the tar reader and create new task, to test the ProcessAllTests behavior.
 	rdr = MakeTestSource(t)
 
-	tt = task.NewTask("filename", rdr, &prsr, &in)
+	tt = task.NewTask("filename", rdr, prsr)
 	tt.ProcessAllTests()
 
-	if len(prsr.files) != 2 {
-		t.Error("Too few files ", len(prsr.files))
+	if len(tp.files) != 2 {
+		t.Error("Too few files ", len(tp.files))
 	}
-	if !reflect.DeepEqual(prsr.files, []string{"foo", "bar"}) {
-		t.Error("Not expected files: ", prsr.files)
+	if !reflect.DeepEqual(tp.files, []string{"foo", "bar"}) {
+		t.Error("Not expected files: ", tp.files)
 	}
 
 }

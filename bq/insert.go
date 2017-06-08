@@ -117,7 +117,7 @@ type BQInserter struct {
 	timeout  time.Duration
 	rows     []interface{}
 	inserted int // Number of rows successfully inserted.
-	badRows  int // Number of row failures.
+	badRows  int // Number of row failures, including rows in full failures.
 	failures int // Number of complete insert failures.
 }
 
@@ -158,6 +158,9 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 			log.Printf("%v\n", err)
 			metrics.ErrorCount.WithLabelValues(
 				in.TableBase(), "unknown", "failed insert").Inc()
+			metrics.ErrorCount.WithLabelValues(
+				in.TableBase(), "unknown", "insert row error").
+				Add(float64(len(typedErr)))
 			in.failures += 1
 		} else {
 			// Handle each error individually.
@@ -179,7 +182,10 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 	default:
 		log.Printf("Unhandled insert error %v\n", typedErr)
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "unknown", "other insert error").Inc()
+			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
+		// TODO - Conservative, but possibly not correct.
+		// This at least preserves the count invariance.
+		in.badRows += len(in.rows)
 		err = nil
 	}
 	// Allocate new slice of rows.  Any failed rows are lost.
@@ -226,8 +232,14 @@ func (in *BQInserter) Dataset() string {
 func (in *BQInserter) RowsInBuffer() int {
 	return len(in.rows)
 }
-func (in *BQInserter) Count() int {
-	return in.inserted + len(in.rows)
+func (in *BQInserter) Accepted() int {
+	return in.inserted + in.badRows + len(in.rows)
+}
+func (in *BQInserter) Committed() int {
+	return in.inserted
+}
+func (in *BQInserter) Failed() int {
+	return in.badRows
 }
 
 //----------------------------------------------------------------------------

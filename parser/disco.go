@@ -42,10 +42,11 @@ type PortStats struct {
 // TODO(dev) add tests
 type DiscoParser struct {
 	inserter etl.Inserter
+	etl.RowStats
 }
 
 func NewDiscoParser(ins etl.Inserter) etl.Parser {
-	return &DiscoParser{inserter: ins}
+	return &DiscoParser{ins, ins}
 }
 
 // Disco data a JSON representation that should be pushed directly into BigQuery.
@@ -99,6 +100,14 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 	return nil
 }
 
+func (dp *DiscoParser) Flush() error {
+	return dp.inserter.Flush()
+}
+
 func (dp *DiscoParser) TableName() string {
 	return dp.inserter.TableBase()
+}
+
+func (dp *DiscoParser) FullTableName() string {
+	return dp.inserter.FullTableName()
 }

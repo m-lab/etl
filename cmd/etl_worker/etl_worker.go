@@ -175,7 +175,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 
 	// Create parser, injecting Inserter
 	p := parser.NewParser(dataType, ins)
-	tsk := task.NewTask(fn, tr, p, ins)
+	tsk := task.NewTask(fn, tr, p)
 
 	err = tsk.ProcessAllTests()
 
