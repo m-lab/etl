@@ -1,12 +1,14 @@
 // web100_cli provides a simple CLI interface to web100 functions.
 package main
 
+// example:
+// go build cmd/web100_cli/web100_cli.go
+// ./web100_cli -filename parser/testdata/20170509T13\:45\:13.590210000Z_eb.measurementlab.net\:44160.s2c_snaplog
 import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"os"
+	"io/ioutil"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/schema"
@@ -28,45 +30,38 @@ func prettyPrint(results map[string]bigquery.Value) {
 
 func main() {
 	flag.Parse()
+	fmt.Println(*filename)
 
-	// Parse tcp-kis.txt variable definitions.
-	k, err := os.Open(*tcpKis)
-	if err != nil {
-		panic(err)
-	}
-	legacyNames, err := web100.ParseWeb100Definitions(k)
+	content, err := ioutil.ReadFile(*filename)
 	if err != nil {
 		panic(err)
 	}
 
-	// Open web100 snapshot log.
-	w, err := web100.Open(*filename, legacyNames)
+	snaplog, err := web100.NewSnapLog(content)
 	if err != nil {
 		panic(err)
 	}
-	defer w.Close()
 
-	// Find all last web100 snapshot.
-	for {
-		err = w.Next()
-		if err != nil {
-			break
-		}
-	}
-	if err != io.EOF {
-		panic(err)
-	}
-
-	snapValues := schema.Web100ValueMap{}
-	err = w.SnapshotValues(snapValues)
+	err = snaplog.ValidateSnapshots()
 	if err != nil {
 		panic(err)
 	}
-	connSpec := schema.Web100ValueMap{}
-	w.ConnectionSpec(connSpec)
-	results := schema.NewWeb100FullRecord(
-		w.LogVersion(), w.LogTime(),
-		(map[string]bigquery.Value)(connSpec),
+
+	last := snaplog.SnapCount() - 1
+	snap, err := snaplog.Snapshot(last)
+	if err != nil {
+		panic(err)
+	}
+
+	snapValues := schema.EmptySnap()
+	snap.SnapshotValues(snapValues)
+
+	nestedConnSpec := make(schema.Web100ValueMap, 6)
+	snaplog.ConnectionSpecValues(nestedConnSpec)
+
+	results := schema.NewWeb100MinimalRecord(
+		snaplog.Version, int64(snaplog.LogTime),
+		(map[string]bigquery.Value)(nestedConnSpec),
 		(map[string]bigquery.Value)(snapValues))
 
 	prettyPrint(results)
