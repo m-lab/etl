@@ -23,6 +23,7 @@ func init() {
 	prometheus.MustRegister(TestCount)
 	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(WarningCount)
+	prometheus.MustRegister(BackendFailureCount)
 	prometheus.MustRegister(GCSRetryCount)
 	prometheus.MustRegister(BigQueryInsert)
 	prometheus.MustRegister(DurationHistogram)
@@ -122,6 +123,22 @@ var (
 		},
 		// Parser type, error description.
 		[]string{"table", "filetype", "kind"},
+	)
+
+	// Counts the all bulk backend failures.  This does not count, e.g.
+	// single row errors.
+	//
+	// Provides metrics:
+	//   etl_backend_failure_count{table, kind}
+	// Example usage:
+	//   metrics.BackendFailureCount.WithLabelValues(TableName(), "insert").Inc()
+	BackendFailureCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_backend_failure_count",
+			Help: "Backend failures, whether or not recoverable.",
+		},
+		// Parser type, error description.
+		[]string{"table", "kind"},
 	)
 
 	// Counts the number of retries on GCS read operations.
