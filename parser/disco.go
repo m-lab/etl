@@ -42,7 +42,7 @@ type PortStats struct {
 // TODO(dev) add tests
 type DiscoParser struct {
 	inserter     etl.Inserter
-	etl.RowStats // Allows RowStats to be implemented with an embedded struct.
+	etl.RowStats // RowStats implemented for DiscoParser with an embedded struct.
 }
 
 func NewDiscoParser(ins etl.Inserter) etl.Parser {

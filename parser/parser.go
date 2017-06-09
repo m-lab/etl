@@ -48,7 +48,6 @@ func (s *FakeRowStats) Failed() int {
 }
 
 type NullParser struct {
-	etl.Parser
 	FakeRowStats
 }
 
@@ -87,6 +86,7 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 	return tp.inserter.InsertRow(bq.MapSaver{values})
 }
 
+// These functions are also required to complete the etl.Parser interface.
 func (tp *TestParser) Flush() error {
 	return nil
 }
