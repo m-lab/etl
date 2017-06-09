@@ -100,8 +100,8 @@ type fileInfoAndData struct {
 }
 
 type NDTParser struct {
-	inserter etl.Inserter
-	etl.RowStats
+	inserter     etl.Inserter
+	etl.RowStats // Implement RowStats through an embedded struct.
 
 	timestamp string // The unique timestamp common across all files in current batch.
 	time      time.Time
@@ -113,7 +113,23 @@ type NDTParser struct {
 }
 
 func NewNDTParser(ins etl.Inserter) *NDTParser {
-	return &NDTParser{inserter: ins, RowStats: ins}
+	return &NDTParser{
+		inserter: ins,
+		RowStats: ins} // Use the Inserter to provide the RowStats interface.
+}
+
+// These functions are also required to complete the etl.Parser interface.
+// For now, we just forward the calls to the Inserter.
+func (n *NDTParser) Flush() error {
+	return n.inserter.Flush()
+}
+
+func (n *NDTParser) TableName() string {
+	return n.inserter.TableBase()
+}
+
+func (n *NDTParser) FullTableName() string {
+	return n.inserter.FullTableName()
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
@@ -401,18 +417,6 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 			n.TableName(), testType, "ok").Inc()
 		return
 	}
-}
-
-func (n *NDTParser) Flush() error {
-	return n.inserter.Flush()
-}
-
-func (n *NDTParser) TableName() string {
-	return n.inserter.TableBase()
-}
-
-func (n *NDTParser) FullTableName() string {
-	return n.inserter.FullTableName()
 }
 
 // fixValues updates web100 log values that need post-processing fix-ups.

@@ -8,7 +8,9 @@ import (
 	"golang.org/x/net/context"
 )
 
-// RowStats should provide the invariants:
+// RowStats interface defines some useful Inserter stats that will also be
+// implemented by Parser.
+// RowStats implementations should provide the invariants:
 //   Accepted == Failed + Committed + RowsInBuffer
 type RowStats interface {
 	// RowsInBuffer returns the count of rows currently in the buffer.
@@ -42,7 +44,7 @@ type Inserter interface {
 	// Dataset name of the BQ dataset containing the table.
 	Dataset() string
 
-	RowStats
+	RowStats // Inserter must implement RowStats
 }
 
 // Params for NewInserter
@@ -74,7 +76,7 @@ type Parser interface {
 	// including $YYYYMMNN, or _YYYYMMNN
 	FullTableName() string
 
-	RowStats
+	RowStats // Parser must implement RowStats
 }
 
 //========================================================================

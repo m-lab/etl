@@ -29,6 +29,8 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 //=====================================================================================
 //                       Parser implementations
 //=====================================================================================
+
+// FakeRowStats provides trivial implementation of RowStats interface.
 type FakeRowStats struct {
 }
 
@@ -64,12 +66,14 @@ func (np *NullParser) TableName() string {
 // "testname":"..."
 // TODO add tests
 type TestParser struct {
-	inserter etl.Inserter
-	etl.RowStats
+	inserter     etl.Inserter
+	etl.RowStats // Allows RowStats to be implemented through an embedded struct.
 }
 
 func NewTestParser(ins etl.Inserter) etl.Parser {
-	return &TestParser{ins, &FakeRowStats{}}
+	return &TestParser{
+		ins,
+		&FakeRowStats{}} // Use a FakeRowStats to provide the RowStats functions.
 }
 
 func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
