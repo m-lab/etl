@@ -19,9 +19,12 @@ import (
 
 // TODO(dev) Add unit tests for meta data.
 type Task struct {
-	*storage.ETLSource                           // Source from which to read tests.
-	etl.Parser                                   // Parser to parse the tests.
-	meta               map[string]bigquery.Value // Metadata about this task.
+	// ETLSource and Parser are both embedded, so their interfaces are delegated
+	// to the component structs.
+	*storage.ETLSource // Source from which to read tests.
+	etl.Parser         // Parser to parse the tests.
+
+	meta map[string]bigquery.Value // Metadata about this task.
 }
 
 // NewTask constructs a task, injecting the source and the parser.
