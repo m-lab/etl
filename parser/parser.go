@@ -3,8 +3,6 @@
 package parser
 
 import (
-	"log"
-
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/bq"
@@ -31,8 +29,26 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 //=====================================================================================
 //                       Parser implementations
 //=====================================================================================
+
+// FakeRowStats provides trivial implementation of RowStats interface.
+type FakeRowStats struct {
+}
+
+func (s *FakeRowStats) RowsInBuffer() int {
+	return 0
+}
+func (s *FakeRowStats) Accepted() int {
+	return 0
+}
+func (s *FakeRowStats) Committed() int {
+	return 0
+}
+func (s *FakeRowStats) Failed() int {
+	return 0
+}
+
 type NullParser struct {
-	etl.Parser
+	FakeRowStats
 }
 
 func (np *NullParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
@@ -49,16 +65,18 @@ func (np *NullParser) TableName() string {
 // "testname":"..."
 // TODO add tests
 type TestParser struct {
-	inserter etl.Inserter
+	inserter     etl.Inserter
+	etl.RowStats // Allows RowStats to be implemented through an embedded struct.
 }
 
 func NewTestParser(ins etl.Inserter) etl.Parser {
-	return &TestParser{ins}
+	return &TestParser{
+		ins,
+		&FakeRowStats{}} // Use a FakeRowStats to provide the RowStats functions.
 }
 
 func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	metrics.TestCount.WithLabelValues("table", "test", "ok").Inc()
-	log.Printf("Parsing %s", testName)
 	values := make(map[string]bigquery.Value, len(meta)+1)
 	// TODO is there a better way to do this?
 	for k, v := range meta {
@@ -68,6 +86,13 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 	return tp.inserter.InsertRow(bq.MapSaver{values})
 }
 
+// These functions are also required to complete the etl.Parser interface.
+func (tp *TestParser) Flush() error {
+	return nil
+}
 func (tp *TestParser) TableName() string {
+	return "test-table"
+}
+func (tp *TestParser) FullTableName() string {
 	return "test-table"
 }

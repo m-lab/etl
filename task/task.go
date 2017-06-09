@@ -19,20 +19,22 @@ import (
 
 // TODO(dev) Add unit tests for meta data.
 type Task struct {
-	*storage.ETLSource                           // Source from which to read tests.
-	etl.Parser                                   // Parser to parse the tests.
-	etl.Inserter                                 // provides InsertRows(...)
-	meta               map[string]bigquery.Value // Metadata about this task.
+	// ETLSource and Parser are both embedded, so their interfaces are delegated
+	// to the component structs.
+	*storage.ETLSource // Source from which to read tests.
+	etl.Parser         // Parser to parse the tests.
+
+	meta map[string]bigquery.Value // Metadata about this task.
 }
 
 // NewTask constructs a task, injecting the source and the parser.
-func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser, inserter etl.Inserter) *Task {
+func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser) *Task {
 	// TODO - should the meta data be a nested type?
 	meta := make(map[string]bigquery.Value, 3)
 	meta["filename"] = filename
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
-	t := Task{src, prsr, inserter, meta}
+	t := Task{src, prsr, meta}
 	return &t
 }
 
@@ -63,7 +65,7 @@ func (tt *Task) ProcessAllTests() error {
 				time.Since(tt.meta["parse_time"].(time.Time)), err)
 
 			metrics.TestCount.WithLabelValues(
-				tt.Inserter.TableBase(), "unknown", "unrecovered").Inc()
+				tt.Parser.TableName(), "unknown", "unrecovered").Inc()
 			break
 		}
 		if data == nil {
@@ -92,7 +94,8 @@ func (tt *Task) ProcessAllTests() error {
 		log.Printf("%v", err)
 	}
 	// TODO - make this debug or remove
-	log.Printf("Processed %d files, %d nil data, %d rows from %s into %s",
-		files, nilData, tt.Count(), tt.meta["filename"], tt.FullTableName())
+	log.Printf("Processed %d files, %d nil data, %d rows committed, %d failed, from %s into %s",
+		files, nilData, tt.Parser.Committed(), tt.Parser.Failed(),
+		tt.meta["filename"], tt.Parser.FullTableName())
 	return err
 }

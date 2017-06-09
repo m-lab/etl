@@ -32,8 +32,8 @@ type TarReader interface {
 }
 
 type ETLSource struct {
-	TarReader
-	io.Closer
+	TarReader // TarReader interface provided by an embedded struct.
+	io.Closer // Closer interface to be provided by an embedded struct.
 }
 
 // Retrieve next file header.

@@ -44,6 +44,7 @@ func (f *PTFileName) GetDate() (string, bool) {
 
 type PTParser struct {
 	inserter etl.Inserter
+	etl.RowStats
 }
 
 type Node struct {
@@ -64,7 +65,7 @@ const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 
 func NewPTParser(ins etl.Inserter) *PTParser {
-	return &PTParser{ins}
+	return &PTParser{ins, ins}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
@@ -160,6 +161,14 @@ func GetLogtime(filename PTFileName) int64 {
 
 func (pt *PTParser) TableName() string {
 	return pt.inserter.TableBase()
+}
+
+func (pt *PTParser) FullTableName() string {
+	return pt.inserter.FullTableName()
+}
+
+func (pt *PTParser) Flush() error {
+	return pt.inserter.Flush()
 }
 
 func CreateTestId(fn string) string {

@@ -117,7 +117,7 @@ type BQInserter struct {
 	timeout  time.Duration
 	rows     []interface{}
 	inserted int // Number of rows successfully inserted.
-	badRows  int // Number of row failures.
+	badRows  int // Number of row failures, including rows in full failures.
 	failures int // Number of complete insert failures.
 }
 
@@ -153,12 +153,18 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 func (in *BQInserter) HandleInsertErrors(err error) error {
 	switch typedErr := err.(type) {
 	case bigquery.PutMultiError:
+		if len(typedErr) == len(in.rows) {
+			log.Printf("%v\n", err)
+			metrics.BackendFailureCount.WithLabelValues(
+				in.TableBase(), "unknown", "failed insert").Inc()
+			in.failures += 1
+		}
 		// If ALL rows failed, and number of rows is large, just report single failure.
 		if len(typedErr) > 10 && len(typedErr) == len(in.rows) {
 			log.Printf("%v\n", err)
 			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "unknown", "failed insert").Inc()
-			in.failures += 1
+				in.TableBase(), "unknown", "insert row error").
+				Add(float64(len(typedErr)))
 		} else {
 			// Handle each error individually.
 			// TODO Should we try to handle large numbers of row errors?
@@ -178,8 +184,13 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 		err = nil
 	default:
 		log.Printf("Unhandled insert error %v\n", typedErr)
+		metrics.BackendFailureCount.WithLabelValues(
+			in.TableBase(), "unknown", "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "unknown", "other insert error").Inc()
+			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
+		// TODO - Conservative, but possibly not correct.
+		// This at least preserves the count invariance.
+		in.badRows += len(in.rows)
 		err = nil
 	}
 	// Allocate new slice of rows.  Any failed rows are lost.
@@ -226,8 +237,14 @@ func (in *BQInserter) Dataset() string {
 func (in *BQInserter) RowsInBuffer() int {
 	return len(in.rows)
 }
-func (in *BQInserter) Count() int {
-	return in.inserted + len(in.rows)
+func (in *BQInserter) Accepted() int {
+	return in.inserted + in.badRows + len(in.rows)
+}
+func (in *BQInserter) Committed() int {
+	return in.inserted
+}
+func (in *BQInserter) Failed() int {
+	return in.badRows
 }
 
 //----------------------------------------------------------------------------

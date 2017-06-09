@@ -8,6 +8,24 @@ import (
 	"golang.org/x/net/context"
 )
 
+// RowStats interface defines some useful Inserter stats that will also be
+// implemented by Parser.
+// RowStats implementations should provide the invariants:
+//   Accepted == Failed + Committed + RowsInBuffer
+type RowStats interface {
+	// RowsInBuffer returns the count of rows currently in the buffer.
+	RowsInBuffer() int
+	// Committed returns the count of rows successfully committed to BQ.
+	Committed() int
+	// Accepted returns the count of all rows received through InsertRow(s)
+	Accepted() int
+	// Failed returns the count of all rows that could not be committed.
+	Failed() int
+}
+
+// Inserter is a data sink that writes to BigQuery tables.
+// Inserters should provide the invariants:
+//   After Flush() returns, RowsInBuffer == 0
 type Inserter interface {
 	// InsertRow inserts one row into the insert buffer.
 	InsertRow(data interface{}) error
@@ -15,6 +33,7 @@ type Inserter interface {
 	InsertRows(data []interface{}) error
 	// Flush flushes any rows in the buffer out to bigquery.
 	Flush() error
+
 	// Base Table name of the BQ table that the uploader pushes to.
 	TableBase() string
 	// Table name suffix of the BQ table that the uploader pushes to.
@@ -24,10 +43,8 @@ type Inserter interface {
 	FullTableName() string
 	// Dataset name of the BQ dataset containing the table.
 	Dataset() string
-	// Count returns the count of rows currently in the buffer.
-	Count() int
-	// RowsInBuffer returns the count of rows currently in the buffer.
-	RowsInBuffer() int
+
+	RowStats // Inserter must implement RowStats
 }
 
 // Params for NewInserter
@@ -48,9 +65,18 @@ type Parser interface {
 	// test - binary test data
 	ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error
 
+	// Flush flushes any pending rows.
+	Flush() error
+
 	// The name of the table that this Parser inserts into.
 	// Used for metrics and logging.
 	TableName() string
+
+	// Full table name of the BQ table that the uploader pushes to,
+	// including $YYYYMMNN, or _YYYYMMNN
+	FullTableName() string
+
+	RowStats // Parser must implement RowStats
 }
 
 //========================================================================

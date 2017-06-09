@@ -54,8 +54,8 @@ func TestJSONParsing(t *testing.T) {
 	meta := map[string]bigquery.Value{"filename": "filename", "parsetime": time.Now()}
 	// Should result in two tests sent to inserter, but no call to uploader.
 	err = parser.ParseAndInsert(meta, "testName", test_data)
-	if ins.Count() != 2 {
-		t.Error("Count = ", ins.Count())
+	if ins.Accepted() != 2 {
+		t.Error("Accepted = ", ins.Accepted())
 		t.Fail()
 	}
 
@@ -68,8 +68,8 @@ func TestJSONParsing(t *testing.T) {
 	// Adds two more rows, triggering an upload of 3 rows.
 	err = parser.ParseAndInsert(meta, "testName", test_data)
 
-	if ins.Count() != 6 {
-		t.Error("Count = ", ins.Count())
+	if ins.Accepted() != 6 {
+		t.Error("Accepted = ", ins.Accepted())
 	}
 	if ins.RowsInBuffer() != 0 {
 		t.Error("RowsInBuffer = ", ins.RowsInBuffer())
@@ -77,9 +77,6 @@ func TestJSONParsing(t *testing.T) {
 	if len(uploader.Rows) != 3 {
 		t.Error("Uploader Row Count = ", len(uploader.Rows))
 	}
-
-	log.Printf("%v\n", uploader.Request)
-	// TODO - check something
 
 	if err != nil {
 		log.Printf("%v\n", uploader.Request)
@@ -102,14 +99,14 @@ func xTestRealBackend(t *testing.T) {
 		// Add two more rows, triggering an upload of 3 rows.
 		// Add two more rows, triggering an upload of 3 rows.
 		err = parser.ParseAndInsert(meta, "testName", test_data)
-		if ins.Count() != 2 {
-			t.Error("Count = ", ins.Count())
+		if ins.Accepted() != 2 {
+			t.Error("Accepted = ", ins.Accepted())
 			t.Fail()
 		}
 	}
 
-	if ins.Count() != 6 {
-		t.Error("Count = ", ins.Count())
+	if ins.Accepted() != 6 {
+		t.Error("Accepted = ", ins.Accepted())
 	}
 	if ins.RowsInBuffer() != 0 {
 		t.Error("RowsInBuffer = ", ins.RowsInBuffer())
