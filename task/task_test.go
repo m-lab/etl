@@ -11,7 +11,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage" // TODO - would be better not to have this.
 	"github.com/m-lab/etl/task"
@@ -81,12 +80,10 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 func TestTarFileInput(t *testing.T) {
 	rdr := MakeTestSource(t)
 
-	var prsr etl.Parser
-	prsr = &TestParser{}
-	var tp = prsr.(*TestParser)
+	tp := &TestParser{}
 
-	// TODO - in := bq.NullInserter{}
-	tt := task.NewTask("filename", rdr, prsr)
+	// Among other things, this requires that tp implements etl.Parser.
+	tt := task.NewTask("filename", rdr, tp)
 	fn, bb, err := tt.NextTest()
 	if err != nil {
 		t.Error(err)
@@ -112,7 +109,7 @@ func TestTarFileInput(t *testing.T) {
 	// Reset the tar reader and create new task, to test the ProcessAllTests behavior.
 	rdr = MakeTestSource(t)
 
-	tt = task.NewTask("filename", rdr, prsr)
+	tt = task.NewTask("filename", rdr, tp)
 	tt.ProcessAllTests()
 
 	if len(tp.files) != 2 {
