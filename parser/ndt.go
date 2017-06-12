@@ -155,6 +155,16 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		// Handle previous test group before processing new group.
 		n.processGroup()
 
+		// Verify that tests are arriving in timestamp order.
+		// TODO(prod) Consider moving this up to task.go (or storage.go)
+		if info.Time < n.timestamp {
+			metrics.ErrorCount.WithLabelValues(
+				n.TableName(), "unknown", "TIMESTAMPS OUT OF ORDER").Inc()
+			log.Printf("Timestamps out of order in: %s\n",
+				n.taskFileName, err)
+			panic("Timestamps out of order in tar file")
+		}
+
 		n.taskFileName = taskInfo["filename"].(string)
 		n.timestamp = info.Time
 	} else {
@@ -167,37 +177,49 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 
 	// Because of port number, the c2s, s2c, and meta files may come in
 	// any order.  We defer processing until Flush or new test group.
-	// TODO - should we just ignore non-gzipped test files?  Or do some archives
-	// have unzipped files?
 	switch info.Suffix {
 	case "c2s_snaplog":
-		if n.c2s != nil {
-			// There are name collisions when rsync collects both the
-			// original file and the gzipped file.  We don't care about
-			// those, but should detect other kinds of collisions.
-			if (n.c2s.fn+".gz") != testName &&
-				(testName+".gz") != n.c2s.fn {
+		if n.c2s == nil {
+			n.c2s = &fileInfoAndData{testName, *info, content}
+		} else {
+			// There are occasional collisions between tests that
+			// have the same timestamp.
+			if (n.c2s.fn + ".gz") == testName {
+				// When rsync collects both the original file and
+				// the gzipped file, prefer the zipped file, since
+				// the unzipped file may be incomplete.
+				n.c2s = &fileInfoAndData{testName, *info, content}
+			} else if n.c2s.fn == (testName + ".gz") {
+				// Unzipped file follows zipped file is unexpected,
+				// but harmless. We just ignore the unzipped file.
+			} else {
+				// Unexpected name collision...
 				metrics.WarningCount.WithLabelValues(
 					n.TableName(), "c2s", "timestamp collision").Inc()
 				log.Printf("Collision: %s and %s\n", n.c2s.fn, testName)
 			}
 		}
-		// We always use the latest file, since .gz is more reliably
-		// complete, and lexicographically later.
-		n.c2s = &fileInfoAndData{testName, *info, content}
 	case "s2c_snaplog":
-		if n.s2c != nil {
-			// See comments above.
-			if (n.s2c.fn+".gz") != testName &&
-				(testName+".gz") != n.s2c.fn {
+		if n.s2c == nil {
+			n.s2c = &fileInfoAndData{testName, *info, content}
+		} else {
+			// There are occasional collisions between tests that
+			// have the same timestamp.
+			if (n.s2c.fn + ".gz") == testName {
+				// When rsync collects both the original file and
+				// the gzipped file, prefer the zipped file, since
+				// the unzipped file may be incomplete.
+				n.s2c = &fileInfoAndData{testName, *info, content}
+			} else if n.s2c.fn == (testName + ".gz") {
+				// Unzipped file follows zipped file is unexpected,
+				// but harmless. We just ignore the unzipped file.
+			} else {
+				// Unexpected name collision...
 				metrics.WarningCount.WithLabelValues(
 					n.TableName(), "s2c", "timestamp collision").Inc()
 				log.Printf("Collision: %s and %s\n", n.s2c.fn, testName)
 			}
 		}
-		// We always use the latest file, since .gz is more reliably
-		// complete, and lexicographically later.
-		n.s2c = &fileInfoAndData{testName, *info, content}
 	case "meta":
 		if n.metaFile != nil {
 			metrics.WarningCount.WithLabelValues(
