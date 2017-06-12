@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"math/rand"
 	"regexp"
 	"strings"
 	"time"
@@ -323,8 +322,8 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, "snaplog failure").Inc()
-			log.Printf("Unable to parse snaplog for %s, when processing: %s\n%s\n",
-				test.fn, n.taskFileName, err)
+		log.Printf("Unable to parse snaplog for %s, when processing: %s\n%s\n",
+			test.fn, n.taskFileName, err)
 		return
 	}
 
@@ -466,15 +465,16 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 			deltaFieldCount, test.fn, n.taskFileName)
 	}
 	// Do this just once in a while, so it doesn't take much resource.
-	if rand.Intn(20) == 0 {
+	if deltaFieldCount > 30000 { // Roughly the top 5%
 		jsonRow, _ := json.Marshal(results)
 		metrics.RowSizeHistogram.WithLabelValues(n.TableName()).
 			Observe(float64(len(jsonRow)))
 		if len(jsonRow) > 800000 {
-			log.Printf("Huge json (%d bytes, %d fields) processing %s from %s\n",
+			log.Printf("Large json (%d bytes, %d fields) processing %s from %s\n",
 				len(jsonRow), deltaFieldCount, test.fn, n.taskFileName)
 		}
 	}
+
 	// TODO - estimate the size of the json (or fields) to allow more rows per request,
 	// but avoid going over the 10MB limit.
 	err = n.inserter.InsertRow(&bq.MapSaver{results})
