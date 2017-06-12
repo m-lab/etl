@@ -44,7 +44,7 @@ func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inse
 
 	return NewBQInserter(
 		etl.InserterParams{Dataset: dataset, Table: table, Suffix: suffix,
-			Timeout: 15 * time.Minute, BufferSize: 500}, nil)
+			Timeout: 15 * time.Minute, BufferSize: 10}, nil)
 }
 
 // TODO - improve the naming between here and NewInserter.
@@ -85,6 +85,7 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 	// when we actually want to access the bigquery backend.
 	clientOnce.Do(func() {
 		ctx, _ := context.WithTimeout(context.Background(), timeout)
+		log.Printf("Using client: %s\n", os.Getenv("GCLOUD_PROJECT"))
 		// Heavyweight!
 		var err error
 		bqClient, err = bigquery.NewClient(ctx, os.Getenv("GCLOUD_PROJECT"))
@@ -161,7 +162,7 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 		}
 		// If ALL rows failed, and number of rows is large, just report single failure.
 		if len(typedErr) > 10 && len(typedErr) == len(in.rows) {
-			log.Printf("%v\n", err)
+			log.Printf("Insert error: %v\n", err)
 			metrics.ErrorCount.WithLabelValues(
 				in.TableBase(), "unknown", "insert row error").
 				Add(float64(len(typedErr)))
