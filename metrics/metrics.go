@@ -175,6 +175,17 @@ var (
 		[]string{"table", "status"},
 	)
 
+	// A histogram of bq row json sizes.  It is intended primarily for
+	// NDT, so the bins are fairly large.  NDT average json is around 200K
+	//
+	// Provides metrics:
+	//   etl_row_json_size_bucket{table="...", le="..."}
+	//   ...
+	//   etl_row_json_size_sum{table="...", le="..."}
+	//   etl_row_json_size_count{table="...", le="..."}
+	// Usage example:
+	//   metrics.RowSizeHistogram.WithLabelValues(
+	//           "ndt").Observe(len(json))
 	RowSizeHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_row_json_size",
@@ -182,37 +193,62 @@ var (
 			Buckets: []float64{
 				100, 200, 400, 800, 1600, 3200, 6400, 10000, 20000,
 				40000, 80000, 160000, 320000, 500000, 600000, 700000,
-				800000, 900000, 1000000, 1200000, 5000000, 10000000, 20000000,
+				800000, 900000, 1000000, 1200000, 1500000, 2000000, 5000000,
 			},
 		},
 		[]string{"table"},
 	)
 
+	// A histogram of snapshot delta field counts.  It is intended primarily for
+	// NDT.  Typical is about 13, but max might be up to 120 or so.
+	//
+	// Provides metrics:
+	//   etl_delta_num_field_bucket{table="...", le="..."}
+	//   ...
+	//   etl_delta_num_field_sum{table="...", le="..."}
+	//   etl_delta_num_field_count{table="...", le="..."}
+	// Usage example:
+	//   metrics.DeltaNumFieldsHistogram.WithLabelValues(
+	//           "ndt").Observe(fieldCount)
 	DeltaNumFieldsHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_delta_num_field",
 			Help: "Number of fields in delta distribution.",
 			Buckets: []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-				14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 50, 60,
+				14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 50, 60, 70, 80, 90,
+				100, 110, 120, 150,
 			},
 		},
 		[]string{"table"},
 	)
 
+	// A histogram of (approximate) row field counts.  It is intended primarily for
+	// NDT, so the bins are fairly large.  NDT snapshots typically total about 10k
+	// fields, 99th percentile around 35k fields, and occasionally as many as 50k.
+	// Smaller field count bins included so that it is possibly useful for other
+	// parsers.
+	//
+	// Provides metrics:
+	//   etl_entry_field_count_bucket{table="...", le="..."}
+	//   ...
+	//   etl_entry_field_count_sum{table="...", le="..."}
+	//   etl_entry_field_count_count{table="...", le="..."}
+	// Usage example:
+	//   metrics.EntryFieldCountHistogram.WithLabelValues(
+	//           "ndt").Observe(fieldCount)
 	EntryFieldCountHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_entry_field_count",
 			Help: "total snapshot field count distributions.",
-			Buckets: []float64{10, 12, 14, 16, 20, 24,
-				28, 32, 40, 48, 64, 72, 80, 88, 96, 102, 110, 118, 126,
-				132, 150, 200, 250, 300, 350, 400, 500, 600, 700, 800, 900, 1000,
-				1250, 1500, 1750, 2000, 2500, 3000, 3500, 4000, 5000, 6000, 8000,
-				10000, 15000, 20000, 30000, 40000, 50000, 70000,
-				100000, 200000, 300000, 400000, 500000,
+			Buckets: []float64{100, 120, 150, 200, 240, 300, 400, 480, 600, 800,
+				1000, 1200, 1500, 2000, 2400, 3000, 4000, 4800, 6000, 8000,
+				10000, 12000, 15000, 20000, 24000, 30000, 40000, 48000, 60000, 80000,
+				100000, 120000, 150000, 200000, 240000, 300000, 400000, 480000,
 			},
 		},
 		[]string{"table"},
 	)
+
 	// A histogram of bigquery insertion times. The buckets should use
 	// periods that are intuitive for people.
 	//
