@@ -340,6 +340,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	last := &web100.Snapshot{}
 	var deltas []schema.Web100ValueMap
 	deltaFieldCount := 0
+	snapshotCount := 0
 	for count := 0; count < snaplog.SnapCount() && count < MAX_NUM_SNAPSHOTS; count++ {
 		snap, err := snaplog.Snapshot(count)
 		if err != nil {
@@ -356,6 +357,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 				n.TableName(), testType, "snapValues failure").Inc()
 			return
 		}
+
 		delete(delta, "TimeStamps")
 		delete(delta, "StartTimeStamp")
 		delete(delta, "StartTimeUsec")
@@ -372,12 +374,13 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 				continue
 			}
 		}
-		if last != &snap {
-			metrics.DeltaNumFieldsHistogram.WithLabelValues(n.TableName()).
-				Observe(float64(len(delta)))
-		}
-		deltaFieldCount += len(delta)
+		delta["snapshot_num"] = count
+		delta["delta_index"] = snapshotCount
+		snapshotCount += 1
+		metrics.DeltaNumFieldsHistogram.WithLabelValues(n.TableName()).
+			Observe(float64(len(delta)))
 
+		deltaFieldCount += len(delta)
 		deltas = append(deltas, delta)
 		last = &snap
 	}
