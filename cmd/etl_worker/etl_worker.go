@@ -69,7 +69,7 @@ var inFlight int32
 // For now, assuming:
 //    MC: 180,  MI: 20, MW: 10
 func shouldThrottle() bool {
-	if atomic.AddInt32(&inFlight, 1) > 10 {
+	if atomic.AddInt32(&inFlight, 1) > 20 {
 		atomic.AddInt32(&inFlight, -1)
 		return true
 	}

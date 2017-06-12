@@ -551,3 +551,24 @@ func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 	}
 	return nil
 }
+
+// SnapshotValues writes changed values into the provided Saver.
+func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
+	if snap.raw == nil {
+		return errors.New("Empty/Invalid Snaplog")
+	}
+	if other.raw == nil {
+		// If other is empty, return full snapshot
+		return snap.SnapshotValues(snapValues)
+	}
+	var field variable
+	for _, field = range snap.fields.Fields {
+		// Interpret and save the web100 field value.
+		a := other.raw[field.Offset : field.Offset+field.Size]
+		b := snap.raw[field.Offset : field.Offset+field.Size]
+		if bytes.Compare(a, b) != 0 {
+			field.Save(b, snapValues)
+		}
+	}
+	return nil
+}

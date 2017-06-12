@@ -61,8 +61,7 @@ func main() {
 
 	results := schema.NewWeb100MinimalRecord(
 		snaplog.Version, int64(snaplog.LogTime),
-		(map[string]bigquery.Value)(nestedConnSpec),
-		(map[string]bigquery.Value)(snapValues))
+		nestedConnSpec, snapValues, nil)
 
 	prettyPrint(results)
 }

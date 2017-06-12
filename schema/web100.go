@@ -140,8 +140,12 @@ func NewWeb100FullRecord(version string, logTime int64, connSpec, snapValues map
 	}
 }
 
+func EmptySnap10() Web100ValueMap {
+	return make(Web100ValueMap, 10)
+}
+
 func EmptySnap() Web100ValueMap {
-	return make(Web100ValueMap, 150)
+	return make(Web100ValueMap, 120)
 }
 
 // NewWeb100Skeleton creates the tree structure, with no leaf fields.
@@ -204,13 +208,14 @@ func EmptyGeolocation() Web100ValueMap {
 
 // NewWeb100MinimalRecord creates a web100 value map with only the given fields.
 // All undefined fields will be set to null after a BQ insert.
-func NewWeb100MinimalRecord(version string, logTime int64, connSpec, snapValues Web100ValueMap) Web100ValueMap {
+func NewWeb100MinimalRecord(version string, logTime int64, connSpec, snapValues Web100ValueMap, deltas []Web100ValueMap) Web100ValueMap {
 	return Web100ValueMap{
 		"web100_log_entry": Web100ValueMap{
 			"version":         version,
 			"log_time":        logTime,
 			"connection_spec": connSpec, // TODO - deprecate connection_spec here.
 			"snap":            snapValues,
+			"deltas":          deltas,
 		},
 	}
 }

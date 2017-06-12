@@ -95,7 +95,7 @@ var (
 	// Map from data type to BigQuery table name.
 	// TODO - this should be loaded from a config.
 	DataTypeToTable = map[DataType]string{
-		NDT:     "ndt_test_daily",
+		NDT:     "ndt_nested",
 		SS:      "ss_test",
 		PT:      "pt_test",
 		SW:      "disco_test",
