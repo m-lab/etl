@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"regexp"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -103,8 +104,8 @@ type NDTParser struct {
 	inserter     etl.Inserter
 	etl.RowStats // Implement RowStats through an embedded struct.
 
-	timestamp string // The unique timestamp common across all files in current batch.
-	time      time.Time
+	taskFileName string // The tar file containing these tests.
+	timestamp    string // The unique timestamp common across all files in current batch.
 
 	c2s *fileInfoAndData
 	s2c *fileInfoAndData
@@ -119,8 +120,9 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 }
 
 // These functions are also required to complete the etl.Parser interface.
-// For now, we just forward the calls to the Inserter.
 func (n *NDTParser) Flush() error {
+	// Process the last group (if it exists) before flushing the inserter.
+	n.processGroup()
 	return n.inserter.Flush()
 }
 
@@ -149,52 +151,74 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		return nil
 	}
 
-	taskFileName := taskInfo["filename"].(string)
-
 	if info.Time != n.timestamp {
-		// All files are processed ASAP.  However, if there is ONLY
-		// a data file, or ONLY a meta file, we have to process the
-		// test files anyway.
-		// TODO(dev) Handle case where we don't get a meta file on the last
-		// test in a task.
-		n.handleAnomolies(taskFileName)
+		// Handle previous test group before processing new group.
+		n.processGroup()
 
+		// Verify that tests are arriving in timestamp order.
+		// TODO(prod) Consider moving this up to task.go (or storage.go)
+		if info.Time < n.timestamp {
+			metrics.ErrorCount.WithLabelValues(
+				n.TableName(), "unknown", "TIMESTAMPS OUT OF ORDER").Inc()
+			log.Printf("Timestamps out of order in: %s\n",
+				n.taskFileName, err)
+			panic("Timestamps out of order in tar file")
+		}
+
+		n.taskFileName = taskInfo["filename"].(string)
 		n.timestamp = info.Time
-		n.s2c = nil
-		n.c2s = nil
-		n.metaFile = nil
+	} else {
+		// Within a group of tests, we expect consistent taskInfo.
+		if n.taskFileName != taskInfo["filename"].(string) {
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), "any", "inconsistent taskFileName").Inc()
+		}
 	}
 
+	// Because of port number, the c2s, s2c, and meta files may come in
+	// any order.  We defer processing until Flush or new test group.
 	switch info.Suffix {
 	case "c2s_snaplog":
-		if n.c2s != nil {
-			// There are name collisions when rsync collects both the
-			// original file and the gzipped file.  We don't care about
-			// those, but should detect other kinds of collisions.
-			if (n.c2s.fn+".gz") != testName &&
-				(testName+".gz") != n.c2s.fn {
+		if n.c2s == nil {
+			n.c2s = &fileInfoAndData{testName, *info, content}
+		} else {
+			// There are occasional collisions between tests that
+			// have the same timestamp.
+			if (n.c2s.fn + ".gz") == testName {
+				// When rsync collects both the original file and
+				// the gzipped file, prefer the zipped file, since
+				// the unzipped file may be incomplete.
+				n.c2s = &fileInfoAndData{testName, *info, content}
+			} else if n.c2s.fn == (testName + ".gz") {
+				// Unzipped file follows zipped file is unexpected,
+				// but harmless. We just ignore the unzipped file.
+			} else {
+				// Unexpected name collision...
 				metrics.WarningCount.WithLabelValues(
 					n.TableName(), "c2s", "timestamp collision").Inc()
 				log.Printf("Collision: %s and %s\n", n.c2s.fn, testName)
 			}
-		} else {
-			// We only take action on the first file, to avoid dups.
-			n.c2s = &fileInfoAndData{testName, *info, content}
-			n.processTest(taskFileName, n.c2s, "c2s")
 		}
 	case "s2c_snaplog":
-		if n.s2c != nil {
-			// See comments above.
-			if (n.s2c.fn+".gz") != testName &&
-				(testName+".gz") != n.s2c.fn {
+		if n.s2c == nil {
+			n.s2c = &fileInfoAndData{testName, *info, content}
+		} else {
+			// There are occasional collisions between tests that
+			// have the same timestamp.
+			if (n.s2c.fn + ".gz") == testName {
+				// When rsync collects both the original file and
+				// the gzipped file, prefer the zipped file, since
+				// the unzipped file may be incomplete.
+				n.s2c = &fileInfoAndData{testName, *info, content}
+			} else if n.s2c.fn == (testName + ".gz") {
+				// Unzipped file follows zipped file is unexpected,
+				// but harmless. We just ignore the unzipped file.
+			} else {
+				// Unexpected name collision...
 				metrics.WarningCount.WithLabelValues(
 					n.TableName(), "s2c", "timestamp collision").Inc()
 				log.Printf("Collision: %s and %s\n", n.s2c.fn, testName)
 			}
-		} else {
-			// We only take action on the first file, to avoid dups.
-			n.s2c = &fileInfoAndData{testName, *info, content}
-			n.processTest(taskFileName, n.s2c, "s2c")
 		}
 	case "meta":
 		if n.metaFile != nil {
@@ -203,12 +227,6 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		}
 		n.metaFile = ProcessMetaFile(
 			n.TableName(), n.inserter.TableSuffix(), testName, content)
-		if n.c2s != nil {
-			n.processTest(taskFileName, n.c2s, "c2s")
-		}
-		if n.s2c != nil {
-			n.processTest(taskFileName, n.s2c, "s2c")
-		}
 	case "c2s_ndttrace":
 	case "s2c_ndttrace":
 	case "cputime":
@@ -221,50 +239,39 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	return nil
 }
 
-// In the case that we are missing one or more files, report and handle gracefully.
-func (n *NDTParser) handleAnomolies(taskFileName string) {
-	switch {
-	case n.metaFile == nil:
-		n.metaFile = &MetaFileData{} // Hack to allow processTest to run.
-		if n.s2c != nil {
-			metrics.WarningCount.WithLabelValues(
-				n.TableName(), "s2c", "no meta").Inc()
-			// TODO Add a log once noise is reduced.
-			n.processTest(taskFileName, n.s2c, "s2c")
-		}
-		if n.c2s != nil {
-			metrics.WarningCount.WithLabelValues(
-				n.TableName(), "c2s", "no meta").Inc()
-			// TODO Add a log once noise is reduced.
-			n.processTest(taskFileName, n.c2s, "c2s")
-		}
-		if n.s2c == nil && n.c2s == nil {
+// processGroup processes tests in the current timestamp grouping.
+func (n *NDTParser) processGroup() {
+	if n.s2c == nil && n.c2s == nil {
+		if n.metaFile == nil {
 			metrics.WarningCount.WithLabelValues(
 				n.TableName(), "test", "no meta,c2s,s2c").Inc()
+		} else {
+			// Meta file but no test files.
+			metrics.WarningCount.WithLabelValues(
+				n.TableName(), "meta", "no tests").Inc()
+			log.Printf("No tests: %s %s\n", n.taskFileName, n.metaFile.TestName)
 		}
-	// Now meta is non-nil
-	case n.s2c == nil && n.c2s == nil:
-		// Meta file but no test file.
-		metrics.WarningCount.WithLabelValues(
-			n.TableName(), "meta", "no tests").Inc()
-		log.Printf("No tests: %s %s\n", taskFileName, n.metaFile.TestName)
-	// Now meta and at least one test are non-nil
-	default:
-		// We often only get meta + one, so no
-		// need to log this.
 	}
+	// Now process the tests, with or without meta file.
+	if n.s2c != nil {
+		n.processTest(n.s2c, "s2c")
+	}
+	if n.c2s != nil {
+		n.processTest(n.c2s, "c2s")
+	}
+
+	n.taskFileName = ""
+	n.timestamp = ""
+	n.s2c = nil
+	n.c2s = nil
+	n.metaFile = nil
 }
 
 // processTest digests a single s2c or c2s test, and writes a row to the Inserter.
 // ProcessMetaFile should already have been called and produced valid data in n.metaFile
 // However, we often get s2c and c2s without corresponding meta files.  When this happens,
 // we proceed with an empty metaFile.
-func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, testType string) {
-	if n.metaFile == nil {
-		// Defer processing until we get the meta file.
-		return
-	}
-
+func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 	// NOTE: this file size threshold and the number of simultaneous workers
 	// defined in etl_worker.go must guarantee that all files written to
 	// /mnt/tmpfs will fit.
@@ -296,13 +303,19 @@ func (n *NDTParser) processTest(taskFileName string, test *fileInfoAndData, test
 	metrics.WorkerState.WithLabelValues("ndt").Inc()
 	defer metrics.WorkerState.WithLabelValues("ndt").Dec()
 
-	n.getAndInsertValues(taskFileName, test, testType)
+	n.getAndInsertValues(test, testType)
 }
 
-func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndData, testType string) {
+func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	// Extract the values from the last snapshot.
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
+
+	// TODO - is this too spammy?
+	if !strings.HasSuffix(test.fn, ".gz") {
+		metrics.WarningCount.WithLabelValues(
+			n.TableName(), testType, "uncompressed file").Inc()
+	}
 
 	snaplog, err := web100.NewSnapLog(test.data)
 	if err != nil {
@@ -314,7 +327,7 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 	err = snaplog.ValidateSnapshots()
 	if err != nil {
 		log.Printf("ValidateSnapshots failed for %s, when processing: %s\n%s\n",
-			test.fn, taskFileName, err)
+			test.fn, n.taskFileName, err)
 		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "validate failed").Inc()
 	}
@@ -357,7 +370,7 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), testType, "final snapValues failure").Inc()
 		log.Printf("Error calling SnapshotValues() in test %s, when processing: %s\n%s\n",
-			test.fn, taskFileName, err)
+			test.fn, n.taskFileName, err)
 		return
 	}
 
@@ -367,11 +380,10 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 
 	results := schema.NewWeb100MinimalRecord(
 		snaplog.Version, int64(snaplog.LogTime),
-		(map[string]bigquery.Value)(nestedConnSpec),
-		(map[string]bigquery.Value)(snapValues))
+		nestedConnSpec, snapValues)
 
 	results["test_id"] = test.fn
-	results["task_filename"] = taskFileName
+	results["task_filename"] = n.taskFileName
 	// This is the timestamp parsed from the filename.
 	lt, err := test.info.Timestamp.MarshalText()
 	if err != nil {
@@ -391,9 +403,18 @@ func (n *NDTParser) getAndInsertValues(taskFileName string, test *fileInfoAndDat
 	}
 
 	connSpec := schema.EmptyConnectionSpec()
-	// TODO - metaFile is currently used only to populate the connection spec.
-	// Should we be using it for anything else?
-	n.metaFile.PopulateConnSpec(connSpec)
+	if n.metaFile != nil {
+		// TODO - metaFile is currently used only to populate the connection spec.
+		// Should we be using it for anything else?
+		n.metaFile.PopulateConnSpec(connSpec)
+		// TODO Add a log once noise is reduced.
+		metrics.WarningCount.WithLabelValues(
+			n.TableName(), testType, "no meta").Inc()
+	} else {
+		// TODO(dev) - use other information to partially populate
+		// the connection spec.
+	}
+
 	switch testType {
 	case "c2s":
 		connSpec.SetInt64("data_direction", CLIENT_TO_SERVER)
