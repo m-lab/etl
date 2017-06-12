@@ -1,8 +1,10 @@
 package parser
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
+	"math/rand"
 	"regexp"
 	"strings"
 	"time"
@@ -321,6 +323,8 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, "snaplog failure").Inc()
+			log.Printf("Unable to parse snaplog for %s, when processing: %s\n%s\n",
+				test.fn, n.taskFileName, err)
 		return
 	}
 
@@ -334,27 +338,56 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 
 	// HACK - just to see how expensive the Values() call is...
 	// parse ALL the snapshots.
+	last := &web100.Snapshot{}
+	var deltas []schema.Web100ValueMap
+	deltaFieldCount := 0
 	for count := 0; count < snaplog.SnapCount() && count < MAX_NUM_SNAPSHOTS; count++ {
 		snap, err := snaplog.Snapshot(count)
 		if err != nil {
+			// TODO - refine label and maybe write a log?
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), testType, "snapshot failure").Inc()
 			return
 		}
 		// Proper sizing avoids evacuate, saving about 20%, excluding BQ code.
-		snap.SnapshotValues(schema.EmptySnap())
+		delta := schema.EmptySnap10()
+		snap.SnapshotDeltas(last, delta)
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				n.TableName(), testType, "snapValues failure").Inc()
 			return
 		}
+		delete(delta, "TimeStamps")
+		delete(delta, "StartTimeStamp")
+		delete(delta, "StartTimeUsec")
+		delete(delta, "LocalAddress")
+		delete(delta, "LocalAddressType")
+		delete(delta, "LocalPort")
+		delete(delta, "RemAddress")
+		delete(delta, "RemPort")
+		delete(delta, "SACK")
+		// Now ignore delta if the only field that changed is duration.
+		if len(delta) == 1 {
+			_, ok := delta["Duration"]
+			if ok {
+				continue
+			}
+		}
+		if last != &snap {
+			metrics.DeltaNumFieldsHistogram.WithLabelValues(n.TableName()).
+				Observe(float64(len(delta)))
+		}
+		deltaFieldCount += len(delta)
+
+		deltas = append(deltas, delta)
+		last = &snap
 	}
 
-	last := snaplog.SnapCount() - 1
-	if last > MAX_NUM_SNAPSHOTS {
-		last = MAX_NUM_SNAPSHOTS
+	final := snaplog.SnapCount() - 1
+	if final > MAX_NUM_SNAPSHOTS {
+		final = MAX_NUM_SNAPSHOTS
 	}
-	snap, err := snaplog.Snapshot(last)
+	snap, err := snaplog.Snapshot(final)
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, "final snapshot failure").Inc()
@@ -380,7 +413,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 
 	results := schema.NewWeb100MinimalRecord(
 		snaplog.Version, int64(snaplog.LogTime),
-		nestedConnSpec, snapValues)
+		nestedConnSpec, snapValues, deltas)
 
 	results["test_id"] = test.fn
 	results["task_filename"] = n.taskFileName
@@ -426,6 +459,24 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 
 	fixValues(results)
 	// TODO fix InsertRow so that we can distinguish errors from prior rows.
+	metrics.EntryFieldCountHistogram.WithLabelValues(n.TableName()).
+		Observe(float64(deltaFieldCount))
+	if deltaFieldCount > 43000 {
+		log.Printf("Bad snapshots (%d fields) processing %s from %s\n",
+			deltaFieldCount, test.fn, n.taskFileName)
+	}
+	// Do this just once in a while, so it doesn't take much resource.
+	if rand.Intn(20) == 0 {
+		jsonRow, _ := json.Marshal(results)
+		metrics.RowSizeHistogram.WithLabelValues(n.TableName()).
+			Observe(float64(len(jsonRow)))
+		if len(jsonRow) > 800000 {
+			log.Printf("Huge json (%d bytes, %d fields) processing %s from %s\n",
+				len(jsonRow), deltaFieldCount, test.fn, n.taskFileName)
+		}
+	}
+	// TODO - estimate the size of the json (or fields) to allow more rows per request,
+	// but avoid going over the 10MB limit.
 	err = n.inserter.InsertRow(&bq.MapSaver{results})
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(

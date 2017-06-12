@@ -26,6 +26,9 @@ func init() {
 	prometheus.MustRegister(BackendFailureCount)
 	prometheus.MustRegister(GCSRetryCount)
 	prometheus.MustRegister(BigQueryInsert)
+	prometheus.MustRegister(RowSizeHistogram)
+	prometheus.MustRegister(DeltaNumFieldsHistogram)
+	prometheus.MustRegister(EntryFieldCountHistogram)
 	prometheus.MustRegister(DurationHistogram)
 	prometheus.MustRegister(InsertionHistogram)
 	prometheus.MustRegister(FileSizeHistogram)
@@ -172,6 +175,44 @@ var (
 		[]string{"table", "status"},
 	)
 
+	RowSizeHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "etl_row_json_size",
+			Help: "Row json size distributions.",
+			Buckets: []float64{
+				100, 200, 400, 800, 1600, 3200, 6400, 10000, 20000,
+				40000, 80000, 160000, 320000, 500000, 600000, 700000,
+				800000, 900000, 1000000, 1200000, 5000000, 10000000, 20000000,
+			},
+		},
+		[]string{"table"},
+	)
+
+	DeltaNumFieldsHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "etl_delta_num_field",
+			Help: "Number of fields in delta distribution.",
+			Buckets: []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+				14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 50, 60,
+			},
+		},
+		[]string{"table"},
+	)
+
+	EntryFieldCountHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "etl_entry_field_count",
+			Help: "total snapshot field count distributions.",
+			Buckets: []float64{10, 12, 14, 16, 20, 24,
+				28, 32, 40, 48, 64, 72, 80, 88, 96, 102, 110, 118, 126,
+				132, 150, 200, 250, 300, 350, 400, 500, 600, 700, 800, 900, 1000,
+				1250, 1500, 1750, 2000, 2500, 3000, 3500, 4000, 5000, 6000, 8000,
+				10000, 15000, 20000, 30000, 40000, 50000, 70000,
+				100000, 200000, 300000, 400000, 500000,
+			},
+		},
+		[]string{"table"},
+	)
 	// A histogram of bigquery insertion times. The buckets should use
 	// periods that are intuitive for people.
 	//
