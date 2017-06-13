@@ -71,7 +71,7 @@
             "fields": [
               { "name": "AbruptTimeouts", "type": "INTEGER"},
               { "name": "ActiveOpen", "type": "INTEGER"},
-	      { "name": "CERcvd", "type": "INTEGER"},
+              { "name": "CERcvd", "type": "INTEGER"},
               { "name": "CongAvoid", "type": "INTEGER"},
               { "name": "CongOverCount", "type": "INTEGER"},
               { "name": "CongSignals", "type": "INTEGER"},
@@ -186,11 +186,12 @@
             ], "name": "snap", "type": "RECORD"},
           {
             "fields": [
+              { "name": "is_last", "type": "BOOLEAN", "description": "true if this is the last delta"},
               { "name": "snapshot_num", "type": "INTEGER", "description": "The snapshot's location in the snaplog"},
               { "name": "delta_index", "type": "INTEGER", "description": "The snapshot's index among the deltas"},
               { "name": "AbruptTimeouts", "type": "INTEGER"},
               { "name": "ActiveOpen", "type": "INTEGER"},
-	      { "name": "CERcvd", "type": "INTEGER"},
+              { "name": "CERcvd", "type": "INTEGER"},
               { "name": "CongAvoid", "type": "INTEGER"},
               { "name": "CongOverCount", "type": "INTEGER"},
               { "name": "CongSignals", "type": "INTEGER"},
