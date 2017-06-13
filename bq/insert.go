@@ -157,7 +157,7 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 		if len(typedErr) == len(in.rows) {
 			log.Printf("%v\n", err)
 			metrics.BackendFailureCount.WithLabelValues(
-				in.TableBase(), "unknown", "failed insert").Inc()
+				in.TableBase(), "failed insert").Inc()
 			in.failures += 1
 		}
 		// If ALL rows failed, and number of rows is large, just report single failure.
@@ -186,7 +186,7 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 	default:
 		log.Printf("Unhandled insert error %v\n", typedErr)
 		metrics.BackendFailureCount.WithLabelValues(
-			in.TableBase(), "unknown", "failed insert").Inc()
+			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
 			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
 		// TODO - Conservative, but possibly not correct.
