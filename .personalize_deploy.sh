@@ -16,11 +16,11 @@ if [[ -f ${BASEDIR}/${YAML} ]] ; then
   if [[ -n "${TRAVIS_BRANCH}" ]] ; then
     if [[ ${TRAVIS_BRANCH} == sandbox-* ]] ; then
       user=${TRAVIS_BRANCH##sandbox-}
-      sed -e 's/^service: \(.*\)/service: \1-'${user}'/' \
-          "${BASEDIR}/${YAML}" > "${BASEDIR}/app.yaml"
+      sed -i -e 's/^service: \(.*\)/service: \1-'${user}'/' \
+          "${BASEDIR}/${YAML}"
     fi
   fi
 fi
 
 # Call actual script to deploy service.
-"${SCRIPT}" "${PROJECT}" "${KEYFILE}" "${BASEDIR}"
+"${SCRIPT}" "${PROJECT}" "${KEYFILE}" "${BASEDIR} ${YAML}"
