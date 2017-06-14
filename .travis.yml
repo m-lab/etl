@@ -78,7 +78,8 @@ deploy:
     # Integration branch will not use decorated service names.
     condition: $TRAVIS_BRANCH == ndt-sandbox-*
 
-# INTEGRATION: before code review for development code in a specific branch.
+# INTEGRATION: Reviewed code, merged to integration branch, will trigger
+# deployment to "standard" mlab-sandbox.
 - provider: script
   script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
