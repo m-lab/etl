@@ -8,8 +8,9 @@ set -e
 
 SCRIPT=${1:?Please provide the deployment script}
 PROJECT=${2:?Please provide the GCP project id}
-BASEDIR=${3:?Please provide the base directory containing yaml file}
-YAML=${4:?Please provide yaml file name, e.g. app-ndt.yaml}
+KEYFILE=${3:?Please provide the service account key file}
+BASEDIR=${4:?Please provide the base directory containing yaml file}
+YAML=${5:?Please provide yaml file name, e.g. app-ndt.yaml}
 
 if [[ -f ${BASEDIR}/${YAML} ]] ; then
   if [[ -n "${TRAVIS_BRANCH}" ]] ; then
