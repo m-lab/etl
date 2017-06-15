@@ -20,8 +20,10 @@ before_install:
 # project referenced in the "deploy" section. These keys authenticate the
 # gcloud deploy operations.
 
-- travis/decrypt.sh "$encrypted_ee3c81e2a61e_key" "$encrypted_ee3c81e2a61e_iv"
+- travis/decrypt.sh "$encrypted_361547783275_key" "$encrypted_361547783275_iv"
   keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
+- tar tvf /tmp/service-accounts.tar
+- echo Branch is $TRAVIS_BRANCH and Tag is $TRAVIS_TAG
 
 # These directories will be cached on successful "script" builds, and restored,
 # if available, to save time on future builds.
@@ -89,14 +91,14 @@ deploy:
     branch: integration
 
 # STAGING: Should be used AFTER code review and commit to dev branch.  Triggers
-# when branch is tagged with ndt-staging-*'
+# when *ANY* branch is tagged with ndt-staging-*'
 - provider: script
-  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
+    all_branches: true
     tag: true
     condition: $TRAVIS_TAG == ndt-staging-*
 
