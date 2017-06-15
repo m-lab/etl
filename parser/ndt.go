@@ -335,6 +335,9 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 			test.fn, n.taskFileName, err)
 		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "validate failed").Inc()
+		// If ValidateSnapshots returns error, it generally means that there
+		// is a problem with the last snapshot, typically a truncated file.
+		// In most cases, there are still many valid snapshots.
 		valid = false
 	}
 
@@ -390,6 +393,9 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	}
 
 	if len(deltas) > 0 {
+		// We tag some of the deltas with specific tags, to make them easy
+		// to find.  is_last is the first, but more will be added as we work
+		// out the most useful tags.
 		deltas[len(deltas)-1]["is_last"] = true
 	}
 	final := snaplog.SnapCount() - 1
