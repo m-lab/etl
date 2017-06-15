@@ -131,6 +131,7 @@ func NewWeb100FullRecord(version string, logTime int64, connSpec, snapValues map
 		"log_time": 0,
 		// Can this be part of the metadata service?
 		"connection_spec": FullConnectionSpec(),
+		"anomalies":       Web100ValueMap{},
 		"web100_log_entry": map[string]bigquery.Value{
 			"version":         version,
 			"log_time":        logTime,
@@ -210,6 +211,7 @@ func EmptyGeolocation() Web100ValueMap {
 // All undefined fields will be set to null after a BQ insert.
 func NewWeb100MinimalRecord(version string, logTime int64, connSpec, snapValues Web100ValueMap, deltas []Web100ValueMap) Web100ValueMap {
 	return Web100ValueMap{
+		"anomalies": Web100ValueMap{},
 		"web100_log_entry": Web100ValueMap{
 			"version":         version,
 			"log_time":        logTime,
