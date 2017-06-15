@@ -442,10 +442,11 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		// TODO - metaFile is currently used only to populate the connection spec.
 		// Should we be using it for anything else?
 		n.metaFile.PopulateConnSpec(connSpec)
+	} else {
 		// TODO Add a log once noise is reduced.
 		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "no meta").Inc()
-	} else {
+		results["anomalies"].(schema.Web100ValueMap)["no_meta"] = true
 		// TODO(dev) - use other information to partially populate
 		// the connection spec.
 	}
