@@ -28,7 +28,8 @@ const (
 	// TODO - in future, we should probably detect when the connection state changes
 	// from established, as there is little reason to parse snapshots beyond that
 	// point.
-	MAX_NUM_SNAPSHOTS = 2800
+	MIN_NUM_SNAPSHOTS = 1600 // If fewer than this, then set anomalies.num_snaps
+	MAX_NUM_SNAPSHOTS = 2800 // If more than this, truncate, and set anomolies.num_snaps
 )
 
 //=========================================================================
@@ -327,12 +328,17 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		return
 	}
 
+	valid := true
 	err = snaplog.ValidateSnapshots()
 	if err != nil {
 		log.Printf("ValidateSnapshots failed for %s, when processing: %s\n%s\n",
 			test.fn, n.taskFileName, err)
 		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "validate failed").Inc()
+		// If ValidateSnapshots returns error, it generally means that there
+		// is a problem with the last snapshot, typically a truncated file.
+		// In most cases, there are still many valid snapshots.
+		valid = false
 	}
 
 	// HACK - just to see how expensive the Values() call is...
@@ -358,6 +364,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 			return
 		}
 
+		// Delete the constant fields.
 		delete(delta, "TimeStamps")
 		delete(delta, "StartTimeStamp")
 		delete(delta, "StartTimeUsec")
@@ -385,6 +392,12 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		last = &snap
 	}
 
+	if len(deltas) > 0 {
+		// We tag some of the deltas with specific tags, to make them easy
+		// to find.  is_last is the first, but more will be added as we work
+		// out the most useful tags.
+		deltas[len(deltas)-1]["is_last"] = true
+	}
 	final := snaplog.SnapCount() - 1
 	if final > MAX_NUM_SNAPSHOTS {
 		final = MAX_NUM_SNAPSHOTS
@@ -419,6 +432,13 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 
 	results["test_id"] = test.fn
 	results["task_filename"] = n.taskFileName
+	if snaplog.SnapCount() > MAX_NUM_SNAPSHOTS || snaplog.SnapCount() < MIN_NUM_SNAPSHOTS {
+		results["anomalies"].(schema.Web100ValueMap)["num_snaps"] = snaplog.SnapCount()
+	}
+	if !valid {
+		results["anomalies"].(schema.Web100ValueMap)["snaplog_error"] = true
+	}
+
 	// This is the timestamp parsed from the filename.
 	lt, err := test.info.Timestamp.MarshalText()
 	if err != nil {
@@ -442,10 +462,11 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		// TODO - metaFile is currently used only to populate the connection spec.
 		// Should we be using it for anything else?
 		n.metaFile.PopulateConnSpec(connSpec)
+	} else {
 		// TODO Add a log once noise is reduced.
 		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "no meta").Inc()
-	} else {
+		results["anomalies"].(schema.Web100ValueMap)["no_meta"] = true
 		// TODO(dev) - use other information to partially populate
 		// the connection spec.
 	}
