@@ -110,7 +110,7 @@ func TestNDTParser(t *testing.T) {
 				"local_port":  int64(40105),
 				"remote_ip":   "45.56.98.222",
 				"remote_port": int64(44160),
-				"local_af":    int64(1),
+				"local_af":    int64(0),
 			},
 		},
 	}

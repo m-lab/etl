@@ -494,20 +494,55 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	}
 }
 
+const (
+	WC_ADDRTYPE_IPV4 = 1
+	WC_ADDRTYPE_IPV6 = 2
+	LOCAL_AF_IPV4    = 0
+	LOCAL_AF_IPV6    = 1
+)
+
 // fixValues updates web100 log values that need post-processing fix-ups.
 // TODO(dev): does this only apply to NDT or is NPAD also affected?
+// TODO(dev) - consider improving test coverage.
 func fixValues(r schema.Web100ValueMap) {
+	connSpec := r.GetMap([]string{"connection_spec"})
 	logEntry := r.GetMap([]string{"web100_log_entry"})
+	snap := logEntry.GetMap([]string{"snap"})
+	nestedConnSpec := logEntry.GetMap([]string{"connection_spec"})
 
-	// Always substitute, unless for some reason the snapshot value is missing.
+	// If FQDN not available, NDT puts "No FQDN name" into the client_hostname string.
+	// In legacy tables, this results in the entry being left empty, so we duplicate
+	// that here.
+	if connSpec["client_hostname"] == "No FQDN name" {
+		delete(connSpec, "client_hostname")
+	}
+
+	// snapshot addresses are always authoritative.  Other sources don't handle
+	// ipv6 correctly.  So, always substitute, unless for some reason the snapshot
+	// value is missing.
 	logEntry.SubstituteString(false, []string{"connection_spec", "local_ip"},
 		[]string{"snap", "LocalAddress"})
 	logEntry.SubstituteString(false, []string{"connection_spec", "remote_ip"},
 		[]string{"snap", "RemAddress"})
-	logEntry.SubstituteInt64(false, []string{"connection_spec", "local_af"},
-		[]string{"snap", "LocalAddressType"})
 
-	// Only substitute these if they are null, (because the .meta file was missing).
+	// Handle local_af.
+	// LocalAddressType has values of WC_ADDRTYPE_IPV4 (1) or WC_ADDRTYPE_IPV6 (2)
+	localAddrType, ok := snap["LocalAddressType"]
+	if ok {
+		switch localAddrType {
+		case WC_ADDRTYPE_IPV4:
+			nestedConnSpec.SetInt64("local_af", LOCAL_AF_IPV4)
+		case WC_ADDRTYPE_IPV6:
+			nestedConnSpec.SetInt64("local_af", LOCAL_AF_IPV6)
+		default:
+			// Leave it empty.
+		}
+	}
+
+	// Top level connection spec values are high quality, but if the meta
+	// file is missing, they may be empty.  In that case, we replace them
+	// with values from the log entry, (which usually come from the snapshot.)
+	// TODO - make these the ONLY representation of client/server tuple.
 	r.SubstituteString(true, []string{"connection_spec", "server_ip"},
 		[]string{"web100_log_entry", "connection_spec", "local_ip"})
 	r.SubstituteInt64(true, []string{"connection_spec", "server_af"},
@@ -517,7 +552,6 @@ func fixValues(r schema.Web100ValueMap) {
 	r.SubstituteInt64(true, []string{"connection_spec", "client_af"},
 		[]string{"web100_log_entry", "connection_spec", "local_af"})
 
-	snap := logEntry.GetMap([]string{"snap"})
 	start, ok := snap.GetInt64([]string{"StartTimeStamp"})
 	if ok {
 		start = 1000000 * start
@@ -528,6 +562,4 @@ func fixValues(r schema.Web100ValueMap) {
 		snap.SetInt64("StartTimeStamp", start)
 	}
 
-	// Fix local_af ?
-	//  - web100_log_entry.connection_spec.local_af: IPv4 = 0, IPv6 = 1.
 }
