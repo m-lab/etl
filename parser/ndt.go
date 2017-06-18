@@ -526,7 +526,8 @@ func fixValues(r schema.Web100ValueMap) {
 		[]string{"snap", "RemAddress"})
 
 	// Handle local_af.
-	// LocalAddressType has values of WC_ADDRTYPE_IPV4 (1) or WC_ADDRTYPE_IPV6 (2)
+	// Translate LocalAddressType values of WC_ADDRTYPE_IPV4 (1) or WC_ADDRTYPE_IPV6 (2)
+	// to legacy tables local_af values (LOCAL_AF_IPV*.)
 	localAddrType, ok := snap["LocalAddressType"]
 	if ok {
 		switch localAddrType {
