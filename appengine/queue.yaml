@@ -1,4 +1,4 @@
-total_storage_limit: 500M
+total_storage_limit: 2000M
 
 queue:
 # TODO(dev): delete this queue
@@ -17,7 +17,7 @@ queue:
   target: etl-ndt-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
-  rate: 2/s
+  rate: 1.5/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
   bucket_size: 10
