@@ -197,7 +197,12 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	p := parser.NewParser(dataType, ins)
 	tsk := task.NewTask(fn, tr, p)
 
-	err = tsk.ProcessAllTests()
+	files, err := tsk.ProcessAllTests()
+
+	// Count the files processed per-host-module per-weekday.
+	metrics.FileCount.WithLabelValues(
+		data.Host+"-"+data.Pod+"-"+data.Experiment,
+		date.Weekday().String()).Add(float64(files))
 
 	metrics.WorkerState.WithLabelValues("finish").Inc()
 	defer metrics.WorkerState.WithLabelValues("finish").Dec()

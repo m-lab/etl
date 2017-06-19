@@ -19,6 +19,7 @@ func init() {
 	// Register the metrics defined with Prometheus's default registry.
 	prometheus.MustRegister(WorkerCount)
 	prometheus.MustRegister(WorkerState)
+	prometheus.MustRegister(FileCount)
 	prometheus.MustRegister(TaskCount)
 	prometheus.MustRegister(TestCount)
 	prometheus.MustRegister(ErrorCount)
@@ -65,6 +66,20 @@ var (
 	},
 		// Worker state, e.g. create task, read, parse, insert
 		[]string{"state"},
+	)
+
+	// Counts the number of files processed by machine, rsync module, and day.
+	//
+	// Provides metrics:
+	//   etl_files_processed{rsync_host_module, day_of_week}
+	// Example usage:
+	//   metrics.FileCount.WithLabelValues("mlab1-atl01-ndt", "Sunday").Inc()
+	FileCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_files_processed",
+			Help: "Number of files processed.",
+		},
+		[]string{"rsync_host_module", "day_of_week"},
 	)
 
 	// Counts the number of tasks processed by the pipeline.
