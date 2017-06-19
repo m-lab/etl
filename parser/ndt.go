@@ -106,9 +106,11 @@ type NDTParser struct {
 	inserter     etl.Inserter
 	etl.RowStats // Implement RowStats through an embedded struct.
 
+	// These will be non-empty iff a test group is pending.
 	taskFileName string // The tar file containing these tests.
 	timestamp    string // The unique timestamp common across all files in current batch.
 
+	// These are non-null when the respective files have been read (within a timestamp group)
 	c2s *fileInfoAndData
 	s2c *fileInfoAndData
 
@@ -124,7 +126,9 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 // These functions are also required to complete the etl.Parser interface.
 func (n *NDTParser) Flush() error {
 	// Process the last group (if it exists) before flushing the inserter.
-	n.processGroup()
+	if n.timestamp != "" {
+		n.processGroup()
+	}
 	return n.inserter.Flush()
 }
 
