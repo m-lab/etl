@@ -106,9 +106,11 @@ type NDTParser struct {
 	inserter     etl.Inserter
 	etl.RowStats // Implement RowStats through an embedded struct.
 
+	// These will be non-empty iff a test group is pending.
 	taskFileName string // The tar file containing these tests.
 	timestamp    string // The unique timestamp common across all files in current batch.
 
+	// These are non-null when the respective files have been read (within a timestamp group)
 	c2s *fileInfoAndData
 	s2c *fileInfoAndData
 
@@ -124,7 +126,9 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 // These functions are also required to complete the etl.Parser interface.
 func (n *NDTParser) Flush() error {
 	// Process the last group (if it exists) before flushing the inserter.
-	n.processGroup()
+	if n.timestamp != "" {
+		n.processGroup()
+	}
 	return n.inserter.Flush()
 }
 
@@ -241,19 +245,41 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	return nil
 }
 
-// processGroup processes tests in the current timestamp grouping.
-func (n *NDTParser) processGroup() {
-	if n.s2c == nil && n.c2s == nil {
-		if n.metaFile == nil {
-			metrics.WarningCount.WithLabelValues(
-				n.TableName(), "test", "no meta,c2s,s2c").Inc()
+func (n *NDTParser) reportAnomalies() {
+	// Report all groups that are missing files.
+	tag := ""
+	code := 0
+	if n.metaFile != nil {
+		tag += "meta, "
+		code += 4
+	}
+	if n.s2c != nil {
+		tag += "s2c, "
+		code += 2
+	}
+	if n.c2s != nil {
+		tag += "c2s"
+		code += 1
+	}
+	if code != 7 {
+		if tag == "" {
+			tag = "Found no files"
 		} else {
-			// Meta file but no test files.
-			metrics.WarningCount.WithLabelValues(
-				n.TableName(), "meta", "no tests").Inc()
-			log.Printf("No tests: %s %s\n", n.taskFileName, n.metaFile.TestName)
+			tag = "Found only " + tag
+		}
+		metrics.WarningCount.WithLabelValues(
+			n.TableName(), "group", tag).Inc()
+		// If no meta file, or ONLY meta file, then log.  This is about 10%
+		// of all tests, so it is pretty spammy.
+		if code <= 4 {
+			log.Printf("%s: from %s at %s\n", tag, n.taskFileName, n.timestamp)
 		}
 	}
+}
+
+// processGroup processes tests in the current timestamp grouping.
+func (n *NDTParser) processGroup() {
+	n.reportAnomalies()
 	// Now process the tests, with or without meta file.
 	if n.s2c != nil {
 		n.processTest(n.s2c, "s2c")
@@ -485,7 +511,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	metrics.EntryFieldCountHistogram.WithLabelValues(n.TableName()).
 		Observe(float64(deltaFieldCount))
 	if deltaFieldCount > 43000 {
-		log.Printf("Bad snapshots (%d fields) processing %s from %s\n",
+		log.Printf("Lots of fields (%d) processing %s from %s\n",
 			deltaFieldCount, test.fn, n.taskFileName)
 	}
 	// Do this just once in a while, so it doesn't take much resource.
