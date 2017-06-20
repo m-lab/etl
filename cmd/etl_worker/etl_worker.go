@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -180,7 +181,11 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	dateFormat := "20060102"
 	date, err := time.Parse(dateFormat, data.PackedDate)
 
-	ins, err := bq.NewInserter("mlab_sandbox", dataType, date)
+	dataset, ok := os.LookupEnv("BIGQUERY_DATASET")
+	if !ok {
+		dataset = "mlab_sandbox"
+	}
+	ins, err := bq.NewInserter(dataset, dataType, date)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)

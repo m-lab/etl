@@ -85,10 +85,15 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 	// when we actually want to access the bigquery backend.
 	clientOnce.Do(func() {
 		ctx, _ := context.WithTimeout(context.Background(), timeout)
-		log.Printf("Using project: %s\n", os.Getenv("GCLOUD_PROJECT"))
+		project, ok := os.LookupEnv("BIGQUERY_DATASET")
+		if !ok {
+			project = os.Getenv("GCLOUD_PROJECT")
+		}
+
+		log.Printf("Using project: %s\n", project)
 		// Heavyweight!
 		var err error
-		bqClient, err = bigquery.NewClient(ctx, os.Getenv("GCLOUD_PROJECT"))
+		bqClient, err = bigquery.NewClient(ctx, project)
 		if err != nil {
 			panic(err.Error())
 		}
