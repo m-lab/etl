@@ -28,6 +28,7 @@ import (
 )
 
 // TODO(dev) Use a more thoughtful setting for buffer size.
+// TODO(P3) Include the project name in the parameters.
 // For now, 10K per row times 100 results is 1MB, which is an order of
 // magnitude below our 10MB max, so 100 might not be such a bad
 // default.
@@ -85,7 +86,7 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 	// when we actually want to access the bigquery backend.
 	clientOnce.Do(func() {
 		ctx, _ := context.WithTimeout(context.Background(), timeout)
-		project, ok := os.LookupEnv("BIGQUERY_DATASET")
+		project, ok := os.LookupEnv("BIGQUERY_PROJECT")
 		if !ok {
 			project = os.Getenv("GCLOUD_PROJECT")
 		}
