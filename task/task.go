@@ -39,8 +39,9 @@ func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser) *Task {
 }
 
 // ProcessAllTests loops through all the tests in a tar file, calls the
-// injected parser to parse them, and inserts them into bigquery (not yet implemented).
-func (tt *Task) ProcessAllTests() error {
+// injected parser to parse them, and inserts them into bigquery. Returns the
+// number of files processed.
+func (tt *Task) ProcessAllTests() (int, error) {
 	metrics.WorkerState.WithLabelValues("task").Inc()
 	defer metrics.WorkerState.WithLabelValues("task").Dec()
 	files := 0
@@ -97,5 +98,5 @@ func (tt *Task) ProcessAllTests() error {
 	log.Printf("Processed %d files, %d nil data, %d rows committed, %d failed, from %s into %s",
 		files, nilData, tt.Parser.Committed(), tt.Parser.Failed(),
 		tt.meta["filename"], tt.Parser.FullTableName())
-	return err
+	return files, err
 }

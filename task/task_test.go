@@ -110,8 +110,13 @@ func TestTarFileInput(t *testing.T) {
 	rdr = MakeTestSource(t)
 
 	tt = task.NewTask("filename", rdr, tp)
-	tt.ProcessAllTests()
-
+	fc, err := tt.ProcessAllTests()
+	if err != nil {
+		t.Error("Expected nil error, but got %v", err)
+	}
+	if fc != len(tp.files) {
+		t.Error("Number of files counted (%s) does not match files parsed", fc, len(tp.files))
+	}
 	if len(tp.files) != 2 {
 		t.Error("Too few files ", len(tp.files))
 	}
