@@ -200,6 +200,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	files, err := tsk.ProcessAllTests()
 
 	// Count the files processed per-host-module per-weekday.
+	// TODO(soltesz): evaluate separating hosts and pods as separate metrics.
 	metrics.FileCount.WithLabelValues(
 		data.Host+"-"+data.Pod+"-"+data.Experiment,
 		date.Weekday().String()).Add(float64(files))
