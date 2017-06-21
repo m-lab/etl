@@ -269,11 +269,8 @@ func (n *NDTParser) reportAnomalies() {
 		}
 		metrics.WarningCount.WithLabelValues(
 			n.TableName(), "group", tag).Inc()
-		// If no meta file, or ONLY meta file, then log.  This is about 10%
-		// of all tests, so it is pretty spammy.
-		if code <= 4 {
-			log.Printf("%s: from %s at %s\n", tag, n.taskFileName, n.timestamp)
-		}
+		// Logging missing meta file is too spammy.  Should restore this when
+		// NDT is fixed.
 	}
 }
 
@@ -339,7 +336,6 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 
-	// TODO - is this too spammy?
 	if !strings.HasSuffix(test.fn, ".gz") {
 		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "uncompressed file").Inc()
