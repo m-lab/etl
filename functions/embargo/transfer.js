@@ -36,7 +36,7 @@ exports.fileIsProcessable = function (file) {
 exports.executeWithAuth = function (func, fail) {
     google.auth.getApplicationDefault(
         function (err, authClient, projectId) {
-            console.log('inside auth, projectId = ', projectId)
+            console.log('inside auth, projectId = ', projectId);
             if (err) {
                 fail();
                 return;
@@ -45,13 +45,13 @@ exports.executeWithAuth = function (func, fail) {
 
             if (authClient.createScopedRequired && authClient.createScopedRequired()) {
                 // This isn't actually executing.
-                console.log('createScopedRequired')
+                console.log('createScopedRequired');
                 authClient = authClient.createScoped(
                     ['https://www.googleapis.com/auth/cloud-platform']);
             }
-            console.log(authClient)
+            console.log(authClient);
 
-            console.log('executing func')
+            console.log('executing func');
             func(authClient, projectId);
         }
     );
@@ -66,44 +66,50 @@ exports.executeWithAuth = function (func, fail) {
  */
 exports.makeMoveWithAuth = function (file, done) {
     return function (authClient, projectId) {
+        var destBucket;  // The destination bucket, based on projectId.
+        if (projectId === 'mlab-oti') {
+            destBucket = 'archive-mlab-oti';
+        } else {
+            destBucket = 'destination-mlab-sandbox';
+        }
 
-        console.log('google.storage')
-        // Doesn't seem to matter whether we do this, or pass the
-        // authClient/project in the storage.objects.copy.
         var storage = google.storage(
             {"version": "v1", "auth": authClient, "project": projectId});
-        //var storage = google.storage('v1')
 
-        console.log(storage)
-        console.log(file.name)
-
-        // This is consistently failing.
-        // The same function, invoked through the cloud API explorer,
-        // seems to work just fine, with either cloud-platform, or
-        // devstorage.read-write scope.
-        console.log('storage.objects.copy')
+        console.log('copying: ', destBucket, encodeURIComponent(file.name));
         storage.objects.copy({
-          //  "auth": authClient,
-          //  "project": projectId,
             "sourceBucket": file.bucket,
-            "sourceObject": file.name,
-            //"destinationBucket": "foobar-mlab-oti",
-            "destinationBucket": "destination-mlab-sandbox",
-            "destinationObject": file.name
+            "sourceObject": encodeURIComponent(file.name),
+            "destinationBucket": destBucket,
+            "destinationObject": encodeURIComponent(file.name)
         },
-      /*  storage.objects.list({
-            "auth": authClient,
-            "project": projectId,
-            "bucket": "scraper-mlab-oti",
-            "prefix": "test/"
-        }, */
-
+        // This will be called when copy completes.
         function(err, msg, incoming) {
-            console.log(err)
-            console.log(msg)
-            console.log(incoming)
-            console.log('calling done')
-            done(err, msg, incoming)
+            if (err) {
+                console.log('err: ', err);
+                console.log('msg: ', msg);
+                console.log('calling done after copy failed.');
+                done(err, msg, incoming);
+            } else {
+                // Delete the object, checking generation in case it changed.
+                console.log('deleting file')
+                storage.objects.delete({
+                    "bucket": file.bucket,
+                    "object": encodeURIComponent(file.name),
+                    "generation": file.generation,
+                },
+                // This will be called when delete completes.
+                function(err, msg, incoming) {
+                    if (err) {
+                        console.log(err);
+                        console.log('calling done after delete failed.');
+                        done(err, msg, incoming);
+                    } else {
+                        console.log('delete succeeded');
+                        done(err, msg, incoming);
+                    }
+                });
+            }
         });
   }
 }
