@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 )
 
@@ -182,6 +183,9 @@ func CreateTestId(fn string) string {
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent)
 	if err != nil {
+		metrics.TestCount.WithLabelValues(
+			pt.TableName(), "pt", "corrupted content").Inc()
+		log.Println(err)
 		return err
 	}
 	test_id := CreateTestId(testName)
@@ -196,8 +200,13 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
-			log.Printf("Insert error: %v\n", err)
+			metrics.ErrorCount.WithLabelValues(
+				pt.TableName(), "pt", "insert-err").Inc()
+			log.Printf("insert-err: %v\n", err)
 			return err
+		} else {
+			metrics.TestCount.WithLabelValues(
+				pt.TableName(), "pt", "ok").Inc()
 		}
 	}
 	return nil
@@ -314,7 +323,10 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
-	// log.Printf("%s", testName)
+	log.Printf("%s", testName)
+
+	metrics.WorkerState.WithLabelValues("pt").Inc()
+	defer metrics.WorkerState.WithLabelValues("pt").Dec()
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
