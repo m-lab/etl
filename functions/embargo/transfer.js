@@ -101,7 +101,7 @@ exports.makeMoveWithAuth = function (file, done) {
             function (err, msg, incoming) {
                 if (err) {
                     console.log('copy err: ', err);
-                    done(err, msg, incoming);
+                    done(err);
                 } else {
                     // Delete the object, checking generation in case it changed.
                     // TODO - add check for mlab-oti project, and don't delete
@@ -116,9 +116,9 @@ exports.makeMoveWithAuth = function (file, done) {
                         function (err, msg, incoming) {
                             if (err) {
                                 console.log('delete err: ', err);
-                                done(err, msg, incoming);
+                                done(err);
                             } else {
-                                done(err, msg, incoming);
+                                done(err);
                             }
                         }
                     );
@@ -157,6 +157,6 @@ exports.transferOnFileNotification = function transferOnFileNotification(event, 
             exports.executeWithAuth(exports.makeMoveWithAuth(file, done));
         }
     } else {
-        done();
+        done(null);
     }
 };
