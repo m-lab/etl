@@ -323,7 +323,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
-	log.Printf("%s", testName)
+	// log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("pt").Inc()
 	defer metrics.WorkerState.WithLabelValues("pt").Dec()
