@@ -183,6 +183,8 @@ func CreateTestId(fn string) string {
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent)
 	if err != nil {
+		metrics.ErrorCount.WithLabelValues(
+			pt.TableName(), "pt-test", "insert-err").Inc()
 		metrics.TestCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
 		log.Println(err)
@@ -202,7 +204,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
-				pt.TableName(), "pt", "insert-err").Inc()
+				pt.TableName(), "pt-hop", "insert-err").Inc()
 			metrics.PTHopCount.WithLabelValues(
 				pt.TableName(), "pt", "insert-err").Inc()
 			log.Printf("insert-err: %v\n", err)
