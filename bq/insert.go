@@ -90,6 +90,7 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 		if !ok {
 			project = os.Getenv("GCLOUD_PROJECT")
 		}
+
 		log.Printf("Using project: %s\n", project)
 		// Heavyweight!
 		var err error
