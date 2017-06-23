@@ -1,0 +1,12 @@
+{
+  "name": "embargo-mover",
+  "description": "Listens for file events and moves or embargoes them.",
+  "main": "transfer.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/m-lab/etl"
+  },
+  "dependencies": {
+    "googleapis": "~19.0.0"
+  }
+}
