@@ -22,6 +22,8 @@
  *   --project=mlab-oti
  */
 
+'use strict';
+
 var google = require('googleapis');
 
 /**
@@ -53,7 +55,8 @@ exports.executeWithAuth = function (func, fail) {
             if (authClient.createScopedRequired && authClient.createScopedRequired()) {
                 // This isn't actually executing.
                 authClient = authClient.createScoped(
-                    ['https://www.googleapis.com/auth/cloud-platform']);
+                    ['https://www.googleapis.com/auth/cloud-platform']
+                );
             }
 
             func(authClient, projectId);
@@ -71,7 +74,8 @@ exports.executeWithAuth = function (func, fail) {
 exports.makeMoveWithAuth = function (file, done) {
     return function (authClient, projectId) {
         // Choose the destination bucket, based on projectId.
-        var destBucket;
+        var destBucket, storage;
+
         if (projectId === 'mlab-oti') {
             destBucket = 'archive-mlab-oti';
         } else {
@@ -79,45 +83,50 @@ exports.makeMoveWithAuth = function (file, done) {
             destBucket = 'destination-mlab-sandbox';
         }
 
-        var storage = google.storage(
-            {"version": "v1", "auth": authClient, "project": projectId});
+        storage = google.storage(
+            {"version": "v1", "auth": authClient, "project": projectId}
+        );
 
         console.log('copying: ', destBucket, file.name);
         // Copy the file.
-        storage.objects.copy({
-            "sourceBucket": file.bucket,
-            "sourceObject": encodeURIComponent(file.name),
-            "destinationBucket": destBucket,
-            "destinationObject": encodeURIComponent(file.name)
-        },
-        // This will be called when copy completes.  If the copy
-        // is successful, this attempts to delete the source file.
-        function(err, msg, incoming) {
-            if (err) {
-                console.log('copy err: ', err);
-                done(err, msg, incoming);
-            } else {
-                // Delete the object, checking generation in case it changed.
-                // TODO - add check for mlab-oti project, and don't delete
-                // from other projects.
-                storage.objects.delete({
-                    "bucket": file.bucket,
-                    "object": encodeURIComponent(file.name),
-                    "generation": file.generation,
-                },
-                // This will be called when delete completes.
-                function(err, msg, incoming) {
-                    if (err) {
-                        console.log('delete err: ', err);
-                        done(err, msg, incoming);
-                    } else {
-                        done(err, msg, incoming);
-                    }
-                });
+        storage.objects.copy(
+            {
+                "sourceBucket": file.bucket,
+                "sourceObject": encodeURIComponent(file.name),
+                "destinationBucket": destBucket,
+                "destinationObject": encodeURIComponent(file.name)
+            },
+            // This will be called when copy completes.  If the copy
+            // is successful, this attempts to delete the source file.
+            function (err, msg, incoming) {
+                if (err) {
+                    console.log('copy err: ', err);
+                    done(err, msg, incoming);
+                } else {
+                    // Delete the object, checking generation in case it changed.
+                    // TODO - add check for mlab-oti project, and don't delete
+                    // from other projects.
+                    storage.objects.delete(
+                        {
+                            "bucket": file.bucket,
+                            "object": encodeURIComponent(file.name),
+                            "generation": file.generation,
+                        },
+                        // This will be called when delete completes.
+                        function (err, msg, incoming) {
+                            if (err) {
+                                console.log('delete err: ', err);
+                                done(err, msg, incoming);
+                            } else {
+                                done(err, msg, incoming);
+                            }
+                        }
+                    );
+                }
             }
-        });
-  }
-}
+        );
+    };
+};
 
 /**
  * Determines whether a file object should be embargoed, or transferred
@@ -127,7 +136,7 @@ exports.makeMoveWithAuth = function (file, done) {
  */
 exports.shouldEmbargo = function (file) {
     // All ndt files can bypass embargo.
-    return (file.name.substring(0,4) !== 'ndt/')
+    return file.name.substring(0, 4) !== 'ndt/';
 };
 
 /**
@@ -137,13 +146,13 @@ exports.shouldEmbargo = function (file) {
  * @param {object} event The Cloud Storage notification event.
  * @param {function} done The callback function called when this function completes.
  */
-exports.transferOnFileNotification = function transferOnFileNotification (event, done) {
-    const file = event.data;
+exports.transferOnFileNotification = function transferOnFileNotification(event, done) {
+    var file = event.data;
 
     if (exports.fileIsProcessable(file)) {
         if (exports.shouldEmbargo(file)) {
             // TODO - notify the embargo system.
-            console.log('Ignoring: ', file.bucket, file.name)
+            console.log('Ignoring: ', file.bucket, file.name);
         } else {
             exports.executeWithAuth(exports.makeMoveWithAuth(file, done));
         }
