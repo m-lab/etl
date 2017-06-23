@@ -36,7 +36,6 @@ exports.fileIsProcessable = function (file) {
 exports.executeWithAuth = function (func, fail) {
     google.auth.getApplicationDefault(
         function (err, authClient, projectId) {
-            console.log('inside auth, projectId = ', projectId);
             if (err) {
                 fail();
                 return;
@@ -45,13 +44,10 @@ exports.executeWithAuth = function (func, fail) {
 
             if (authClient.createScopedRequired && authClient.createScopedRequired()) {
                 // This isn't actually executing.
-                console.log('createScopedRequired');
                 authClient = authClient.createScoped(
                     ['https://www.googleapis.com/auth/cloud-platform']);
             }
-            console.log(authClient);
 
-            console.log('executing func');
             func(authClient, projectId);
         }
     );
@@ -76,7 +72,7 @@ exports.makeMoveWithAuth = function (file, done) {
         var storage = google.storage(
             {"version": "v1", "auth": authClient, "project": projectId});
 
-        console.log('copying: ', destBucket, encodeURIComponent(file.name));
+        console.log('copying: ', destBucket, file.name);
         storage.objects.copy({
             "sourceBucket": file.bucket,
             "sourceObject": encodeURIComponent(file.name),
@@ -86,13 +82,10 @@ exports.makeMoveWithAuth = function (file, done) {
         // This will be called when copy completes.
         function(err, msg, incoming) {
             if (err) {
-                console.log('err: ', err);
-                console.log('msg: ', msg);
-                console.log('calling done after copy failed.');
+                console.log('copy err: ', err);
                 done(err, msg, incoming);
             } else {
                 // Delete the object, checking generation in case it changed.
-                console.log('deleting file')
                 storage.objects.delete({
                     "bucket": file.bucket,
                     "object": encodeURIComponent(file.name),
@@ -101,11 +94,9 @@ exports.makeMoveWithAuth = function (file, done) {
                 // This will be called when delete completes.
                 function(err, msg, incoming) {
                     if (err) {
-                        console.log(err);
-                        console.log('calling done after delete failed.');
+                        console.log('delete err: ', err);
                         done(err, msg, incoming);
                     } else {
-                        console.log('delete succeeded');
                         done(err, msg, incoming);
                     }
                 });
