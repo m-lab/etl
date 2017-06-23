@@ -80,6 +80,7 @@ exports.makeMoveWithAuth = function (file, done) {
             destBucket = 'archive-mlab-oti';
         } else {
             // For projects other than mlab-oti, write files elsewhere.
+            console.log('projectId: ', projectId);
             destBucket = 'destination-mlab-sandbox';
         }
 
@@ -87,7 +88,7 @@ exports.makeMoveWithAuth = function (file, done) {
             {"version": "v1", "auth": authClient, "project": projectId}
         );
 
-        console.log('copying: ', destBucket, file.name);
+        console.log('copying: ', file.name, ' to ', destBucket);
         // Copy the file.
         storage.objects.copy(
             {
@@ -98,7 +99,8 @@ exports.makeMoveWithAuth = function (file, done) {
             },
             // This will be called when copy completes.  If the copy
             // is successful, this attempts to delete the source file.
-            function (err, msg, incoming) {
+            // Additional parameters msg, and incoming, are unused.
+            function (err) {
                 if (err) {
                     console.log('copy err: ', err);
                     done(err);
@@ -106,22 +108,29 @@ exports.makeMoveWithAuth = function (file, done) {
                     // Delete the object, checking generation in case it changed.
                     // TODO - add check for mlab-oti project, and don't delete
                     // from other projects.
-                    storage.objects.delete(
-                        {
-                            "bucket": file.bucket,
-                            "object": encodeURIComponent(file.name),
-                            "generation": file.generation,
-                        },
-                        // This will be called when delete completes.
-                        function (err, msg, incoming) {
-                            if (err) {
-                                console.log('delete err: ', err);
-                                done(err);
-                            } else {
-                                done(err);
+                    // TODO - remove this condition when we are happy with
+                    // deletion.
+                    if (file.name.substring(0, 5) === 'test/') {
+                        storage.objects.delete(
+                            {
+                                "bucket": file.bucket,
+                                "object": encodeURIComponent(file.name),
+                                "generation": file.generation,
+                            },
+                            // This will be called when delete completes.
+                            // Additional parameters msg, and incoming, are unused.
+                            function (err) {
+                                if (err) {
+                                    console.log('delete err: ', err);
+                                    done(err);
+                                } else {
+                                    done(null);
+                                }
                             }
-                        }
-                    );
+                        );
+                    } else {
+                        done(null);
+                    }
                 }
             }
         );
@@ -136,7 +145,13 @@ exports.makeMoveWithAuth = function (file, done) {
  */
 exports.shouldEmbargo = function (file) {
     // All ndt files can bypass embargo.
-    return file.name.substring(0, 4) !== 'ndt/';
+    if (file.name.substring(0, 4) === 'ndt/') {
+        return false;
+    }
+    if (file.name.substring(0, 5) === 'test/') {
+        return false;
+    }
+    return true;
 };
 
 /**
