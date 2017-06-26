@@ -183,6 +183,9 @@ func CreateTestId(fn string) string {
 }
 
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
+	metrics.WorkerState.WithLabelValues("pt").Inc()
+	defer metrics.WorkerState.WithLabelValues("pt").Dec()
+
 	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
@@ -329,8 +332,8 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
 	// log.Printf("%s", testName)
 
-	metrics.WorkerState.WithLabelValues("pt").Inc()
-	defer metrics.WorkerState.WithLabelValues("pt").Dec()
+	metrics.WorkerState.WithLabelValues("parse").Inc()
+	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
