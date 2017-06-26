@@ -79,6 +79,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 	// Iterate from the end of the list of nodes to minimize cost of removing nodes.
 	for i := len(all_nodes) - 1; i >= 0; i-- {
 		parent := all_nodes[i].parent
+		metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
 		if parent == nil {
 			one_hop := &schema.ParisTracerouteHop{
 				Protocol:      protocol,
@@ -90,7 +91,6 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 				Dest_af:       IPv4_AF,
 			}
 			results = append(results, *one_hop)
-			metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
 			break
 		} else {
 			one_hop := &schema.ParisTracerouteHop{
@@ -104,7 +104,6 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 				Dest_af:       IPv4_AF,
 			}
 			results = append(results, *one_hop)
-			metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
 		}
 	}
 	return results
@@ -196,7 +195,6 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 	test_id := CreateTestId(testName)
-	metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 	for _, hop := range hops {
 		pt_test := schema.PT{
 			Test_id:              test_id,
@@ -208,14 +206,15 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
-			metrics.ErrorCount.WithLabelValues(
-				pt.TableName(), "pt-hop", "insert-err").Inc()
+			metrics.TestCount.WithLabelValues(
+				pt.TableName(), "pt", "insert-err").Inc()
 			metrics.PTHopCount.WithLabelValues(
 				pt.TableName(), "pt", "insert-err").Inc()
 			log.Printf("insert-err: %v\n", err)
 			return err
 		}
 	}
+	metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 	return nil
 }
 
