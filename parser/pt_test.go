@@ -23,7 +23,7 @@ func TestGetIPTuple(t *testing.T) {
 
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
-	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris", rawData)
+	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
