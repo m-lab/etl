@@ -186,7 +186,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
-			pt.TableName(), "pt-test", "insert-err").Inc()
+			pt.TableName(), "pt", "insert-err").Inc()
 		metrics.TestCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
 		log.Println(err)
