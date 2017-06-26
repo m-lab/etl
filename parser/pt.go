@@ -382,8 +382,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
 				err := ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
 				if err != nil {
-					metrics.PTHopCount.WithLabelValues(
-						tableName, "pt", "parse error").Inc()
+					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(len(all_nodes))
 					return nil, 0, nil, err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.

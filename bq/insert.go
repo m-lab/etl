@@ -94,7 +94,7 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 		log.Printf("Using project: %s\n", project)
 		// Heavyweight!
 		var err error
-		bqClient, err = bigquery.NewClient(ctx, "mlab-sandbox")
+		bqClient, err = bigquery.NewClient(ctx, project)
 		if err != nil {
 			panic(err.Error())
 		}
