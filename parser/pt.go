@@ -173,12 +173,16 @@ func (pt *PTParser) Flush() error {
 	return pt.inserter.Flush()
 }
 
-func CreateTestId(fn string) string {
-	base_name := filepath.Base(fn)
-	// base_name is in format like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+func CreateTestId(fn string, bn string) string {
+	raw_fn := filepath.Base(fn)
+	// fn is in format like 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
+	// bn is in format like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// test_id is in format like 2017/05/01/mlab1.lga06/20170501T23:58:07Z-72.228.158.51-40835-128.177.119.209-8080.paris.gz
-	// TODO: get site info and add to test_id.
-	return base_name
+	test_id := bn
+	if len(raw_fn) > 30 {
+		test_id = raw_fn[0:4] + "/" + raw_fn[4:6] + "/" + raw_fn[6:8] + "/" + raw_fn[17:22] + "." + raw_fn[23:28] + "/" + bn + ".gz"
+	}
+	return test_id
 }
 
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
@@ -194,7 +198,11 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		log.Println(err)
 		return err
 	}
-	test_id := CreateTestId(testName)
+	test_id := filepath.Base(testName)
+	if meta["filename"] != nil {
+		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
+	}
+	noErr := true
 	for _, hop := range hops {
 		pt_test := schema.PT{
 			Test_id:              test_id,
@@ -206,13 +214,15 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		err := pt.inserter.InsertRow(pt_test)
 		if err != nil {
-			metrics.TestCount.WithLabelValues(
+			metrics.ErrorCount.WithLabelValues(
 				pt.TableName(), "pt", "insert-err").Inc()
-			metrics.PTHopCount.WithLabelValues(
-				pt.TableName(), "pt", "insert-err").Inc()
+			noErr = false
 			log.Printf("insert-err: %v\n", err)
-			return err
 		}
+	}
+	if !noErr {
+		// Inc TestCount only once per test.
+		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
 	}
 	metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 	return nil
@@ -382,7 +392,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
 				err := ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
 				if err != nil {
-					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(len(all_nodes))
+					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(float64(len(all_nodes)))
 					return nil, 0, nil, err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
