@@ -189,7 +189,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
-			pt.TableName(), "pt", "insert-err").Inc()
+			pt.TableName(), "pt", "corrupted content").Inc()
 		metrics.TestCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
 		log.Println(err)
@@ -383,6 +383,8 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
 				err := ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
 				if err != nil {
+					metrics.PTHopCount.WithLabelValues(
+						tableName, "pt", "parse error").Inc()
 					return nil, 0, nil, err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
