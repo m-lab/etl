@@ -70,7 +70,7 @@ func NewPTParser(ins etl.Inserter) *PTParser {
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
-func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []schema.ParisTracerouteHop {
+func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName string) []schema.ParisTracerouteHop {
 	var results []schema.ParisTracerouteHop
 	if len(all_nodes) == 0 {
 		return nil
@@ -90,6 +90,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []schema.Pari
 				Dest_af:       IPv4_AF,
 			}
 			results = append(results, *one_hop)
+			metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
 			break
 		} else {
 			one_hop := &schema.ParisTracerouteHop{
@@ -103,6 +104,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string) []schema.Pari
 				Dest_af:       IPv4_AF,
 			}
 			results = append(results, *one_hop)
+			metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
 		}
 	}
 	return results
@@ -181,7 +183,7 @@ func CreateTestId(fn string) string {
 }
 
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent)
+	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt-test", "insert-err").Inc()
@@ -209,9 +211,6 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				pt.TableName(), "pt", "insert-err").Inc()
 			log.Printf("insert-err: %v\n", err)
 			return err
-		} else {
-			metrics.PTHopCount.WithLabelValues(
-				pt.TableName(), "pt", "ok").Inc()
 		}
 	}
 	return nil
@@ -327,7 +326,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
+func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
 	// log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("pt").Inc()
@@ -379,7 +378,10 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 			// The following parts are grouped into tuples, each with 4 parts:
 			for i := 3; i < len(parts); i += 4 {
 				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
-				ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
+				err := ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
+				if err != nil {
+					return nil, 0, nil, err
+				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
 				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i += 1 {
 				}
@@ -389,7 +391,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte) (
 	} // Done with a test file
 
 	// Generate Hops from all_nodes
-	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol)
+	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol, tableName)
 
 	return PT_hops, t, conn_spec, nil
 }
