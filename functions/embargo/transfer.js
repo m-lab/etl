@@ -135,15 +135,9 @@ exports.makeMoveWithAuth = function (file, done) {
  * @param {object} file The file under consideration
  */
 exports.shouldEmbargo = function (file) {
-    // All ndt files can bypass embargo.
-    if (file.name.substring(0, 4) === 'ndt/') {
-        return false;
-    }
-    // Allow test/ for testing purposes.
-    if (file.name.substring(0, 5) === 'test/') {
-        return false;
-    }
-    return true;
+    // Only sidestream files need to be embargoed.  All others can be
+    // transferred.
+    return (file.name.substring(0, 11) === 'sidestream/');
 };
 
 /**
