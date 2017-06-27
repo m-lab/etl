@@ -102,6 +102,15 @@ var (
 		INVALID: "invalid",
 	}
 
+	// Map from data type to number of buffer size for BQ insertion.
+	// TODO - this should be loaded from a config.
+	DataTypeToBQBufferSize = map[DataType]int{
+		NDT:     10,
+		SS:      100,
+		PT:      100,
+		SW:      100,
+		INVALID: 0,
+	}
 	// There is also a mapping of data types to queue names in
 	// queue_pusher.go
 )
