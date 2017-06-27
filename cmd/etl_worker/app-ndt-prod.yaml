@@ -36,6 +36,7 @@ network:
     - 9090/tcp
 
 env_variables:
+  MAX_CONCURRENT_REQUESTS: 20
   BIGQUERY_PROJECT: 'measurement-lab'
   BIGQUERY_DATASET: 'public'
   # TODO add custom service-account, instead of using default credentials.
