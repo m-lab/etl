@@ -353,7 +353,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	valid := true
 	err = snaplog.ValidateSnapshots()
 	if err != nil {
-		log.Printf("ValidateSnapshots failed for %s, when processing: %s\n%s\n",
+		log.Printf("ValidateSnapshots failed for %s, when processing: %s (%s)\n",
 			test.fn, n.taskFileName, err)
 		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "validate failed").Inc()
