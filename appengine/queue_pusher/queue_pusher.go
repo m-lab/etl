@@ -100,6 +100,7 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
+		return
 	}
 	// determine correct queue based on file name.
 	queuename, ok := queueForType[fn_data.GetDataType()]

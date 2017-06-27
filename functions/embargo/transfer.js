@@ -4,22 +4,21 @@
  * determine whether a new file needs to be embargoed, and if not, moves
  * the file to the archive bucket.
  *
- * It currently supports two hard coded destination buckets, archive-mlab-oti, for GCF
- * deployed in mlab-oti (production), and destination-mlab-sandbox for any other
- * deployment (though the destination may fail for projects other than
- * mlab-sandbox).
+ * The destination bucket, archive-mlab-oti, is hard coded, though the trigger
+ * bucket and the project are both determined by the deployment command.  Tried
+ * using projectId to determine destination bucket, but that is unreliable.
  *
  * To deploy this cloud function to mlab-oti (until we get autodeploy set up):
 
  * // Create the buckets
- * gsutil mb -p mlab-oti archive-mlab-oti
- * gsutil mb -p mlab-oti scraper-mlab-oti
- * gsutil mb -p mlab-oti functions-mlab-oti
- * // Deploy the functions.
- * gcloud beta functions deploy transferOnFileNotification \
- *   --stage-bucket=functions-mlab-oti \
- *   --trigger-bucket=scraper-mlab-oti \
- *   --project=mlab-oti
+   gsutil mb -p mlab-oti archive-mlab-oti
+   gsutil mb -p mlab-oti scraper-mlab-oti
+   gsutil mb -p mlab-oti functions-mlab-oti
+   // Deploy the functions.
+   gcloud beta functions deploy transferOnFileNotification \
+     --stage-bucket=functions-mlab-oti \
+     --trigger-bucket=scraper-mlab-oti \
+     --project=mlab-oti
  */
 
 'use strict';
@@ -73,17 +72,9 @@ exports.executeWithAuth = function (func, fail) {
  */
 exports.makeMoveWithAuth = function (file, done) {
     return function (authClient, projectId) {
-        // Choose the destination bucket, based on projectId.
         var destBucket, storage;
 
-        if (projectId === 'mlab-oti') {
-            destBucket = 'archive-mlab-oti';
-        } else {
-            // For projects other than mlab-oti, write files elsewhere.
-            console.log('projectId: ', projectId);
-            destBucket = 'destination-mlab-sandbox';
-        }
-
+        destBucket = 'archive-mlab-oti';
         storage = google.storage(
             {"version": "v1", "auth": authClient, "project": projectId}
         );
@@ -144,14 +135,9 @@ exports.makeMoveWithAuth = function (file, done) {
  * @param {object} file The file under consideration
  */
 exports.shouldEmbargo = function (file) {
-    // All ndt files can bypass embargo.
-    if (file.name.substring(0, 4) === 'ndt/') {
-        return false;
-    }
-    if (file.name.substring(0, 5) === 'test/') {
-        return false;
-    }
-    return true;
+    // Only sidestream files need to be embargoed.  All others can be
+    // transferred.
+    return (file.name.substring(0, 11) === 'sidestream/');
 };
 
 /**
