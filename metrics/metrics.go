@@ -22,6 +22,7 @@ func init() {
 	prometheus.MustRegister(FileCount)
 	prometheus.MustRegister(TaskCount)
 	prometheus.MustRegister(TestCount)
+	prometheus.MustRegister(PTHopCount)
 	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(WarningCount)
 	prometheus.MustRegister(BackendFailureCount)
@@ -110,6 +111,22 @@ var (
 			Help: "Number of tests processed.",
 		},
 		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/
+		[]string{"table", "filetype", "status"},
+	)
+
+	// Counts the number of hops in PT tests successfully processed by the parsers.
+	//
+	// Provides metrics:
+	//   etl_pthop_count{table, filetype, status}
+	// Example usage:
+	// metrics.PTHopCount.WithLabelValues(
+	//	tt.Inserter.TableBase(), "hop", "ok").Inc()
+	PTHopCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_pthop_count",
+			Help: "Number of hops for PT tests processed.",
+		},
+		// pt, pt, ok/reject/error/
 		[]string{"table", "filetype", "status"},
 	)
 
