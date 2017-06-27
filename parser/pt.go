@@ -202,7 +202,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if meta["filename"] != nil {
 		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
 	}
-	noErr := true
+	insertErr := false
 	for _, hop := range hops {
 		pt_test := schema.PT{
 			Test_id:              test_id,
@@ -216,15 +216,16 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				pt.TableName(), "pt", "insert-err").Inc()
-			noErr = false
+			insertErr = true
 			log.Printf("insert-err: %v\n", err)
 		}
 	}
-	if !noErr {
+	if insertErr {
 		// Inc TestCount only once per test.
 		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
+	} else {
+		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 	}
-	metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 	return nil
 }
 
