@@ -240,6 +240,22 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "ok")
 }
 
+func setMaxInFlight() {
+	maxInFlightString, ok := os.LookupEnv("MAX_CONCURRENT_REQUESTS")
+	if ok {
+		maxInFlightInt, err := strconv.Atoi(maxInFlightString)
+		if err == nil {
+			maxInFlight = int32(maxInFlightInt)
+		} else {
+			log.Println("MAX_CONCURRENT_REQUESTS not configured.  Using 20.")
+			maxInFlight = defaultMaxInFlight
+		}
+	} else {
+		log.Println("MAX_CONCURRENT_REQUESTS not configured.  Using 20.")
+		maxInFlight = defaultMaxInFlight
+	}
+}
+
 func main() {
 	// Define a custom serve mux for prometheus to listen on a separate port.
 	// We listen on a separate port so we can forward this port on the host VM.
@@ -263,11 +279,7 @@ func main() {
 	// Enable block profiling
 	runtime.SetBlockProfileRate(1000000) // One event per msec.
 
-	maxInFlight, ok := os.LookupEnv("MAX_CONCURRENT_REQUESTS")
-	if !ok {
-		log.Println("MAX_CONCURRENT_REQUESTS not configured.  Using 20.")
-		maxInFlight := defaultMaxInFlight
-	}
+	setMaxInFlight()
 
 	// We also setup another prometheus handler on a non-standard path. This
 	// path name will be accessible through the AppEngine service address,
