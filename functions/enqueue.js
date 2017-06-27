@@ -18,6 +18,7 @@ exports.queueForFile = function (filename) {
         "sidestream": "etl-sidestream-queue",
         "paris-traceroute": "etl-paris-traceroute-queue"
     };
+    // TODO - fix this.
     for (key in experiment_to_task_queue) {
         re = new RegExp("^" + key + "/\\d{4}/\\d{2}/\\d{2}/[0-9a-z_a-z:.-]+");
         if (re.test(filename)) {
