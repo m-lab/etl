@@ -53,8 +53,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Basic throttling to restrict the number of tasks in flight.
-var maxInFlight = 20 // Max number of concurrent workers (and tasks in flight).
-var inFlight int32   // Current number of tasks in flight.
+const defaultMaxInFlight = 20
+
+var maxInFlight int32 // Max number of concurrent workers (and tasks in flight).
+var inFlight int32    // Current number of tasks in flight.
 
 // Returns true if request should be rejected.
 // If the max concurrency (MC) exceeds (or matches) the instances*workers, then
@@ -264,7 +266,7 @@ func main() {
 	maxInFlight, ok := os.LookupEnv("MAX_CONCURRENT_REQUESTS")
 	if !ok {
 		log.Println("MAX_CONCURRENT_REQUESTS not configured.  Using 20.")
-		maxInFlight := 20
+		maxInFlight := defaultMaxInFlight
 	}
 
 	// We also setup another prometheus handler on a non-standard path. This
