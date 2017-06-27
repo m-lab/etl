@@ -3,15 +3,27 @@ build the initial version and then moved to the [storage triggers
 tutorial](https://cloud.google.com/functions/docs/tutorials/storage) to refine
 things.
 
-To deploy this cloud function to mlab-sandbox, try:
+Note that for different deployments there are 4 things to change...
+createXXXTask..., stage-bucket, trigger-bucket, and project.
+
+To deploy this cloud function to sandbox, use:
 ```bash
-gcloud beta functions deploy fileNotification \
-    --stage-bucket=parser-functions-sandbox \
+gcloud beta functions deploy createSandboxTaskOnFileNotification \
+    --stage-bucket=functions-mlab-sandbox \
     --trigger-bucket=m-lab-sandbox \
     --project=mlab-sandbox
 ```
+To deploy this cloud function to production, use:
+```bash
+gcloud beta functions deploy createProdTaskOnFileNotification \
+    --stage-bucket=functions-mlab-oti \
+    --trigger-bucket=archive-mlab-oti \
+    --project=mlab-oti
+```
 
-To install all the dependencies:
+---------------------------------------------------------------
+
+To install all the dependencies on local machine:
 ```bash
 npm install .
 ```
@@ -20,3 +32,4 @@ To run the unit tests:
 ```bash
 npm test
 ```
+

@@ -1,3 +1,7 @@
+
+
+'use strict';
+
 var google = require("googleapis");
 
 exports.fileIsProcessable = function (file) {
@@ -7,13 +11,13 @@ exports.fileIsProcessable = function (file) {
 };
 
 exports.queueForFile = function (filename) {
-    const experiment_to_task_queue = {
+    var key, re, experiment_to_task_queue;
+    experiment_to_task_queue = {
         "switch": "etl-parser-queue",
         "ndt": "etl-ndt-queue",
         "sidestream": "etl-sidestream-queue",
         "paris-traceroute": "etl-paris-traceroute-queue"
     };
-    var key, re;
     for (key in experiment_to_task_queue) {
         re = new RegExp("^" + key + "/\\d{4}/\\d{2}/\\d{2}/[0-9a-z_a-z:.-]+");
         if (re.test(filename)) {
@@ -23,51 +27,21 @@ exports.queueForFile = function (filename) {
     return null;
 };
 
-
-exports.enqueueFileTask = function (bucket, filename, queue, callback) {
-  var http = require('http');
-  var gsFilename = "gs://" + bucket + "/" + filename;
-  var safeFilename = new Buffer(gsFilename).toString("base64");
-  http.get('http://queue-pusher-dot-mlab-sandbox.appspot.com/receiver?filename=' + safeFilename,
-      function (res) {
-        res.on('data', function (data) {});
-        res.on('end',
-               function() {
-                 console.log('Enqueue GET done', gsFilename);
-                 callback();
-               });
-      });
-  /*
-    // If you want things to be authenticated, then put them inside the callback
-    // here.
-    google.auth.getApplicationDefault(function (err, authClient, projectId) {
-        if (err) {
-            throw err;
-        }
-
-        // push taskqueues are currently non-functional for the REST API
-        // TODO: complain about this
-        var taskqueue = google.taskqueue({"version": "v1beta2", "auth": authClient})
-        var storage = google.storage({"version": "v1", "auth": authClient});
-        console.log(storage.buckets.list({"project": "mlab-sandbox"}));
-        console.log(storage.buckets.list({"project": "mlab-sandbox"}));
-
-        var gsFilename = "gs://" + bucket + "/" + filename;
-        var params = {
-            "project": "mlab-sandbox",
-            "taskqueue": "etl-parser-queue",
-            "payloadBase64": new Buffer(gsFilename).toString("base64")
-        };
-        taskqueue.tasks.insert(params, function (err, response) {
-            if (err) {
-                console.log("Failed to enqueue", filename, "error was", err);
-            } else {
-                console.log("Enqueued", filename);
-            }
-            callback();
+exports.enqueueFileTask = function (project, bucket, filename, callback) {
+    var http, gsFilename, safeFilename;
+    http = require('http');
+    gsFilename = "gs://" + bucket + "/" + filename;
+    safeFilename = new Buffer(gsFilename).toString("base64");
+    http.get('http://queue-pusher-dot-' + project +
+        '.appspot.com/receiver?filename=' + safeFilename,
+        function (res) {
+            res.on('data', function (data) {});
+            res.on('end',
+                function () {
+                    console.log('Enqueue GET done', gsFilename);
+                    callback();
+                });
         });
-    });
-    */
 };
 
 /**
@@ -77,13 +51,46 @@ exports.enqueueFileTask = function (bucket, filename, queue, callback) {
  * @param {object} event The Cloud Functions event.
  * @param {function} The callback function.
  */
-exports.fileNotification = function fileNotification (event, callback) {
-    const file = event.data;
-    const queue = exports.queueForFile(file.name);
+exports.createSandboxTaskOnFileNotification = function createTaskOnFileNotification(event, callback) {
+    var file = event.data;
 
-    if (exports.fileIsProcessable(file) && queue) {
-        exports.enqueueFileTask(file.bucket, file.name, queue, callback);
+    if (exports.fileIsProcessable(file) && exports.queueForFile(file.name)) {
+        exports.enqueueFileTask('mlab-sandbox', file.bucket, file.name, callback);
     } else {
-      callback();
+        callback();
+    }
+};
+
+/**
+ * Cloud Function to be triggered by Cloud Storage, enqueues the file to the
+ * proper task queue (or none at all).
+ *
+ * @param {object} event The Cloud Functions event.
+ * @param {function} The callback function.
+ */
+exports.createStagingTaskOnFileNotification = function createTaskOnFileNotification(event, callback) {
+    var file = event.data;
+
+    if (exports.fileIsProcessable(file) && exports.queueForFile(file.name)) {
+        exports.enqueueFileTask('mlab-staging', file.bucket, file.name, callback);
+    } else {
+        callback();
+    }
+};
+
+/**
+ * Cloud Function to be triggered by Cloud Storage, enqueues the file to the
+ * proper task queue (or none at all).
+ *
+ * @param {object} event The Cloud Functions event.
+ * @param {function} The callback function.
+ */
+exports.createProdTaskOnFileNotification = function createTaskOnFileNotification(event, callback) {
+    var file = event.data;
+
+    if (exports.fileIsProcessable(file) && exports.queueForFile(file.name)) {
+        exports.enqueueFileTask('mlab-oti', file.bucket, file.name, callback);
+    } else {
+        callback();
     }
 };
