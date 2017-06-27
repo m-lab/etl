@@ -102,9 +102,9 @@ var (
 		INVALID: "invalid",
 	}
 
-	// Map from data type to number of workers for BQ insertion.
+	// Map from data type to number of buffer size for BQ insertion.
 	// TODO - this should be loaded from a config.
-	DataTypeToNumWorkers = map[DataType]int{
+	DataTypeToBQBufferSize = map[DataType]int{
 		NDT:     10,
 		SS:      100,
 		PT:      100,
