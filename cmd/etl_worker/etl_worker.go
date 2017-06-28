@@ -53,7 +53,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Basic throttling to restrict the number of tasks in flight.
-var inFlight int32
+const defaultMaxInFlight = 20
+
+var maxInFlight int32 // Max number of concurrent workers (and tasks in flight).
+var inFlight int32    // Current number of tasks in flight.
 
 // Returns true if request should be rejected.
 // If the max concurrency (MC) exceeds (or matches) the instances*workers, then
@@ -69,8 +72,11 @@ var inFlight int32
 //
 // For now, assuming:
 //    MC: 180,  MI: 20, MW: 10
+//
+// TODO - replace the atomic with a channel based semaphore and non-blocking
+// select.
 func shouldThrottle() bool {
-	if atomic.AddInt32(&inFlight, 1) > 20 {
+	if atomic.AddInt32(&inFlight, 1) > maxInFlight {
 		atomic.AddInt32(&inFlight, -1)
 		return true
 	}
@@ -183,6 +189,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 
 	dataset, ok := os.LookupEnv("BIGQUERY_DATASET")
 	if !ok {
+		// TODO - make this fatal.
 		dataset = "mlab_sandbox"
 	}
 	ins, err := bq.NewInserter(dataset, dataType, date)
@@ -233,6 +240,22 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "ok")
 }
 
+func setMaxInFlight() {
+	maxInFlightString, ok := os.LookupEnv("MAX_WORKERS")
+	if ok {
+		maxInFlightInt, err := strconv.Atoi(maxInFlightString)
+		if err == nil {
+			maxInFlight = int32(maxInFlightInt)
+		} else {
+			log.Println("MAX_WORKERS not configured.  Using 20.")
+			maxInFlight = defaultMaxInFlight
+		}
+	} else {
+		log.Println("MAX_WORKERS not configured.  Using 20.")
+		maxInFlight = defaultMaxInFlight
+	}
+}
+
 func main() {
 	// Define a custom serve mux for prometheus to listen on a separate port.
 	// We listen on a separate port so we can forward this port on the host VM.
@@ -255,6 +278,8 @@ func main() {
 
 	// Enable block profiling
 	runtime.SetBlockProfileRate(1000000) // One event per msec.
+
+	setMaxInFlight()
 
 	// We also setup another prometheus handler on a non-standard path. This
 	// path name will be accessible through the AppEngine service address,
