@@ -241,17 +241,17 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func setMaxInFlight() {
-	maxInFlightString, ok := os.LookupEnv("MAX_CONCURRENT_REQUESTS")
+	maxInFlightString, ok := os.LookupEnv("MAX_WORKERS")
 	if ok {
 		maxInFlightInt, err := strconv.Atoi(maxInFlightString)
 		if err == nil {
 			maxInFlight = int32(maxInFlightInt)
 		} else {
-			log.Println("MAX_CONCURRENT_REQUESTS not configured.  Using 20.")
+			log.Println("MAX_WORKERS not configured.  Using 20.")
 			maxInFlight = defaultMaxInFlight
 		}
 	} else {
-		log.Println("MAX_CONCURRENT_REQUESTS not configured.  Using 20.")
+		log.Println("MAX_WORKERS not configured.  Using 20.")
 		maxInFlight = defaultMaxInFlight
 	}
 }

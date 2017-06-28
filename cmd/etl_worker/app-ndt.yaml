@@ -36,7 +36,7 @@ network:
     - 9090/tcp
 
 env_variables:
-  MAX_CONCURRENT_REQUESTS: 20
+  MAX_WORKERS: 20
   BIGQUERY_PROJECT: 'mlab-sandbox'
   BIGQUERY_DATASET: 'mlab_sandbox'
   # TODO add custom service-account, instead of using default credentials.
