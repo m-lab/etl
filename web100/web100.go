@@ -81,6 +81,7 @@ import (
 type Saver interface {
 	SetInt64(name string, value int64)
 	SetString(name string, value string)
+	SetBool(name string, value bool)
 }
 
 //=================================================================================

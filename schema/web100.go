@@ -85,6 +85,11 @@ func (s Web100ValueMap) SetString(name string, value string) {
 	s[name] = value
 }
 
+// SetBool saves a boolean in a field with the given name.
+func (s Web100ValueMap) SetBool(name string, value bool) {
+	s[name] = value
+}
+
 func (r Web100ValueMap) SubstituteString(onlyIfNull bool, target []string, source []string) {
 	m := r.GetMap(target[:len(target)-1])
 	if m == nil {
@@ -175,6 +180,8 @@ func FullConnectionSpec() Web100ValueMap {
 		"client_browser":        "",
 		"client_application":    "",
 		"data_direction":        0,
+		"tls":                   false,
+		"websocket":             false,
 		"client_geolocation":    FullGeolocation(),
 		"server_geolocation":    FullGeolocation(),
 	}
