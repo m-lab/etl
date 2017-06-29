@@ -16,5 +16,7 @@ client_application name:
 Summary data: 0,36,1346,14,2983,24,32,2,74,0,1448,16,39,136448,23184,8688,0,10521978,347602,105334,0,4,4,2896,364,136448,100,0,0,0,1,6,3,2,10,2,74,97,7,22,6,0,156,0,-1,-1,0,1,0,-1,1448,8688,7
  * Additional data:
 client.os.name: CLIWebsockets
+client.version: 3.7.0
+client.kernel.version: 3.14.0
 tls: false
 websockets: true
