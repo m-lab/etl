@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/etl/schema"
-
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 )
