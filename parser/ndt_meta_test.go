@@ -2,10 +2,13 @@ package parser_test
 
 import (
 	"io/ioutil"
+	"log"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/schema"
 )
 
 // Not complete, but verifies basic functionality.
@@ -33,5 +36,33 @@ func TestMetaParser(t *testing.T) {
 	}
 	if meta.Fields["server hostname"] != "mlab3.vie01.measurement-lab.org" {
 		t.Error("Incorrect hostname: ", meta.Fields["hostname"])
+	}
+
+	connSpec := schema.EmptyConnectionSpec()
+	meta.PopulateConnSpec(connSpec)
+
+	// This particular file is missing the server_ip address...
+	if _, ok := connSpec["server_ip"]; ok {
+		t.Error("expected server_ip to be empty")
+	}
+
+	// But the client_ip address (and client_af) should be fine.
+	if v, ok := connSpec["client_ip"]; !ok {
+		log.Println("missing client ip address")
+		for k, v := range meta.Fields {
+			log.Printf("%s : %s\n", k, v)
+		}
+		t.Error("missing client ip address")
+	} else {
+		log.Printf("found client ip: %v\n", v)
+	}
+
+	if v, ok := connSpec["client_af"]; !ok {
+		log.Println("missing client_af annotation")
+		t.Error("missing client_af")
+	} else {
+		if v.(int64) != syscall.AF_INET {
+			log.Printf("Wrong client_af value: ", v.(int64))
+		}
 	}
 }
