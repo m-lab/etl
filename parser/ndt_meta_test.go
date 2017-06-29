@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/etl/schema"
+
 	"github.com/m-lab/etl/parser"
 )
 
@@ -33,5 +35,27 @@ func TestMetaParser(t *testing.T) {
 	}
 	if meta.Fields["server hostname"] != "mlab3.vie01.measurement-lab.org" {
 		t.Error("Incorrect hostname: ", meta.Fields["hostname"])
+	}
+
+	// Check for the presenece of select connSpec fields.
+	connSpec := schema.Web100ValueMap{}
+	meta.PopulateConnSpec(connSpec)
+	if connSpec["tls"] != false {
+		t.Error("Incorrect tls: got true; want false")
+	}
+	if connSpec["websocket"] != true {
+		t.Error("Incorrect websocket: got false; want")
+	}
+	if connSpec["client_kernel_version"] != "3.14.0" {
+		t.Errorf("Incorrect client_kernel_version: got %s; want 3.14.0",
+			connSpec["client_kernel_version"])
+	}
+	if connSpec["client_version"] != "3.7.0" {
+		t.Errorf("Incorrect client_version: got %s; want 3.7.0",
+			connSpec["client_version"])
+	}
+	if connSpec["client_os"] != "CLIWebsockets" {
+		t.Errorf("Incorrect client_os: got %s; want CLIWebsockets",
+			connSpec["client_os"])
 	}
 }

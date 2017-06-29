@@ -42,6 +42,17 @@ var fieldPairs = map[string]string{
 	"client OS name":          "client_os",
 	"client_browser name":     "client_browser",
 	"client_application name": "client_application",
+
+	// Some client fields are "Additional" meta data optionally provided by the client.
+	// The NDT client names these fields differently than the server.
+	// Other clients may provide different key names.
+	"client.kernel.version": "client_kernel_version",
+	"client.version":        "client_version",
+
+	// NDT SSL added two additional meta fields to signify whether the test was
+	// a websocket and/or tls test.
+	"tls":       "tls",
+	"websocket": "websocket",
 }
 
 func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
@@ -66,6 +77,8 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 			connSpec.SetString(v, s)
 		}
 	}
+	connSpec.SetBool("tls", mfd.Tls)
+	connSpec.SetBool("websocket", mfd.Websockets)
 	s, ok := mfd.Fields["server_ip"]
 	// TODO - extract function for this stanza
 	if ok && s != "" {
