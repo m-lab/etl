@@ -85,14 +85,16 @@ func (s Web100ValueMap) SetString(name string, value string) {
 	s[name] = value
 }
 
-func (r Web100ValueMap) SubstituteString(onlyIfNull bool, target []string, source []string) {
+// if overwrite is false, will only add missing values.
+// if overwrite is true, will overwrite existing values.
+func (r Web100ValueMap) SubstituteString(overwrite bool, target []string, source []string) {
 	m := r.GetMap(target[:len(target)-1])
 	if m == nil {
 		// Error ?
 		log.Printf("No such path: %v\n", target)
 		return
 	}
-	if _, notNull := m[target[len(target)-1]]; onlyIfNull && notNull {
+	if _, notNull := m[target[len(target)-1]]; notNull && !overwrite {
 		// All good
 		return
 	}
@@ -104,14 +106,16 @@ func (r Web100ValueMap) SubstituteString(onlyIfNull bool, target []string, sourc
 	m[target[len(target)-1]] = value
 }
 
-func (r Web100ValueMap) SubstituteInt64(onlyIfNull bool, target []string, source []string) {
+// if overwrite is false, will only add missing values.
+// if overwrite is true, will overwrite existing values.
+func (r Web100ValueMap) SubstituteInt64(overwrite bool, target []string, source []string) {
 	m := r.GetMap(target[:len(target)-1])
 	if m == nil {
 		// Error ?
 		log.Printf("No such path: %v\n", target)
 		return
 	}
-	if _, notNull := m[target[len(target)-1]]; onlyIfNull && notNull {
+	if _, notNull := m[target[len(target)-1]]; notNull && !overwrite {
 		// All good
 		return
 	}

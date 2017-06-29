@@ -575,9 +575,9 @@ func (n *NDTParser) fixValues(r schema.Web100ValueMap) {
 	// snapshot addresses are always authoritative.  Other sources don't handle
 	// ipv6 correctly.  So, always substitute, unless for some reason the snapshot
 	// value is missing.
-	logEntry.SubstituteString(false, []string{"connection_spec", "local_ip"},
+	logEntry.SubstituteString(true, []string{"connection_spec", "local_ip"},
 		[]string{"snap", "LocalAddress"})
-	logEntry.SubstituteString(false, []string{"connection_spec", "remote_ip"},
+	logEntry.SubstituteString(true, []string{"connection_spec", "remote_ip"},
 		[]string{"snap", "RemAddress"})
 
 	// Handle local_af.
@@ -599,13 +599,13 @@ func (n *NDTParser) fixValues(r schema.Web100ValueMap) {
 	// file is missing, they may be empty.  In that case, we replace them
 	// with values from the log entry, (which usually come from the snapshot.)
 	// TODO - make these the ONLY representation of client/server tuple.
-	r.SubstituteString(true, []string{"connection_spec", "server_ip"},
+	r.SubstituteString(false, []string{"connection_spec", "server_ip"},
 		[]string{"web100_log_entry", "connection_spec", "local_ip"})
-	r.SubstituteInt64(true, []string{"connection_spec", "server_af"},
+	r.SubstituteInt64(false, []string{"connection_spec", "server_af"},
 		[]string{"web100_log_entry", "connection_spec", "local_af"})
-	r.SubstituteString(true, []string{"connection_spec", "client_ip"},
+	r.SubstituteString(false, []string{"connection_spec", "client_ip"},
 		[]string{"web100_log_entry", "connection_spec", "remote_ip"})
-	r.SubstituteInt64(true, []string{"connection_spec", "client_af"},
+	r.SubstituteInt64(false, []string{"connection_spec", "client_af"},
 		[]string{"web100_log_entry", "connection_spec", "local_af"})
 
 	start, ok := snap.GetInt64([]string{"StartTimeStamp"})
