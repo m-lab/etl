@@ -51,8 +51,8 @@ var fieldPairs = map[string]string{
 
 	// NDT SSL added two additional meta fields to signify whether the test was
 	// a websocket and/or tls test.
-	"tls":       "tls",
-	"websocket": "websocket",
+	"tls":        "tls",
+	"websockets": "websockets",
 }
 
 func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
@@ -83,8 +83,17 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 			log.Printf("Missing field: %s %v\n", k, v)
 		}
 	}
-	connSpec.SetBool("tls", mfd.Tls)
-	connSpec.SetBool("websocket", mfd.Websockets)
+	// Only set the value for tls & websocket if the field is present.
+	if s, ok := mfd.Fields["tls"]; ok {
+		if s != "" {
+			connSpec.SetBool("tls", mfd.Tls)
+		}
+	}
+	if s, ok := mfd.Fields["websockets"]; ok {
+		if s != "" {
+			connSpec.SetBool("websockets", mfd.Websockets)
+		}
+	}
 	s, ok := mfd.Fields["server_ip"]
 	// TODO - extract function for this stanza
 	if ok {
@@ -123,8 +132,10 @@ func createMetaFileData(testName string, fields map[string]string) (*MetaFileDat
 				"20060102T15:04:05.999999999Z", v)
 		case "tls":
 			data.Tls, err = strconv.ParseBool(v)
+			data.Fields[k] = v
 		case "websockets":
 			data.Websockets, err = strconv.ParseBool(v)
+			data.Fields[k] = v
 		case "Summary data":
 			err = json.Unmarshal(
 				[]byte(`{"SummaryData":[`+v+`]}`),

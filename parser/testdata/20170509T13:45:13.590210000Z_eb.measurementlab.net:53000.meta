@@ -18,5 +18,4 @@ Summary data: 0,36,1346,14,2983,24,32,2,74,0,1448,16,39,136448,23184,8688,0,1052
 client.os.name: CLIWebsockets
 client.version: 3.7.0
 client.kernel.version: 3.14.0
-tls: false
 websockets: true

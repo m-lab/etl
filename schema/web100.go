@@ -185,7 +185,7 @@ func FullConnectionSpec() Web100ValueMap {
 		"client_application":    "",
 		"data_direction":        0,
 		"tls":                   false,
-		"websocket":             false,
+		"websockets":            false,
 		"client_geolocation":    FullGeolocation(),
 		"server_geolocation":    FullGeolocation(),
 	}

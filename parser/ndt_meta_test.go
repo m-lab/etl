@@ -69,11 +69,11 @@ func TestMetaParser(t *testing.T) {
 
 	}
 
-	if connSpec["tls"] != false {
-		t.Error("Incorrect tls: got true; want false")
+	if s, ok := connSpec["tls"]; ok {
+		t.Errorf("Found field tls: got %q; want not found", s)
 	}
-	if connSpec["websocket"] != true {
-		t.Error("Incorrect websocket: got false; want")
+	if connSpec["websockets"] != true {
+		t.Errorf("Incorrect websockets: got %q; want true", connSpec["websockets"])
 	}
 	if connSpec["client_kernel_version"] != "3.14.0" {
 		t.Errorf("Incorrect client_kernel_version: got %s; want 3.14.0",
