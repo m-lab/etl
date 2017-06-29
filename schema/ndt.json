@@ -26,6 +26,8 @@
           { "name": "server_hostname", "type": "STRING"},
           { "name": "server_ip", "type": "STRING"},
           { "name": "server_kernel_version", "type": "STRING"},
+          { "name": "tls", "type": "BOOLEAN"},
+          { "name": "websocket", "type": "BOOLEAN"},
           {
             "fields": [
               { "name": "area_code", "type": "INTEGER"},
