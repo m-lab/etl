@@ -48,7 +48,9 @@ func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
 	connSpec.SetString(prefix+"_ip", ipString)
 	ip := net.ParseIP(ipString)
 	if ip == nil {
-		// TODO - log/metric
+		log.Printf("Failed parsing connSpec IP: %s\n", ipString)
+		metrics.WarningCount.WithLabelValues(
+			"ndt", "unknown", "failed parsing connSpec IP").Inc()
 	} else {
 		connSpec.SetString(prefix+"_ip", ip.String())
 		if ip.To4() != nil {
@@ -62,18 +64,33 @@ func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
 func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 	for k, v := range fieldPairs {
 		s, ok := mfd.Fields[k]
-		if ok && s != "" {
-			connSpec.SetString(v, s)
+		if ok {
+			if s != "" {
+				connSpec.SetString(v, s)
+			}
+		} else {
+			log.Printf("Missing field: %s %v\n", k, v)
 		}
 	}
-	s, ok := mfd.Fields["server_ip"]
+	s, ok := connSpec["server_ip"]
 	// TODO - extract function for this stanza
-	if ok && s != "" {
-		handleIP(connSpec, "server", s)
+	if ok {
+		if s != "" {
+			handleIP(connSpec, "server", s.(string))
+		}
+	} else {
+		metrics.WarningCount.WithLabelValues(
+			"table", "unknown", "missing server_ip").Inc()
 	}
-	s, ok = mfd.Fields["client_ip"]
-	if ok && s != "" {
-		handleIP(connSpec, "client", s)
+	s, ok = connSpec["client_ip"]
+	if ok {
+		if s != "" {
+			handleIP(connSpec, "client", s.(string))
+		}
+	} else {
+		log.Println("client_ip missing from .meta")
+		metrics.WarningCount.WithLabelValues(
+			"table", "unknown", "missing client_ip").Inc()
 	}
 }
 
