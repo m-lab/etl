@@ -94,7 +94,7 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 			connSpec.SetBool("websockets", mfd.Websockets)
 		}
 	}
-	s, ok := mfd.Fields["server_ip"]
+	s, ok := connSpec["server_ip"]
 	// TODO - extract function for this stanza
 	if ok {
 		if s != "" {
@@ -102,7 +102,7 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 		}
 	} else {
 		metrics.WarningCount.WithLabelValues(
-			"table", "unknown", "missing server_ip").Inc()
+			"ndt", "unknown", "missing server_ip").Inc()
 	}
 	s, ok = connSpec["client_ip"]
 	if ok {
@@ -112,7 +112,7 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 	} else {
 		log.Println("client_ip missing from .meta")
 		metrics.WarningCount.WithLabelValues(
-			"table", "unknown", "missing client_ip").Inc()
+			"ndt", "unknown", "missing client_ip").Inc()
 	}
 }
 
