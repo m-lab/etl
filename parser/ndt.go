@@ -3,6 +3,7 @@ package parser
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"regexp"
 	"strings"
@@ -502,7 +503,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	}
 	results["connection_spec"] = connSpec
 
-	fixValues(results)
+	n.fixValues(results)
 	// TODO fix InsertRow so that we can distinguish errors from prior rows.
 	metrics.EntryFieldCountHistogram.WithLabelValues(n.TableName()).
 		Observe(float64(deltaFieldCount))
@@ -547,7 +548,7 @@ const (
 // fixValues updates web100 log values that need post-processing fix-ups.
 // TODO(dev): does this only apply to NDT or is NPAD also affected?
 // TODO(dev) - consider improving test coverage.
-func fixValues(r schema.Web100ValueMap) {
+func (n *NDTParser) fixValues(r schema.Web100ValueMap) {
 	connSpec := r.GetMap([]string{"connection_spec"})
 	logEntry := r.GetMap([]string{"web100_log_entry"})
 	snap := logEntry.GetMap([]string{"snap"})
@@ -558,6 +559,17 @@ func fixValues(r schema.Web100ValueMap) {
 	// that here.
 	if connSpec["client_hostname"] == "No FQDN name" {
 		delete(connSpec, "client_hostname")
+	}
+
+	// If there is no meta file then the server hostname will not be set.
+	if connSpec["server_hostname"] == "" {
+		data, err := etl.ValidateTestPath(n.taskFileName)
+		if err != nil {
+			log.Println("WARNING: taskFileName is unexpectedly invalid.")
+		} else {
+			connSpec["server_hostname"] = fmt.Sprintf(
+				"%s.%s.%s", data.Host, data.Pod, etl.MlabDomain)
+		}
 	}
 
 	// snapshot addresses are always authoritative.  Other sources don't handle
