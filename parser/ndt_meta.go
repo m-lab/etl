@@ -42,6 +42,17 @@ var fieldPairs = map[string]string{
 	"client OS name":          "client_os",
 	"client_browser name":     "client_browser",
 	"client_application name": "client_application",
+
+	// Some client fields are "Additional" meta data optionally provided by the client.
+	// The NDT client names these fields differently than the server.
+	// Other clients may provide different key names.
+	"client.kernel.version": "client_kernel_version",
+	"client.version":        "client_version",
+
+	// NDT SSL added two additional meta fields to signify whether the test was
+	// a websocket and/or tls test.
+	"tls":        "tls",
+	"websockets": "websockets",
 }
 
 func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
@@ -72,6 +83,17 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 			log.Printf("Missing field: %s %v\n", k, v)
 		}
 	}
+	// Only set the value for tls & websocket if the field is present.
+	if s, ok := mfd.Fields["tls"]; ok {
+		if s != "" {
+			connSpec.SetBool("tls", mfd.Tls)
+		}
+	}
+	if s, ok := mfd.Fields["websockets"]; ok {
+		if s != "" {
+			connSpec.SetBool("websockets", mfd.Websockets)
+		}
+	}
 	s, ok := connSpec["server_ip"]
 	// TODO - extract function for this stanza
 	if ok {
@@ -80,7 +102,7 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 		}
 	} else {
 		metrics.WarningCount.WithLabelValues(
-			"table", "unknown", "missing server_ip").Inc()
+			"ndt", "unknown", "missing server_ip").Inc()
 	}
 	s, ok = connSpec["client_ip"]
 	if ok {
@@ -90,7 +112,7 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 	} else {
 		log.Println("client_ip missing from .meta")
 		metrics.WarningCount.WithLabelValues(
-			"table", "unknown", "missing client_ip").Inc()
+			"ndt", "unknown", "missing client_ip").Inc()
 	}
 }
 
@@ -110,8 +132,10 @@ func createMetaFileData(testName string, fields map[string]string) (*MetaFileDat
 				"20060102T15:04:05.999999999Z", v)
 		case "tls":
 			data.Tls, err = strconv.ParseBool(v)
+			data.Fields[k] = v
 		case "websockets":
 			data.Websockets, err = strconv.ParseBool(v)
+			data.Fields[k] = v
 		case "Summary data":
 			err = json.Unmarshal(
 				[]byte(`{"SummaryData":[`+v+`]}`),

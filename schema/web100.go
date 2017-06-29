@@ -85,6 +85,11 @@ func (s Web100ValueMap) SetString(name string, value string) {
 	s[name] = value
 }
 
+// SetBool saves a boolean in a field with the given name.
+func (s Web100ValueMap) SetBool(name string, value bool) {
+	s[name] = value
+}
+
 // if overwrite is false, will only add missing values.
 // if overwrite is true, will overwrite existing values.
 func (r Web100ValueMap) SubstituteString(overwrite bool, target []string, source []string) {
@@ -179,6 +184,8 @@ func FullConnectionSpec() Web100ValueMap {
 		"client_browser":        "",
 		"client_application":    "",
 		"data_direction":        0,
+		"tls":                   false,
+		"websockets":            false,
 		"client_geolocation":    FullGeolocation(),
 		"server_geolocation":    FullGeolocation(),
 	}

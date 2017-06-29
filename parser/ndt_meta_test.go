@@ -37,6 +37,7 @@ func TestMetaParser(t *testing.T) {
 		t.Error("Incorrect hostname: ", meta.Fields["hostname"])
 	}
 
+	// Check for the presenece of select connSpec fields.
 	connSpec := schema.EmptyConnectionSpec()
 	meta.PopulateConnSpec(connSpec)
 
@@ -63,5 +64,25 @@ func TestMetaParser(t *testing.T) {
 		if v.(int64) != syscall.AF_INET {
 			t.Logf("Wrong client_af value: ", v.(int64))
 		}
+
+	}
+
+	if s, ok := connSpec["tls"]; ok {
+		t.Errorf("Found field tls: got %q; want not found", s)
+	}
+	if connSpec["websockets"] != true {
+		t.Errorf("Incorrect websockets: got %q; want true", connSpec["websockets"])
+	}
+	if connSpec["client_kernel_version"] != "3.14.0" {
+		t.Errorf("Incorrect client_kernel_version: got %s; want 3.14.0",
+			connSpec["client_kernel_version"])
+	}
+	if connSpec["client_version"] != "3.7.0" {
+		t.Errorf("Incorrect client_version: got %s; want 3.7.0",
+			connSpec["client_version"])
+	}
+	if connSpec["client_os"] != "CLIWebsockets" {
+		t.Errorf("Incorrect client_os: got %s; want CLIWebsockets",
+			connSpec["client_os"])
 	}
 }
