@@ -11,6 +11,7 @@ const dateTime = `(\d{4}[01]\d[0123]\d)T000000Z`
 const mlabN_podNN = `-(mlab\d)-([[:alpha:]]{3}\d[0-9t])-`
 const exp_NNNN = `(.*)-(\d{4})`
 const suffix = `(?:\.tar|\.tar.gz|\.tgz)$`
+const MlabDomain = `measurement-lab.org`
 
 // These are here to facilitate use across queue-pusher and parsing components.
 var (
