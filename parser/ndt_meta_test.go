@@ -2,7 +2,6 @@ package parser_test
 
 import (
 	"io/ioutil"
-	"log"
 	"syscall"
 	"testing"
 	"time"
@@ -48,21 +47,21 @@ func TestMetaParser(t *testing.T) {
 
 	// But the client_ip address (and client_af) should be fine.
 	if v, ok := connSpec["client_ip"]; !ok {
-		log.Println("missing client ip address")
+		t.Logf("missing client ip address")
 		for k, v := range meta.Fields {
-			log.Printf("%s : %s\n", k, v)
+			t.Logf("%s : %s\n", k, v)
 		}
 		t.Error("missing client ip address")
 	} else {
-		log.Printf("found client ip: %v\n", v)
+		t.Logf("found client ip: %v\n", v)
 	}
 
 	if v, ok := connSpec["client_af"]; !ok {
-		log.Println("missing client_af annotation")
+		t.Logf("missing client_af annotation")
 		t.Error("missing client_af")
 	} else {
 		if v.(int64) != syscall.AF_INET {
-			log.Printf("Wrong client_af value: ", v.(int64))
+			t.Logf("Wrong client_af value: ", v.(int64))
 		}
 	}
 }

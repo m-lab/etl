@@ -50,7 +50,7 @@ func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
 	if ip == nil {
 		log.Printf("Failed parsing connSpec IP: %s\n", ipString)
 		metrics.WarningCount.WithLabelValues(
-			"table", "unknown", "failed parsing connSpec IP").Inc()
+			"ndt", "unknown", "failed parsing connSpec IP").Inc()
 	} else {
 		connSpec.SetString(prefix+"_ip", ip.String())
 		if ip.To4() != nil {
