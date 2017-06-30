@@ -28,8 +28,8 @@ func TestCreateTestId(t *testing.T) {
 }
 
 func TestPTParser(t *testing.T) {
-	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
-	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris", rawData, "pt-daily")
+	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
+	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -104,11 +104,11 @@ func TestPTParser(t *testing.T) {
 func TestPTInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
 	n := parser.NewPTParser(ins)
-	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
+	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
 	}
-	err = n.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris", rawData)
+	err = n.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -117,7 +117,7 @@ func TestPTInserter(t *testing.T) {
 	}
 
 	expectedValues := &schema.PT{
-		Test_id:  "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris",
+		Test_id:  "20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris",
 		Project:  3,
 		Log_time: 1490053990,
 		Connection_spec: schema.MLabConnectionSpecification{
