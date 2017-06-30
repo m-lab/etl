@@ -21,20 +21,6 @@ type PTFileName struct {
 	Name string
 }
 
-// GetLocalIP parse the filename and return IP.
-// TODO(dev): use regex parser.
-func (f *PTFileName) GetIPTuple() (string, string, string, string) {
-	firstIPStart := strings.IndexByte(f.Name, '-')
-	first_segment := f.Name[firstIPStart+1 : len(f.Name)]
-	firstPortStart := strings.IndexByte(first_segment, '-')
-	second_segment := first_segment[firstPortStart+1 : len(first_segment)]
-	secondIPStart := strings.IndexByte(second_segment, '-')
-	third_segment := second_segment[secondIPStart+1 : len(second_segment)]
-	secondPortStart := strings.IndexByte(third_segment, '-')
-	secondPortEnd := strings.LastIndexByte(third_segment, '.')
-	return first_segment[0:firstPortStart], second_segment[0:secondIPStart], third_segment[0:secondPortStart], third_segment[secondPortStart+1 : secondPortEnd]
-}
-
 func (f *PTFileName) GetDate() (string, bool) {
 	if len(f.Name) > 18 {
 		// Return date string in format "20170320T23:53:10Z"
@@ -122,11 +108,18 @@ func Unique(one_node Node, list []Node) bool {
 
 // Handle the first line, like
 // "traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s"
-func ParseFirstLine(oneLine string) (protocol string) {
+func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP string) {
 	parts := strings.Split(oneLine, ",")
 	// check protocol
 	// check algo
-	for _, part := range parts {
+	for index, part := range parts {
+		if index == 0 {
+			segments := strings.Split(part, " ")
+			portIndex := strings.IndexByte(segments[1], ':')
+			server_IP = segments[1][2:portIndex]
+			portIndex = strings.IndexByte(segments[3], ':')
+			dest_IP = segments[3][1:portIndex]
+		}
 		mm := strings.Split(strings.TrimSpace(part), " ")
 		if len(mm) > 1 {
 			if mm[0] == "algo" {
@@ -137,14 +130,14 @@ func ParseFirstLine(oneLine string) (protocol string) {
 			if mm[0] == "protocol" {
 				if mm[1] != "icmp" && mm[1] != "udp" && mm[1] != "tcp" {
 					log.Printf("Unknown protocol")
-					return ""
+					return "", "", ""
 				} else {
 					protocol = mm[1]
 				}
 			}
 		}
 	}
-	return protocol
+	return protocol, dest_IP, server_IP
 }
 
 func GetLogtime(filename PTFileName) int64 {
@@ -347,16 +340,13 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
-	dest_IP, _, server_IP, _ := fn.GetIPTuple()
+	// Check whether the file name format is old format ("20160221T23:43:25Z_ALL27695.paris")
+	// or new 5-tuple format ("20170501T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris").
+	dest_IP := ""
+	server_IP := ""
+	// We do not need to get dest_IP and server_IP from file name, since they are at the first line
+	// of test content as well.
 	t := GetLogtime(fn)
-
-	conn_spec := &schema.MLabConnectionSpecification{
-		Server_ip:      server_IP,
-		Server_af:      IPv4_AF,
-		Client_ip:      dest_IP,
-		Client_af:      IPv4_AF,
-		Data_direction: 0,
-	}
 
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
@@ -377,7 +367,11 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 		var new_leaves []Node
 		if is_first_line {
 			is_first_line = false
-			protocol = ParseFirstLine(oneLine)
+			protocol, dest_IP, server_IP = ParseFirstLine(oneLine)
+			if protocol == "" {
+				metrics.TestCount.WithLabelValues(tableName, "pt", "wrong protocol").Inc()
+				return nil, 0, nil, errors.New("wrong protocol")
+			}
 		} else {
 			// Handle each line of test file after the first line.
 			// TODO(dev): use regexp here
@@ -406,6 +400,12 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol, tableName)
-
+	conn_spec := &schema.MLabConnectionSpecification{
+		Server_ip:      server_IP,
+		Server_af:      IPv4_AF,
+		Client_ip:      dest_IP,
+		Client_af:      IPv4_AF,
+		Data_direction: 0,
+	}
 	return PT_hops, t, conn_spec, nil
 }
