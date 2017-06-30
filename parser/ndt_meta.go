@@ -79,8 +79,6 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 			if s != "" {
 				connSpec.SetString(v, s)
 			}
-		} else {
-			log.Printf("Missing field: %s %v\n", k, v)
 		}
 	}
 	// Only set the value for tls & websocket if the field is present.
