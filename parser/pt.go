@@ -120,8 +120,10 @@ func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP 
 				server_IP = segments[1][2:portIndex]
 				portIndex = strings.IndexByte(segments[3], ':')
 				dest_IP = segments[3][1:portIndex]
+				if server_IP == "" || dest_IP == "" {
+					return "", "", "", errors.New("corrupted first line.")
+				}
 			} else {
-				fmt.Println(oneLine)
 				return "", "", "", errors.New("corrupted first line.")
 			}
 		}
