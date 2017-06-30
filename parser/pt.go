@@ -108,7 +108,7 @@ func Unique(one_node Node, list []Node) bool {
 
 // Handle the first line, like
 // "traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s"
-func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP string) {
+func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP string, err error) {
 	parts := strings.Split(oneLine, ",")
 	// check protocol
 	// check algo
@@ -130,14 +130,14 @@ func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP 
 			if mm[0] == "protocol" {
 				if mm[1] != "icmp" && mm[1] != "udp" && mm[1] != "tcp" {
 					log.Printf("Unknown protocol")
-					return "", "", ""
+					return "", "", "", errors.New("Unknown protocol")
 				} else {
 					protocol = mm[1]
 				}
 			}
 		}
 	}
-	return protocol, dest_IP, server_IP
+	return protocol, dest_IP, server_IP, nil
 }
 
 func GetLogtime(filename PTFileName) int64 {
@@ -356,7 +356,8 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	var current_leaves []Node
 	// This var keep all possible nodes
 	var all_nodes []Node
-
+	// TODO(dev): Handle the first line explicitly before this for loop,
+	// then run the for loop on the remainder of the slice.
 	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
 		// Skip initial lines starting with #.
@@ -367,10 +368,11 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 		var new_leaves []Node
 		if is_first_line {
 			is_first_line = false
-			protocol, dest_IP, server_IP = ParseFirstLine(oneLine)
-			if protocol == "" {
-				metrics.TestCount.WithLabelValues(tableName, "pt", "wrong protocol").Inc()
-				return nil, 0, nil, errors.New("wrong protocol")
+			protocol, dest_IP, server_IP, err = ParseFirstLine(oneLine)
+			if err != nil {
+				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
+				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
+				return nil, 0, nil, err
 			}
 		} else {
 			// Handle each line of test file after the first line.
