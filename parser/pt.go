@@ -368,6 +368,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 		var new_leaves []Node
 		if is_first_line {
 			is_first_line = false
+			var err error
 			protocol, dest_IP, server_IP, err = ParseFirstLine(oneLine)
 			if err != nil {
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()

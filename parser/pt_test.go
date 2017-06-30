@@ -12,8 +12,8 @@ import (
 
 // TODO: IPv6 tests
 func TestParseFirstLine(t *testing.T) {
-	protocol, dest_ip, server_ip := parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s")
-	if dest_ip != "98.162.212.214" || server_ip != "64.86.132.76" || protocol != "icmp" {
+	protocol, dest_ip, server_ip, err := parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s")
+	if dest_ip != "98.162.212.214" || server_ip != "64.86.132.76" || protocol != "icmp" || err != nil {
 		t.Errorf("Error in parsing the first line!\n")
 		return
 	}
