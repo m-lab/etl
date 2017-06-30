@@ -11,11 +11,10 @@ import (
 )
 
 // TODO: IPv6 tests
-func TestGetIPTuple(t *testing.T) {
-	fn1 := parser.PTFileName{Name: "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris"}
-	dest_ip, dest_port, server_ip, server_port := fn1.GetIPTuple()
-	if dest_ip != "98.162.212.214" || dest_port != "53849" || server_ip != "64.86.132.75" || server_port != "42677" {
-		t.Errorf("Wrong file name parsing!\n")
+func TestParseFirstLine(t *testing.T) {
+	protocol, dest_ip, server_ip, err := parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s")
+	if dest_ip != "98.162.212.214" || server_ip != "64.86.132.76" || protocol != "icmp" || err != nil {
+		t.Errorf("Error in parsing the first line!\n")
 		return
 	}
 
@@ -29,8 +28,8 @@ func TestCreateTestId(t *testing.T) {
 }
 
 func TestPTParser(t *testing.T) {
-	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
-	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris", rawData, "pt-daily")
+	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
+	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -39,9 +38,9 @@ func TestPTParser(t *testing.T) {
 	}
 
 	expected_cspec := schema.MLabConnectionSpecification{
-		Server_ip:      "64.86.132.75",
+		Server_ip:      "172.17.94.34",
 		Server_af:      2,
-		Client_ip:      "98.162.212.214",
+		Client_ip:      "74.125.224.100",
 		Client_af:      2,
 		Data_direction: 0,
 	}
@@ -88,7 +87,7 @@ func TestPTParser(t *testing.T) {
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.25.252.166", Src_af: 2, Dest_ip: "172.25.253.46", Dest_af: 2, Src_hostname: "us-mtv-ply1-bb1-tengigabitethernet2-3.n.corp.google.com", Dest_hostname: "us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com", Rtt: []float64{0.343}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.25.252.172", Src_af: 2, Dest_ip: "172.25.252.166", Dest_af: 2, Src_hostname: "us-mtv-cl4-core1-gigabitethernet1-1.n.corp.google.com", Dest_hostname: "us-mtv-ply1-bb1-tengigabitethernet2-3.n.corp.google.com", Rtt: []float64{0.501}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.17.95.252", Src_af: 2, Dest_ip: "172.25.252.172", Dest_af: 2, Src_hostname: "172.17.95.252", Dest_hostname: "us-mtv-cl4-core1-gigabitethernet1-1.n.corp.google.com", Rtt: []float64{0.407}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "64.86.132.75", Src_af: 2, Dest_ip: "172.17.95.252", Dest_af: 2, Dest_hostname: "172.17.95.252", Rtt: []float64{0.376}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.17.94.34", Src_af: 2, Dest_ip: "172.17.95.252", Dest_af: 2, Dest_hostname: "172.17.95.252", Rtt: []float64{0.376}},
 	}
 	if len(hops) != len(expected_hops) {
 		t.Fatalf("Wrong results for PT hops!")
@@ -105,11 +104,11 @@ func TestPTParser(t *testing.T) {
 func TestPTInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
 	n := parser.NewPTParser(ins)
-	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
+	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
 	}
-	err = n.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris", rawData)
+	err = n.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -118,13 +117,13 @@ func TestPTInserter(t *testing.T) {
 	}
 
 	expectedValues := &schema.PT{
-		Test_id:  "20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris",
+		Test_id:  "20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris",
 		Project:  3,
 		Log_time: 1490053990,
 		Connection_spec: schema.MLabConnectionSpecification{
-			Server_ip:      "64.86.132.75",
+			Server_ip:      "172.17.94.34",
 			Server_af:      2,
-			Client_ip:      "98.162.212.214",
+			Client_ip:      "74.125.224.100",
 			Client_af:      2,
 			Data_direction: 0,
 		},
