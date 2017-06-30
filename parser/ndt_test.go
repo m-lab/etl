@@ -71,7 +71,8 @@ func TestNDTParser(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	meta := map[string]bigquery.Value{"filename": "tarfile.tgz"}
+	// Use a valid archive name.
+	meta := map[string]bigquery.Value{"filename": "gs://mlab-test-bucket/ndt/2017/06/13/20170613T000000Z-mlab3-vie01-ndt-0186.tgz"}
 	err = n.ParseAndInsert(meta, s2cName+".gz", s2cData)
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -100,6 +101,9 @@ func TestNDTParser(t *testing.T) {
 	// Extract the values saved to the inserter.
 	actualValues := ins.data[0].(*bq.MapSaver).Values
 	expectedValues := schema.Web100ValueMap{
+		"connection_spec": schema.Web100ValueMap{
+			"server_hostname": "mlab3.vie01.measurement-lab.org",
+		},
 		"web100_log_entry": schema.Web100ValueMap{
 			"version": "2.5.27 201001301335 net100",
 			"snap": schema.Web100ValueMap{
