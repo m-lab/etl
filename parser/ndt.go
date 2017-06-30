@@ -562,13 +562,17 @@ func (n *NDTParser) fixValues(r schema.Web100ValueMap) {
 	}
 
 	// If there is no meta file then the server hostname will not be set.
-	if connSpec["server_hostname"] == "" {
+	// We must check for presence and an empty value.
+	hn, ok := connSpec["server_hostname"]
+	if !ok || hn == "" {
 		data, err := etl.ValidateTestPath(n.taskFileName)
 		if err != nil {
-			log.Println("WARNING: taskFileName is unexpectedly invalid.")
+			// The current filename is ambiguous, but the timestamp should help.
+			log.Printf("WARNING: taskFileName is unexpectedly invalid: %s %s: %q",
+				n.taskFileName, n.timestamp, err)
 		} else {
-			connSpec["server_hostname"] = fmt.Sprintf(
-				"%s.%s.%s", data.Host, data.Pod, etl.MlabDomain)
+			connSpec.SetString("server_hostname", fmt.Sprintf(
+				"%s.%s.%s", data.Host, data.Pod, etl.MlabDomain))
 		}
 	}
 
