@@ -17,6 +17,10 @@ import (
 	"github.com/m-lab/etl/storage"
 )
 
+// Impose 200MB max size for a single file.  Larger than this risks an OOM if there are
+// multiple large files at on multiple tasks.
+const MAX_FILE_SIZE = 200000000
+
 // TODO(dev) Add unit tests for meta data.
 type Task struct {
 	// ETLSource and Parser are both embedded, so their interfaces are delegated
@@ -46,8 +50,12 @@ func (tt *Task) ProcessAllTests() (int, error) {
 	defer metrics.WorkerState.WithLabelValues("task").Dec()
 	files := 0
 	nilData := 0
+	var testname string
+	var data []byte
+	var err error
 	// Read each file from the tar
-	for testname, data, err := tt.NextTest(); err != io.EOF; testname, data, err = tt.NextTest() {
+
+	for testname, data, err = tt.NextTest(MAX_FILE_SIZE); err != io.EOF; testname, data, err = tt.NextTest(MAX_FILE_SIZE) {
 		files++
 		if err != nil {
 			if err == io.EOF {
@@ -89,14 +97,18 @@ func (tt *Task) ProcessAllTests() (int, error) {
 	}
 
 	// Flush any rows cached in the inserter.
-	err := tt.Flush()
+	flushErr := tt.Flush()
 
-	if err != nil {
-		log.Printf("%v", err)
+	if flushErr != nil {
+		log.Printf("%v", flushErr)
 	}
 	// TODO - make this debug or remove
 	log.Printf("Processed %d files, %d nil data, %d rows committed, %d failed, from %s into %s",
 		files, nilData, tt.Parser.Committed(), tt.Parser.Failed(),
 		tt.meta["filename"], tt.Parser.FullTableName())
-	return files, err
+	// Return the file count, and the terminal error, if other than EOF.
+	if err != io.EOF {
+		return files, err
+	}
+	return files, nil
 }

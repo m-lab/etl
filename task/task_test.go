@@ -84,7 +84,7 @@ func TestTarFileInput(t *testing.T) {
 
 	// Among other things, this requires that tp implements etl.Parser.
 	tt := task.NewTask("filename", rdr, tp)
-	fn, bb, err := tt.NextTest()
+	fn, bb, err := tt.NextTest(1000)
 	if err != nil {
 		t.Error(err)
 	}
@@ -95,7 +95,7 @@ func TestTarFileInput(t *testing.T) {
 		t.Error("Expected biscuits but got ", string(bb))
 	}
 
-	fn, bb, err = tt.NextTest()
+	fn, bb, err = tt.NextTest(1000)
 	if err != nil {
 		t.Error(err)
 	}
