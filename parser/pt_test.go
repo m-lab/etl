@@ -18,6 +18,12 @@ func TestParseFirstLine(t *testing.T) {
 		return
 	}
 
+	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("Exception : [ERROR](Probe.cc, 109)Can't send the probe : Invalid argument")
+	if err == nil {
+		t.Errorf("Error in parsing the first line!\n")
+		return
+	}
+
 }
 
 func TestCreateTestId(t *testing.T) {

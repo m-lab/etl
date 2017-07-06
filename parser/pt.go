@@ -186,10 +186,6 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
 	}
 
-	if test_id == "2016/01/12/mlab1.mnl01/20160112T00:45:44Z_ALL27409.paris.gz" {
-		fmt.Println("process target file")
-	}
-
 	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
