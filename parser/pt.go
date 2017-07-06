@@ -115,17 +115,10 @@ func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP 
 	for index, part := range parts {
 		if index == 0 {
 			segments := strings.Split(part, " ")
-			if len(segments) == 4 {
-				portIndex := strings.IndexByte(segments[1], ':')
-				server_IP = segments[1][2:portIndex]
-				portIndex = strings.IndexByte(segments[3], ':')
-				dest_IP = segments[3][1:portIndex]
-				if server_IP == "" || dest_IP == "" {
-					return "", "", "", errors.New("corrupted first line.")
-				}
-			} else {
-				return "", "", "", errors.New("corrupted first line.")
-			}
+			portIndex := strings.IndexByte(segments[1], ':')
+			server_IP = segments[1][2:portIndex]
+			portIndex = strings.IndexByte(segments[3], ':')
+			dest_IP = segments[3][1:portIndex]
 		}
 		mm := strings.Split(strings.TrimSpace(part), " ")
 		if len(mm) > 1 {
@@ -188,6 +181,14 @@ func CreateTestId(fn string, bn string) string {
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues("pt").Inc()
 	defer metrics.WorkerState.WithLabelValues("pt").Dec()
+	test_id := filepath.Base(testName)
+	if meta["filename"] != nil {
+		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
+	}
+
+	if test_id == "2016/01/12/mlab1.mnl01/20160112T00:45:44Z_ALL27409.paris.gz" {
+		fmt.Println("process target file")
+	}
 
 	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent, pt.TableName())
 	if err != nil {
@@ -198,10 +199,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		log.Println(err)
 		return err
 	}
-	test_id := filepath.Base(testName)
-	if meta["filename"] != nil {
-		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
-	}
+
 	insertErr := false
 	for _, hop := range hops {
 		pt_test := schema.PT{
