@@ -42,6 +42,3 @@ network:
   # Note: the default AppEngine container port 8080 cannot be forwarded.
   forwarded_ports:
     - 9090/tcp
-
-env_variables:
-  MAX_WORKERS: 30
