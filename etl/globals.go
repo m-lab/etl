@@ -108,7 +108,7 @@ var (
 	DataTypeToBQBufferSize = map[DataType]int{
 		NDT:     10,
 		SS:      100,
-		PT:      100,
+		PT:      200,
 		SW:      100,
 		INVALID: 0,
 	}
