@@ -28,7 +28,7 @@ queue:
   target: etl-traceroute-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
-  rate: 2.5/s
+  rate: 1.5/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
   bucket_size: 10
