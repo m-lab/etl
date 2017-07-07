@@ -501,6 +501,14 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		connSpec.SetInt64("data_direction", SERVER_TO_CLIENT)
 	default:
 	}
+	ip, ok := connSpec["client_ip"].(string)
+	if ok {
+		addMetaData(nil, nil, ip)
+	}
+	ip, ok = connSpec["server_ip"].(string)
+	if ok {
+		addMetaData(nil, nil, ip)
+	}
 	results["connection_spec"] = connSpec
 
 	n.fixValues(results)
