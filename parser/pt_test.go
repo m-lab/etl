@@ -18,12 +18,37 @@ func TestParseFirstLine(t *testing.T) {
 		return
 	}
 
+	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("Exception : [ERROR](Probe.cc, 109)Can't send the probe : Invalid argument")
+	if err == nil {
+		t.Errorf("Error in parsing the first line!\n")
+		return
+	}
+
 }
 
 func TestCreateTestId(t *testing.T) {
 	test_id := parser.CreateTestId("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz", "20170501T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
 	if test_id != "2017/05/01/mlab1.acc02/20170501T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris.gz" {
 		fmt.Println(test_id)
+	}
+}
+
+func TestParseLegacyFormatData(t *testing.T) {
+	rawData, err := ioutil.ReadFile("testdata/20160112T00:45:44Z_ALL27409.paris")
+	if err != nil {
+		fmt.Println("cannot load test data")
+		return
+	}
+	hops, logTime, _, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", rawData, "pt-daily")
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if len(hops) != 545 {
+		t.Fatalf("Do not process hops correctly.")
+	}
+	if logTime != 1452559544 {
+		fmt.Println(logTime)
+		t.Fatalf("Do not process log time correctly.")
 	}
 }
 
