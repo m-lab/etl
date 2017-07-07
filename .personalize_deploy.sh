@@ -23,4 +23,4 @@ if [[ -f ${BASEDIR}/${YAML} ]] ; then
 fi
 
 # Call actual script to deploy service.
-"${SCRIPT}" "${PROJECT}" "${KEYFILE}" "${BASEDIR} ${YAML}"
+"${SCRIPT}" "${PROJECT}" "${KEYFILE}" "${BASEDIR}" "${YAML}"
