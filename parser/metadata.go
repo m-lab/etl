@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 
@@ -16,7 +17,8 @@ func addMetaData(geo *bigquery.Value, asn *bigquery.Value, ip string) {
 	timerStart := time.Now()
 	defer metrics.AnnotationTimeSummary.Observe(float64(time.Since(timerStart).Nanoseconds()))
 
-	resp, err := http.Get("https://annotator-dot-mlab-sandbox.appspot.com/annotate?ip_addr=" + url.QueryEscape(ip) + "&since_epoch=" + strconv.FormatInt(time.Now().Unix(), 10))
+	id := os.Getenv("GCLOUD_PROJECT")
+	resp, err := http.Get("https://annotator-dot-" + id + ".appspot.com/annotate?ip_addr=" + url.QueryEscape(ip) + "&since_epoch=" + strconv.FormatInt(time.Now().Unix(), 10))
 
 	if err != nil {
 		metrics.AnnotationErrorCount.Inc()
