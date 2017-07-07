@@ -17,7 +17,8 @@ queue:
   target: etl-ndt-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
-  rate: 0.5/s
+  # 1.0 allow processing a day's data (about 11K tasks) in 3 to 4 hours.
+  rate: 1.0/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
   bucket_size: 10
