@@ -341,7 +341,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
-	// log.Printf("%s", testName)
+	//log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
@@ -379,6 +379,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 			var err error
 			protocol, dest_IP, server_IP, err = ParseFirstLine(oneLine)
 			if err != nil {
+				log.Println(oneLine)
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				return nil, 0, nil, err
@@ -395,6 +396,10 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 			// Drop the first 3 parts, like "1  P(6, 6)" because they are useless.
 			// The following parts are grouped into tuples, each with 4 parts:
 			for i := 3; i < len(parts); i += 4 {
+				if (i + 3) >= len(parts) {
+					// avoid panic crash due to corrupted content
+					break
+				}
 				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
 				err := ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
 				if err != nil {
