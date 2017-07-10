@@ -26,6 +26,8 @@ import (
 	storage "google.golang.org/api/storage/v1"
 )
 
+var OVERSIZE_FILE = errors.New("Oversize file")
+
 type TarReader interface {
 	Next() (*tar.Header, error)
 	Read(b []byte) (int, error)
@@ -106,8 +108,10 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 }
 
 // Next reads the next test object from the tar file.
+// Skips reading contents of any file larger than maxSize, returning empty data
+// and storage.OVERSIZE_FILE error.
 // Returns io.EOF when there are no more tests.
-func (rr *ETLSource) NextTest() (string, []byte, error) {
+func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 	metrics.WorkerState.WithLabelValues("read").Inc()
 	defer metrics.WorkerState.WithLabelValues("read").Dec()
 
@@ -136,28 +140,33 @@ func (rr *ETLSource) NextTest() (string, []byte, error) {
 		time.Sleep(delay)
 	}
 
-	// Only process regular files.
-	if h.Typeflag == tar.TypeReg {
-		trial = 0
-		delay = 16 * time.Millisecond
-		for {
-			trial++
-			var retry bool
-			data, retry, err = rr.nextData(h, trial)
-			if err == nil {
-				break
-			}
-			if !retry || trial >= 10 {
-				// FYI, it appears that stream errors start in the
-				// nextData phase of reading, but then persist on
-				// the next call to nextHeader.
-				break
-			}
-			// For each trial, increase backoff delay by 2x.
-			delay *= 2
-			time.Sleep(delay)
+	if h.Size > maxSize {
+		return h.Name, data, OVERSIZE_FILE
+	}
 
+	// Only process regular files.
+	if h.Typeflag != tar.TypeReg {
+		return h.Name, data, nil
+	}
+
+	trial = 0
+	delay = 16 * time.Millisecond
+	for {
+		trial++
+		var retry bool
+		data, retry, err = rr.nextData(h, trial)
+		if err == nil {
+			break
 		}
+		if !retry || trial >= 10 {
+			// FYI, it appears that stream errors start in the
+			// nextData phase of reading, but then persist on
+			// the next call to nextHeader.
+			break
+		}
+		// For each trial, increase backoff delay by 2x.
+		delay *= 2
+		time.Sleep(delay)
 	}
 
 	return h.Name, data, nil

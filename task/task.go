@@ -17,6 +17,11 @@ import (
 	"github.com/m-lab/etl/storage"
 )
 
+// Impose 200MiB max size for a single file.  Larger than this risks an OOM if there are
+// multiple large files at on multiple tasks.
+// This can be overridden with SetMaxFileSize()
+const MAX_FILE_SIZE = 20 * 1024 * 1024
+
 // TODO(dev) Add unit tests for meta data.
 type Task struct {
 	// ETLSource and Parser are both embedded, so their interfaces are delegated
@@ -24,7 +29,8 @@ type Task struct {
 	*storage.ETLSource // Source from which to read tests.
 	etl.Parser         // Parser to parse the tests.
 
-	meta map[string]bigquery.Value // Metadata about this task.
+	meta        map[string]bigquery.Value // Metadata about this task.
+	maxFileSize int64  // Max file size to avoid OOM.
 }
 
 // NewTask constructs a task, injecting the source and the parser.
@@ -34,8 +40,12 @@ func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser) *Task {
 	meta["filename"] = filename
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
-	t := Task{src, prsr, meta}
+	t := Task{src, prsr, meta, MAX_FILE_SIZE}
 	return &t
+}
+
+func (tt *Task) SetMaxFileSize(max int64) {
+	tt.maxFileSize = max
 }
 
 // ProcessAllTests loops through all the tests in a tar file, calls the
@@ -46,28 +56,45 @@ func (tt *Task) ProcessAllTests() (int, error) {
 	defer metrics.WorkerState.WithLabelValues("task").Dec()
 	files := 0
 	nilData := 0
+	var testname string
+	var data []byte
+	var err error
 	// Read each file from the tar
-	for testname, data, err := tt.NextTest(); err != io.EOF; testname, data, err = tt.NextTest() {
+
+	for testname, data, err = tt.NextTest(tt.maxFileSize); err != io.EOF; testname, data, err = tt.NextTest(tt.maxFileSize) {
 		files++
 		if err != nil {
-			if err == io.EOF {
+			switch {
+			case err == io.EOF:
+				break
+			case err == storage.OVERSIZE_FILE:
+				log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
+					tt.meta["filename"], testname, files,
+					time.Since(tt.meta["parse_time"].(time.Time)), err)
+				metrics.TestCount.WithLabelValues(
+					tt.Parser.TableName(), "unknown", "oversize file").Inc()
+				continue
+			default:
+				// We are seeing several of these per hour, a little more than
+				// one in one thousand files.  duration varies from 10 seconds
+				// up to several minutes.
+				// Example:
+				// filename:
+				// gs://m-lab-sandbox/ndt/2016/04/10/20160410T000000Z-mlab1-ord02-ndt-0002.tgz
+				// files:666 duration:1m47.571825351s
+				// err:stream error: stream ID 801; INTERNAL_ERROR
+				// Because of the break, this error is passed up, and counted at
+				// the Task level.
+				log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
+					tt.meta["filename"], testname, files,
+					time.Since(tt.meta["parse_time"].(time.Time)), err)
+
+				metrics.TestCount.WithLabelValues(
+					tt.Parser.TableName(), "unknown", "unrecovered").Inc()
+				// Since we don't understand these errors, safest thing to do is
+				// stop processing the tar file (and task).
 				break
 			}
-			// We are seeing several of these per hour, a little more than
-			// one in one thousand files.  duration varies from 10 seconds up to several
-			// minutes.
-			// Example:
-			// filename:gs://m-lab-sandbox/ndt/2016/04/10/20160410T000000Z-mlab1-ord02-ndt-0002.tgz
-			// files:666 duration:1m47.571825351s
-			// err:stream error: stream ID 801; INTERNAL_ERROR
-			// Because of the break, this error is passed up, and counted at the Task level.
-			log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
-				tt.meta["filename"], testname, files,
-				time.Since(tt.meta["parse_time"].(time.Time)), err)
-
-			metrics.TestCount.WithLabelValues(
-				tt.Parser.TableName(), "unknown", "unrecovered").Inc()
-			break
 		}
 		if data == nil {
 			// TODO(dev) Handle directories (expected) and other
@@ -89,14 +116,18 @@ func (tt *Task) ProcessAllTests() (int, error) {
 	}
 
 	// Flush any rows cached in the inserter.
-	err := tt.Flush()
+	flushErr := tt.Flush()
 
-	if err != nil {
-		log.Printf("%v", err)
+	if flushErr != nil {
+		log.Printf("%v", flushErr)
 	}
 	// TODO - make this debug or remove
 	log.Printf("Processed %d files, %d nil data, %d rows committed, %d failed, from %s into %s",
 		files, nilData, tt.Parser.Committed(), tt.Parser.Failed(),
 		tt.meta["filename"], tt.Parser.FullTableName())
-	return files, err
+	// Return the file count, and the terminal error, if other than EOF.
+	if err != io.EOF {
+		return files, err
+	}
+	return files, nil
 }
