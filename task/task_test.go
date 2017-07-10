@@ -44,6 +44,14 @@ func MakeTestSource(t *testing.T) *storage.ETLSource {
 		t.Fatal(err)
 	}
 
+	// Put a large file in the middle to test skipping.
+	hdr = tar.Header{Name: "big_file", Mode: 0666, Typeflag: tar.TypeReg, Size: int64(101)}
+	tw.WriteHeader(&hdr)
+	_, err = tw.Write(make([]byte, 101))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	hdr = tar.Header{Name: "bar", Mode: 0666, Typeflag: tar.TypeReg, Size: int64(11)}
 	tw.WriteHeader(&hdr)
 	_, err = tw.Write([]byte("butter milk"))
@@ -84,7 +92,7 @@ func TestTarFileInput(t *testing.T) {
 
 	// Among other things, this requires that tp implements etl.Parser.
 	tt := task.NewTask("filename", rdr, tp)
-	fn, bb, err := tt.NextTest(1000)
+	fn, bb, err := tt.NextTest(100)
 	if err != nil {
 		t.Error(err)
 	}
@@ -95,7 +103,19 @@ func TestTarFileInput(t *testing.T) {
 		t.Error("Expected biscuits but got ", string(bb))
 	}
 
-	fn, bb, err = tt.NextTest(1000)
+	// Here we expect an oversize file error, with filename = big_file.
+	fn, bb, err = tt.NextTest(100)
+	if fn != "big_file" {
+		t.Error("Expected big_file: " + fn)
+	}
+	if err == nil {
+		t.Error("Expected oversize file")
+	} else if err != storage.OVERSIZE_FILE {
+		t.Error("Expected oversize file but got: " + err.Error())
+	}
+
+	// This is the last file, so we expect EOF.
+	fn, bb, err = tt.NextTest(100)
 	if err != nil {
 		t.Error(err)
 	}
@@ -110,15 +130,18 @@ func TestTarFileInput(t *testing.T) {
 	rdr = MakeTestSource(t)
 
 	tt = task.NewTask("filename", rdr, tp)
+	tt.SetMaxFileSize(100)
 	fc, err := tt.ProcessAllTests()
 	if err != nil {
 		t.Error("Expected nil error, but got %v", err)
 	}
-	if fc != len(tp.files) {
-		t.Error("Number of files counted (%s) does not match files parsed", fc, len(tp.files))
+	// Should see 3 files.
+	if fc != 3 {
+		t.Error("Expected 3 files: ", fc)
 	}
+	// ... but process only two.
 	if len(tp.files) != 2 {
-		t.Error("Too few files ", len(tp.files))
+		t.Error("Should have processed two files: ", len(tp.files))
 	}
 	if !reflect.DeepEqual(tp.files, []string{"foo", "bar"}) {
 		t.Error("Not expected files: ", tp.files)

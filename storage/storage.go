@@ -26,6 +26,8 @@ import (
 	storage "google.golang.org/api/storage/v1"
 )
 
+var OVERSIZE_FILE = errors.New("Oversize file")
+
 type TarReader interface {
 	Next() (*tar.Header, error)
 	Read(b []byte) (int, error)
@@ -106,6 +108,8 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 }
 
 // Next reads the next test object from the tar file.
+// Skips reading contents of any file larger than maxSize, returning empty data
+// and storage.OVERSIZE_FILE error.
 // Returns io.EOF when there are no more tests.
 func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 	metrics.WorkerState.WithLabelValues("read").Inc()
@@ -137,7 +141,7 @@ func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 	}
 
 	if h.Size > maxSize {
-		return h.Name, data, errors.New("Oversize file")
+		return h.Name, data, OVERSIZE_FILE
 	}
 
 	// Only process regular files.
