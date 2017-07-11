@@ -76,7 +76,6 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 				Src_af:        IPv4_AF,
 				Dest_af:       IPv4_AF,
 			}
-			fmt.Println(one_hop.Src_ip + "," + one_hop.Dest_ip)
 			results = append(results, *one_hop)
 			break
 		} else {
@@ -90,7 +89,6 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 				Src_af:        IPv4_AF,
 				Dest_af:       IPv4_AF,
 			}
-			fmt.Println(one_hop.Src_ip + "," + one_hop.Dest_ip)
 			results = append(results, *one_hop)
 		}
 	}

@@ -43,7 +43,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if len(hops) != 218 {
+	if len(hops) != 9 {
 		t.Fatalf("Do not process hops correctly.")
 	}
 	if logTime != 1452559544 {
