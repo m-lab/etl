@@ -3,11 +3,11 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
-	//"reflect"
+	"reflect"
 	"testing"
 
 	"github.com/m-lab/etl/parser"
-	//"github.com/m-lab/etl/schema"
+	"github.com/m-lab/etl/schema"
 )
 
 // TODO: IPv6 tests
@@ -51,7 +51,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 		t.Fatalf("Do not process log time correctly.")
 	}
 }
-/*
+
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData, "pt-daily")
@@ -171,4 +171,4 @@ func TestPTInserter(t *testing.T) {
 		fmt.Printf("Here is what is real: %v\n", ins.data[0])
 		t.Errorf("Not the expected values:")
 	}
-}*/
+}
