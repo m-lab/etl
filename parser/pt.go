@@ -35,10 +35,11 @@ type PTParser struct {
 }
 
 type Node struct {
-	hostname string
-	ip       string
-	rtts     []float64
-	parent   *Node
+	hostname        string
+	ip              string
+	rtts            []float64
+	parent_ip       string
+	parent_hostname string
 
 	// For a given hop in a paris traceroute, there may be multiple IP
 	// addresses. Each one belongs to a flow, which is an independent path from
@@ -64,9 +65,8 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 
 	// Iterate from the end of the list of nodes to minimize cost of removing nodes.
 	for i := len(all_nodes) - 1; i >= 0; i-- {
-		parent := all_nodes[i].parent
 		metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
-		if parent == nil {
+		if all_nodes[i].parent_ip == "" {
 			one_hop := &schema.ParisTracerouteHop{
 				Protocol:      protocol,
 				Dest_ip:       all_nodes[i].ip,
@@ -76,6 +76,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 				Src_af:        IPv4_AF,
 				Dest_af:       IPv4_AF,
 			}
+			fmt.Println(one_hop.Src_ip + "," + one_hop.Dest_ip)
 			results = append(results, *one_hop)
 			break
 		} else {
@@ -84,11 +85,12 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 				Dest_ip:       all_nodes[i].ip,
 				Dest_hostname: all_nodes[i].hostname,
 				Rtt:           all_nodes[i].rtts,
-				Src_ip:        parent.ip,
-				Src_hostname:  parent.hostname,
+				Src_ip:        all_nodes[i].parent_ip,
+				Src_hostname:  all_nodes[i].parent_hostname,
 				Src_af:        IPv4_AF,
 				Dest_af:       IPv4_AF,
 			}
+			fmt.Println(one_hop.Src_ip + "," + one_hop.Dest_ip)
 			results = append(results, *one_hop)
 		}
 	}
@@ -279,12 +281,13 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 	// Check whether it is root node.
 	if len(*all_nodes) == 0 {
 		one_node := &Node{
-			hostname: parts[0],
-			ip:       ips[0][1 : len(ips[0])-1],
-			rtts:     rtt,
-			parent:   nil,
-			flow:     -1,
+			hostname:  parts[0],
+			ip:        ips[0][1 : len(ips[0])-1],
+			rtts:      rtt,
+			parent_ip: "",
+			flow:      -1,
 		}
+
 		*all_nodes = append(*all_nodes, *one_node)
 		*new_leaves = append(*new_leaves, *one_node)
 		return nil
@@ -296,11 +299,12 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 		// For single flow, the new node will be son of all current leaves
 		for _, leaf := range current_leaves {
 			one_node := &Node{
-				hostname: parts[0],
-				ip:       ips[0][1 : len(ips[0])-1],
-				rtts:     rtt,
-				parent:   &leaf,
-				flow:     -1,
+				hostname:        parts[0],
+				ip:              ips[0][1 : len(ips[0])-1],
+				rtts:            rtt,
+				parent_ip:       leaf.ip,
+				parent_hostname: leaf.hostname,
+				flow:            -1,
 			}
 			*all_nodes = append(*all_nodes, *one_node)
 			if Unique(*one_node, *new_leaves) {
@@ -318,12 +322,14 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 
 			for _, leaf := range current_leaves {
 				if leaf.flow == -1 || leaf.flow == flow_int {
+
 					one_node := &Node{
-						hostname: parts[0],
-						ip:       ips[0][1 : len(ips[0])-1],
-						rtts:     rtt,
-						parent:   &leaf,
-						flow:     flow_int,
+						hostname:        parts[0],
+						ip:              ips[0][1 : len(ips[0])-1],
+						rtts:            rtt,
+						parent_ip:       leaf.ip,
+						parent_hostname: leaf.hostname,
+						flow:            flow_int,
 					}
 					*all_nodes = append(*all_nodes, *one_node)
 					if Unique(*one_node, *new_leaves) {
@@ -389,7 +395,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 			// TODO(dev): use regexp here
 			parts := strings.Fields(oneLine)
 			// Skip line start with "MPLS"
-			if len(parts) < 3 || parts[0] == "MPLS" {
+			if len(parts) < 4 || parts[0] == "MPLS" {
 				continue
 			}
 
