@@ -43,7 +43,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if len(hops) != 545 {
+	if len(hops) != 9 {
 		t.Fatalf("Do not process hops correctly.")
 	}
 	if logTime != 1452559544 {
@@ -80,24 +80,24 @@ func TestPTParser(t *testing.T) {
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.232.136", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae7.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "216.239.49.250", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae3.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "216.239.49.250", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae3.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "216.239.49.250", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae3.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "216.239.49.250", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae3.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "216.239.49.250", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae3.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "216.239.49.250", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae3.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "216.239.49.250", Src_af: 2, Dest_ip: "64.233.174.109", Dest_af: 2, Src_hostname: "bb01-ae3.nuq04.net.google.com", Dest_hostname: "sr05-te1-8.nuq04.net.google.com", Rtt: []float64{1.614}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "72.14.232.136", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae7.nuq04.net.google.com", Rtt: []float64{1.693}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "72.14.232.136", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae7.nuq04.net.google.com", Rtt: []float64{1.693}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "72.14.232.136", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae7.nuq04.net.google.com", Rtt: []float64{1.693}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "72.14.232.136", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae7.nuq04.net.google.com", Rtt: []float64{1.693}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
-		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.196.8", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.218.190", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr01-xe-7-1-0.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.218.190", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr01-xe-7-1-0.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.218.190", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr01-xe-7-1-0.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.218.190", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr01-xe-7-1-0.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.218.190", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr01-xe-7-1-0.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.218.190", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr01-xe-7-1-0.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
+		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "72.14.218.190", Src_af: 2, Dest_ip: "216.239.49.250", Dest_af: 2, Src_hostname: "pr01-xe-7-1-0.pao03.net.google.com", Dest_hostname: "bb01-ae3.nuq04.net.google.com", Rtt: []float64{1.386}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.25.253.46", Src_af: 2, Dest_ip: "72.14.196.8", Dest_af: 2, Src_hostname: "us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com", Dest_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Rtt: []float64{0.556}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.25.253.46", Src_af: 2, Dest_ip: "72.14.196.8", Dest_af: 2, Src_hostname: "us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com", Dest_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Rtt: []float64{0.556}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.25.253.46", Src_af: 2, Dest_ip: "72.14.196.8", Dest_af: 2, Src_hostname: "us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com", Dest_hostname: "pr02-xe-3-0-1.pao03.net.google.com", Rtt: []float64{0.556}},
@@ -117,8 +117,10 @@ func TestPTParser(t *testing.T) {
 	if len(hops) != len(expected_hops) {
 		t.Fatalf("Wrong results for PT hops!")
 	}
+
 	for i := 0; i < len(hops); i++ {
 		if !reflect.DeepEqual(hops[i], expected_hops[i]) {
+			fmt.Println(i)
 			fmt.Printf("Here is expected    : %v\n", expected_hops[i])
 			fmt.Printf("Here is what is real: %v\n", hops[i])
 			t.Fatalf("Wrong results for PT hops!")
