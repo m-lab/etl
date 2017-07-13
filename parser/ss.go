@@ -2,20 +2,20 @@
 package parser
 
 import (
-	"bufio"
+	//"bufio"
 	"cloud.google.com/go/bigquery"
 	"errors"
 	"fmt"
-	"log"
-	"net"
-	"os"
-	"path/filepath"
-	"strconv"
+	//"log"
+	//"net"
+	//"os"
+	//"path/filepath"
+	//"strconv"
 	"strings"
 	"time"
 
 	"github.com/m-lab/etl/etl"
-	"github.com/m-lab/etl/schema"
+	//"github.com/m-lab/etl/schema"
 )
 
 type SSParser struct {
@@ -26,10 +26,25 @@ func NewSSParser(ins etl.Inserter) *SSParser {
 	return &SSParser{ins}
 }
 
-func ParseSSFilename(testName string) {
-	return
+// The legacy filename is like  "20170203T00:00:00Z_ALL0.web100"
+// The current filename is like "20170315T01:00:00Z_173.205.3.39_0.web100"
+// Return time stamp if the filename is in right format
+func ExtractLogtimeFromFilename(testName string) (int64, error) {
+	if len(testName) < 19 || !strings.Contains(testName, ".web100") {
+		return 0, errors.New("Wrong sidestream filename")
+	}
+
+	date_str := testName[0:4] + "-" + testName[4:6] + "-" + testName[6:8] + testName[8:17] + ".000Z"
+	fmt.Println(date_str)
+	t, err := time.Parse(time.RFC3339, date_str)
+
+	if err != nil {
+		return 0, err
+	}
+	return t.Unix(), nil
 }
 
+/*
 func ParseIPFamily(ipStr string) int {
 	ip := net.ParseIP(ipStr)
 	if ip.To4() != nil {
@@ -84,21 +99,22 @@ func InsertIntoBQ() {
 
 }
 
-func ParseOneLine(snapshot string, ) error {
+func ParseOneLine(snapshot string) error {
 	value := strings.Split(snapshot, " ")
 	if value[0] != "C:" {
 		return
 	}
-        
-        for index, val := range value {
-          if index == 0 {
-            continue
-          }
-          
-        }
+
+	for index, val := range value {
+		if index == 0 {
+			continue
+		}
+
+	}
 
 }
-
+*/
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	time := ParseSSFilename(testName)
+	//time, err := ExtractLogtimeFromFilename(testName)
+	return nil
 }
