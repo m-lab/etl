@@ -7,11 +7,12 @@ import (
 	"errors"
 	"fmt"
 	//"log"
-	//"net"
+	"net"
 	//"os"
 	//"path/filepath"
 	//"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/m-lab/etl/etl"
@@ -44,7 +45,6 @@ func ExtractLogtimeFromFilename(testName string) (int64, error) {
 	return t.Unix(), nil
 }
 
-/*
 func ParseIPFamily(ipStr string) int {
 	ip := net.ParseIP(ipStr)
 	if ip.To4() != nil {
@@ -55,6 +55,7 @@ func ParseIPFamily(ipStr string) int {
 	return -1
 }
 
+/*
 func LoadLegacyMapping(fileName string) map[string]string {
 	legacy_mapping := make(map[string]string)
 	file, err := os.Open(fileName)
