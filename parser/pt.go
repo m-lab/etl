@@ -3,7 +3,6 @@
 package parser
 
 import (
-	"cloud.google.com/go/bigquery"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"

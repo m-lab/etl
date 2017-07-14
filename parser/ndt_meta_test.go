@@ -62,7 +62,7 @@ func TestMetaParser(t *testing.T) {
 		t.Error("missing client_af")
 	} else {
 		if v.(int64) != syscall.AF_INET {
-			t.Logf("Wrong client_af value: ", v.(int64))
+			t.Log("Wrong client_af value: ", v.(int64))
 		}
 
 	}

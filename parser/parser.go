@@ -1,4 +1,4 @@
-// The parser package defines the Parser interface and implementations for the different
+// Package parser defines the Parser interface and implementations for the different
 // test types, NDT, Paris Traceroute, and SideStream.
 package parser
 
@@ -83,7 +83,7 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 		values[k] = v
 	}
 	values["testname"] = testName
-	return tp.inserter.InsertRow(bq.MapSaver{values})
+	return tp.inserter.InsertRow(bq.MapSaver{Values: values})
 }
 
 // These functions are also required to complete the etl.Parser interface.
