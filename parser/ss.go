@@ -106,11 +106,11 @@ func ParseOneLine(snapshot string, var_names []string) (map[string]string, error
 }
 
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	time, err := ExtractLogtimeFromFilename(testName)
+	log_time, err := ExtractLogtimeFromFilename(testName)
 	if err != nil {
 		return err
 	}
-        fmt.Println(time)
+	fmt.Println(log_time)
 	var var_names []string
 	for index, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
@@ -135,12 +135,32 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			}
 			conn_spec := &schema.Web100ConnectionSpecification{
 				Local_ip:    ss_value["LocalAddress"],
-				Local_af:    IPv4_AF,
+				Local_af:    int32(ParseIPFamily(ss_value["LocalAddress"])),
 				Local_port:  int32(local_port),
 				Remote_ip:   ss_value["RemAddress"],
 				Remote_port: int32(remote_port),
 			}
-                        fmt.Println(conn_spec)
+			snap := &schema.Web100Snap{}
+			web100_log := &schema.Web100LogEntry{
+				Log_time:        log_time,
+				Version:         "unknown",
+				Group_name:      "read",
+				Connection_spec: *conn_spec,
+				Snap:            *snap,
+			}
+
+			ss_test := &schema.SS{
+				Test_id:          testName,
+				Log_time:         log_time,
+				Type:             int32(1),
+				Project:          int32(2),
+				Web100_log_entry: *web100_log,
+				Is_last_entry:    true,
+			}
+			err = ss.inserter.InsertRow(ss_test)
+			if err != nil {
+				continue
+			}
 		}
 	}
 	return nil

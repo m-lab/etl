@@ -171,9 +171,10 @@ type Web100LogEntry struct {
 }
 
 type SS struct {
-	Test_id     string         `json:"test_id, string"`
-	Project     int32          `json:"project, int32"`
-	Log_time    int64          `json:"log_time, int64"`
-	Type        int32          `json:"type, int32"`
-	Web_100_log Web100LogEntry `json:"web100_log_entry"`
+	Test_id          string         `json:"test_id, string"`
+	Project          int32          `json:"project, int32"`
+	Log_time         int64          `json:"log_time, int64"`
+	Type             int32          `json:"type, int32"`
+	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`
+	Is_last_entry    bool           `json:"is_last_entry, bool"`
 }
