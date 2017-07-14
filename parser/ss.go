@@ -2,7 +2,7 @@
 package parser
 
 import (
-	//"bufio"
+	"bytes"
 	"cloud.google.com/go/bigquery"
 	"errors"
 	"fmt"
@@ -10,13 +10,14 @@ import (
 	"net"
 	//"os"
 	//"path/filepath"
-	//"strconv"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/m-lab/etl/etl"
-	//"github.com/m-lab/etl/schema"
+	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/etl/web100"
 )
 
 type SSParser struct {
@@ -55,35 +56,22 @@ func ParseIPFamily(ipStr string) int {
 	return -1
 }
 
-/*
-func LoadLegacyMapping(fileName string) map[string]string {
-	legacy_mapping := make(map[string]string)
-	file, err := os.Open(fileName)
-	if err != nil {
-		return legacy_mapping
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		oneLine := strings.TrimSuffix(scanner.Text(), "\n")
-		names := strings.Split(oneLine, " ")
-		if len(names) != 2 {
-		}
-		legacy_mapping[names[0]] = names[1]
-	}
-
-	return legacy_mapping
-}
-
 // the first line of SS test is in format "K: web100_variables_separated_by_space"
-func ParseHeader(header string) ([]string, error) {
+func ParseKHeader(header string) ([]string, error) {
+	var var_names []string
 	web100_vars := strings.Split(header, " ")
 	if web100_vars[0] != "K:" {
-		return errors.New("Corrupted header")
+		return var_names, errors.New("Corrupted header")
 	}
-	mapping := LoadLegacyMapping("legacy_name_mapping.txt")
-	var var_names []string
+
+	data, err := web100.Asset("tcp-kis.txt")
+	if err != nil {
+		panic("tcp-kis.txt not found")
+	}
+	b := bytes.NewBuffer(data)
+
+	mapping, err := web100.ParseWeb100Definitions(b)
+
 	for index, name := range web100_vars {
 		if index == 0 {
 			continue
@@ -93,29 +81,68 @@ func ParseHeader(header string) ([]string, error) {
 			var_names[index-1] = mapping[name]
 		}
 	}
-	return var_names
+	return var_names, nil
 }
 
 func InsertIntoBQ() {
 
 }
 
-func ParseOneLine(snapshot string) error {
+func ParseOneLine(snapshot string, var_names []string) (map[string]string, error) {
 	value := strings.Split(snapshot, " ")
-	if value[0] != "C:" {
-		return
+	var ss_value map[string]string
+	if value[0] != "C:" || len(value) != len(var_names)+1 {
+		return ss_value, errors.New("corrupted content")
 	}
 
 	for index, val := range value {
 		if index == 0 {
 			continue
 		}
-
+		// Match value with var_name
+		ss_value[var_names[index-1]] = val
 	}
-
+	return ss_value, nil
 }
-*/
+
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	//time, err := ExtractLogtimeFromFilename(testName)
+	time, err := ExtractLogtimeFromFilename(testName)
+	if err != nil {
+		return err
+	}
+        fmt.Println(time)
+	var var_names []string
+	for index, oneLine := range strings.Split(string(rawContent[:]), "\n") {
+		oneLine := strings.TrimSuffix(oneLine, "\n")
+		if index == 0 {
+			var_names, err = ParseKHeader(oneLine)
+			if err != nil {
+				return err
+			}
+		} else {
+			ss_value, err := ParseOneLine(oneLine, var_names)
+			if err != nil {
+				return err
+			}
+			// Insert this test into BQ
+			local_port, err := strconv.Atoi(ss_value["LocalPort"])
+			if err != nil {
+				continue
+			}
+			remote_port, err := strconv.Atoi(ss_value["RemPort"])
+			if err != nil {
+				continue
+			}
+			conn_spec := &schema.Web100ConnectionSpecification{
+				Local_ip:    ss_value["LocalAddress"],
+				Local_af:    IPv4_AF,
+				Local_port:  int32(local_port),
+				Remote_ip:   ss_value["RemAddress"],
+				Remote_port: int32(remote_port),
+			}
+                        fmt.Println(conn_spec)
+		}
+	}
 	return nil
+
 }

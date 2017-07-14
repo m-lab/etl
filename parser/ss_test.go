@@ -4,7 +4,7 @@ import (
 	"fmt"
 	//"io/ioutil"
 	//"reflect"
-        "syscall"
+	"syscall"
 	"testing"
 
 	"github.com/m-lab/etl/parser"
