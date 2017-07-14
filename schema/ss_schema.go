@@ -1,0 +1,179 @@
+// This files contains schema for SideStream tests.
+package schema
+
+type Web100ConnectionSpecification struct {
+	Local_ip    string `json:"local_ip, string"`
+	Local_af    int32  `json:"local_af, int32"`
+	Local_port  int32  `json:"local_port, int32"`
+	Remote_ip   string `json:"remote_ip, string"`
+	Remote_port int32  `json:"remote_port, int32"`
+}
+
+type Web100Snap struct {
+	AbruptTimeouts       int32  `json:"AbruptTimeouts, int32"`
+	ActiveOpen           int32  `json:"ActiveOpen, int32"`
+	CERcvd               int32  `json:"CERcvd, int32"`
+	CongAvoid            int32  `json:"CongAvoid, int32"`
+	CongOverCount        int32  `json:"CongOverCount, int32"`
+	CongSignals          int32  `json:"CongSignals, int32"`
+	CountRTT             int32  `json:"CountRTT, int32"`
+	CurAppRQueue         int32  `json:"CurAppRQueue, int32"`
+	CurAppWQueue         int32  `json:"CurAppWQueue, int32"`
+	CurCwnd              int32  `json:"CurCwnd, int32"`
+	CurMSS               int32  `json:"CurMSS, int32"`
+	CurRTO               int32  `json:"CurRTO, int32"`
+	CurReasmQueue        int32  `json:"CurReasmQueue, int32"`
+	CurRetxQueue         int32  `json:"CurRetxQueue, int32"`
+	CurRwinRcvd          int32  `json:"CurRwinRcvd, int32"`
+	CurRwinSent          int32  `json:"CurRwinSent, int32"`
+	CurSsthresh          int32  `json:"CurSsthresh, int32"`
+	CurTimeoutCount      int32  `json:"CurTimeoutCount, int32"`
+	DSACKDups            int32  `json:"DSACKDups, int32"`
+	DataOctetsIn         int32  `json:"DataOctetsIn, int32"`
+	DataOctetsOut        int32  `json:"DataOctetsOut, int32"`
+	DataSegsIn           int32  `json:"DataSegsIn, int32"`
+	DataSegsOut          int32  `json:"DataSegsOut, int32"`
+	DupAckEpisodes       int32  `json:"DupAckEpisodes, int32"`
+	DupAcksIn            int32  `json:"DupAcksIn, int32"`
+	DupAcksOut           int32  `json:"DupAcksOut, int32"`
+	Duration             int32  `json:"Duration, int32"`
+	ECESent              int32  `json:"ECESent, int32"`
+	ECN                  int32  `json:"ECN, int32"`
+	ECNNonceRcvd         int32  `json:"ECNNonceRcvd, int32"`
+	ECNsignals           int32  `json:"ECNsignals, int32"`
+	ElapsedMicroSecs     int32  `json:"ElapsedMicroSecs, int32"`
+	ElapsedSecs          int32  `json:"ElapsedSecs, int32"`
+	FastRetran           int32  `json:"FastRetran, int32"`
+	HCDataOctetsIn       int32  `json:"HCDataOctetsIn, int32"`
+	HCDataOctetsOut      int32  `json:"HCDataOctetsOut, int32"`
+	HCSumRTT             int32  `json:"HCSumRTT, int32"`
+	HCThruOctetsAcked    int32  `json:"HCThruOctetsAcked, int32"`
+	HCThruOctetsReceived int32  `json:"HCThruOctetsReceived, int32"`
+	InRecovery           int32  `json:"InRecovery, int32"`
+	IpTosIn              int32  `json:"IpTosIn, int32"`
+	IpTosOut             int32  `json:"IpTosOut, int32"`
+	IpTtl                int32  `json:"IpTtl, int32"`
+	LimCwnd              int32  `json:"LimCwnd, int32"`
+	LimMSS               int32  `json:"LimMSS, int32"`
+	LimRwin              int32  `json:"LimRwin, int32"`
+	LimSsthresh          int32  `json:"LimSsthresh, int32"`
+	LocalAddress         string `json:"LocalAddress, string"`
+	LocalAddressType     int32  `json:"LocalAddressType, int32"`
+	LocalPort            int32  `json:"LocalPort, int32"`
+	MSSRcvd              int32  `json:"MSSRcvd, int32"`
+	MSSSent              int32  `json:"MSSSent, int32"`
+	MaxAppRQueue         int32  `json:"MaxAppRQueue, int32"`
+	MaxAppWQueue         int32  `json:"MaxAppWQueue, int32"`
+	MaxCaCwnd            int32  `json:"MaxCaCwnd, int32"`
+	MaxMSS               int32  `json:"MaxMSS, int32"`
+	MaxPipeSize          int32  `json:"MaxPipeSize, int32"`
+	MaxRTO               int32  `json:"MaxRTO, int32"`
+	MaxRTT               int32  `json:"MaxRTT, int32"`
+	MaxReasmQueue        int32  `json:"MaxReasmQueue, int32"`
+	MaxRetxQueue         int32  `json:"MaxRetxQueue, int32"`
+	MaxRwinRcvd          int32  `json:"MaxRwinRcvd, int32"`
+	MaxRwinSent          int32  `json:"MaxRwinSent, int32"`
+	MaxSsCwnd            int32  `json:"MaxSsCwnd, int32"`
+	MaxSsthresh          int32  `json:"MaxSsthresh, int32"`
+	MinMSS               int32  `json:"MinMSS, int32"`
+	MinRTO               int32  `json:"MinRTO, int32"`
+	MinRTT               int32  `json:"MinRTT, int32"`
+	MinRwinRcvd          int32  `json:"MinRwinRcvd, int32"`
+	MinRwinSent          int32  `json:"MinRwinSent, int32"`
+	MinSsthresh          int32  `json:"MinSsthresh, int32"`
+	Nagle                int32  `json:"Nagle, int32"`
+	NonRecovDA           int32  `json:"NonRecovDA, int32"`
+	NonRecovDAEpisodes   int32  `json:"NonRecovDAEpisodes, int32"`
+	OctetsRetrans        int32  `json:"OctetsRetrans, int32"`
+	OtherReductions      int32  `json:"OtherReductions, int32"`
+	PipeSize             int32  `json:"PipeSize, int32"`
+	PostCongCountRTT     int32  `json:"PostCongCountRTT, int32"`
+	PostCongSumRTT       int32  `json:"PostCongSumRTT, int32"`
+	PreCongSumCwnd       int32  `json:"PreCongSumCwnd, int32"`
+	PreCongSumRTT        int32  `json:"PreCongSumRTT, int32"`
+	QuenchRcvd           int32  `json:"QuenchRcvd, int32"`
+	RTTVar               int32  `json:"RTTVar, int32"`
+	RcvNxt               int32  `json:"RcvNxt, int32"`
+	RcvRTT               int32  `json:"RcvRTT, int32"`
+	RcvWindScale         int32  `json:"RcvWindScale, int32"`
+	RecInitial           int32  `json:"RecInitial, int32"`
+	RemAddress           string `json:"RemAddress, string"`
+	RemPort              int32  `json:"RemPort, int32"`
+	RetranThresh         int32  `json:"RetranThresh, int32"`
+	SACK                 int32  `json:"SACK, int32"`
+	SACKBlocksRcvd       int32  `json:"SACKBlocksRcvd, int32"`
+	SACKsRcvd            int32  `json:"SACKsRcvd, int32"`
+	SampleRTT            int32  `json:"SampleRTT, int32"`
+	SegsIn               int32  `json:"SegsIn, int32"`
+	SegsOut              int32  `json:"SegsOut, int32"`
+	SegsRetrans          int32  `json:"SegsRetrans, int32"`
+	SendStall            int32  `json:"SendStall, int32"`
+	SlowStart            int32  `json:"SlowStart, int32"`
+	SmoothedRTT          int32  `json:"SmoothedRTT, int32"`
+	SndInitial           int32  `json:"SndInitial, int32"`
+	SndLimBytesCwnd      int32  `json:"SndLimBytesCwnd, int32"`
+	SndLimBytesRwin      int32  `json:"SndLimBytesRwin, int32"`
+	SndLimBytesSender    int32  `json:"SndLimBytesSender, int32"`
+	SndLimTimeCwnd       int32  `json:"SndLimTimeCwnd, int32"`
+	SndLimTimeRwin       int32  `json:"SndLimTimeRwin, int32"`
+	SndLimTimeSnd        int32  `json:"SndLimTimeSnd, int32"`
+	SndLimTransCwnd      int32  `json:"SndLimTransCwnd, int32"`
+	SndLimTransRwin      int32  `json:"SndLimTransRwin, int32"`
+	SndLimTransSnd       int32  `json:"SndLimTransSnd, int32"`
+	SndMax               int32  `json:"SndMax, int32"`
+	SndNxt               int32  `json:"SndNxt, int32"`
+	SndUna               int32  `json:"SndUna, int32"`
+	SndWindScale         int32  `json:"SndWindScale, int32"`
+	SoftErrorReason      int32  `json:"SoftErrorReason, int32"`
+	SoftErrors           int32  `json:"SoftErrors, int32"`
+	SpuriousFrDetected   int32  `json:"SpuriousFrDetected, int32"`
+	SpuriousRtoDetected  int32  `json:"SpuriousRtoDetected, int32"`
+	StartTimeStamp       int32  `json:"StartTimeStamp, int32"`
+	State                int32  `json:"State, int32"`
+	SubsequentTimeouts   int32  `json:"SubsequentTimeouts, int32"`
+	SumOctetsReordered   int32  `json:"SumOctetsReordered, int32"`
+	SumRTT               int32  `json:"SumRTT, int32"`
+	ThruOctetsAcked      int32  `json:"ThruOctetsAcked, int32"`
+	ThruOctetsReceived   int32  `json:"ThruOctetsReceived, int32"`
+	TimeStamps           int32  `json:"TimeStamps, int32"`
+	TimeStampRcvd        bool   `json:"TimeStampRcvd, string"`
+	TimeStampSent        bool   `json:"TimeStampSent, string"`
+	Timeouts             int32  `json:"Timeouts, int32"`
+	WAD_CwndAdjust       int32  `json:"WAD_CwndAdjust, int32"`
+	WAD_IFQ              int32  `json:"WAD_IFQ, int32"`
+	WAD_MaxBurst         int32  `json:"WAD_MaxBurst, int32"`
+	WAD_MaxSsthresh      int32  `json:"WAD_MaxSsthresh, int32"`
+	WAD_NoAI             int32  `json:"WAD_NoAI, int32"`
+	WillSendSACK         int32  `json:"WillSendSACK, int32"`
+	WillUseSACK          int32  `json:"WillUseSACK, int32"`
+	WinScaleRcvd         int32  `json:"WinScaleRcvd, int32"`
+	WinScaleSent         int32  `json:"WinScaleSent, int32"`
+	X_OtherReductionsCM  int32  `json:"X_OtherReductionsCM, int32"`
+	X_OtherReductionsCV  int32  `json:"X_OtherReductionsCV, int32"`
+	X_Rcvbuf             int32  `json:"X_Rcvbuf, int32"`
+	X_Sndbuf             int32  `json:"X_Sndbuf, int32"`
+	X_dbg1               int32  `json:"X_dbg1, int32"`
+	X_dbg2               int32  `json:"X_dbg2, int32"`
+	X_dbg3               int32  `json:"X_dbg3, int32"`
+	X_dbg4               int32  `json:"X_dbg4, int32"`
+	X_rcv_ssthresh       int32  `json:"X_rcv_ssthresh, int32"`
+	X_wnd_clamp          int32  `json:"X_wnd_clamp, int32"`
+	ZeroRwinRcvd         int32  `json:"ZeroRwinRcvd, int32"`
+	ZeroRwinSent         int32  `json:"ZeroRwinSent, int32"`
+}
+
+type Web100LogEntry struct {
+	Log_time        int64                         `json:"log_time, int64"`
+	Version         string                        `json:"version, string"`
+	Group_name      string                        `json:"group_name, string"`
+	Connection_spec Web100ConnectionSpecification `json:"connection_spec"`
+	Snap            Web100Snap                    `json:"snap"`
+}
+
+type SS struct {
+	Test_id     string         `json:"test_id, string"`
+	Project     int32          `json:"project, int32"`
+	Log_time    int64          `json:"log_time, int64"`
+	Type        int32          `json:"type, int32"`
+	Web_100_log Web100LogEntry `json:"web100_log_entry"`
+}
