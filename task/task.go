@@ -30,7 +30,7 @@ type Task struct {
 	etl.Parser         // Parser to parse the tests.
 
 	meta        map[string]bigquery.Value // Metadata about this task.
-	maxFileSize int64  // Max file size to avoid OOM.
+	maxFileSize int64                     // Max file size to avoid OOM.
 }
 
 // NewTask constructs a task, injecting the source and the parser.
@@ -61,19 +61,20 @@ func (tt *Task) ProcessAllTests() (int, error) {
 	var err error
 	// Read each file from the tar
 
+OUTER:
 	for testname, data, err = tt.NextTest(tt.maxFileSize); err != io.EOF; testname, data, err = tt.NextTest(tt.maxFileSize) {
 		files++
 		if err != nil {
 			switch {
 			case err == io.EOF:
-				break
+				break OUTER
 			case err == storage.OVERSIZE_FILE:
 				log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
 					tt.meta["filename"], testname, files,
 					time.Since(tt.meta["parse_time"].(time.Time)), err)
 				metrics.TestCount.WithLabelValues(
 					tt.Parser.TableName(), "unknown", "oversize file").Inc()
-				continue
+				continue OUTER
 			default:
 				// We are seeing several of these per hour, a little more than
 				// one in one thousand files.  duration varies from 10 seconds
@@ -93,7 +94,7 @@ func (tt *Task) ProcessAllTests() (int, error) {
 					tt.Parser.TableName(), "unknown", "unrecovered").Inc()
 				// Since we don't understand these errors, safest thing to do is
 				// stop processing the tar file (and task).
-				break
+				break OUTER
 			}
 		}
 		if data == nil {
