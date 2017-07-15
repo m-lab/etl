@@ -27,7 +27,7 @@ func TestNewTarReader(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		count += 1
+		count++
 	}
 	if count != 3 {
 		t.Error("Wrong number of files: ", count)
@@ -46,7 +46,7 @@ func TestNewTarReaderGzip(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		count += 1
+		count++
 	}
 	if count != 3 {
 		t.Error("Wrong number of files: ", count)
