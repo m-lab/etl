@@ -24,3 +24,14 @@ func TestParseIPFamily(t *testing.T) {
 		t.Fatalf("Do not parse IPv4 address correctly.")
 	}
 }
+
+func TestPopulateSnap(t *testing.T) {
+	ss_value := make(map[string]string)
+	ss_value["CERcvd"] = "22"
+	ss_value["RemAddress"] = "abcd"
+	ss_value["TimeStampRcvd"] = "0"
+	_, err := parser.PopulateSnap(ss_value)
+	if err != nil {
+		t.Fatalf("Do not populate snap fields correctly.")
+	}
+}
