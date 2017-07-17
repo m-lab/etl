@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -31,7 +32,8 @@ func NewSSParser(ins etl.Inserter) *SSParser {
 // The legacy filename is like  "20170203T00:00:00Z_ALL0.web100"
 // The current filename is like "20170315T01:00:00Z_173.205.3.39_0.web100"
 // Return time stamp if the filename is in right format
-func ExtractLogtimeFromFilename(testName string) (int64, error) {
+func ExtractLogtimeFromFilename(fileName string) (int64, error) {
+	testName := filepath.Base(fileName)
 	if len(testName) < 19 || !strings.Contains(testName, ".web100") {
 		return 0, errors.New("Wrong sidestream filename")
 	}
@@ -145,11 +147,10 @@ func InsertIntoBQ(ss_inserter etl.Inserter, ss_value map[string]string, log_time
 
 func ParseOneLine(snapshot string, var_names []string) (map[string]string, error) {
 	value := strings.Split(snapshot, " ")
-	fmt.Println(len(value))
-	fmt.Println(len(var_names))
 	ss_value := make(map[string]string)
 	if value[0] != "C:" || len(value) != len(var_names)+1 {
-		log.Printf("corrupted content")
+		log.Printf("corrupted content:")
+		log.Printf(snapshot)
 		return ss_value, errors.New("corrupted content")
 	}
 
@@ -173,7 +174,9 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 		// We do special handling for this variable
 		if key == "StartTimeUsec" {
 			// TODO: func CalculateStartTimeStamp() to get correct StartTimeStamp value.
+			continue
 		}
+		fmt.Println(key)
 		x := reflect.ValueOf(snap).Elem().FieldByName(key)
 		t := x.Type().String()
 		log.Printf("Name: %s    Type: %s\n", key, t)
@@ -206,17 +209,19 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if err != nil {
 		return err
 	}
-	fmt.Println(log_time)
 	var var_names []string
 	for index, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
-                // TODO: add metrics.
+		// TODO: add metrics.
 		if index == 0 {
 			var_names, err = ParseKHeader(oneLine)
 			if err != nil {
 				return err
 			}
 		} else {
+			if len(oneLine) == 0 {
+				continue
+			}
 			ss_value, err := ParseOneLine(oneLine, var_names)
 			if err != nil {
 				return err
