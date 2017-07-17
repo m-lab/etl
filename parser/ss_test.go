@@ -2,6 +2,7 @@ package parser_test
 
 import (
 	"fmt"
+	"io/ioutil"
 	"syscall"
 	"testing"
 
@@ -46,5 +47,21 @@ func TestParser(t *testing.T) {
 	}
 	if len(ss_value) != 121 || ss_value["SampleRTT"] != "72" {
 		t.Fatalf("Could not parse the content correctly.")
+	}
+}
+
+func TestSSInserter(t *testing.T) {
+	ins := &inMemoryInserter{}
+	n := parser.NewSSParser(ins)
+	rawData, err := ioutil.ReadFile("testdata/20170203T00:00:00Z_ALL0.web100")
+	if err != nil {
+		t.Fatalf("cannot read testdata.")
+	}
+	err = n.ParseAndInsert(nil, "testdata/20170203T00:00:00Z_ALL0.web100", rawData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if ins.RowsInBuffer() != 6 {
+		t.Fatalf("Number of rows in PT table is wrong.")
 	}
 }
