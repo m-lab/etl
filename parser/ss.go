@@ -6,16 +6,16 @@ import (
 	"cloud.google.com/go/bigquery"
 	"errors"
 	"fmt"
-	//"log"
+	"log"
 	"net"
-	//"os"
-	//"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/web100"
 )
@@ -84,8 +84,61 @@ func ParseKHeader(header string) ([]string, error) {
 	return var_names, nil
 }
 
-func InsertIntoBQ() {
+func (ss *SSParser) TableName() string {
+	return ss.inserter.TableBase()
+}
 
+func (ss *SSParser) FullTableName() string {
+	return ss.inserter.FullTableName()
+}
+
+func (ss *SSParser) Flush() error {
+	return ss.inserter.Flush()
+}
+
+func InsertIntoBQ(ss_inserter etl.Inserter, ss_value map[string]string, log_time int64, testName string) error {
+	// Insert this test into BQ
+	local_port, err := strconv.Atoi(ss_value["LocalPort"])
+	if err != nil {
+		return err
+	}
+	remote_port, err := strconv.Atoi(ss_value["RemPort"])
+	if err != nil {
+		return err
+	}
+	conn_spec := &schema.Web100ConnectionSpecification{
+		Local_ip:    ss_value["LocalAddress"],
+		Local_af:    int32(ParseIPFamily(ss_value["LocalAddress"])),
+		Local_port:  int32(local_port),
+		Remote_ip:   ss_value["RemAddress"],
+		Remote_port: int32(remote_port),
+	}
+	snap, err := PopulateSnap(ss_value)
+	if err != nil {
+		return err
+	}
+	web100_log := &schema.Web100LogEntry{
+		Log_time:        log_time,
+		Version:         "unknown",
+		Group_name:      "read",
+		Connection_spec: *conn_spec,
+		Snap:            snap,
+	}
+
+	ss_test := &schema.SS{
+		Test_id:          testName,
+		Log_time:         log_time,
+		Type:             int32(1),
+		Project:          int32(2),
+		Web100_log_entry: *web100_log,
+		Is_last_entry:    true,
+	}
+	err = ss_inserter.InsertRow(ss_test)
+	if err != nil {
+		log.Printf("insert-err: %v\n", err)
+		return err
+	}
+	return nil
 }
 
 func ParseOneLine(snapshot string, var_names []string) (map[string]string, error) {
@@ -103,6 +156,36 @@ func ParseOneLine(snapshot string, var_names []string) (map[string]string, error
 		ss_value[var_names[index-1]] = val
 	}
 	return ss_value, nil
+}
+
+func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
+	var snap = &schema.Web100Snap{}
+	for key := range ss_value {
+		x := reflect.ValueOf(snap).Elem().FieldByName(key)
+		t := x.Type().String()
+		log.Printf("Name: %s    Type: %s\n", key, t)
+
+		switch t {
+		case "int32":
+			value, err := strconv.Atoi(ss_value[key])
+			if err != nil {
+				return *snap, err
+			}
+			x.SetInt(int64(value))
+		case "string":
+			x.Set(reflect.ValueOf(ss_value[key]))
+		case "bool":
+			if ss_value[key] == "0" {
+				x.Set(reflect.ValueOf(false))
+			} else if ss_value[key] == "1" {
+				x.Set(reflect.ValueOf(true))
+			} else {
+				return *snap, errors.New("Cannot parse field " + key + " into a valie bool value.")
+			}
+		}
+	}
+
+	return *snap, nil
 }
 
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
@@ -124,45 +207,13 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			if err != nil {
 				return err
 			}
-			// Insert this test into BQ
-			local_port, err := strconv.Atoi(ss_value["LocalPort"])
+			InsertIntoBQ(ss.inserter, ss_value, log_time, testName)
 			if err != nil {
-				continue
-			}
-			remote_port, err := strconv.Atoi(ss_value["RemPort"])
-			if err != nil {
-				continue
-			}
-			conn_spec := &schema.Web100ConnectionSpecification{
-				Local_ip:    ss_value["LocalAddress"],
-				Local_af:    int32(ParseIPFamily(ss_value["LocalAddress"])),
-				Local_port:  int32(local_port),
-				Remote_ip:   ss_value["RemAddress"],
-				Remote_port: int32(remote_port),
-			}
-			snap := &schema.Web100Snap{}
-			web100_log := &schema.Web100LogEntry{
-				Log_time:        log_time,
-				Version:         "unknown",
-				Group_name:      "read",
-				Connection_spec: *conn_spec,
-				Snap:            *snap,
-			}
-
-			ss_test := &schema.SS{
-				Test_id:          testName,
-				Log_time:         log_time,
-				Type:             int32(1),
-				Project:          int32(2),
-				Web100_log_entry: *web100_log,
-				Is_last_entry:    true,
-			}
-			err = ss.inserter.InsertRow(ss_test)
-			if err != nil {
+				metrics.ErrorCount.WithLabelValues(
+					ss.TableName(), "ss", "insert-err").Inc()
 				continue
 			}
 		}
 	}
 	return nil
-
 }
