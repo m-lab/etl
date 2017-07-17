@@ -161,6 +161,14 @@ func ParseOneLine(snapshot string, var_names []string) (map[string]string, error
 func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 	var snap = &schema.Web100Snap{}
 	for key := range ss_value {
+		// Skip cid and PollTime. They are SideStream-specific fields, not web100 variables.
+		if key == "cid" || key == "PollTime" {
+			continue
+		}
+		// We do special handling for this variable
+		if key == "StartTimeUsec" {
+			// TODO: func CalculateStartTimeStamp() to get correct StartTimeStamp value.
+		}
 		x := reflect.ValueOf(snap).Elem().FieldByName(key)
 		t := x.Type().String()
 		log.Printf("Name: %s    Type: %s\n", key, t)
@@ -184,7 +192,7 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 			}
 		}
 	}
-
+	// TODO: check whether snap has valid LocalAddress, RemAddress. Return error if not.
 	return *snap, nil
 }
 
