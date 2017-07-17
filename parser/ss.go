@@ -76,9 +76,11 @@ func ParseKHeader(header string) ([]string, error) {
 		if index == 0 {
 			continue
 		}
-		var_names[index-1] = name
+
 		if mapping[name] != "" {
-			var_names[index-1] = mapping[name]
+			var_names = append(var_names, mapping[name])
+		} else {
+			var_names = append(var_names, name)
 		}
 	}
 	return var_names, nil
@@ -143,8 +145,11 @@ func InsertIntoBQ(ss_inserter etl.Inserter, ss_value map[string]string, log_time
 
 func ParseOneLine(snapshot string, var_names []string) (map[string]string, error) {
 	value := strings.Split(snapshot, " ")
-	var ss_value map[string]string
+	fmt.Println(len(value))
+	fmt.Println(len(var_names))
+	ss_value := make(map[string]string)
 	if value[0] != "C:" || len(value) != len(var_names)+1 {
+		log.Printf("corrupted content")
 		return ss_value, errors.New("corrupted content")
 	}
 
