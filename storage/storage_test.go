@@ -23,7 +23,7 @@ func TestNewTarReader(t *testing.T) {
 	defer src.Close()
 
 	count := 0
-	for _, _, err := src.NextTest(); err != io.EOF; _, _, err = src.NextTest() {
+	for _, _, err := src.NextTest(10000000); err != io.EOF; _, _, err = src.NextTest(10000000) {
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -42,7 +42,7 @@ func TestNewTarReaderGzip(t *testing.T) {
 	defer src.Close()
 
 	count := 0
-	for _, _, err := src.NextTest(); err != io.EOF; _, _, err = src.NextTest() {
+	for _, _, err := src.NextTest(10000000); err != io.EOF; _, _, err = src.NextTest(10000000) {
 		if err != nil {
 			t.Fatal(err)
 		}
