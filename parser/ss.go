@@ -210,6 +210,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	var var_names []string
 	for index, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
+                // TODO: add metrics.
 		if index == 0 {
 			var_names, err = ParseKHeader(oneLine)
 			if err != nil {
