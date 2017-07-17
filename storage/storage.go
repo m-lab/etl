@@ -34,8 +34,9 @@ type TarReader interface {
 }
 
 type ETLSource struct {
-	TarReader // TarReader interface provided by an embedded struct.
-	io.Closer // Closer interface to be provided by an embedded struct.
+	TarReader                   // TarReader interface provided by an embedded struct.
+	io.Closer                   // Closer interface to be provided by an embedded struct.
+	RetryBaseTime time.Duration // The base time for backoff and retry.
 }
 
 // Retrieve next file header.
@@ -121,10 +122,11 @@ func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 	var data []byte
 	var h *tar.Header
 
-	// Last trial will be after total delay of 16ms + 32ms + ... + 8192ms,
-	// or about 15 seconds.
+	// With default RetryBaseTime, the last trial will be after total delay of
+	// 16ms + 32ms + ... + 8192ms, or about 15 seconds.
+	// TODO - should add a random element to the backoff?
 	trial := 0
-	delay := 16 * time.Millisecond
+	delay := rr.RetryBaseTime
 	for {
 		trial++
 		var retry bool
@@ -150,7 +152,7 @@ func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 	}
 
 	trial = 0
-	delay = 16 * time.Millisecond
+	delay = rr.RetryBaseTime
 	for {
 		trial++
 		var retry bool
@@ -236,7 +238,8 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	}
 	tarReader := tar.NewReader(rdr)
 
-	return &ETLSource{tarReader, closer}, nil
+	timeout := 16 * time.Millisecond
+	return &ETLSource{tarReader, closer, timeout}, nil
 }
 
 // Create a storage reader client.

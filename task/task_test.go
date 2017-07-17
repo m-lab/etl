@@ -5,11 +5,14 @@ package task_test
 import (
 	"archive/tar"
 	"bytes"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
+
+	"time"
 
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage" // TODO - would be better not to have this.
@@ -59,7 +62,7 @@ func MakeTestSource(t *testing.T) *storage.ETLSource {
 		t.Fatal(err)
 	}
 
-	return &storage.ETLSource{tar.NewReader(b), NullCloser{}}
+	return &storage.ETLSource{tar.NewReader(b), NullCloser{}, time.Millisecond}
 }
 
 type TestParser struct {
@@ -83,8 +86,37 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 	return nil
 }
 
-// TODO(dev) - add unit tests for tgz and tar.gz files
-// TODO(dev) - add good comments
+type badSource struct{}
+
+func (bs *badSource) Next() (*tar.Header, error) {
+	return nil, errors.New("Random Error")
+}
+func (bs *badSource) Read(b []byte) (int, error) {
+	return 0, errors.New("Read error")
+}
+
+// TODO - this test is very slow, because it triggers the backoff and retry mechanism.
+func TestBadTarFileInput(t *testing.T) {
+	rdr := &storage.ETLSource{&badSource{}, NullCloser{}, time.Millisecond}
+
+	tp := &TestParser{}
+
+	// Among other things, this requires that tp implements etl.Parser.
+	tt := task.NewTask("filename", rdr, tp)
+	fc, err := tt.ProcessAllTests()
+	if err.Error() != "Random Error" {
+		t.Error("Expected Random Error, but got %v", err)
+	}
+	// Should see 1 files.
+	if fc != 1 {
+		t.Error("Expected 1 file: ", fc)
+	}
+	// ... but process none.
+	if len(tp.files) != 0 {
+		t.Error("Should have processed no files: ", len(tp.files))
+	}
+}
+
 func TestTarFileInput(t *testing.T) {
 	rdr := MakeTestSource(t)
 
