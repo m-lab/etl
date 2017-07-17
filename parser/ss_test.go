@@ -2,13 +2,10 @@ package parser_test
 
 import (
 	"fmt"
-	//"io/ioutil"
-	//"reflect"
 	"syscall"
 	"testing"
 
 	"github.com/m-lab/etl/parser"
-	//"github.com/m-lab/etl/schema"
 )
 
 func TestExtractLogtimeFromFilename(t *testing.T) {
