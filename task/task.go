@@ -20,7 +20,7 @@ import (
 // Impose 200MiB max size for a single file.  Larger than this risks an OOM if there are
 // multiple large files at on multiple tasks.
 // This can be overridden with SetMaxFileSize()
-const MAX_FILE_SIZE = 20 * 1024 * 1024
+const MAX_FILE_SIZE = 200 * 1024 * 1024
 
 // TODO(dev) Add unit tests for meta data.
 type Task struct {
