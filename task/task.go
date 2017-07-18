@@ -17,11 +17,13 @@ import (
 	"github.com/m-lab/etl/storage"
 )
 
-// Impose 200MiB max size for a single file.  Larger than this risks an OOM if there are
+// DefaultMaxFileSize is the default value for the file size limit for calls to NextTest.
+// Larger than this risks an OOM if there are
 // multiple large files at on multiple tasks.
 // This can be overridden with SetMaxFileSize()
-const MAX_FILE_SIZE = 200 * 1024 * 1024
+const DefaultMaxFileSize = 200 * 1024 * 1024
 
+// Task contains the state required to process a single task tar file.
 // TODO(dev) Add unit tests for meta data.
 type Task struct {
 	// ETLSource and Parser are both embedded, so their interfaces are delegated
@@ -40,10 +42,11 @@ func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser) *Task {
 	meta["filename"] = filename
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
-	t := Task{src, prsr, meta, MAX_FILE_SIZE}
+	t := Task{src, prsr, meta, DefaultMaxFileSize}
 	return &t
 }
 
+// SetMaxFileSize overrides the default maxFileSize.
 func (tt *Task) SetMaxFileSize(max int64) {
 	tt.maxFileSize = max
 }
@@ -68,7 +71,7 @@ OUTER:
 			switch {
 			case err == io.EOF:
 				break OUTER
-			case err == storage.OVERSIZE_FILE:
+			case err == storage.ErrOversizeFile:
 				log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
 					tt.meta["filename"], testname, files,
 					time.Since(tt.meta["parse_time"].(time.Time)), err)
@@ -100,7 +103,7 @@ OUTER:
 		if data == nil {
 			// TODO(dev) Handle directories (expected) and other
 			// things separately.
-			nilData += 1
+			nilData++
 			// If verbose, log the filename that is skipped.
 			continue
 		}

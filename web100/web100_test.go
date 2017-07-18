@@ -32,11 +32,11 @@ func TestHeaderParsing(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	if slog.SnapshotNumFields() != 142 {
-		log.Printf("%d\n", slog.SnapshotNumFields)
+		log.Printf("%d\n", slog.SnapshotNumFields())
 		t.Error("Wrong number of fields.")
 	}
 	if slog.SnapshotNumBytes() != 669 {
-		log.Printf("Record length %d\n", slog.SnapshotNumBytes)
+		log.Printf("Record length %d\n", slog.SnapshotNumBytes())
 		t.Error("Wrong record length.")
 	}
 
