@@ -1,1 +1,54 @@
+# To deploy (from cmd/etl_worker):
+# go build etl_worker.go && gcloud beta app deploy --project=mlab-staging app-traceroute-staging.yaml
+
+runtime: custom
+env: flex
+service: etl-traceroute-parser
+
+# Resource and scaling options. For more background, see:
+#   https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml
+
+# TODO(dev): adjust CPU and memory based on actual requirements.
+resources:
+  cpu: 2
+  # Instances support between [(cpu * 0.9) - 0.4, (cpu * 6.5) - 0.4]
+  # Actual memory available is exposed via GAE_MEMORY_MB environment variable.
+  memory_gb: 12
+
+  # TODO - Adjust once we understand requirements.
+  disk_size_gb: 10
+
+  # The tmpfs space is allocated from memory_gb.
+  volumes:
+  # Define a tmpfs disk for NDT snapshot files.
+  # Mounted under: /mnt/tmpfs
+  - name: tmpfs
+    volume_type: tmpfs
+    size_gb: 1.0
+
+automatic_scaling:
+  # We expect fairly steady load, so a modest minimum will rarely cost us anything.
+  min_num_instances: 1
+  max_num_instances: 50
+  cool_down_period_sec: 300
+  # We don't care much about latency, so a high utilization is desireable.
+  cpu_utilization:
+    target_utilization: 0.95
+
+# Note: add a public port for GCE auto discovery by prometheus.
+# TODO(dev): are any values redundant or irrelevant?
+network:
+  instance_tag: etl-parser
+  name: default
+  # Forward port 9090 on the GCE instance address to the same port in the
+  # container address. Only forward TCP traffic.
+  # Note: the default AppEngine container port 8080 cannot be forwarded.
+  forwarded_ports:
+    - 9090/tcp
+
+env_variables:
+  MAX_WORKERS: 30
+  BIGQUERY_PROJECT: 'mlab-staging'
+  BIGQUERY_DATASET: 'staging'
+  # TODO add custom service-account, instead of using default credentials.
 
