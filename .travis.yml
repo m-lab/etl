@@ -150,6 +150,19 @@ deploy:
     # Sandbox branches will be deployed to personalized service names.
     # Integration branch will not use decorated service names.
     condition: $TRAVIS_BRANCH == pt-sandbox-*
+    
+# STAGING: Should be used AFTER code review and commit to dev branch.  Triggers
+# when *ANY* branch is tagged with pt-staging-*'
+- provider: script
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-pt-staging.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    tag: true
+    condition: $TRAVIS_TAG == pt-staging-*
+
 
 ######################################################################
 ## Service: queue-pusher -- AppEngine Standard Environment.
