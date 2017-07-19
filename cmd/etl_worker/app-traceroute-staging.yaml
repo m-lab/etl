@@ -1,5 +1,6 @@
 # To deploy (from cmd/etl_worker):
 # go build etl_worker.go && gcloud beta app deploy --project=mlab-staging app-traceroute-staging.yaml
+# the destination table will be at mlab-staging:staging.traceroute
 
 runtime: custom
 env: flex
