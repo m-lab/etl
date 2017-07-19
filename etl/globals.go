@@ -98,7 +98,7 @@ var (
 	DataTypeToTable = map[DataType]string{
 		NDT:     "ndt",
 		SS:      "ss_test",
-		PT:      "pt_test",
+		PT:      "traceroute",
 		SW:      "disco_test",
 		INVALID: "invalid",
 	}
