@@ -62,7 +62,7 @@ func MakeTestSource(t *testing.T) *storage.ETLSource {
 		t.Fatal(err)
 	}
 
-	return &storage.ETLSource{tar.NewReader(b), NullCloser{}, time.Millisecond}
+	return &storage.ETLSource{TarReader: tar.NewReader(b), Closer: NullCloser{}, RetryBaseTime: time.Millisecond}
 }
 
 type TestParser struct {
@@ -97,7 +97,7 @@ func (bs *badSource) Read(b []byte) (int, error) {
 
 // TODO - this test is very slow, because it triggers the backoff and retry mechanism.
 func TestBadTarFileInput(t *testing.T) {
-	rdr := &storage.ETLSource{&badSource{}, NullCloser{}, time.Millisecond}
+	rdr := &storage.ETLSource{TarReader: &badSource{}, Closer: NullCloser{}, RetryBaseTime: time.Millisecond}
 
 	tp := &TestParser{}
 
@@ -105,7 +105,7 @@ func TestBadTarFileInput(t *testing.T) {
 	tt := task.NewTask("filename", rdr, tp)
 	fc, err := tt.ProcessAllTests()
 	if err.Error() != "Random Error" {
-		t.Error("Expected Random Error, but got %v", err)
+		t.Error("Expected Random Error, but got " + err.Error())
 	}
 	// Should see 1 files.
 	if fc != 1 {
@@ -142,7 +142,7 @@ func TestTarFileInput(t *testing.T) {
 	}
 	if err == nil {
 		t.Error("Expected oversize file")
-	} else if err != storage.OVERSIZE_FILE {
+	} else if err != storage.ErrOversizeFile {
 		t.Error("Expected oversize file but got: " + err.Error())
 	}
 
@@ -165,7 +165,7 @@ func TestTarFileInput(t *testing.T) {
 	tt.SetMaxFileSize(100)
 	fc, err := tt.ProcessAllTests()
 	if err != nil {
-		t.Error("Expected nil error, but got %v", err)
+		t.Error("Expected nil error, but got ", err)
 	}
 	// Should see 3 files.
 	if fc != 3 {

@@ -1,4 +1,4 @@
-// The parser package defines the Parser interface and implementations for the different
+// Package parser defines the Parser interface and implementations for the different
 // test types, NDT, Paris Traceroute, and SideStream.
 package parser
 
@@ -19,6 +19,7 @@ import (
 //=====================================================================================
 //                       Disco Parser
 //=====================================================================================
+
 type PortStats struct {
 	// TODO - replace these with standard meta data.
 	Meta struct {

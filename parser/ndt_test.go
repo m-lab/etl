@@ -178,13 +178,13 @@ func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100V
 			}
 		case []float64:
 			if len(v) != len(act.([]float64)) {
-				t.Logf("Wrong floats for key %q: got %d; want %d",
+				t.Logf("Wrong floats for key %q: got %f; want %v",
 					key, v, act.([]float64))
 				match = false
 			}
 			for i := range v {
 				if v[i] != act.([]float64)[i] {
-					t.Logf("Wrong floats for key %q: got %d; want %d",
+					t.Logf("Wrong floats for key %q: got %f; want %v",
 						key, v, act.([]float64))
 					match = false
 				}

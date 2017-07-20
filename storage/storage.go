@@ -26,13 +26,16 @@ import (
 	storage "google.golang.org/api/storage/v1"
 )
 
-var OVERSIZE_FILE = errors.New("Oversize file")
+// ErrOversizeFile is returned when exceptionally large files are skipped.
+var ErrOversizeFile = errors.New("Oversize file")
 
+// TarReader provides Next and Read functions.
 type TarReader interface {
 	Next() (*tar.Header, error)
 	Read(b []byte) (int, error)
 }
 
+// ETLSource wraps a gsutil tar file containing tests.
 type ETLSource struct {
 	TarReader                   // TarReader interface provided by an embedded struct.
 	io.Closer                   // Closer interface to be provided by an embedded struct.
@@ -108,9 +111,9 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 	return data, false, nil
 }
 
-// Next reads the next test object from the tar file.
+// NextTest reads the next test object from the tar file.
 // Skips reading contents of any file larger than maxSize, returning empty data
-// and storage.OVERSIZE_FILE error.
+// and storage.ErrOversizeFile.
 // Returns io.EOF when there are no more tests.
 func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 	metrics.WorkerState.WithLabelValues("read").Inc()
@@ -143,7 +146,7 @@ func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 	}
 
 	if h.Size > maxSize {
-		return h.Name, data, OVERSIZE_FILE
+		return h.Name, data, ErrOversizeFile
 	}
 
 	// Only process regular files.
@@ -174,12 +177,13 @@ func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 	return h.Name, data, nil
 }
 
-// Compound closer, for use with gzip files.
+// Closer handles gzip files.
 type Closer struct {
 	zipper io.Closer // Must be non-null
 	body   io.Closer // Must be non-null
 }
 
+// Close invokes the gzip and body Close() functions.
 func (t *Closer) Close() error {
 	err := t.zipper.Close()
 	t.body.Close()
@@ -188,12 +192,11 @@ func (t *Closer) Close() error {
 
 var errNoClient = errors.New("client should be non-null")
 
-// Create a ETLSource suitable for injecting into Task.
+// NewETLSource creates an ETLSource suitable for injecting into Task.
 // Caller is responsible for calling Close on the returned object.
 //
 // uri should be of form gs://bucket/filename.tar or gs://bucket/filename.tgz
 // FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
-// TODO(now) rename
 func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	if client == nil {
 		return nil, errNoClient
@@ -242,7 +245,8 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	return &ETLSource{tarReader, closer, timeout}, nil
 }
 
-// Create a storage reader client.
+// GetStorageClient provides a storage reader client.
+// This contacts the backend server, so should be used infrequently.
 func GetStorageClient(writeAccess bool) (*http.Client, error) {
 	var scope string
 	if writeAccess {
@@ -260,7 +264,7 @@ func GetStorageClient(writeAccess bool) (*http.Client, error) {
 	return client, nil
 }
 
-// Turn the bytes received from the queue into a filename
+// GetFilename converts request received from the queue into a filename.
 // TODO(dev) Add unit test
 func GetFilename(filename string) (string, error) {
 	if strings.HasPrefix(filename, "gs://") {

@@ -190,7 +190,7 @@ func parseMetaFile(rawContent []byte) (map[string]string, error) {
 	return result, nil
 }
 
-// ProcessMeta parses the .meta file.
+// ProcessMetaFile parses the .meta file.
 // TODO(dev) - add unit tests
 // TODO(prod) - For tests that include a meta file, should respect the test filenames.
 // See ndt_meta_log_parser_lib.cc

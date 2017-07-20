@@ -29,8 +29,9 @@ const (
 	// TODO - in future, we should probably detect when the connection state changes
 	// from established, as there is little reason to parse snapshots beyond that
 	// point.
-	MIN_NUM_SNAPSHOTS = 1600 // If fewer than this, then set anomalies.num_snaps
-	MAX_NUM_SNAPSHOTS = 2800 // If more than this, truncate, and set anomolies.num_snaps
+
+	minNumSnapshots = 1600 // If fewer than this, then set anomalies.num_snaps
+	maxNumSnapshots = 2800 // If more than this, truncate, and set anomolies.num_snaps
 )
 
 //=========================================================================
@@ -125,6 +126,7 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 }
 
 // These functions are also required to complete the etl.Parser interface.
+
 func (n *NDTParser) Flush() error {
 	// Process the last group (if it exists) before flushing the inserter.
 	if n.timestamp != "" {
@@ -167,7 +169,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		if info.Time < n.timestamp {
 			metrics.ErrorCount.WithLabelValues(
 				n.TableName(), "unknown", "TIMESTAMPS OUT OF ORDER").Inc()
-			log.Printf("Timestamps out of order in: %s\n",
+			log.Printf("Timestamps out of order in: %s: %s\n",
 				n.taskFileName, err)
 			panic("Timestamps out of order in tar file")
 		}
@@ -260,7 +262,7 @@ func (n *NDTParser) reportAnomalies() {
 	}
 	if n.c2s != nil {
 		tag += "c2s"
-		code += 1
+		code++
 	}
 	if code != 7 {
 		if tag == "" {
@@ -309,11 +311,10 @@ func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 		metrics.FileSizeHistogram.WithLabelValues(
 			"huge").Observe(float64(len(test.data)))
 		return
-	} else {
-		// Record the file size.
-		metrics.FileSizeHistogram.WithLabelValues(
-			"normal").Observe(float64(len(test.data)))
 	}
+	// Record the file size.
+	metrics.FileSizeHistogram.WithLabelValues(
+		"normal").Observe(float64(len(test.data)))
 
 	if len(test.data) < 16*1024 {
 		metrics.WarningCount.WithLabelValues(
@@ -370,7 +371,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	var deltas []schema.Web100ValueMap
 	deltaFieldCount := 0
 	snapshotCount := 0
-	for count := 0; count < snaplog.SnapCount() && count < MAX_NUM_SNAPSHOTS; count++ {
+	for count := 0; count < snaplog.SnapCount() && count < maxNumSnapshots; count++ {
 		snap, err := snaplog.Snapshot(count)
 		if err != nil {
 			// TODO - refine label and maybe write a log?
@@ -406,7 +407,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		}
 		delta["snapshot_num"] = count
 		delta["delta_index"] = snapshotCount
-		snapshotCount += 1
+		snapshotCount++
 		metrics.DeltaNumFieldsHistogram.WithLabelValues(n.TableName()).
 			Observe(float64(len(delta)))
 
@@ -422,8 +423,8 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		deltas[len(deltas)-1]["is_last"] = true
 	}
 	final := snaplog.SnapCount() - 1
-	if final > MAX_NUM_SNAPSHOTS {
-		final = MAX_NUM_SNAPSHOTS
+	if final > maxNumSnapshots {
+		final = maxNumSnapshots
 	}
 	snap, err := snaplog.Snapshot(final)
 	if err != nil {
@@ -455,7 +456,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 
 	results["test_id"] = test.fn
 	results["task_filename"] = n.taskFileName
-	if snaplog.SnapCount() > MAX_NUM_SNAPSHOTS || snaplog.SnapCount() < MIN_NUM_SNAPSHOTS {
+	if snaplog.SnapCount() > maxNumSnapshots || snaplog.SnapCount() < minNumSnapshots {
 		results["anomalies"].(schema.Web100ValueMap)["num_snaps"] = snaplog.SnapCount()
 	}
 	if !valid {
@@ -524,7 +525,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 
 	// TODO - estimate the size of the json (or fields) to allow more rows per request,
 	// but avoid going over the 10MB limit.
-	err = n.inserter.InsertRow(&bq.MapSaver{results})
+	err = n.inserter.InsertRow(&bq.MapSaver{Values: results})
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, "insert-err").Inc()
