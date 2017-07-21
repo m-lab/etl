@@ -219,7 +219,8 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	}
 
 	// TODO(prod) Evaluate whether this is long enough.
-	obj, err := getObject(client, bucket, fn, 30*time.Minute)
+	// 30 minutes is insufficient for some very large files produced by scraper in 2Q17
+	obj, err := getObject(client, bucket, fn, 60*time.Minute)
 	if err != nil {
 		return nil, err
 	}
