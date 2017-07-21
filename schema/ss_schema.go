@@ -176,5 +176,4 @@ type SS struct {
 	Log_time         int64          `json:"log_time, int64"`
 	Type             int32          `json:"type, int32"`
 	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`
-	Is_last_entry    bool           `json:"is_last_entry, bool"`
 }

@@ -8,6 +8,7 @@ package task
 import (
 	"io"
 	"log"
+        "strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -30,7 +31,7 @@ type Task struct {
 	etl.Parser         // Parser to parse the tests.
 
 	meta        map[string]bigquery.Value // Metadata about this task.
-	maxFileSize int64  // Max file size to avoid OOM.
+	maxFileSize int64                     // Max file size to avoid OOM.
 }
 
 // NewTask constructs a task, injecting the source and the parser.
@@ -103,7 +104,10 @@ func (tt *Task) ProcessAllTests() (int, error) {
 			// If verbose, log the filename that is skipped.
 			continue
 		}
-
+		if strings.Contains(testname, ".tra") {
+			// Ignore the trace file for sidestream test.
+			continue
+		}
 		err := tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if err != nil {
