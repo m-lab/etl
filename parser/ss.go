@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"cloud.google.com/go/bigquery"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"path/filepath"
@@ -23,10 +22,11 @@ import (
 
 type SSParser struct {
 	inserter etl.Inserter
+	etl.RowStats
 }
 
 func NewSSParser(ins etl.Inserter) *SSParser {
-	return &SSParser{ins}
+	return &SSParser{ins, ins}
 }
 
 // The legacy filename is like  "20170203T00:00:00Z_ALL0.web100"
@@ -35,16 +35,18 @@ func NewSSParser(ins etl.Inserter) *SSParser {
 func ExtractLogtimeFromFilename(fileName string) (int64, error) {
 	testName := filepath.Base(fileName)
 	if len(testName) < 19 || !strings.Contains(testName, ".web100") {
+		log.Println(testName)
 		return 0, errors.New("Wrong sidestream filename")
 	}
 
 	date_str := testName[0:4] + "-" + testName[4:6] + "-" + testName[6:8] + testName[8:17] + ".000Z"
-	fmt.Println(date_str)
+
 	t, err := time.Parse(time.RFC3339, date_str)
 
 	if err != nil {
 		return 0, err
 	}
+
 	return t.Unix(), nil
 }
 
@@ -135,7 +137,6 @@ func InsertIntoBQ(ss_inserter etl.Inserter, ss_value map[string]string, log_time
 		Type:             int32(1),
 		Project:          int32(2),
 		Web100_log_entry: *web100_log,
-		Is_last_entry:    true,
 	}
 	err = ss_inserter.InsertRow(ss_test)
 	if err != nil {
@@ -176,10 +177,10 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 			// TODO: func CalculateStartTimeStamp() to get correct StartTimeStamp value.
 			continue
 		}
-		fmt.Println(key)
+		//fmt.Println(key)
 		x := reflect.ValueOf(snap).Elem().FieldByName(key)
 		t := x.Type().String()
-		log.Printf("Name: %s    Type: %s\n", key, t)
+		//log.Printf("Name: %s    Type: %s\n", key, t)
 
 		switch t {
 		case "int32":
