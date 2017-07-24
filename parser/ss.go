@@ -101,14 +101,14 @@ func (ss *SSParser) Flush() error {
 
 // TODO: add metrics
 // Prepare data into sidestream BigQeury schema and insert it.
-func InsertIntoBQ(ss_inserter etl.Inserter, ss_value map[string]string, log_time int64, testName string) error {
+func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName string) (schema.SS, error) {
 	local_port, err := strconv.Atoi(ss_value["LocalPort"])
 	if err != nil {
-		return err
+		return schema.SS{}, err
 	}
 	remote_port, err := strconv.Atoi(ss_value["RemPort"])
 	if err != nil {
-		return err
+		return schema.SS{}, err
 	}
 	conn_spec := &schema.Web100ConnectionSpecification{
 		Local_ip:    ss_value["LocalAddress"],
@@ -119,7 +119,7 @@ func InsertIntoBQ(ss_inserter etl.Inserter, ss_value map[string]string, log_time
 	}
 	snap, err := PopulateSnap(ss_value)
 	if err != nil {
-		return err
+		return schema.SS{}, err
 	}
 	web100_log := &schema.Web100LogEntry{
 		Log_time:        log_time,
@@ -136,12 +136,7 @@ func InsertIntoBQ(ss_inserter etl.Inserter, ss_value map[string]string, log_time
 		Project:          int32(2),
 		Web100_log_entry: *web100_log,
 	}
-	err = ss_inserter.InsertRow(ss_test)
-	if err != nil {
-		log.Printf("insert-err: %v\n", err)
-		return err
-	}
-	return nil
+	return *ss_test, nil
 }
 
 func ParseOneLine(snapshot string, var_names []string) (map[string]string, error) {
@@ -225,10 +220,17 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			if err != nil {
 				return err
 			}
-			InsertIntoBQ(ss.inserter, ss_value, log_time, testName)
+			ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
+			if err != nil {
+				log.Printf("cannot pack data into sidestream schema: %v\n", err)
+				return err
+			}
+			err = ss.inserter.InsertRow(ss_test)
+
 			if err != nil {
 				metrics.ErrorCount.WithLabelValues(
 					ss.TableName(), "ss", "insert-err").Inc()
+				log.Printf("insert-err: %v\n", err)
 				continue
 			}
 		}
