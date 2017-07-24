@@ -167,12 +167,9 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 			// TODO: func CalculateStartTimeStamp() to get correct StartTimeStamp value.
 			continue
 		}
-		//fmt.Println(key)
 		x := reflect.ValueOf(snap).Elem().FieldByName(key)
-		t := x.Type().String()
-		//log.Printf("Name: %s    Type: %s\n", key, t)
 
-		switch t {
+		switch x.Type().String() {
 		case "int32":
 			value, err := strconv.Atoi(ss_value[key])
 			if err != nil {
