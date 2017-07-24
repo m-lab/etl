@@ -112,10 +112,10 @@ func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName str
 	}
 	conn_spec := &schema.Web100ConnectionSpecification{
 		Local_ip:    ss_value["LocalAddress"],
-		Local_af:    int64(ParseIPFamily(ss_value["LocalAddress"])),
-		Local_port:  int64(local_port),
+		Local_af:    int32(ParseIPFamily(ss_value["LocalAddress"])),
+		Local_port:  int32(local_port),
 		Remote_ip:   ss_value["RemAddress"],
-		Remote_port: int64(remote_port),
+		Remote_port: int32(remote_port),
 	}
 	snap, err := PopulateSnap(ss_value)
 	if err != nil {
@@ -132,8 +132,8 @@ func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName str
 	ss_test := &schema.SS{
 		Test_id:          testName,
 		Log_time:         log_time,
-		Type:             int64(1),
-		Project:          int64(2),
+		Type:             int32(1),
+		Project:          int32(2),
 		Web100_log_entry: *web100_log,
 	}
 	return *ss_test, nil
@@ -194,7 +194,7 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 
 // TODO: add metrics.
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	if strings.Contains(testname, ".tra") {
+	if strings.Contains(testName, ".tra") {
 		// Ignore the trace file for sidestream test.
 		return nil
 	}
