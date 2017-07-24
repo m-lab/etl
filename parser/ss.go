@@ -148,10 +148,7 @@ func ParseOneLine(snapshot string, var_names []string) (map[string]string, error
 		return ss_value, errors.New("corrupted content")
 	}
 
-	for index, val := range value {
-		if index == 0 {
-			continue
-		}
+	for index, val := range value[1:] {
 		// Match value with var_name
 		ss_value[var_names[index-1]] = val
 	}
