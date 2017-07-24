@@ -216,11 +216,12 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
 		if err != nil {
+			metrics.ErrorCount.WithLabelValues(
+				ss.TableName(), "ss", "corrupted data").Inc()
 			log.Printf("cannot pack data into sidestream schema: %v\n", err)
 			return err
 		}
 		err = ss.inserter.InsertRow(ss_test)
-
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				ss.TableName(), "ss", "insert-err").Inc()
