@@ -150,7 +150,7 @@ func ParseOneLine(snapshot string, var_names []string) (map[string]string, error
 
 	for index, val := range value[1:] {
 		// Match value with var_name
-		ss_value[var_names[index-1]] = val
+		ss_value[var_names[index]] = val
 	}
 	return ss_value, nil
 }
