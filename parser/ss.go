@@ -194,6 +194,10 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 
 // TODO: add metrics.
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
+	if strings.Contains(testname, ".tra") {
+		// Ignore the trace file for sidestream test.
+		return nil
+	}
 	log_time, err := ExtractLogtimeFromFilename(testName)
 	if err != nil {
 		return err
