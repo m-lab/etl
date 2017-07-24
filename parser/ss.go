@@ -192,42 +192,42 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 	return *snap, nil
 }
 
+// TODO: add metrics.
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	log_time, err := ExtractLogtimeFromFilename(testName)
 	if err != nil {
 		return err
 	}
 	var var_names []string
-	for index, oneLine := range strings.Split(string(rawContent[:]), "\n") {
+	testContent := strings.Split(string(rawContent[:]), "\n")
+	var_names, err = ParseKHeader(testContent[0])
+	if err != nil {
+		return err
+	}
+	for _, oneLine := range testContent[1:] {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
-		// TODO: add metrics.
-		if index == 0 {
-			var_names, err = ParseKHeader(oneLine)
-			if err != nil {
-				return err
-			}
-		} else {
-			if len(oneLine) == 0 {
-				continue
-			}
-			ss_value, err := ParseOneLine(oneLine, var_names)
-			if err != nil {
-				return err
-			}
-			ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
-			if err != nil {
-				log.Printf("cannot pack data into sidestream schema: %v\n", err)
-				return err
-			}
-			err = ss.inserter.InsertRow(ss_test)
 
-			if err != nil {
-				metrics.ErrorCount.WithLabelValues(
-					ss.TableName(), "ss", "insert-err").Inc()
-				log.Printf("insert-err: %v\n", err)
-				continue
-			}
+		if len(oneLine) == 0 {
+			continue
 		}
+		ss_value, err := ParseOneLine(oneLine, var_names)
+		if err != nil {
+			return err
+		}
+		ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
+		if err != nil {
+			log.Printf("cannot pack data into sidestream schema: %v\n", err)
+			return err
+		}
+		err = ss.inserter.InsertRow(ss_test)
+
+		if err != nil {
+			metrics.ErrorCount.WithLabelValues(
+				ss.TableName(), "ss", "insert-err").Inc()
+			log.Printf("insert-err: %v\n", err)
+			continue
+		}
+
 	}
 	return nil
 }
