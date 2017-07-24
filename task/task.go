@@ -107,7 +107,6 @@ OUTER:
 			// If verbose, log the filename that is skipped.
 			continue
 		}
-
 		err := tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if err != nil {

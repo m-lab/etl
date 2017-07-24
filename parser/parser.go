@@ -15,8 +15,7 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	case etl.NDT:
 		return NewNDTParser(ins)
 	case etl.SS:
-		// TODO - substitute appropriate parsers here and below.
-		return NewTestParser(ins)
+		return NewSSParser(ins)
 	case etl.PT:
 		return NewPTParser(ins)
 	case etl.SW:
