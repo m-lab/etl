@@ -1,12 +1,13 @@
 // This files contains schema for SideStream tests.
+// Any changes here should also be made in ss.json
 package schema
 
 type Web100ConnectionSpecification struct {
 	Local_ip    string `json:"local_ip, string"`
-	Local_af    int32  `json:"local_af, int32"`
-	Local_port  int32  `json:"local_port, int32"`
+	Local_af    int64  `json:"local_af, int64"`
+	Local_port  int64  `json:"local_port, int64"`
 	Remote_ip   string `json:"remote_ip, string"`
-	Remote_port int32  `json:"remote_port, int32"`
+	Remote_port int64  `json:"remote_port, int64"`
 }
 
 type Web100Snap struct {
@@ -172,8 +173,8 @@ type Web100LogEntry struct {
 
 type SS struct {
 	Test_id          string         `json:"test_id, string"`
-	Project          int32          `json:"project, int32"`
+	Project          int64          `json:"project, int64"`
 	Log_time         int64          `json:"log_time, int64"`
-	Type             int32          `json:"type, int32"`
+	Type             int64          `json:"type, int64"`
 	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`
 }
