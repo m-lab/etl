@@ -8,7 +8,6 @@ package task
 import (
 	"io"
 	"log"
-        "strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
