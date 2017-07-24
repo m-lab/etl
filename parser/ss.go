@@ -1,4 +1,4 @@
-// Parse Sidestream filename like 20170516T22:00:00Z_163.7.129.73_0.web100
+// Parse Sidestream tests.
 package parser
 
 import (
@@ -36,13 +36,10 @@ func ExtractLogtimeFromFilename(fileName string) (int64, error) {
 	testName := filepath.Base(fileName)
 	if len(testName) < 19 || !strings.Contains(testName, ".web100") {
 		log.Println(testName)
-		return 0, errors.New("Wrong sidestream filename")
+		return 0, errors.New("Invalid sidestream filename")
 	}
 
-	date_str := testName[0:4] + "-" + testName[4:6] + "-" + testName[6:8] + testName[8:17] + ".000Z"
-
-	t, err := time.Parse(time.RFC3339, date_str)
-
+	t, err := time.Parse("20060102T15:04:05.999999999Z_", testName[0:17]+".000000000Z_")
 	if err != nil {
 		return 0, err
 	}
