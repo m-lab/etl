@@ -104,10 +104,6 @@ func (tt *Task) ProcessAllTests() (int, error) {
 			// If verbose, log the filename that is skipped.
 			continue
 		}
-		if strings.Contains(testname, ".tra") {
-			// Ignore the trace file for sidestream test.
-			continue
-		}
 		err := tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if err != nil {
