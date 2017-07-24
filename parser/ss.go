@@ -205,7 +205,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	var var_names []string
 	testContent := strings.Split(string(rawContent[:]), "\n")
 	if len(testContent) < 2 {
-		return erros.New("empty test file.")
+		return errors.New("empty test file.")
 	}
 	var_names, err = ParseKHeader(testContent[0])
 	if err != nil {
