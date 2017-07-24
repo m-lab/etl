@@ -57,7 +57,7 @@ func ParseIPFamily(ipStr string) int {
 	return -1
 }
 
-// the first line of SS test is in format "K: web100_variables_separated_by_space"
+// the first line of SS test is in format "K: cid PollTime LocalAddress LocalPort ... other_web100_variables_separated_by_space"
 func ParseKHeader(header string) ([]string, error) {
 	var var_names []string
 	web100_vars := strings.Split(header, " ")
@@ -99,8 +99,9 @@ func (ss *SSParser) Flush() error {
 	return ss.inserter.Flush()
 }
 
+// TODO: add metrics
+// Prepare data into sidestream BigQeury schema and insert it.
 func InsertIntoBQ(ss_inserter etl.Inserter, ss_value map[string]string, log_time int64, testName string) error {
-	// Insert this test into BQ
 	local_port, err := strconv.Atoi(ss_value["LocalPort"])
 	if err != nil {
 		return err
