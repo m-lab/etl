@@ -140,6 +140,24 @@ exports.shouldEmbargo = function (file) {
     return (file.name.substring(0, 11) === 'sidestream/');
 };
 
+
+exports.embargoFileTask = function (project, bucket, filename, callback) {
+    var http, gsFilename, safeFilename;
+    http = require('http');
+    gsFilename = "gs://" + bucket + "/" + filename;
+    safeFilename = new Buffer(gsFilename).toString("base64");
+    http.get('http://embargo-dot-' + project +
+        '.appspot.com/submit?filename=' + safeFilename,
+        function (res) {
+            res.on('data', function (data) {});
+            res.on('end',
+                function () {
+                    console.log('Embargo done', gsFilename);
+                    callback();
+                });
+        });
+};
+
 /**
  * Cloud Function to be triggered by Cloud Storage,
  * moves the file to the archive-mlab-oti bucket.
@@ -152,8 +170,9 @@ exports.transferOnFileNotification = function transferOnFileNotification(event, 
 
     if (exports.fileIsProcessable(file)) {
         if (exports.shouldEmbargo(file)) {
-            // TODO - notify the embargo system.
-            console.log('Ignoring: ', file.bucket, file.name);
+            // notify the embargo system.
+            exports.embargoFileTask('mlab-sandbox', file.bucket, file.name, callback);
+            console.log('Embargo: ', file.bucket, file.name);
         } else {
             exports.executeWithAuth(exports.makeMoveWithAuth(file, done));
         }
