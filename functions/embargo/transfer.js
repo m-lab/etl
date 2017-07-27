@@ -4,7 +4,12 @@
  * CAUTION: There are subtleties in deploying this, because of our intended
  * separation of sandbox, staging, and production pipelines.
  *
- * This is a b
+ * This is far from ideal.  Also, beware that doing multiple transfers from
+ * scraper-mlab-oti will soon stop working, because we intend for the production
+ * transfer function to also DELETE the file from the scraper-mlab-oti source.
+ * We just haven't enabled that yet, because we want to be comfortable that
+ * there won't be any risk of data loss, and we haven't done the testing yet
+ * to ensure that.
  *
  * These functions process fileNotifications from google cloud storage,
  * determine whether a new file needs to be embargoed, and if not, moves
@@ -92,9 +97,8 @@ exports.executeWithAuth = function (func, fail) {
  */
 exports.makeMoveWithAuth = function (file, destBucket, done) {
     return function (authClient, projectId) {
-        var destBucket, storage;
+        var storage;
 
-        destBucket = 'archive-mlab-oti';
         storage = google.storage(
             {"version": "v1", "auth": authClient, "project": projectId}
         );
@@ -192,7 +196,7 @@ exports.embargoOnFileNotification = function (event, project, destBucket, done) 
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationSandbox = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-sandbox', 'unknown', done);
+    exports.embargoOnFileNotification(event, 'mlab-sandbox', 'etl-mlab-sandbox', done);
 };
 
 /**
@@ -203,7 +207,7 @@ exports.embargoOnFileNotificationSandbox = function (event, done) {
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationStaging = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-staging', 'unknown', done);
+    exports.embargoOnFileNotification(event, 'mlab-staging', 'data-mlab-staging', done);
 };
 
 /**
