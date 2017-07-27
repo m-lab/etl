@@ -52,7 +52,7 @@ exports.enqueueFileTask = function (project, bucket, filename, callback) {
  * @param {object} event The Cloud Functions event.
  * @param {function} The callback function.
  */
-exports.createSandboxTaskOnFileNotification = function createTaskOnFileNotification(event, callback) {
+exports.createSandboxTaskOnFileNotification = function (event, callback) {
     var file = event.data;
 
     if (exports.fileIsProcessable(file) && exports.queueForFile(file.name)) {
@@ -69,7 +69,7 @@ exports.createSandboxTaskOnFileNotification = function createTaskOnFileNotificat
  * @param {object} event The Cloud Functions event.
  * @param {function} The callback function.
  */
-exports.createStagingTaskOnFileNotification = function createTaskOnFileNotification(event, callback) {
+exports.createStagingTaskOnFileNotification = function (event, callback) {
     var file = event.data;
 
     if (exports.fileIsProcessable(file) && exports.queueForFile(file.name)) {
@@ -86,7 +86,7 @@ exports.createStagingTaskOnFileNotification = function createTaskOnFileNotificat
  * @param {object} event The Cloud Functions event.
  * @param {function} The callback function.
  */
-exports.createProdTaskOnFileNotification = function createTaskOnFileNotification(event, callback) {
+exports.createProdTaskOnFileNotification = function (event, callback) {
     var file = event.data;
 
     if (exports.fileIsProcessable(file) && exports.queueForFile(file.name)) {

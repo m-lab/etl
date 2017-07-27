@@ -1,24 +1,43 @@
 /**
  * @fileoverview Description of this file.
+ *
+ * CAUTION: There are subtleties in deploying this, because of our intended
+ * separation of sandbox, staging, and production pipelines.
+ *
+ * This is a b
+ *
  * These functions process fileNotifications from google cloud storage,
  * determine whether a new file needs to be embargoed, and if not, moves
- * the file to the archive bucket.
+ * the file to the destination bucket.
  *
- * The destination bucket, archive-mlab-oti, is hard coded, though the trigger
- * bucket and the project are both determined by the deployment command.  Tried
- * using projectId to determine destination bucket, but that is unreliable.
+ * The destination bucket is hard coded into different functions, one for each
+ * project.  The trigger bucket and the project are both determined by the
+ * deployment command.  Tried using projectId to determine destination bucket,
+ * but the projectId is not reliably available.
  *
  * To deploy this cloud function to mlab-oti (until we get autodeploy set up):
-
+ *
  * // Create the buckets
    gsutil mb -p mlab-oti archive-mlab-oti
    gsutil mb -p mlab-oti scraper-mlab-oti
    gsutil mb -p mlab-oti functions-mlab-oti
    // Deploy the functions.
-   gcloud beta functions deploy transferOnFileNotification \
+   gcloud beta functions deploy embargoOnFileNotificationProd \
      --stage-bucket=functions-mlab-oti \
      --trigger-bucket=scraper-mlab-oti \
      --project=mlab-oti
+
+ * To deploy this cloud function to mlab-staging, but triggered by files
+ * appearing in scraper-mlab-oti:
+ *
+ * // Create the buckets
+   gsutil mb -p mlab-staging data-mlab-staging
+   gsutil mb -p mlab-staging functions-mlab-staging
+   // Deploy the functions.
+   gcloud beta functions deploy embargoOnFileNotificationStaging \
+     --stage-bucket=functions-mlab-staging \
+     --trigger-bucket=scraper-mlab-oti \
+     --project=mlab-staging
  */
 
 'use strict';
@@ -64,13 +83,14 @@ exports.executeWithAuth = function (func, fail) {
 };
 
 /**
- * Create a function to copy and delete a single file.  The destination
- * is determined by the projectId passed in from executeWithAuth.
+ * Create a function to copy and delete a single file.
+ * Ideally, the destination should be determined based on the project ID,
+ * but the project ID does not seem to be reliably available.
  *
  * @param {file} file The object to move.
  * @param {function} done The callback called when the move completes.
  */
-exports.makeMoveWithAuth = function (file, done) {
+exports.makeMoveWithAuth = function (file, destBucket, done) {
     return function (authClient, projectId) {
         var destBucket, storage;
 
@@ -142,12 +162,14 @@ exports.shouldEmbargo = function (file) {
 
 /**
  * Cloud Function to be triggered by Cloud Storage,
- * moves the file to the archive-mlab-oti bucket.
+ * moves the file to the requested bucket.
  *
  * @param {object} event The Cloud Storage notification event.
+ * @param {string} project The cloud project ID
+ * @param {string} destBucket The Cloud Storage bucket to move files to.
  * @param {function} done The callback function called when this function completes.
  */
-exports.transferOnFileNotification = function transferOnFileNotification(event, done) {
+exports.embargoOnFileNotification = function (event, project, destBucket, done) {
     var file = event.data;
 
     if (exports.fileIsProcessable(file)) {
@@ -155,9 +177,42 @@ exports.transferOnFileNotification = function transferOnFileNotification(event, 
             // TODO - notify the embargo system.
             console.log('Ignoring: ', file.bucket, file.name);
         } else {
-            exports.executeWithAuth(exports.makeMoveWithAuth(file, done));
+            exports.executeWithAuth(exports.makeMoveWithAuth(file, destBucket, done));
         }
     } else {
         done(null);
     }
+};
+
+/**
+ * Cloud Function to be triggered by Cloud Storage notifications, for
+ * mlab-sandbox.
+ *
+ * @param {object} event The Cloud Storage notification event.
+ * @param {function} done The callback function called when this function completes.
+ */
+exports.embargoOnFileNotificationSandbox = function (event, done) {
+    exports.embargoOnFileNotification(event, 'mlab-sandbox', 'unknown', done);
+};
+
+/**
+ * Cloud Function to be triggered by Cloud Storage notifications, for
+ * mlab-staging.
+ *
+ * @param {object} event The Cloud Storage notification event.
+ * @param {function} done The callback function called when this function completes.
+ */
+exports.embargoOnFileNotificationStaging = function (event, done) {
+    exports.embargoOnFileNotification(event, 'mlab-staging', 'unknown', done);
+};
+
+/**
+ * Cloud Function to be triggered by Cloud Storage notifications, for
+ * production (mlab-oti).
+ *
+ * @param {object} event The Cloud Storage notification event.
+ * @param {function} done The callback function called when this function completes.
+ */
+exports.embargoOnFileNotificationProd = function (event, done) {
+    exports.embargoOnFileNotification(event, 'mlab-oti', 'archive-mlab-oti', done);
 };
