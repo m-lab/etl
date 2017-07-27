@@ -24,7 +24,7 @@
 'use strict';
 
 var google = require('googleapis');
-
+var http = require('http');
 /**
  * Checks whether a file is eligible for processing, e.g. if it exists, since we
  * get notifications on delete operations.
@@ -141,9 +141,8 @@ exports.shouldEmbargo = function (file) {
 };
 
 
-exports.embargoFileTask = function (project, bucket, filename, callback) {
-    var http, gsFilename, safeFilename;
-    http = require('http');
+exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
+    var gsFilename, safeFilename;
     gsFilename = "gs://" + bucket + "/" + filename;
     safeFilename = new Buffer(gsFilename).toString("base64");
     http.get('http://embargo-dot-' + project +
@@ -171,7 +170,8 @@ exports.transferOnFileNotification = function transferOnFileNotification(event, 
     if (exports.fileIsProcessable(file)) {
         if (exports.shouldEmbargo(file)) {
             // notify the embargo system.
-            exports.embargoFileTask('mlab-sandbox', file.bucket, file.name, callback);
+            // TODO: remove hard coded project id. 
+            exports.triggerEmbargoHandler('mlab-sandbox', file.bucket, file.name, callback);
             console.log('Embargo: ', file.bucket, file.name);
         } else {
             exports.executeWithAuth(exports.makeMoveWithAuth(file, done));
