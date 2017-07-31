@@ -23,26 +23,52 @@
  * To deploy this cloud function to mlab-oti (until we get autodeploy set up):
  *
  * // Create the buckets
-   gsutil mb -p mlab-oti archive-mlab-oti
-   gsutil mb -p mlab-oti scraper-mlab-oti
-   gsutil mb -p mlab-oti functions-mlab-oti
+   export GCLOUD_PROJECT=mlab-oti
+   gsutil mb -p $GCLOUD_PROJECT archive-$GCLOUD_PROJECT
+   gsutil mb -p $GCLOUD_PROJECT scraper-$GCLOUD_PROJECT
+   gsutil mb -p $GCLOUD_PROJECT functions-$GCLOUD_PROJECT
    // Deploy the functions.
-   gcloud beta functions deploy embargoOnFileNotificationProd \
-     --stage-bucket=functions-mlab-oti \
-     --trigger-bucket=scraper-mlab-oti \
-     --project=mlab-oti
+   export FN_SUFFIX=${GCLOUD_PROJECT##*-}
+   gcloud beta functions deploy embargoOnFileNotification${SUFFIX^} \
+     --stage-bucket=functions-$GCLOUD_PROJECT \
+     --trigger-bucket=scraper-$GCLOUD_PROJECT \
+     --project=$GCLOUD_PROJECT
 
- * To deploy this cloud function to mlab-staging, but triggered by files
- * appearing in scraper-mlab-oti:
+ * Scraper pushes files into scraper-mlab-oti, but not to corresponding buckets
+ * for staging or sandbox.  So staging and sandbox deployments require you to
+ * choose what to trigger from.
+ * When triggering on any mlab-oti bucket, we MUST NOT delete the file, so
+ * please ensure that this will not happen.  (There should be ACLs to prevent
+ * this, but please do not rely on them).
+ * If we trigger on scraper-mlab-oti, we may miss some files, if they are
+ * deleted (by the mlab-oti functions) before we handle them.
+ * A simple way to get most of the files that prod is handling is to trigger on
+ * archive-mlab-oti, so that the files are copied in a waterfall manner.  However,
+ * any embargoed files won't show up in archive-mlab-oti, so use this strategy
+ * with caution.
  *
  * // Create the buckets
-   gsutil mb -p mlab-staging data-mlab-staging
-   gsutil mb -p mlab-staging functions-mlab-staging
+   export GCLOUD_PROJECT=mlab-staging
+   gsutil mb -p $GCLOUD_PROJECT archive-$GCLOUD_PROJECT
+   gsutil mb -p $GCLOUD_PROJECT functions-$GCLOUD_PROJECT
    // Deploy the functions.
-   gcloud beta functions deploy embargoOnFileNotificationStaging \
-     --stage-bucket=functions-mlab-staging \
+   gcloud beta functions deploy embargoOnFileNotification${SUFFIX^} \
+     --stage-bucket=functions-$GCLOUD_PROJECT \
      --trigger-bucket=scraper-mlab-oti \
-     --project=mlab-staging
+     --project=$GCLOUD_PROJECT
+
+ * Or for sandbox, also triggering by files appearing in scraper-mlab-oti:
+ *
+ * // Create the buckets
+   export GCLOUD_PROJECT=mlab-sandbox
+   gsutil mb -p $GCLOUD_PROJECT archive-$GCLOUD_PROJECT
+   gsutil mb -p $GCLOUD_PROJECT functions-$GCLOUD_PROJECT
+   // Deploy the functions.
+   export FN_SUFFIX=${GCLOUD_PROJECT##*-}
+   gcloud beta functions deploy embargoOnFileNotification${SUFFIX^} \
+     --stage-bucket=functions-$GCLOUD_PROJECT \
+     --trigger-bucket=scraper-mlab-oti \
+     --project=$GCLOUD_PROJECT
  */
 
 'use strict';
@@ -121,8 +147,8 @@ exports.makeMoveWithAuth = function (file, destBucket, done) {
                     done(err);
                 } else {
                     // Delete the object, checking generation in case it changed.
-                    // TODO - add check for mlab-oti project, and don't delete
-                    // from other projects.
+                    // TODO - add check that this is running in the mlab-oti project,
+                    // and don't delete from other projects.
                     // TODO - remove this condition when we are happy with
                     // deletion.
                     if (file.name.substring(0, 5) === 'test/') {
@@ -196,7 +222,7 @@ exports.embargoOnFileNotification = function (event, project, destBucket, done) 
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationSandbox = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-sandbox', 'etl-mlab-sandbox', done);
+    exports.embargoOnFileNotification(event, 'mlab-sandbox', 'archive-mlab-sandbox', done);
 };
 
 /**
@@ -207,7 +233,7 @@ exports.embargoOnFileNotificationSandbox = function (event, done) {
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationStaging = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-staging', 'data-mlab-staging', done);
+    exports.embargoOnFileNotification(event, 'mlab-staging', 'archive-mlab-staging', done);
 };
 
 /**
@@ -217,6 +243,6 @@ exports.embargoOnFileNotificationStaging = function (event, done) {
  * @param {object} event The Cloud Storage notification event.
  * @param {function} done The callback function called when this function completes.
  */
-exports.embargoOnFileNotificationProd = function (event, done) {
+exports.embargoOnFileNotificationOti = function (event, done) {
     exports.embargoOnFileNotification(event, 'mlab-oti', 'archive-mlab-oti', done);
 };
