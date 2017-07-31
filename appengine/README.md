@@ -1,6 +1,6 @@
 
 To deploy in sandbox:
-    gcloud auth login ...
+  gcloud auth login ...
   gcloud config set project mlab-sandbox
   gcloud app deploy queue.yaml
 
