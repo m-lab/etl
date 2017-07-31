@@ -1,14 +1,14 @@
 
-To deploy:
+To deploy in sandbox:
   gcloud auth login ...
   gcloud config set project mlab-sandbox
-  gcloud deploy sandbox-queue.yaml
+  gcloud app deploy queue.yaml
 
-Or:
+For production:
+
   gcloud auth login ...
   gcloud config set project mlab-oti
-  gcloud deploy queue.yaml
-
+  gcloud app deploy queue.yaml
 
 Task queues may be observed in cloud console.
 
