@@ -78,7 +78,7 @@
 'use strict';
 
 var google = require('googleapis');
-
+var http = require('http');
 /**
  * Checks whether a file is eligible for processing, e.g. if it exists, since we
  * get notifications on delete operations.
@@ -194,6 +194,23 @@ exports.shouldEmbargo = function (file) {
     return (file.name.substring(0, 11) === 'sidestream/');
 };
 
+
+exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
+    var gsFilename, safeFilename;
+    gsFilename = "gs://" + bucket + "/" + filename;
+    safeFilename = new Buffer(gsFilename).toString("base64");
+    http.get('http://embargo-dot-' + project +
+        '.appspot.com/submit?filename=' + safeFilename,
+        function (res) {
+            res.on('data', function (data) {});
+            res.on('end',
+                function () {
+                    console.log('Embargo done', gsFilename);
+                    callback();
+                });
+        });
+};
+
 /**
  * Cloud Function to be triggered by Cloud Storage,
  * moves the file to the requested bucket.
@@ -208,8 +225,10 @@ exports.embargoOnFileNotification = function (event, project, destBucket, done) 
 
     if (exports.fileIsProcessable(file)) {
         if (exports.shouldEmbargo(file)) {
-            // TODO - notify the embargo system.
-            console.log('Ignoring: ', file.bucket, file.name);
+            // notify the embargo system.
+            // TODO: remove hard coded project id. 
+            exports.triggerEmbargoHandler('mlab-sandbox', file.bucket, file.name, callback);
+            console.log('Embargo: ', file.bucket, file.name);
         } else {
             exports.executeWithAuth(exports.makeMoveWithAuth(file, destBucket, done));
         }
