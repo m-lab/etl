@@ -29,7 +29,7 @@
    gsutil mb -p $GCLOUD_PROJECT functions-$GCLOUD_PROJECT
    // Deploy the functions.
    export FN_SUFFIX=${GCLOUD_PROJECT##*-}
-   gcloud beta functions deploy embargoOnFileNotification${SUFFIX^} \
+   gcloud beta functions deploy embargoOnFileNotification${FN_SUFFIX^} \
      --stage-bucket=functions-$GCLOUD_PROJECT \
      --trigger-bucket=scraper-$GCLOUD_PROJECT \
      --project=$GCLOUD_PROJECT
@@ -52,7 +52,8 @@
    gsutil mb -p $GCLOUD_PROJECT archive-$GCLOUD_PROJECT
    gsutil mb -p $GCLOUD_PROJECT functions-$GCLOUD_PROJECT
    // Deploy the functions.
-   gcloud beta functions deploy embargoOnFileNotification${SUFFIX^} \
+   export FN_SUFFIX=${GCLOUD_PROJECT##*-}
+   gcloud beta functions deploy embargoOnFileNotification${FN_SUFFIX^} \
      --stage-bucket=functions-$GCLOUD_PROJECT \
      --trigger-bucket=scraper-mlab-oti \
      --project=$GCLOUD_PROJECT
@@ -65,10 +66,13 @@
    gsutil mb -p $GCLOUD_PROJECT functions-$GCLOUD_PROJECT
    // Deploy the functions.
    export FN_SUFFIX=${GCLOUD_PROJECT##*-}
-   gcloud beta functions deploy embargoOnFileNotification${SUFFIX^} \
+   gcloud beta functions deploy embargoOnFileNotification${FN_SUFFIX^} \
      --stage-bucket=functions-$GCLOUD_PROJECT \
      --trigger-bucket=scraper-mlab-oti \
      --project=$GCLOUD_PROJECT
+
+ * Alternatively, it might be more desireable to create another sandbox bucket,
+ * designate it as the trigger source, and use file transfers to populate it.
  */
 
 'use strict';
