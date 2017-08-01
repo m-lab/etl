@@ -148,7 +148,7 @@ exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
     //gsFilename = filename;
     safeFilename = new Buffer(gsFilename).toString("base64");
     http.get('http://embargo-dot-' + project +
-        '.appspot.com/submit?filename=' + safeFilename,
+        '.appspot.com/submit?file=' + safeFilename,
         function (res) {
             res.on('data', function (data) {});
             res.on('end',

@@ -18,7 +18,7 @@ resources:
 automatic_scaling:
   # We expect fairly steady load, so a modest minimum will rarely cost us anything.
   min_num_instances: 2
-  max_num_instances: 50
+  max_num_instances: 30
   cool_down_period_sec: 300
   # We don't care much about latency, so a high utilization is desireable.
   cpu_utilization:
