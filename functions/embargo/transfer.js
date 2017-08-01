@@ -78,6 +78,7 @@
 'use strict';
 
 var google = require('googleapis');
+var http = require('http');
 
 /**
  * Checks whether a file is eligible for processing, e.g. if it exists, since we
@@ -116,6 +117,23 @@ exports.executeWithAuth = function (func, fail) {
         }
     );
 };
+
+exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
+     var gsFilename, safeFilename;
+     gsFilename = "gs://" + bucket + "/" + filename;
+     //gsFilename = filename;
+     safeFilename = new Buffer(gsFilename).toString("base64");
+     http.get('http://embargo-dot-' + project +
+         '.appspot.com/submit?file=' + safeFilename,
+         function (res) {
+             res.on('data', function (data) {});
+             res.on('end',
+                 function () {
+                     console.log('Embargo done', gsFilename);
+                     callback();
+                 });
+         });
+ };
 
 /**
  * Create a function to copy and delete a single file.
@@ -208,8 +226,9 @@ exports.embargoOnFileNotification = function (event, project, destBucket, done) 
 
     if (exports.fileIsProcessable(file)) {
         if (exports.shouldEmbargo(file)) {
-            // TODO - notify the embargo system.
-            console.log('Ignoring: ', file.bucket, file.name);
+             // notify the embargo system.
+              exports.triggerEmbargoHandler('mlab-sandbox', file.bucket, file.name, done);
+              console.log('Embargo: ', file.bucket, file.name);
         } else {
             exports.executeWithAuth(exports.makeMoveWithAuth(file, destBucket, done));
         }
