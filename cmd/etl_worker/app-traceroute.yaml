@@ -15,14 +15,6 @@ resources:
   # TODO - Adjust once we understand requirements.
   disk_size_gb: 10
 
-  # The tmpfs space is allocated from memory_gb.
-  volumes:
-  # Define a tmpfs disk for NDT snapshot files.
-  # Mounted under: /mnt/tmpfs
-  - name: tmpfs
-    volume_type: tmpfs
-    size_gb: 1.0
-
 automatic_scaling:
   # We expect fairly steady load, so a modest minimum will rarely cost us anything.
   min_num_instances: 2
