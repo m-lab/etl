@@ -74,7 +74,8 @@ exports.makeMoveWithAuth = function (file, done) {
     return function (authClient, projectId) {
         var destBucket, storage;
 
-        destBucket = 'archive-mlab-oti';
+        // destBucket = 'archive-mlab-oti';
+        destBucket = 'yachang'
         storage = google.storage(
             {"version": "v1", "auth": authClient, "project": projectId}
         );
@@ -144,6 +145,7 @@ exports.shouldEmbargo = function (file) {
 exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
     var gsFilename, safeFilename;
     gsFilename = "gs://" + bucket + "/" + filename;
+    //gsFilename = filename;
     safeFilename = new Buffer(gsFilename).toString("base64");
     http.get('http://embargo-dot-' + project +
         '.appspot.com/submit?filename=' + safeFilename,
@@ -164,7 +166,7 @@ exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
  * @param {object} event The Cloud Storage notification event.
  * @param {function} done The callback function called when this function completes.
  */
-exports.transferOnFileNotification = function transferOnFileNotification(event, done) {
+exports.transferOnFileNotification = function transferOnFileNotification(event, callback) {
     var file = event.data;
 
     if (exports.fileIsProcessable(file)) {
