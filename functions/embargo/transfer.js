@@ -119,30 +119,6 @@ exports.executeWithAuth = function (func, fail) {
 };
 
 /**
- * Trigger the operation by embargo app engine.
- *
- * @param {project} The name of the project.
- * @param {bucket} The source bucket name.
- * @param {filename} The file name to be embargoed.
- * @param {callback} The call back function
- */
-exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
-    var gsFilename, safeFilename;
-    gsFilename = "gs://" + bucket + "/" + filename;
-    safeFilename = new Buffer(gsFilename).toString("base64");
-    http.get('http://embargo-dot-' + project +
-        '.appspot.com/submit?file=' + safeFilename,
-        function (res) {
-            res.on('data', function (data) {});
-            res.on('end',
-                function () {
-                    console.log('Embargo done', gsFilename);
-                    callback();
-                });
-        });
-};
-
-/**
  * Create a function to copy and delete a single file.
  * Ideally, the destination should be determined based on the project ID,
  * but the project ID does not seem to be reliably available.
@@ -218,6 +194,31 @@ exports.shouldEmbargo = function (file) {
     // transferred.
     return (file.name.substring(0, 11) === 'sidestream/');
 };
+
+/**
+ * Trigger the operation by embargo app engine.
+ *
+ * @param {string} project The cloud project ID
+ * @param {string} destBucket The Cloud Storage bucket to move files to.
+ * @param {string} filename The file name to be embargoed.
+ * @param {function} callback The callback function called when this function completes.
+ */
+exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
+    var gsFilename, safeFilename;
+    gsFilename = "gs://m-lab-sandbox/" + filename;
+    safeFilename = new Buffer(gsFilename).toString("base64");
+    http.get('http://embargo-dot-' + project +
+        '.appspot.com/submit?file=' + safeFilename + "&destinationBucket=" + bucket,
+        function (res) {
+            res.on('data', function (data) {});
+            res.on('end',
+                function () {
+                    console.log('Embargo done', gsFilename);
+                    callback();
+                });
+        });
+};
+
 
 /**
  * Cloud Function to be triggered by Cloud Storage,
