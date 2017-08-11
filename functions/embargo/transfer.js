@@ -203,12 +203,12 @@ exports.shouldEmbargo = function (file) {
  * @param {string} filename The file name to be embargoed.
  * @param {function} callback The callback function called when this function completes.
  */
-exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
+exports.triggerEmbargoHandler = function (project, publicBucket, privateBucket, filename, callback) {
     var gsFilename, safeFilename;
     gsFilename = "gs://m-lab-sandbox/" + filename;
     safeFilename = new Buffer(gsFilename).toString("base64");
     http.get('http://embargo-dot-' + project +
-        '.appspot.com/submit?file=' + safeFilename + "&destinationBucket=" + bucket,
+        '.appspot.com/submit?file=' + safeFilename + "&publicBucket=" + publicBucket + "&privateBucket=" + privateBucket,
         function (res) {
             res.on('data', function (data) {});
             res.on('end',
@@ -229,15 +229,15 @@ exports.triggerEmbargoHandler = function (project, bucket, filename, callback) {
  * @param {string} destBucket The Cloud Storage bucket to move files to.
  * @param {function} done The callback function called when this function completes.
  */
-exports.embargoOnFileNotification = function (event, project, destBucket, done) {
+exports.embargoOnFileNotification = function (event, project, destPublicBucket, destPrivateBucket, done) {
     var file = event.data;
 
     if (exports.fileIsProcessable(file)) {
         if (exports.shouldEmbargo(file)) {
-            exports.triggerEmbargoHandler(project, file.bucket, file.name, done);
+            exports.triggerEmbargoHandler(project, destPublicBucket, destPrivateBucket, file.name, done);
             console.log('Embargo: ', file.bucket, file.name);
         } else {
-            exports.executeWithAuth(exports.makeMoveWithAuth(file, destBucket, done));
+            exports.executeWithAuth(exports.makeMoveWithAuth(file, destPublicBucket, done));
         }
     } else {
         done(null);
@@ -252,7 +252,7 @@ exports.embargoOnFileNotification = function (event, project, destBucket, done) 
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationSandbox = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-sandbox', 'archive-mlab-sandbox', done);
+    exports.embargoOnFileNotification(event, 'mlab-sandbox', 'archive-mlab-sandbox', 'embargo-mlab-sandbox', done);
 };
 
 /**
@@ -263,7 +263,7 @@ exports.embargoOnFileNotificationSandbox = function (event, done) {
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationStaging = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-staging', 'archive-mlab-staging', done);
+    exports.embargoOnFileNotification(event, 'mlab-staging', 'archive-mlab-staging', 'embargo-mlab-staging', done);
 };
 
 /**
@@ -274,5 +274,5 @@ exports.embargoOnFileNotificationStaging = function (event, done) {
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationOti = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-oti', 'archive-mlab-oti', done);
+    exports.embargoOnFileNotification(event, 'mlab-oti', 'archive-mlab-oti', 'embargo-mlab-oti', done);
 };
