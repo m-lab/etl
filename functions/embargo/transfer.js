@@ -199,9 +199,10 @@ exports.shouldEmbargo = function (file) {
  * Trigger the operation by embargo app engine.
  *
  * @param {string} project The cloud project ID
+ * @param {string} sourceBucket The Cloud Storage bucket that holds the source file.
+ * @param {string} filename The file name to be embargoed.
  * @param {string} publicBucket The Cloud Storage bucket to move the public files to.
  * @param {string} privateBucket The Cloud Storage bucket to move the embargoed files to.
- * @param {string} filename The file name to be embargoed.
  * @param {function} callback The callback function called when this function completes.
  */
 exports.triggerEmbargoHandler = function (project, sourceBucket, filename, publicBucket, privateBucket, callback) {
