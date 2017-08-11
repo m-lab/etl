@@ -199,13 +199,14 @@ exports.shouldEmbargo = function (file) {
  * Trigger the operation by embargo app engine.
  *
  * @param {string} project The cloud project ID
- * @param {string} destBucket The Cloud Storage bucket to move files to.
+ * @param {string} publicBucket The Cloud Storage bucket to move the public files to.
+ * @param {string} privateBucket The Cloud Storage bucket to move the embargoed files to.
  * @param {string} filename The file name to be embargoed.
  * @param {function} callback The callback function called when this function completes.
  */
-exports.triggerEmbargoHandler = function (project, publicBucket, privateBucket, filename, callback) {
+exports.triggerEmbargoHandler = function (project, sourceBucket, filename, publicBucket, privateBucket, callback) {
     var gsFilename, safeFilename;
-    gsFilename = "gs://m-lab-sandbox/" + filename;
+    gsFilename = "gs://" + sourceBucket + "/" + filename;
     safeFilename = new Buffer(gsFilename).toString("base64");
     http.get('http://embargo-dot-' + project +
         '.appspot.com/submit?file=' + safeFilename + "&publicBucket=" + publicBucket + "&privateBucket=" + privateBucket,
@@ -234,7 +235,7 @@ exports.embargoOnFileNotification = function (event, project, destPublicBucket, 
 
     if (exports.fileIsProcessable(file)) {
         if (exports.shouldEmbargo(file)) {
-            exports.triggerEmbargoHandler(project, destPublicBucket, destPrivateBucket, file.name, done);
+            exports.triggerEmbargoHandler(project, file.bucket, file.name, destPublicBucket, destPrivateBucket, done);
             console.log('Embargo: ', file.bucket, file.name);
         } else {
             exports.executeWithAuth(exports.makeMoveWithAuth(file, destPublicBucket, done));
