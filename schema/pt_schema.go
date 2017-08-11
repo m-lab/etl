@@ -2,19 +2,6 @@
 package schema
 
 // TODO(dev): use mixed case Go variable names throughout
-type GeolocationIP struct {
-	continent_code string
-	country_code   string
-	country_code3  string
-	country_name   string
-	region         string
-	metro_code     int64
-	city           string
-	area_code      int64
-	postal_code    string
-	latitude       float64
-	longitude      float64
-}
 
 type ParisTracerouteHop struct {
 	Protocol      string    `json:"protocal, string"`
