@@ -26,12 +26,53 @@ var BaseURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
 	".appspot.com/annotate?"
 
+func AddMetaDataPTConnSpec(spec schema.MLabConnectionSpecification, timestamp time.Time) {
+	// Time the response
+	timerStart := time.Now()
+	defer func(tStart time.Time) {
+		metrics.AnnotationTimeSummary.
+			With(prometheus.Labels{"test_type": "PT"}).
+			Observe(float64(time.Since(tStart).Nanoseconds()))
+	}(timerStart)
+	if spec.Server_ip != "" {
+		GetAndInsertGeolocationIPStruct(&spec.Server_geolocation, spec.Server_ip, timestamp)
+	}
+	if spec.Client_ip != "" {
+		GetAndInsertGeolocationIPStruct(&spec.Client_geolocation, spec.Client_ip, timestamp)
+	}
+}
+
+func AddMetaDataPTHop(hop schema.ParisTracerouteHop, timestamp time.Time) {
+	// Time the response
+	timerStart := time.Now()
+	defer func(tStart time.Time) {
+		metrics.AnnotationTimeSummary.
+			With(prometheus.Labels{"test_type": "PT-HOP"}).
+			Observe(float64(time.Since(tStart).Nanoseconds()))
+	}(timerStart)
+	if hop.Src_ip != "" {
+		GetAndInsertGeolocationIPStruct(&hop.Src_geolocation, hop.Src_ip, timestamp)
+	}
+	if hop.Dest_ip != "" {
+		GetAndInsertGeolocationIPStruct(&hop.Dest_geolocation, hop.Dest_ip, timestamp)
+	}
+}
+
+func GetAndInsertGeolocationIPStruct(geo *schema.GeolocationIP, ip string, timestamp time.Time) {
+	url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +
+		"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
+	annotationData := GetMetaData(url)
+	if annotationData != nil && annotationData.Geo != nil {
+		*geo = *annotationData.Geo
+	}
+}
+
 // AddMetaDataNDTConnSpec takes a connection spec and a timestamp and
 // annotates the connection spec with metadata associated with each IP
 // Address. It will either sucessfully add the metadata or fail
 // silently and make no changes.
 func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
-	//Time the response
+	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
 		metrics.AnnotationTimeSummary.
