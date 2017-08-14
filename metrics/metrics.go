@@ -63,7 +63,7 @@ var (
 	//    metrics.AnnotationErrorCount.Inc() / .Dec()
 	AnnotationErrorCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "etl_annotator_Error_Count",
-		Help: "The current number of unresolved errors encountered while attemting to add metadata.",
+		Help: "The current number of errors encountered while attemting to add metadata.",
 	}, []string{"source"})
 	// Counts the number of tasks processed by the pipeline.
 	//

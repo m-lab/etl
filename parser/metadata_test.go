@@ -111,6 +111,12 @@ func TestParseJSONMetaDataResponse(t *testing.T) {
 	}
 	for _, test := range tests {
 		res, err := p.ParseJSONMetaDataResponse(test.testBuffer)
+		// This big mishmash of if statements is simply
+		// checking that if one err is nil, that the other is
+		// too. Because error messages can vary, this is less
+		// brittle than doing just err == test.resultError. If
+		// that is okay, then we just use DeepEqual to compare
+		// the structs.
 		if err == nil && test.resultError != nil ||
 			err != nil && test.resultError == nil {
 			t.Errorf("Expected %s, got %s for data: %s\n", test.resultError, err, string(test.testBuffer))
