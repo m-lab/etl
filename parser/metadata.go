@@ -87,11 +87,6 @@ func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	}
 }
 
-// GetAndInsertGeolocationIPStruct takes a NON-NIL pointer to a
-// pre-allocated schema.GeolocationIP struct, an IP address, and a
-// timestamp. It will connect to the annotation service, get the
-// metadata, and insert the metadata into the reigion pointed to by
-// the schema.GeolocationIP pointer.
 func GetAndInsertGeolocationIPStruct(geo *schema.GeolocationIP, ip string, timestamp time.Time) {
 	url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +
 		"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
