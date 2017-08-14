@@ -16,6 +16,7 @@ type GeolocationIP struct {
 	Postal_code    string  `json:"postal_code, string"`    // Postal code, again similar to metro
 	Latitude       float64 `json:"latitude, float"`        // Latitude
 	Longitude      float64 `json:"longitude, float"`       // Longitude
+
 }
 
 // The struct that will hold the IP/ASN data when it gets added to the
