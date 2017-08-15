@@ -26,7 +26,7 @@ var BaseURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
 	".appspot.com/annotate?"
 
-func AddMetaDataPTConnSpec(spec schema.MLabConnectionSpecification, timestamp time.Time) {
+func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
 	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
@@ -42,7 +42,7 @@ func AddMetaDataPTConnSpec(spec schema.MLabConnectionSpecification, timestamp ti
 	}
 }
 
-func AddMetaDataPTHop(hop schema.ParisTracerouteHop, timestamp time.Time) {
+func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
