@@ -99,7 +99,6 @@ func (ss *SSParser) Flush() error {
 	return ss.inserter.Flush()
 }
 
-// TODO: add metrics
 // Prepare data into sidestream BigQeury schema and insert it.
 func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName string) (schema.SS, error) {
 	local_port, err := strconv.Atoi(ss_value["LocalPort"])
@@ -192,8 +191,9 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 	return *snap, nil
 }
 
-// TODO: add metrics.
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
+	metrics.WorkerState.WithLabelValues("ss").Inc()
+	defer metrics.WorkerState.WithLabelValues("ss").Dec()
 	if strings.Contains(testName, ".tra") {
 		// Ignore the trace file for sidestream test.
 		return nil
@@ -209,6 +209,8 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 	var_names, err = ParseKHeader(testContent[0])
 	if err != nil {
+		metrics.ErrorCount.WithLabelValues(
+			ss.TableName(), "ss", "corrupted header").Inc()
 		return err
 	}
 	for _, oneLine := range testContent[1:] {
@@ -219,11 +221,15 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		ss_value, err := ParseOneLine(oneLine, var_names)
 		if err != nil {
+			metrics.TestCount.WithLabelValues(
+				ss.TableName(), "ss", "corrupted content").Inc()
 			return err
 		}
 		ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
+				ss.TableName(), "ss", "corrupted data").Inc()
+			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "corrupted data").Inc()
 			log.Printf("cannot pack data into sidestream schema: %v\n", err)
 			return err
@@ -232,9 +238,12 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				ss.TableName(), "ss", "insert-err").Inc()
+			metrics.TestCount.WithLabelValues(
+				ss.TableName(), "ss", "insert-err").Inc()
 			log.Printf("insert-err: %v\n", err)
 			continue
 		}
+		metrics.TestCount.WithLabelValues(ss.TableName(), "ss", "ok").Inc()
 
 	}
 	return nil
