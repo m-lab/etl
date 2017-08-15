@@ -26,6 +26,10 @@ var BaseURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
 	".appspot.com/annotate?"
 
+// AddMetaDataPTConnSpec takes a pointer to a
+// MLabConnectionSpecification struct and a timestamp. With these, it
+// will fetch the appropriate metadata and add it to the hop struct
+// referenced by the pointer.
 func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
 	// Time the response
 	timerStart := time.Now()
@@ -42,6 +46,9 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 	}
 }
 
+// AddMetaDataPTHop takes a pointer to a ParisTracerouteHop and a
+// timestamp. With these, it will fetch the appropriate metadata and
+// add it to the hop struct referenced by the pointer.
 func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	// Time the response
 	timerStart := time.Now()
@@ -58,6 +65,11 @@ func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	}
 }
 
+// GetAndInsertGeolocationIPStruct takes a NON-NIL pointer to a
+// pre-allocated schema.GeolocationIP struct, an IP address, and a
+// timestamp. It will connect to the annotation service, get the
+// metadata, and insert the metadata into the reigion pointed to by
+// the schema.GeolocationIP pointer.
 func GetAndInsertGeolocationIPStruct(geo *schema.GeolocationIP, ip string, timestamp time.Time) {
 	url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +
 		"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
