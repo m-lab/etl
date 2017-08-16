@@ -14,7 +14,21 @@
               { "name": "local_ip", "type": "STRING"},
               { "name": "local_port", "type": "INTEGER"},
               { "name": "remote_ip", "type": "STRING"},
-              { "name": "remote_port", "type": "INTEGER"}
+              { "name": "remote_port", "type": "INTEGER"},
+	      {
+            "fields": [
+              { "name": "area_code", "type": "INTEGER"},
+              { "name": "city", "type": "STRING"},
+              { "name": "continent_code", "type": "STRING"},
+              { "name": "country_code", "type": "STRING"},
+              { "name": "country_code3", "type": "STRING"},
+              { "name": "country_name", "type": "STRING"},
+              { "name": "latitude", "type": "FLOAT"},
+              { "name": "longitude", "type": "FLOAT"},
+              { "name": "metro_code", "type": "INTEGER"},
+              { "name": "postal_code", "type": "STRING"},
+              { "name": "region", "type": "STRING"}
+            ], "name": "client_geolocation", "type": "RECORD"},
             ], "name": "connection_spec", "type": "RECORD", "description": "Deprecated.  Use top level connection_spec"},
           {
             "fields": [
