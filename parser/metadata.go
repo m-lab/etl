@@ -39,22 +39,25 @@ func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 
-	GetAndInsertNDT("client", spec, timestamp)
-	GetAndInsertNDT("server", spec, timestamp)
+	GetAndInsertMetaIntoNDTConnSpec("client", spec, timestamp)
+	GetAndInsertMetaIntoNDTConnSpec("server", spec, timestamp)
 }
 
 // GetAndInsertNDT takes a timestamp, an NDT connection spec, and a
 // string indicating whether it should get the metadata for the client
 // end or the server end of the connection. It will either insert the
 // data into the connection spec or silently fail.
-func GetAndInsertNDT(side string, spec schema.Web100ValueMap, timestamp time.Time) {
+func GetAndInsertMetaIntoNDTConnSpec(side string, spec schema.Web100ValueMap, timestamp time.Time) {
 	ip, ok := spec.GetString([]string{side + "_ip"})
 	if ok {
 		url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +
 			"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
 		annotationData := GetMetaData(url)
-		if annotationData != nil {
+		if annotationData != nil && annotationData.Geo != nil {
 			CopyStructToMap(annotationData.Geo, spec.Get(side+"_geolocation"))
+		} else {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "Couldn't get metadata for the " + side + " side."}).Inc()
 		}
 	}
 }
@@ -91,6 +94,8 @@ func GetMetaData(url string) *schema.MetaData {
 	// Safely parse the JSON response and pass it back to the caller
 	metaDataFromResponse, err := ParseJSONMetaDataResponse(annotatorResponse)
 	if err != nil {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "Failed to parse JSON"}).Inc()
 		log.Println(err)
 		return nil
 	}
@@ -131,10 +136,7 @@ func ParseJSONMetaDataResponse(jsonBuffer []byte) (*schema.MetaData, error) {
 	parsedJSON := &schema.MetaData{}
 	err := json.Unmarshal(jsonBuffer, parsedJSON)
 	if err != nil {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Failed to parse JSON"}).Inc()
 		return nil, err
 	}
-
 	return parsedJSON, nil
 }
