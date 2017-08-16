@@ -26,6 +26,26 @@ var BaseURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
 	".appspot.com/annotate?"
 
+// AddMetaDataSSConnSpec takes a pointer to a
+// Web100ConnectionSpecification struct and a timestamp. With these,
+// it will fetch the appropriate metadata and add it to the hop struct
+// referenced by the pointer.
+func AddMetaDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp time.Time) {
+	// Time the response
+	timerStart := time.Now()
+	defer func(tStart time.Time) {
+		metrics.AnnotationTimeSummary.
+			With(prometheus.Labels{"test_type": "SS"}).
+			Observe(float64(time.Since(tStart).Nanoseconds()))
+	}(timerStart)
+	if spec.Local_ip != "" {
+		GetAndInsertGeolocationIPStruct(&spec.Local_geolocation, spec.Local_ip, timestamp)
+	}
+	if spec.Remote_ip != "" {
+		GetAndInsertGeolocationIPStruct(&spec.Remote_geolocation, spec.Remote_ip, timestamp)
+	}
+}
+
 // AddMetaDataPTConnSpec takes a pointer to a
 // MLabConnectionSpecification struct and a timestamp. With these, it
 // will fetch the appropriate metadata and add it to the hop struct
