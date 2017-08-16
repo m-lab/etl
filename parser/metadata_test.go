@@ -77,7 +77,7 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 	}
 }
 
-func TestGetAndInsertNDT(t *testing.T) {
+func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
 	tests := []struct {
 		side      string
 		spec      schema.Web100ValueMap
@@ -132,7 +132,7 @@ func TestGetAndInsertNDT(t *testing.T) {
 	}))
 	for _, test := range tests {
 		p.BaseURL = ts.URL + test.url
-		p.GetAndInsertNDT(test.side, test.spec, test.timestamp)
+		p.GetAndInsertMetaIntoNDTConnSpec(test.side, test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
 		}
