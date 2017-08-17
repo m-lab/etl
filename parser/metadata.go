@@ -31,6 +31,11 @@ var BaseURL = "https://annotator-dot-" +
 // it will fetch the appropriate metadata and add it to the hop struct
 // referenced by the pointer.
 func AddMetaDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp time.Time) {
+	if spec == nil {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "SS ConnSpec was nil!!!"}).Inc()
+		return
+	}
 	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
@@ -40,9 +45,15 @@ func AddMetaDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp
 	}(timerStart)
 	if spec.Local_ip != "" {
 		GetAndInsertGeolocationIPStruct(&spec.Local_geolocation, spec.Local_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "SS ConnSpec had no local_ip!"}).Inc()
 	}
 	if spec.Remote_ip != "" {
 		GetAndInsertGeolocationIPStruct(&spec.Remote_geolocation, spec.Remote_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "SS ConnSpec had no remote_ip!"}).Inc()
 	}
 }
 
