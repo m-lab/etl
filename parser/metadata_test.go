@@ -17,6 +17,151 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
+func TestAddMetaDataPTConnSpec(t *testing.T) {
+	tests := []struct {
+		conspec   schema.MLabConnectionSpecification
+		timestamp time.Time
+		url       string
+		res       schema.MLabConnectionSpecification
+	}{
+		{
+			conspec:   schema.MLabConnectionSpecification{},
+			timestamp: time.Now(),
+			url:       "/notCalled",
+			res:       schema.MLabConnectionSpecification{},
+		},
+		{
+			conspec:   schema.MLabConnectionSpecification{Server_ip: "127.0.0.1"},
+			timestamp: time.Now(),
+			url:       "/src",
+			res: schema.MLabConnectionSpecification{
+				Server_ip:          "127.0.0.1",
+				Server_geolocation: schema.GeolocationIP{Postal_code: "10583"},
+			},
+		},
+		{
+			conspec:   schema.MLabConnectionSpecification{Client_ip: "127.0.0.1"},
+			timestamp: time.Now(),
+			url:       "/dest",
+			res: schema.MLabConnectionSpecification{
+				Client_ip:          "127.0.0.1",
+				Client_geolocation: schema.GeolocationIP{Postal_code: "10583"},
+			},
+		},
+		{
+			conspec:   schema.MLabConnectionSpecification{Server_ip: "127.0.0.1", Client_ip: "127.0.0.2"},
+			timestamp: time.Now(),
+			url:       "/both",
+			res: schema.MLabConnectionSpecification{
+				Server_ip:          "127.0.0.1",
+				Server_geolocation: schema.GeolocationIP{Postal_code: "10583"},
+				Client_ip:          "127.0.0.2",
+				Client_geolocation: schema.GeolocationIP{Postal_code: "10583"},
+			},
+		},
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
+	}))
+	for _, test := range tests {
+		p.BaseURL = ts.URL + test.url
+		p.AddMetaDataPTConnSpec(&test.conspec, test.timestamp)
+		if !reflect.DeepEqual(test.conspec, test.res) {
+			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
+		}
+	}
+}
+
+func TestAddMetaDataPTHop(t *testing.T) {
+	tests := []struct {
+		hop       schema.ParisTracerouteHop
+		timestamp time.Time
+		url       string
+		res       schema.ParisTracerouteHop
+	}{
+		{
+			hop:       schema.ParisTracerouteHop{},
+			timestamp: time.Now(),
+			url:       "/notCalled",
+			res:       schema.ParisTracerouteHop{},
+		},
+		{
+			hop:       schema.ParisTracerouteHop{Src_ip: "127.0.0.1"},
+			timestamp: time.Now(),
+			url:       "/src",
+			res: schema.ParisTracerouteHop{
+				Src_ip:          "127.0.0.1",
+				Src_geolocation: schema.GeolocationIP{Postal_code: "10583"},
+			},
+		},
+		{
+			hop:       schema.ParisTracerouteHop{Dest_ip: "127.0.0.1"},
+			timestamp: time.Now(),
+			url:       "/dest",
+			res: schema.ParisTracerouteHop{
+				Dest_ip:          "127.0.0.1",
+				Dest_geolocation: schema.GeolocationIP{Postal_code: "10583"},
+			},
+		},
+		{
+			hop:       schema.ParisTracerouteHop{Src_ip: "127.0.0.1", Dest_ip: "127.0.0.2"},
+			timestamp: time.Now(),
+			url:       "/both",
+			res: schema.ParisTracerouteHop{
+				Src_ip:           "127.0.0.1",
+				Src_geolocation:  schema.GeolocationIP{Postal_code: "10583"},
+				Dest_ip:          "127.0.0.2",
+				Dest_geolocation: schema.GeolocationIP{Postal_code: "10583"},
+			},
+		},
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
+	}))
+	for _, test := range tests {
+		p.BaseURL = ts.URL + test.url
+		p.AddMetaDataPTHop(&test.hop, test.timestamp)
+		if !reflect.DeepEqual(test.hop, test.res) {
+			t.Errorf("Expected %v, got %v for test %s", test.res, test.hop, test.url)
+		}
+	}
+}
+
+func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
+	tests := []struct {
+		geo       *schema.GeolocationIP
+		ip        string
+		timestamp time.Time
+		url       string
+		res       *schema.GeolocationIP
+	}{
+		{
+			geo:       &schema.GeolocationIP{},
+			ip:        "123.123.123.001",
+			timestamp: time.Now(),
+			url:       "portGarbage",
+			res:       &schema.GeolocationIP{},
+		},
+		{
+			geo: &schema.GeolocationIP{},
+			ip:  "127.0.0.1",
+			url: "/10583",
+			res: &schema.GeolocationIP{Postal_code: "10583"},
+		},
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
+	}))
+	for _, test := range tests {
+		p.BaseURL = ts.URL + test.url
+		p.GetAndInsertGeolocationIPStruct(test.geo, test.ip, test.timestamp)
+		if !reflect.DeepEqual(test.geo, test.res) {
+			t.Errorf("Expected %v, got %v for test %s", test.res, test.geo, test.url)
+		}
+	}
+
+}
+
 func TestAddMetaDataNDTConnSpec(t *testing.T) {
 	tests := []struct {
 		spec      schema.Web100ValueMap
