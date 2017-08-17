@@ -31,6 +31,11 @@ var BaseURL = "https://annotator-dot-" +
 // will fetch the appropriate metadata and add it to the hop struct
 // referenced by the pointer.
 func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
+	if hop == nil {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT ConnSpec was nil!!!"}).Inc()
+		return
+	}
 	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
@@ -40,9 +45,15 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 	}(timerStart)
 	if spec.Server_ip != "" {
 		GetAndInsertGeolocationIPStruct(&spec.Server_geolocation, spec.Server_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT ConnSpec had no server_ip!"}).Inc()
 	}
 	if spec.Client_ip != "" {
 		GetAndInsertGeolocationIPStruct(&spec.Client_geolocation, spec.Client_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT ConnSpec had no client_ip!"}).Inc()
 	}
 }
 
@@ -50,6 +61,11 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 // timestamp. With these, it will fetch the appropriate metadata and
 // add it to the hop struct referenced by the pointer.
 func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
+	if hop == nil {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT Hop was nil!!!"}).Inc()
+		return
+	}
 	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
@@ -59,9 +75,15 @@ func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	}(timerStart)
 	if hop.Src_ip != "" {
 		GetAndInsertGeolocationIPStruct(&hop.Src_geolocation, hop.Src_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT Hop had no src_ip!"}).Inc()
 	}
 	if hop.Dest_ip != "" {
 		GetAndInsertGeolocationIPStruct(&hop.Dest_geolocation, hop.Dest_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT Hop had no dest_ip!"}).Inc()
 	}
 }
 
