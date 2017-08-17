@@ -31,7 +31,7 @@ var BaseURL = "https://annotator-dot-" +
 // will fetch the appropriate metadata and add it to the hop struct
 // referenced by the pointer.
 func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
-	if hop == nil {
+	if spec == nil {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "PT ConnSpec was nil!!!"}).Inc()
 		return
