@@ -26,12 +26,87 @@ var BaseURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
 	".appspot.com/annotate?"
 
+// AddMetaDataPTConnSpec takes a pointer to a
+// MLabConnectionSpecification struct and a timestamp. With these, it
+// will fetch the appropriate metadata and add it to the hop struct
+// referenced by the pointer.
+func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
+	if spec == nil {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT ConnSpec was nil!!!"}).Inc()
+		return
+	}
+	// Time the response
+	timerStart := time.Now()
+	defer func(tStart time.Time) {
+		metrics.AnnotationTimeSummary.
+			With(prometheus.Labels{"test_type": "PT"}).
+			Observe(float64(time.Since(tStart).Nanoseconds()))
+	}(timerStart)
+	if spec.Server_ip != "" {
+		GetAndInsertGeolocationIPStruct(&spec.Server_geolocation, spec.Server_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT ConnSpec had no server_ip!"}).Inc()
+	}
+	if spec.Client_ip != "" {
+		GetAndInsertGeolocationIPStruct(&spec.Client_geolocation, spec.Client_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT ConnSpec had no client_ip!"}).Inc()
+	}
+}
+
+// AddMetaDataPTHop takes a pointer to a ParisTracerouteHop and a
+// timestamp. With these, it will fetch the appropriate metadata and
+// add it to the hop struct referenced by the pointer.
+func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
+	if hop == nil {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT Hop was nil!!!"}).Inc()
+		return
+	}
+	// Time the response
+	timerStart := time.Now()
+	defer func(tStart time.Time) {
+		metrics.AnnotationTimeSummary.
+			With(prometheus.Labels{"test_type": "PT-HOP"}).
+			Observe(float64(time.Since(tStart).Nanoseconds()))
+	}(timerStart)
+	if hop.Src_ip != "" {
+		GetAndInsertGeolocationIPStruct(&hop.Src_geolocation, hop.Src_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT Hop had no src_ip!"}).Inc()
+	}
+	if hop.Dest_ip != "" {
+		GetAndInsertGeolocationIPStruct(&hop.Dest_geolocation, hop.Dest_ip, timestamp)
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT Hop had no dest_ip!"}).Inc()
+	}
+}
+
+// GetAndInsertGeolocationIPStruct takes a NON-NIL pointer to a
+// pre-allocated schema.GeolocationIP struct, an IP address, and a
+// timestamp. It will connect to the annotation service, get the
+// metadata, and insert the metadata into the reigion pointed to by
+// the schema.GeolocationIP pointer.
+func GetAndInsertGeolocationIPStruct(geo *schema.GeolocationIP, ip string, timestamp time.Time) {
+	url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +
+		"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
+	annotationData := GetMetaData(url)
+	if annotationData != nil && annotationData.Geo != nil {
+		*geo = *annotationData.Geo
+	}
+}
+
 // AddMetaDataNDTConnSpec takes a connection spec and a timestamp and
 // annotates the connection spec with metadata associated with each IP
 // Address. It will either sucessfully add the metadata or fail
 // silently and make no changes.
 func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
-	//Time the response
+	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
 		metrics.AnnotationTimeSummary.
