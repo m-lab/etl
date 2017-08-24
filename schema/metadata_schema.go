@@ -1,5 +1,7 @@
 package schema
 
+import "time"
+
 // The GeolocationIP struct contains all the information needed for the
 // geolocation data that will be inserted into big query. The fiels are
 // capitalized for exporting, although the originals in the DB schema
@@ -29,4 +31,12 @@ type IPASNData struct{}
 type MetaData struct {
 	Geo *GeolocationIP // Holds the geolocation data
 	ASN *IPASNData     // Holds the IP/ASN data
+}
+
+// The RequestData schema is the schema for the json that we will send
+// down the pipe to the annotation service.
+type RequestData struct {
+	IP        string    // Holds the IP from an incoming request
+	IPFormat  int       // Holds the ip format, 4 or 6
+	Timestamp time.Time // Holds the timestamp from an incoming request
 }
