@@ -177,8 +177,19 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 	structToCopy := reflect.ValueOf(sourceStruct).Elem()
 	typeOfStruct := structToCopy.Type()
 	for i := 0; i < typeOfStruct.NumField(); i++ {
-		destinationMap[strings.ToLower(typeOfStruct.Field(i).Name)] =
-			structToCopy.Field(i).Interface()
+		v := structToCopy.Field(i).Interface()
+		switch t := v.(type) {
+		case string:
+			if t == "" {
+				continue
+			}
+		case int64:
+			if t == 0 {
+				continue
+			}
+		}
+		destinationMap[strings.ToLower(typeOfStruct.Field(i).Name)] = v
+
 	}
 
 }

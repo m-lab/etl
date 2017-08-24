@@ -238,24 +238,20 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 				spec["client_ip"] = "127.0.0.1"
 				spec["server_ip"] = "1.0.0.127"
 				geoc := spec.Get("client_geolocation")
-				geoc["continent_code"] = ""
 				geoc["country_code"] = "US"
 				geoc["country_code3"] = "USA"
 				geoc["country_name"] = "United States of America"
 				geoc["region"] = "NY"
-				geoc["metro_code"] = int64(0)
 				geoc["city"] = "Scarsdale"
 				geoc["area_code"] = int64(10583)
 				geoc["postal_code"] = "10583"
 				geoc["latitude"] = float64(0.0)
 				geoc["longitude"] = float64(0.0)
 				geos := spec.Get("server_geolocation")
-				geos["continent_code"] = ""
 				geos["country_code"] = "US"
 				geos["country_code3"] = "USA"
 				geos["country_name"] = "United States of America"
 				geos["region"] = "NY"
-				geos["metro_code"] = int64(0)
 				geos["city"] = "Scarsdale"
 				geos["area_code"] = int64(10583)
 				geos["postal_code"] = "10583"
@@ -312,12 +308,10 @@ func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
 				spec := schema.EmptyConnectionSpec()
 				spec["client_ip"] = "127.0.0.1"
 				geo := spec.Get("client_geolocation")
-				geo["continent_code"] = ""
 				geo["country_code"] = "US"
 				geo["country_code3"] = "USA"
 				geo["country_name"] = "United States of America"
 				geo["region"] = "NY"
-				geo["metro_code"] = int64(0)
 				geo["city"] = "Scarsdale"
 				geo["area_code"] = int64(10583)
 				geo["postal_code"] = "10583"
@@ -348,11 +342,19 @@ func TestCopyStructToMap(t *testing.T) {
 	}{
 		{
 			source: &struct {
-				A   int
+				A   int64
 				Bee string
 			}{A: 1, Bee: "2"},
 			dest: make(map[string]bigquery.Value),
-			res:  map[string]bigquery.Value{"a": 1, "bee": "2"},
+			res:  map[string]bigquery.Value{"a": int64(1), "bee": "2"},
+		},
+		{
+			source: &struct {
+				A   int64
+				Bee string
+			}{A: 0, Bee: ""},
+			dest: make(map[string]bigquery.Value),
+			res:  map[string]bigquery.Value{},
 		},
 		{
 			source: &struct{}{},
