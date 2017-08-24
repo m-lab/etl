@@ -245,8 +245,8 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 				geoc["city"] = "Scarsdale"
 				geoc["area_code"] = int64(10583)
 				geoc["postal_code"] = "10583"
-				geoc["latitude"] = float64(0.0)
-				geoc["longitude"] = float64(0.0)
+				geoc["latitude"] = float64(41.0051)
+				geoc["longitude"] = float64(73.7846)
 				geos := spec.Get("server_geolocation")
 				geos["country_code"] = "US"
 				geos["country_code3"] = "USA"
@@ -255,14 +255,14 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 				geos["city"] = "Scarsdale"
 				geos["area_code"] = int64(10583)
 				geos["postal_code"] = "10583"
-				geos["latitude"] = float64(0.0)
-				geos["longitude"] = float64(0.0)
+				geos["latitude"] = float64(41.0051)
+				geos["longitude"] = float64(73.7846)
 				return spec
 			}(),
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":0,"longitude":0},"ASN":{}}`)
+		fmt.Fprint(w, `{"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`)
 	}))
 	for _, test := range tests {
 		p.BaseURL = ts.URL + test.url
@@ -315,8 +315,8 @@ func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
 				geo["city"] = "Scarsdale"
 				geo["area_code"] = int64(10583)
 				geo["postal_code"] = "10583"
-				geo["latitude"] = float64(0.0)
-				geo["longitude"] = float64(0.0)
+				geo["latitude"] = float64(41.0051)
+				geo["longitude"] = float64(73.7846)
 				return spec
 			}(),
 		},
