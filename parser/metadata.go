@@ -27,6 +27,10 @@ var BaseURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
 	".appspot.com/annotate?"
 
+var BatchURL = "https://annotator-dot-" +
+	os.Getenv("GCLOUD_PROJECT") +
+	".appspot.com/batch_annotate"
+
 // AddMetaDataSSConnSpec takes a pointer to a
 // Web100ConnectionSpecification struct and a timestamp. With these,
 // it will fetch the appropriate metadata and add it to the hop struct
@@ -146,8 +150,7 @@ func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 
-	GetAndInsertMetaIntoNDTConnSpec("client", spec, timestamp)
-	GetAndInsertMetaIntoNDTConnSpec("server", spec, timestamp)
+	GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec, timestamp)
 }
 
 // GetAndInsertNDT takes a timestamp, an NDT connection spec, and a
@@ -257,6 +260,43 @@ func ParseJSONMetaDataResponse(jsonBuffer []byte) (*schema.MetaData, error) {
 		return nil, err
 	}
 	return parsedJSON, nil
+}
+
+// GetAndInsertTwoSidedMetaIntoNDTConnSpec takes a timestamp and an
+// NDT connection spec. It will either insert the data into the
+// connection spec or silently fail.
+func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
+	cip, cok := spec.GetString([]string{"client_ip"})
+	sip, sok := spec.GetString([]string{"server_ip"})
+	reqData := []schema.RequestData{}
+	if cok {
+		reqData = append(reqData, schema.RequestData{IP: cip, Timestamp: timestamp})
+	}
+	if sok {
+		reqData = append(reqData, schema.RequestData{IP: sip, Timestamp: timestamp})
+	}
+	if cok || sok {
+		annotationDataMap := GetBatchMetaData(BatchURL, reqData)
+		timeString := strconv.FormatInt(timestamp.Unix(), 36)
+		if cok {
+			if data, ok := annotationDataMap[cip+timeString]; ok && data.Geo != nil {
+				CopyStructToMap(data.Geo, spec.Get("client_geolocation"))
+			} else {
+				metrics.AnnotationErrorCount.With(prometheus.
+					Labels{"source": "Couldn't get metadata for the client side."}).Inc()
+			}
+		}
+		if sok {
+			if data, ok := annotationDataMap[sip+timeString]; ok && data.Geo != nil {
+				CopyStructToMap(data.Geo, spec.Get("server_geolocation"))
+			} else {
+				metrics.AnnotationErrorCount.With(prometheus.
+					Labels{"source": "Couldn't get metadata for the server side."}).Inc()
+			}
+
+		}
+	}
+
 }
 
 // GetBatchMetaData combines the functionality of

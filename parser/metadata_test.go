@@ -218,6 +218,7 @@ func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
 }
 
 func TestAddMetaDataNDTConnSpec(t *testing.T) {
+	tst, _ := time.Parse(time.RFC3339, "2002-10-02T15:00:00Z")
 	tests := []struct {
 		spec      schema.Web100ValueMap
 		timestamp time.Time
@@ -231,7 +232,7 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 				spec["server_ip"] = "1.0.0.127"
 				return spec
 			}(),
-			timestamp: time.Now(),
+			timestamp: tst,
 			url:       "/10583?",
 			res: func() schema.Web100ValueMap {
 				spec := schema.EmptyConnectionSpec()
@@ -253,8 +254,8 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 				geos["country_name"] = "United States of America"
 				geos["region"] = "NY"
 				geos["city"] = "Scarsdale"
-				geos["area_code"] = int64(10583)
-				geos["postal_code"] = "10583"
+				geos["area_code"] = int64(10584)
+				geos["postal_code"] = "10584"
 				geos["latitude"] = float64(41.0051)
 				geos["longitude"] = float64(73.7846)
 				return spec
@@ -262,10 +263,11 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`)
+		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
+			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		p.BaseURL = ts.URL + test.url
+		p.BatchURL = ts.URL + test.url
 		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
@@ -479,6 +481,64 @@ func TestParseJSONMetaDataResponse(t *testing.T) {
 			t.Errorf("Expected %s, got %s for data: %s\n", test.resultError, err, string(test.testBuffer))
 		} else if !reflect.DeepEqual(res, test.resultData) {
 			t.Errorf("Expected %+v, got %+v, for data %s\n", test.resultData, res, string(test.testBuffer))
+		}
+	}
+}
+
+func TestGetAndInsertTwoSidedMetaIntoNDTConnSpec(t *testing.T) {
+	tst, _ := time.Parse(time.RFC3339, "2002-10-02T15:00:00Z")
+	tests := []struct {
+		spec      schema.Web100ValueMap
+		timestamp time.Time
+		url       string
+		res       schema.Web100ValueMap
+	}{
+		{
+			spec: func() schema.Web100ValueMap {
+				spec := schema.EmptyConnectionSpec()
+				spec["client_ip"] = "127.0.0.1"
+				spec["server_ip"] = "1.0.0.127"
+				return spec
+			}(),
+			timestamp: tst,
+			url:       "/10583?",
+			res: func() schema.Web100ValueMap {
+				spec := schema.EmptyConnectionSpec()
+				spec["client_ip"] = "127.0.0.1"
+				spec["server_ip"] = "1.0.0.127"
+				geoc := spec.Get("client_geolocation")
+				geoc["country_code"] = "US"
+				geoc["country_code3"] = "USA"
+				geoc["country_name"] = "United States of America"
+				geoc["region"] = "NY"
+				geoc["city"] = "Scarsdale"
+				geoc["area_code"] = int64(10583)
+				geoc["postal_code"] = "10583"
+				geoc["latitude"] = float64(41.0051)
+				geoc["longitude"] = float64(73.7846)
+				geos := spec.Get("server_geolocation")
+				geos["country_code"] = "US"
+				geos["country_code3"] = "USA"
+				geos["country_name"] = "United States of America"
+				geos["region"] = "NY"
+				geos["city"] = "Scarsdale"
+				geos["area_code"] = int64(10584)
+				geos["postal_code"] = "10584"
+				geos["latitude"] = float64(41.0051)
+				geos["longitude"] = float64(73.7846)
+				return spec
+			}(),
+		},
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
+			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
+	}))
+	for _, test := range tests {
+		p.BatchURL = ts.URL + test.url
+		p.GetAndInsertTwoSidedMetaIntoNDTConnSpec(test.spec, test.timestamp)
+		if !reflect.DeepEqual(test.spec, test.res) {
+			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
 		}
 	}
 }
