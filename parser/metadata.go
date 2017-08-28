@@ -93,6 +93,9 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 	}
 }
 
+// AddMetaDataPTHopBatch takes a slice of pointers to
+// schema.ParisTracerouteHops and will annotate all of them or fail
+// silently. It sends them all in a single remote request.
 func AddMetaDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time) {
 	// Time the response
 	timerStart := time.Now()
@@ -106,6 +109,9 @@ func AddMetaDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Tim
 	AnnotatePTHops(hops, annotationData, timestamp)
 }
 
+// AnnotatePTHops takes a slice of hop pointers, the annotation data
+// mapping ip addresses to metadata and a timestamp. It will then use
+// these to attach the appropriate metadata to the PT hops.
 func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]schema.MetaData, timestamp time.Time) {
 	if annotationData == nil {
 		return
@@ -132,6 +138,10 @@ func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string
 	}
 }
 
+// CreateRequestDataFromPTHops will take a slice of PT hop pointers
+// and the associate timestamp. From those, it will create a slice of
+// requests to send to the annotation service, removing duplicates
+// along the way.
 func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp time.Time) []schema.RequestData {
 	hopMap := map[string]schema.RequestData{}
 	for _, hop := range hops {
