@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -252,6 +253,79 @@ func QueryAnnotationService(url string) ([]byte, error) {
 func ParseJSONMetaDataResponse(jsonBuffer []byte) (*schema.MetaData, error) {
 	parsedJSON := &schema.MetaData{}
 	err := json.Unmarshal(jsonBuffer, parsedJSON)
+	if err != nil {
+		return nil, err
+	}
+	return parsedJSON, nil
+}
+
+// GetBatchMetaData combines the functionality of
+// BatchQueryAnnotationService and BatchParseJSONMetaDataResponse to
+// query the annotator service and return the corresponding map of
+// ip-timestamp strings to schema.MetaData structs, or a nil map if it
+// encounters any error and cannot get the data for any reason
+func GetBatchMetaData(url string, data []schema.RequestData) map[string]schema.MetaData {
+	// Query the service and grab the response safely
+	annotatorResponse, err := BatchQueryAnnotationService(url, data)
+	if err != nil {
+		metrics.AnnotationErrorCount.
+			With(prometheus.Labels{"source": "Error querying annotation service"}).Inc()
+		log.Println(err)
+		return nil
+	}
+
+	// Safely parse the JSON response and pass it back to the caller
+	metaDataFromResponse, err := BatchParseJSONMetaDataResponse(annotatorResponse)
+	if err != nil {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "Failed to parse JSON"}).Inc()
+		log.Println(err)
+		return nil
+	}
+	return metaDataFromResponse
+}
+
+// BatchQueryAnnotationService takes a url to POST the request to and
+// a slice of schema.RequestDatas to be sent in the body in a JSON
+// format. It will copy the response into a []byte and return it to
+// the user, returning an error if any occurs
+func BatchQueryAnnotationService(url string, data []schema.RequestData) ([]byte, error) {
+	encodedData, err := json.Marshal(data)
+	if err != nil {
+		metrics.AnnotationErrorCount.
+			With(prometheus.Labels{"source": "Couldn't Marshal Data"}).Inc()
+		return nil, err
+	}
+	// Make the actual request
+	resp, err := http.Post(url, "raw", bytes.NewReader(encodedData))
+
+	// Catch http errors
+	if err != nil {
+		metrics.AnnotationErrorCount.
+			With(prometheus.Labels{"source": "Request to Annotator failed"}).Inc()
+		return nil, err
+	}
+
+	// Catch errors reported by the service
+	if resp.StatusCode != http.StatusOK {
+		metrics.AnnotationErrorCount.
+			With(prometheus.Labels{"source": "Webserver gave non-ok response"}).Inc()
+		return nil, errors.New("URL:" + url + " gave response code " + resp.Status)
+	}
+	defer resp.Body.Close()
+
+	// Copy response into a byte slice
+	return ioutil.ReadAll(resp.Body)
+}
+
+// BatchParseJSONMetaDataResponse takes a byte slice containing the
+// text of the JSON from the annoator service's batch request endpoint
+// and parses it into a map of strings to schema.MetaData structs, for
+// easy manipulation. It returns a pointer to the struct on success
+// and an error if one occurs.
+func BatchParseJSONMetaDataResponse(jsonBuffer []byte) (map[string]schema.MetaData, error) {
+	parsedJSON := make(map[string]schema.MetaData)
+	err := json.Unmarshal(jsonBuffer, &parsedJSON)
 	if err != nil {
 		return nil, err
 	}
