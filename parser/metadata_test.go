@@ -26,13 +26,13 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 	}{
 		{
 			conspec:   schema.Web100ConnectionSpecification{},
-			timestamp: time.Now(),
+			timestamp: time.Unix(0, 0),
 			url:       "/notCalled",
 			res:       schema.Web100ConnectionSpecification{},
 		},
 		{
 			conspec:   schema.Web100ConnectionSpecification{Local_ip: "127.0.0.1"},
-			timestamp: time.Now(),
+			timestamp: time.Unix(0, 0),
 			url:       "/src",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:          "127.0.0.1",
@@ -41,7 +41,7 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 		},
 		{
 			conspec:   schema.Web100ConnectionSpecification{Remote_ip: "127.0.0.1"},
-			timestamp: time.Now(),
+			timestamp: time.Unix(0, 0),
 			url:       "/dest",
 			res: schema.Web100ConnectionSpecification{
 				Remote_ip:          "127.0.0.1",
@@ -50,21 +50,22 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 		},
 		{
 			conspec:   schema.Web100ConnectionSpecification{Local_ip: "127.0.0.1", Remote_ip: "127.0.0.2"},
-			timestamp: time.Now(),
+			timestamp: time.Unix(0, 0),
 			url:       "/both",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:           "127.0.0.1",
 				Local_geolocation:  schema.GeolocationIP{Postal_code: "10583"},
 				Remote_ip:          "127.0.0.2",
-				Remote_geolocation: schema.GeolocationIP{Postal_code: "10583"},
+				Remote_geolocation: schema.GeolocationIP{Postal_code: "10584"},
 			},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
+		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
+			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		p.BaseURL = ts.URL + test.url
+		p.BatchURL = ts.URL + test.url
 		p.AddMetaDataSSConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
@@ -81,13 +82,13 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 	}{
 		{
 			conspec:   schema.MLabConnectionSpecification{},
-			timestamp: time.Now(),
+			timestamp: time.Unix(0, 0),
 			url:       "/notCalled",
 			res:       schema.MLabConnectionSpecification{},
 		},
 		{
 			conspec:   schema.MLabConnectionSpecification{Server_ip: "127.0.0.1"},
-			timestamp: time.Now(),
+			timestamp: time.Unix(0, 0),
 			url:       "/src",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
@@ -96,7 +97,7 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 		},
 		{
 			conspec:   schema.MLabConnectionSpecification{Client_ip: "127.0.0.1"},
-			timestamp: time.Now(),
+			timestamp: time.Unix(0, 0),
 			url:       "/dest",
 			res: schema.MLabConnectionSpecification{
 				Client_ip:          "127.0.0.1",
@@ -105,21 +106,22 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 		},
 		{
 			conspec:   schema.MLabConnectionSpecification{Server_ip: "127.0.0.1", Client_ip: "127.0.0.2"},
-			timestamp: time.Now(),
+			timestamp: time.Unix(0, 0),
 			url:       "/both",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
 				Server_geolocation: schema.GeolocationIP{Postal_code: "10583"},
 				Client_ip:          "127.0.0.2",
-				Client_geolocation: schema.GeolocationIP{Postal_code: "10583"},
+				Client_geolocation: schema.GeolocationIP{Postal_code: "10584"},
 			},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
+		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
+			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		p.BaseURL = ts.URL + test.url
+		p.BatchURL = ts.URL + test.url
 		p.AddMetaDataPTConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
