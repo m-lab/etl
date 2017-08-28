@@ -23,13 +23,13 @@ import (
 
 // TODO(JosephMarques) See if there is a better way of determining
 // where to send the request (there almost certainly is)
-var BaseURL = "https://annotator-dot-" +
+var AnnotatorURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
-	".appspot.com/annotate?"
+	".appspot.com"
 
-var BatchURL = "https://annotator-dot-" +
-	os.Getenv("GCLOUD_PROJECT") +
-	".appspot.com/batch_annotate"
+var BaseURL = AnnotatorURL + "/annotate?"
+
+var BatchURL = AnnotatorURL + "/batch_annotate"
 
 // AddMetaDataSSConnSpec takes a pointer to a
 // Web100ConnectionSpecification struct and a timestamp. With these,
@@ -266,6 +266,7 @@ func ParseJSONMetaDataResponse(jsonBuffer []byte) (*schema.MetaData, error) {
 // NDT connection spec. It will either insert the data into the
 // connection spec or silently fail.
 func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
+	// TODO(JM): Make metrics for sok and cok failures. And double check metrics for cleanliness.
 	cip, cok := spec.GetString([]string{"client_ip"})
 	sip, sok := spec.GetString([]string{"server_ip"})
 	reqData := []schema.RequestData{}
@@ -277,6 +278,9 @@ func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timesta
 	}
 	if cok || sok {
 		annotationDataMap := GetBatchMetaData(BatchURL, reqData)
+		// TODO(JM): Revisit decision to use base36 for
+		// encoding, rather than base64. (It had to do with
+		// library support.)
 		timeString := strconv.FormatInt(timestamp.Unix(), 36)
 		if cok {
 			if data, ok := annotationDataMap[cip+timeString]; ok && data.Geo != nil {
