@@ -568,6 +568,9 @@ func TestBatchParseJSONMetaDataResponse(t *testing.T) {
 		resultError error
 	}{
 		{
+			// Note: This is not testing for corruptedIP
+			// addresses. The xyz could be a base36
+			// encoded timestamp.
 			testBuffer:  []byte(`{"127.0.0.1xyz": {"Geo":null,"ASN":null}}`),
 			resultData:  map[string]schema.MetaData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
 			resultError: nil,
