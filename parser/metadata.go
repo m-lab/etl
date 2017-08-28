@@ -31,6 +31,30 @@ var BaseURL = AnnotatorURL + "/annotate?"
 
 var BatchURL = AnnotatorURL + "/batch_annotate"
 
+func GetAndInsertSliceOfGeolocationIPStructs(ips []string, timestamp time.Time, geoDest []*schema.GeolocationIP) {
+	reqData := make([]schema.RequestData, 0, len(ips))
+	for _, ip := range ips {
+		if ip == "" {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "Empty IP Address!!!"}).Inc()
+			continue
+		}
+		reqData = append(reqData, schema.RequestData{ip, 0, timestamp})
+	}
+	annotationData := GetBatchMetaData(BatchURL, reqData)
+	timeString := strconv.FormatInt(timestamp.Unix(), 36)
+	for index, ip := range ips {
+		data, ok := annotationData[ip+timeString]
+		if !ok || data.Geo == nil {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "Missing or empty data for IP Address!!!"}).Inc()
+			continue
+		}
+		*geoDest[index] = *data.Geo
+
+	}
+}
+
 // AddMetaDataSSConnSpec takes a pointer to a
 // Web100ConnectionSpecification struct and a timestamp. With these,
 // it will fetch the appropriate metadata and add it to the hop struct
@@ -48,18 +72,10 @@ func AddMetaDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp
 			With(prometheus.Labels{"test_type": "SS"}).
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
-	if spec.Local_ip != "" {
-		GetAndInsertGeolocationIPStruct(&spec.Local_geolocation, spec.Local_ip, timestamp)
-	} else {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "SS ConnSpec had no local_ip!"}).Inc()
-	}
-	if spec.Remote_ip != "" {
-		GetAndInsertGeolocationIPStruct(&spec.Remote_geolocation, spec.Remote_ip, timestamp)
-	} else {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "SS ConnSpec had no remote_ip!"}).Inc()
-	}
+
+	ipSlice := []string{spec.Local_ip, spec.Remote_ip}
+	geoSlice := []*schema.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
+	GetAndInsertSliceOfGeolocationIPStructs(ipSlice, timestamp, geoSlice)
 }
 
 // AddMetaDataPTConnSpec takes a pointer to a
@@ -79,18 +95,9 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 			With(prometheus.Labels{"test_type": "PT"}).
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
-	if spec.Server_ip != "" {
-		GetAndInsertGeolocationIPStruct(&spec.Server_geolocation, spec.Server_ip, timestamp)
-	} else {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "PT ConnSpec had no server_ip!"}).Inc()
-	}
-	if spec.Client_ip != "" {
-		GetAndInsertGeolocationIPStruct(&spec.Client_geolocation, spec.Client_ip, timestamp)
-	} else {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "PT ConnSpec had no client_ip!"}).Inc()
-	}
+	ipSlice := []string{spec.Server_ip, spec.Client_ip}
+	geoSlice := []*schema.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
+	GetAndInsertSliceOfGeolocationIPStructs(ipSlice, timestamp, geoSlice)
 }
 
 // AddMetaDataPTHopBatch takes a slice of pointers to
