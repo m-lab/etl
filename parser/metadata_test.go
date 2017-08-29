@@ -17,6 +17,41 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
+func TestGetAndINsertSliceOfGeolocationIPStructs(t *testing.T) {
+	tests := []struct {
+		ips       []string
+		timestamp time.Time
+		geoDest   []*schema.GeolocationIP
+		res       []*schema.GeolocationIP
+	}{
+		{
+			ips:       []string{"", "127.0.0.1", "2.2.2.2"},
+			timestamp: time.Unix(0, 0),
+			geoDest: []*schema.GeolocationIP{
+				&schema.GeolocationIP{},
+				&schema.GeolocationIP{},
+				&schema.GeolocationIP{},
+			},
+			res: []*schema.GeolocationIP{
+				&schema.GeolocationIP{},
+				&schema.GeolocationIP{Postal_code: "10583"},
+				&schema.GeolocationIP{},
+			},
+		},
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
+			`,"2.2.2.20" : {"Geo":null,"ASN":null}}`)
+	}))
+	for _, test := range tests {
+		p.BatchURL = ts.URL
+		p.GetAndInsertSliceOfGeolocationIPStructs(test.ips, test.timestamp, test.geoDest)
+		if !reflect.DeepEqual(test.geoDest, test.res) {
+			t.Errorf("Expected %s, got %s", test.res, test.geoDest)
+		}
+	}
+}
+
 func TestAddMetaDataSSConnSpec(t *testing.T) {
 	tests := []struct {
 		conspec   schema.Web100ConnectionSpecification
