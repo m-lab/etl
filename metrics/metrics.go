@@ -79,7 +79,7 @@ var (
 		Help: "Number of active workers.",
 	})
 
-        // Counts the number of tasks processed by the pipeline.
+	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
 	//   etl_worker_count{state}
@@ -98,13 +98,20 @@ var (
 	//   etl_embargo_Success_count
 	// Example usage:
 	//   metrics.EmbargoSuccessCount.Inc() / .Dec()
-	WorkerState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	EmbargoSuccessCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "etl_embargo_Success_count",
 		Help: "Number of files that was processed by embargo app engine successfully.",
-	},
-		// Worker state, e.g. create task, read, parse, insert
-		[]string{"state"},
-	)
+	})
+
+	// Measures the number of files that was not processed by embargo app engine successfully.
+	// Provides metrics:
+	//   etl_embargo_Error_count
+	// Example usage:
+	//   metrics.EmbargoErrorCount.Inc() / .Dec()
+	EmbargoErrorCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "etl_embargo_Error_count",
+		Help: "Number of files that was not processed by embargo app engine successfully.",
+	})
 
 	// Counts the number of files processed by machine, rsync module, and day.
 	//
