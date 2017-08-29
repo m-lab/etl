@@ -98,7 +98,7 @@ var (
 	//   etl_embargo_Success_count
 	// Example usage:
 	//   metrics.EmbargoSuccessCount.Inc() / .Dec()
-	EmbargoSuccessCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	EmbargoSuccessCount = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "etl_embargo_Success_count",
 		Help: "Number of files that was processed by embargo app engine successfully.",
 	})
@@ -108,7 +108,7 @@ var (
 	//   etl_embargo_Error_count
 	// Example usage:
 	//   metrics.EmbargoErrorCount.Inc() / .Dec()
-	EmbargoErrorCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	EmbargoErrorCount = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "etl_embargo_Error_count",
 		Help: "Number of files that was not processed by embargo app engine successfully.",
 	})
