@@ -19,7 +19,7 @@ func init() {
 	// Register the metrics defined with Prometheus's default registry.
 	prometheus.MustRegister(AnnotationTimeSummary)
 	prometheus.MustRegister(AnnotationErrorCount)
-        prometheus.MustRegister(EmbargoSuccessCount)
+	prometheus.MustRegister(EmbargoSuccessCount)
 	prometheus.MustRegister(EmbargoErrorCount)
 	prometheus.MustRegister(WorkerCount)
 	prometheus.MustRegister(WorkerState)
@@ -67,6 +67,7 @@ var (
 		Name: "etl_annotator_Error_Count",
 		Help: "The current number of errors encountered while attemting to add metadata.",
 	}, []string{"source"})
+
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
@@ -78,7 +79,21 @@ var (
 		Help: "Number of active workers.",
 	})
 
-        // Measures the number of files that was processed by embargo app engine successfully. 
+        // Counts the number of tasks processed by the pipeline.
+	//
+	// Provides metrics:
+	//   etl_worker_count{state}
+	// Example usage:
+	//   metrics.WorkerState.WithLabelValues("flush").Inc() / .Dec()
+	WorkerState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "etl_worker_state",
+		Help: "Number of workers in different states.",
+	},
+		// Worker state, e.g. create task, read, parse, insert
+		[]string{"state"},
+	)
+
+	// Measures the number of files that was processed by embargo app engine successfully.
 	// Provides metrics:
 	//   etl_embargo_Success_count
 	// Example usage:
