@@ -93,6 +93,85 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 	}
 }
 
+// AddMetaDataPTHopBatch takes a slice of pointers to
+// schema.ParisTracerouteHops and will annotate all of them or fail
+// silently. It sends them all in a single remote request.
+func AddMetaDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time) {
+	// Time the response
+	timerStart := time.Now()
+	defer func(tStart time.Time) {
+		metrics.AnnotationTimeSummary.
+			With(prometheus.Labels{"test_type": "PT-HOP Batch"}).
+			Observe(float64(time.Since(tStart).Nanoseconds()))
+	}(timerStart)
+	requestSlice := CreateRequestDataFromPTHops(hops, timestamp)
+	annotationData := GetBatchMetaData(BatchURL, requestSlice)
+	AnnotatePTHops(hops, annotationData, timestamp)
+}
+
+// AnnotatePTHops takes a slice of hop pointers, the annotation data
+// mapping ip addresses to metadata and a timestamp. It will then use
+// these to attach the appropriate metadata to the PT hops.
+func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]schema.MetaData, timestamp time.Time) {
+	if annotationData == nil {
+		return
+	}
+	timeString := strconv.FormatInt(timestamp.Unix(), 36)
+	for _, hop := range hops {
+		if hop == nil {
+			continue
+		}
+
+		if data, ok := annotationData[hop.Src_ip+timeString]; ok && data.Geo != nil {
+			hop.Src_geolocation = *data.Geo
+		} else {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "Couldn't get geo data for PT Hop!"}).Inc()
+		}
+
+		if data, ok := annotationData[hop.Dest_ip+timeString]; ok && data.Geo != nil {
+			hop.Dest_geolocation = *data.Geo
+		} else {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "Couldn't get geo data for PT Hop!"}).Inc()
+		}
+	}
+}
+
+// CreateRequestDataFromPTHops will take a slice of PT hop pointers
+// and the associate timestamp. From those, it will create a slice of
+// requests to send to the annotation service, removing duplicates
+// along the way.
+func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp time.Time) []schema.RequestData {
+	hopMap := map[string]schema.RequestData{}
+	for _, hop := range hops {
+		if hop == nil {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "PT Hop was nil!!!"}).Inc()
+			continue
+		}
+		if hop.Src_ip != "" {
+			hopMap[hop.Src_ip] = schema.RequestData{hop.Src_ip, 0, timestamp}
+		} else {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()
+		}
+
+		if hop.Dest_ip != "" {
+			hopMap[hop.Dest_ip] = schema.RequestData{hop.Dest_ip, 0, timestamp}
+		} else {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()
+		}
+	}
+
+	requestSlice := make([]schema.RequestData, 0, len(hopMap))
+	for _, req := range hopMap {
+		requestSlice = append(requestSlice, req)
+	}
+	return requestSlice
+}
+
 // AddMetaDataPTHop takes a pointer to a ParisTracerouteHop and a
 // timestamp. With these, it will fetch the appropriate metadata and
 // add it to the hop struct referenced by the pointer.

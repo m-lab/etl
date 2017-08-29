@@ -127,6 +127,120 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 	}
 }
 
+func TestAddMetaDataPTHopBatch(t *testing.T) {
+	tests := []struct {
+		hops      []*schema.ParisTracerouteHop
+		timestamp time.Time
+		url       string
+		res       []*schema.ParisTracerouteHop
+	}{
+		{
+			hops: []*schema.ParisTracerouteHop{
+				&schema.ParisTracerouteHop{
+					Src_ip:  "127.0.0.1",
+					Dest_ip: "1.0.0.127",
+				},
+			},
+			timestamp: time.Unix(0, 0),
+			url:       "/10583?",
+			res: []*schema.ParisTracerouteHop{
+				&schema.ParisTracerouteHop{
+					Src_ip:           "127.0.0.1",
+					Src_geolocation:  schema.GeolocationIP{Area_code: 10583},
+					Dest_ip:          "1.0.0.127",
+					Dest_geolocation: schema.GeolocationIP{Area_code: 10584},
+				},
+			},
+		},
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"area_code":10583},"ASN":{}}`+
+			`,"1.0.0.1270" : {"Geo":{"area_code":10584},"ASN":{}}}`)
+	}))
+	for _, test := range tests {
+		p.BatchURL = ts.URL + test.url
+		p.AddMetaDataPTHopBatch(test.hops, test.timestamp)
+		if !reflect.DeepEqual(test.hops, test.res) {
+			t.Errorf("Expected %s, got %s from data %s", test.res, test.hops, test.url)
+		}
+	}
+}
+
+func TestAnnotatePTHops(t *testing.T) {
+	tests := []struct {
+		hops           []*schema.ParisTracerouteHop
+		annotationData map[string]schema.MetaData
+		timestamp      time.Time
+		res            []*schema.ParisTracerouteHop
+	}{
+		{
+			hops:           nil,
+			annotationData: nil,
+			timestamp:      time.Unix(0, 0),
+			res:            nil,
+		},
+		{
+			hops:           []*schema.ParisTracerouteHop{nil},
+			annotationData: map[string]schema.MetaData{},
+			timestamp:      time.Unix(0, 0),
+			res:            []*schema.ParisTracerouteHop{nil},
+		},
+		{
+			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
+			annotationData: map[string]schema.MetaData{"127.0.0.10": schema.MetaData{
+				Geo: &schema.GeolocationIP{}, ASN: nil}},
+			timestamp: time.Unix(0, 0),
+			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1",
+				Src_geolocation: schema.GeolocationIP{}}},
+		},
+		{
+			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
+			annotationData: map[string]schema.MetaData{"1.0.0.1270": schema.MetaData{
+				Geo: &schema.GeolocationIP{}, ASN: nil}},
+			timestamp: time.Unix(0, 0),
+			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127",
+				Dest_geolocation: schema.GeolocationIP{}}},
+		},
+	}
+	for _, test := range tests {
+		p.AnnotatePTHops(test.hops, test.annotationData, test.timestamp)
+		if !reflect.DeepEqual(test.hops, test.res) {
+			t.Errorf("Expected %s, got %s.", test.res, test.hops)
+		}
+	}
+
+}
+
+func TestCreateRequestDataFromPTHops(t *testing.T) {
+	tests := []struct {
+		hops      []*schema.ParisTracerouteHop
+		timestamp time.Time
+		res       []schema.RequestData
+	}{
+		{
+			hops:      []*schema.ParisTracerouteHop{},
+			timestamp: time.Unix(0, 0),
+			res:       []schema.RequestData{},
+		},
+		{
+			hops:      []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
+			timestamp: time.Unix(0, 0),
+			res:       []schema.RequestData{schema.RequestData{"1.0.0.127", 0, time.Unix(0, 0)}},
+		},
+		{
+			hops:      []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
+			timestamp: time.Unix(0, 0),
+			res:       []schema.RequestData{schema.RequestData{"127.0.0.1", 0, time.Unix(0, 0)}},
+		},
+	}
+	for _, test := range tests {
+		res := p.CreateRequestDataFromPTHops(test.hops, test.timestamp)
+		if !reflect.DeepEqual(res, test.res) {
+			t.Errorf("Expected %v, got %v.", test.res, res)
+		}
+	}
+}
+
 func TestAddMetaDataPTHop(t *testing.T) {
 	tests := []struct {
 		hop       schema.ParisTracerouteHop
