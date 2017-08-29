@@ -102,7 +102,7 @@ var (
 		Name: "etl_embargo_success_total",
 		Help: "Number of files that was processed by embargo app engine successfully.",
 	},
-                // "sidestream", "Monday"
+		// "sidestream", "Monday"
 		[]string{"experiment", "day_of_week"})
 
 	// Measures the number of files that was not processed by embargo app engine successfully.
