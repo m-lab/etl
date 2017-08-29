@@ -98,20 +98,22 @@ var (
 	//   etl_embargo_Success_count
 	// Example usage:
 	//   metrics.EmbargoSuccessCount.Inc() / .Dec()
-	EmbargoSuccessCount = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "etl_embargo_Success_count",
+	EmbargoSuccessCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "etl_embargo_success_count",
 		Help: "Number of files that was processed by embargo app engine successfully.",
-	})
+	},
+		[]string{"sidestream", "date"},)
 
 	// Measures the number of files that was not processed by embargo app engine successfully.
 	// Provides metrics:
 	//   etl_embargo_Error_count
 	// Example usage:
 	//   metrics.EmbargoErrorCount.Inc() / .Dec()
-	EmbargoErrorCount = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "etl_embargo_Error_count",
+	EmbargoErrorCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "etl_embargo_error_count",
 		Help: "Number of files that was not processed by embargo app engine successfully.",
-	})
+	},
+		[]string{"sidestream", "date"},)
 
 	// Counts the number of files processed by machine, rsync module, and day.
 	//
