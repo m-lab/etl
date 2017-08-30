@@ -502,10 +502,11 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		connSpec.SetInt64("data_direction", SERVER_TO_CLIENT)
 	default:
 	}
-	AddMetaDataNDTConnSpec(connSpec, test.info.Timestamp)
+
 	results["connection_spec"] = connSpec
 
 	n.fixValues(results)
+	AddMetaDataNDTConnSpec(connSpec, test.info.Timestamp)
 	// TODO fix InsertRow so that we can distinguish errors from prior rows.
 	metrics.EntryFieldCountHistogram.WithLabelValues(n.TableName()).
 		Observe(float64(deltaFieldCount))
