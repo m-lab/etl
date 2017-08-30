@@ -365,9 +365,15 @@ func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timesta
 	reqData := []schema.RequestData{}
 	if cok {
 		reqData = append(reqData, schema.RequestData{IP: cip, Timestamp: timestamp})
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
 		reqData = append(reqData, schema.RequestData{IP: sip, Timestamp: timestamp})
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "Missing server side IP."}).Inc()
 	}
 	if cok || sok {
 		annotationDataMap := GetBatchMetaData(BatchURL, reqData)
