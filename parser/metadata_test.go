@@ -19,7 +19,7 @@ import (
 
 var epoch time.Time = time.Unix(0, 0)
 
-func TestGetAndINsertSliceOfGeolocationIPStructs(t *testing.T) {
+func TestFetchGeoAnnotations(t *testing.T) {
 	tests := []struct {
 		ips       []string
 		timestamp time.Time
@@ -53,7 +53,7 @@ func TestGetAndINsertSliceOfGeolocationIPStructs(t *testing.T) {
 	}))
 	for _, test := range tests {
 		p.BatchURL = ts.URL
-		p.GetAndInsertSliceOfGeolocationIPStructs(test.ips, test.timestamp, test.geoDest)
+		p.FetchGeoAnnotations(test.ips, test.timestamp, test.geoDest)
 		if !reflect.DeepEqual(test.geoDest, test.res) {
 			t.Errorf("Expected %s, got %s", test.res, test.geoDest)
 		}

@@ -31,14 +31,14 @@ var BaseURL = AnnotatorURL + "/annotate?"
 
 var BatchURL = AnnotatorURL + "/batch_annotate"
 
-// GetAndInsertSliceOfGeolocationIPStructs takes a slice of strings
+// FetchGeoAnnotations takes a slice of strings
 // containing ip addresses, a timestamp, and a slice of pointers to
 // the GeolocationIP structs that correspond to the ip addresses. A
 // precondition assumed by this function is that both slices are the
 // same length. It will then make a call to the batch annotator, using
 // the ip addresses and the timestamp. Then, it uses that data to fill
 // in the structs pointed to by the slice of GeolocationIP pointers.
-func GetAndInsertSliceOfGeolocationIPStructs(ips []string, timestamp time.Time, geoDest []*schema.GeolocationIP) {
+func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*schema.GeolocationIP) {
 	reqData := make([]schema.RequestData, 0, len(ips))
 	for _, ip := range ips {
 		if ip == "" {
@@ -82,7 +82,7 @@ func AddMetaDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp
 
 	ipSlice := []string{spec.Local_ip, spec.Remote_ip}
 	geoSlice := []*schema.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
-	GetAndInsertSliceOfGeolocationIPStructs(ipSlice, timestamp, geoSlice)
+	FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
 // AddMetaDataPTConnSpec takes a pointer to a
@@ -104,7 +104,7 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 	}(timerStart)
 	ipSlice := []string{spec.Server_ip, spec.Client_ip}
 	geoSlice := []*schema.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
-	GetAndInsertSliceOfGeolocationIPStructs(ipSlice, timestamp, geoSlice)
+	FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
 // AddMetaDataPTHopBatch takes a slice of pointers to
