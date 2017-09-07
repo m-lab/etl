@@ -19,6 +19,8 @@ func init() {
 	// Register the metrics defined with Prometheus's default registry.
 	prometheus.MustRegister(AnnotationTimeSummary)
 	prometheus.MustRegister(AnnotationErrorCount)
+	prometheus.MustRegister(EmbargoSuccess)
+	prometheus.MustRegister(EmbargoError)
 	prometheus.MustRegister(WorkerCount)
 	prometheus.MustRegister(WorkerState)
 	prometheus.MustRegister(FileCount)
@@ -65,6 +67,7 @@ var (
 		Name: "etl_annotator_Error_Count",
 		Help: "The current number of errors encountered while attemting to add metadata.",
 	}, []string{"source"})
+
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
@@ -89,6 +92,30 @@ var (
 		// Worker state, e.g. create task, read, parse, insert
 		[]string{"state"},
 	)
+
+	// Measures the number of files that was processed by embargo app engine successfully.
+	// Provides metrics:
+	//   etl_embargo_success_total
+	// Example usage:
+	//   metrics.EmbargoSuccess.Inc() / .Dec()
+	EmbargoSuccess = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "etl_embargo_success_total",
+		Help: "Number of files that was processed by embargo app engine successfully.",
+	},
+		// "sidestream", "Monday"
+		[]string{"experiment", "day_of_week"})
+
+	// Measures the number of files that was not processed by embargo app engine successfully.
+	// Provides metrics:
+	//   etl_embargo_error_total
+	// Example usage:
+	//   metrics.EmbargoError.Inc() / .Dec()
+	EmbargoError = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "etl_embargo_error_total",
+		Help: "Number of files that was not processed by embargo app engine successfully.",
+	},
+		// "sidestream", "Monday"
+		[]string{"experiment", "day_of_week"})
 
 	// Counts the number of files processed by machine, rsync module, and day.
 	//

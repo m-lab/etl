@@ -159,18 +159,23 @@ func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string
 func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp time.Time) []schema.RequestData {
 	hopMap := map[string]schema.RequestData{}
 	for _, hop := range hops {
-		if hop != nil && hop.Src_ip != "" {
+		if hop == nil {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "PT Hop was nil!!!"}).Inc()
+			continue
+		}
+		if hop.Src_ip != "" {
 			hopMap[hop.Src_ip] = schema.RequestData{hop.Src_ip, 0, timestamp}
 		} else {
 			metrics.AnnotationErrorCount.With(prometheus.
-				Labels{"source": "PT Hop was nil or was missing an IP!!!"}).Inc()
+				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()
 		}
 
-		if hop != nil && hop.Dest_ip != "" {
+		if hop.Dest_ip != "" {
 			hopMap[hop.Dest_ip] = schema.RequestData{hop.Dest_ip, 0, timestamp}
 		} else {
 			metrics.AnnotationErrorCount.With(prometheus.
-				Labels{"source": "PT Hop was nil or was missing an IP!!!"}).Inc()
+				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()
 		}
 	}
 
