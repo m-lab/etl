@@ -17,6 +17,8 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
+var epoch time.Time = time.Unix(0, 0)
+
 func TestGetAndINsertSliceOfGeolocationIPStructs(t *testing.T) {
 	tests := []struct {
 		ips       []string
@@ -25,8 +27,14 @@ func TestGetAndINsertSliceOfGeolocationIPStructs(t *testing.T) {
 		res       []*schema.GeolocationIP
 	}{
 		{
+			ips:       []string{},
+			timestamp: epoch,
+			geoDest:   []*schema.GeolocationIP{},
+			res:       []*schema.GeolocationIP{},
+		},
+		{
 			ips:       []string{"", "127.0.0.1", "2.2.2.2"},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			geoDest: []*schema.GeolocationIP{
 				&schema.GeolocationIP{},
 				&schema.GeolocationIP{},
@@ -61,13 +69,13 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 	}{
 		{
 			conspec:   schema.Web100ConnectionSpecification{},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			url:       "/notCalled",
 			res:       schema.Web100ConnectionSpecification{},
 		},
 		{
 			conspec:   schema.Web100ConnectionSpecification{Local_ip: "127.0.0.1"},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			url:       "/src",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:          "127.0.0.1",
@@ -76,7 +84,7 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 		},
 		{
 			conspec:   schema.Web100ConnectionSpecification{Remote_ip: "127.0.0.1"},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			url:       "/dest",
 			res: schema.Web100ConnectionSpecification{
 				Remote_ip:          "127.0.0.1",
@@ -85,7 +93,7 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 		},
 		{
 			conspec:   schema.Web100ConnectionSpecification{Local_ip: "127.0.0.1", Remote_ip: "127.0.0.2"},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			url:       "/both",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:           "127.0.0.1",
@@ -117,13 +125,13 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 	}{
 		{
 			conspec:   schema.MLabConnectionSpecification{},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			url:       "/notCalled",
 			res:       schema.MLabConnectionSpecification{},
 		},
 		{
 			conspec:   schema.MLabConnectionSpecification{Server_ip: "127.0.0.1"},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			url:       "/src",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
@@ -132,7 +140,7 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 		},
 		{
 			conspec:   schema.MLabConnectionSpecification{Client_ip: "127.0.0.1"},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			url:       "/dest",
 			res: schema.MLabConnectionSpecification{
 				Client_ip:          "127.0.0.1",
@@ -141,7 +149,7 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 		},
 		{
 			conspec:   schema.MLabConnectionSpecification{Server_ip: "127.0.0.1", Client_ip: "127.0.0.2"},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			url:       "/both",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
@@ -178,7 +186,7 @@ func TestAddMetaDataPTHopBatch(t *testing.T) {
 					Dest_ip: "1.0.0.127",
 				},
 			},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			url:       "/10583?",
 			res: []*schema.ParisTracerouteHop{
 				&schema.ParisTracerouteHop{
@@ -213,20 +221,20 @@ func TestAnnotatePTHops(t *testing.T) {
 		{
 			hops:           nil,
 			annotationData: nil,
-			timestamp:      time.Unix(0, 0),
+			timestamp:      epoch,
 			res:            nil,
 		},
 		{
 			hops:           []*schema.ParisTracerouteHop{nil},
 			annotationData: map[string]schema.MetaData{},
-			timestamp:      time.Unix(0, 0),
+			timestamp:      epoch,
 			res:            []*schema.ParisTracerouteHop{nil},
 		},
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
 			annotationData: map[string]schema.MetaData{"127.0.0.10": schema.MetaData{
 				Geo: &schema.GeolocationIP{}, ASN: nil}},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1",
 				Src_geolocation: schema.GeolocationIP{}}},
 		},
@@ -234,7 +242,7 @@ func TestAnnotatePTHops(t *testing.T) {
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
 			annotationData: map[string]schema.MetaData{"1.0.0.1270": schema.MetaData{
 				Geo: &schema.GeolocationIP{}, ASN: nil}},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127",
 				Dest_geolocation: schema.GeolocationIP{}}},
 		},
@@ -256,18 +264,18 @@ func TestCreateRequestDataFromPTHops(t *testing.T) {
 	}{
 		{
 			hops:      []*schema.ParisTracerouteHop{},
-			timestamp: time.Unix(0, 0),
+			timestamp: epoch,
 			res:       []schema.RequestData{},
 		},
 		{
 			hops:      []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
-			timestamp: time.Unix(0, 0),
-			res:       []schema.RequestData{schema.RequestData{"1.0.0.127", 0, time.Unix(0, 0)}},
+			timestamp: epoch,
+			res:       []schema.RequestData{schema.RequestData{"1.0.0.127", 0, epoch}},
 		},
 		{
 			hops:      []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
-			timestamp: time.Unix(0, 0),
-			res:       []schema.RequestData{schema.RequestData{"127.0.0.1", 0, time.Unix(0, 0)}},
+			timestamp: epoch,
+			res:       []schema.RequestData{schema.RequestData{"127.0.0.1", 0, epoch}},
 		},
 	}
 	for _, test := range tests {
