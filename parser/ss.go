@@ -97,9 +97,13 @@ func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName str
 	if err != nil {
 		return schema.SS{}, err
 	}
+	if ValidateIP(ss_value["LocalAddress"]) != nil || ValidateIP(ss_value["RemAddress"]) != nil {
+		return schema.SS{}, errors.New("Invalid server or client IP address.")
+	}
+
 	conn_spec := &schema.Web100ConnectionSpecification{
 		Local_ip:    ss_value["LocalAddress"],
-		Local_af:    int64(ParseIPFamily(ss_value["LocalAddress"])),
+		Local_af:    ParseIPFamily(ss_value["LocalAddress"]),
 		Local_port:  int64(local_port),
 		Remote_ip:   ss_value["RemAddress"],
 		Remote_port: int64(remote_port),
