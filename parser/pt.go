@@ -122,7 +122,7 @@ func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP 
 				portIndex = strings.IndexByte(segments[3], ':')
 				dest_IP = segments[3][1:portIndex]
 				if server_IP == "" || dest_IP == "" {
-					return "", "", "", errors.New("corrupted first line.")
+					return "", "", "", errors.New("Invalid IP address in the first line.")
 				}
 			} else {
 				return "", "", "", errors.New("corrupted first line.")
