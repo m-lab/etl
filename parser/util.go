@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-func ParseIPFamily(ipStr string) int {
+func ParseIPFamily(ipStr string) int64 {
 	ip := net.ParseIP(ipStr)
 	if ip.To4() != nil {
 		return syscall.AF_INET
@@ -17,7 +17,7 @@ func ParseIPFamily(ipStr string) int {
 	return -1
 }
 
-// Return true if it is a valid IP v4 or IPv6 address.
+// Return nil if it is a valid IP v4 or IPv6 address.
 func ValidateIP(ipStr string) error {
 	ip := net.ParseIP(ipStr)
 	if ip == nil || ip.To4() == nil && ip.To16() == nil {
