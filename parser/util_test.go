@@ -1,6 +1,7 @@
 package parser_test
 
 import (
+	"fmt"
 	"syscall"
 	"testing"
 
@@ -17,8 +18,12 @@ func TestParseIPFamily(t *testing.T) {
 }
 
 func TestValidateIP(t *testing.T) {
-	if parser.ValidateIP("1.2.3.4") != nil || parser.ValidateIP("2620:0:1000:2304:8053:fe91:6e2e:b4f1") != nil {
-		t.Fatalf("Valid IP was identified as invalid.")
+	if parser.ValidateIP("1.2.3.4") != nil {
+		fmt.Println(parser.ValidateIP("1.2.3.4"))
+		t.Fatalf("Valid IPv4 was identified as invalid.")
+	}
+	if parser.ValidateIP("2620:0:1000:2304:8053:fe91:6e2e:b4f1") != nil {
+		t.Fatalf("Valid IPv6 was identified as invalid.")
 	}
 	if parser.ValidateIP("::") == nil || parser.ValidateIP("0.0.0.0") == nil ||
 		parser.ValidateIP("abc.0.0.0") == nil || parser.ValidateIP("1.0.0.256") == nil {
