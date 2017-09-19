@@ -36,3 +36,13 @@ func TestValidateIP(t *testing.T) {
 		t.Fatalf("Nonroutable IP was not identified as invalid IP.")
 	}
 }
+
+func BenchmarkFunction(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = parser.ValidateIP("1.2.3.4")
+	}
+}
+
+func TestRunningTime(t *testing.T) {
+	fmt.Println(testing.Benchmark(BenchmarkFunction))
+}

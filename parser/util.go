@@ -35,7 +35,7 @@ func ValidateIP(ipStr string) error {
 		_, private22BitBlock, _ := net.ParseCIDR("100.64.0.0/10")
 		if private24BitBlock.Contains(ip) || private20BitBlock.Contains(ip) ||
 			private16BitBlock.Contains(ip) || private22BitBlock.Contains(ip) {
-			return errors.New("private IPv4 is invalid.")
+			return errors.New("Private IPv4 is invalid.")
 		}
 
 		// check whether it is nonroutable IP
@@ -48,7 +48,7 @@ func ValidateIP(ipStr string) error {
 	} else if ip.To16() != nil {
 		_, private7BitBlock, _ := net.ParseCIDR("FC00::/7")
 		if private7BitBlock.Contains(ip) {
-			return errors.New("private IPv6 is invalid.")
+			return errors.New("Private IPv6 is invalid.")
 		}
 
 		_, nonroutable1, _ := net.ParseCIDR("2001:db8::/32")
