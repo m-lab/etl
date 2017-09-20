@@ -12,7 +12,13 @@
 #
 language: go
 
+go:
+- tip
+
 before_install:
+# Coverage tools
+- go get github.com/mattn/goveralls
+
 # NB: Encrypted values are not defined in forks or pull requests.
 # Decrypt the tar archive containing the GCP service account key files.
 #
@@ -32,15 +38,19 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 script:
+# Coveralls
+- $HOME/gopath/bin/goveralls -service=travis-ci
+
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
-- go test -v github.com/m-lab/etl/bq
-- go test -v github.com/m-lab/etl/parser
-- go test -v github.com/m-lab/etl/task
-- go test -v github.com/m-lab/etl/web100
+#- go test -v github.com/m-lab/etl/bq
+#- go test -v github.com/m-lab/etl/parser
+#- go test -v github.com/m-lab/etl/task
+#- go test -v github.com/m-lab/etl/web100
+
+# Build and prepare for deployment
 - cd $TRAVIS_BUILD_DIR/cmd/etl_worker && go build
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
-
 
 # Deploy steps never trigger on a new Pull Request. Deploy steps will trigger
 # after a merge with matching "on:" conditions.
