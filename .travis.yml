@@ -12,9 +12,6 @@
 #
 language: go
 
-go:
-- tip
-
 before_install:
 # Coverage tools
 - go get github.com/mattn/goveralls
