@@ -36,7 +36,6 @@ before_install:
 cache:
   directories:
     - "$HOME/google-cloud-sdk/"
-    - "$HOME/gopath/bin/goveralls
 
 script:
 # Currently skipping storage tests, because they depend on GCS, and there is
