@@ -38,15 +38,15 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 script:
-# Coveralls
-- $HOME/gopath/bin/goveralls -service=travis-ci
-
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
-#- go test -v github.com/m-lab/etl/bq
-#- go test -v github.com/m-lab/etl/parser
-#- go test -v github.com/m-lab/etl/task
-#- go test -v github.com/m-lab/etl/web100
+- go test -covermode=count -coverprofile=profile.cov -v github.com/m-lab/etl/bq
+- go test -covermode=count -coverprofile=profile.cov -v github.com/m-lab/etl/parser
+- go test -covermode=count -coverprofile=profile.cov -v github.com/m-lab/etl/task
+- go test -covermode=count -coverprofile=profile.cov -v github.com/m-lab/etl/web100
+
+# Coveralls
+- $HOME/gopath/bin/goveralls -coverprofile=profile.cov -service=travis-ci
 
 # Build and prepare for deployment
 - cd $TRAVIS_BUILD_DIR/cmd/etl_worker && go build
