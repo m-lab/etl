@@ -37,12 +37,12 @@ func TestValidateIP(t *testing.T) {
 	}
 }
 
-func BenchmarkFunction(b *testing.B) {
+func BenchmarkValidateIPv4(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = parser.ValidateIP("1.2.3.4")
 	}
 }
 
 func TestRunningTime(t *testing.T) {
-	fmt.Println(testing.Benchmark(BenchmarkFunction))
+	fmt.Println(testing.Benchmark(BenchmarkValidateIPv4))
 }
