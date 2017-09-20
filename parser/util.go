@@ -27,6 +27,10 @@ func ValidateIP(ipStr string) error {
 		return errors.New("IP is zero and invalid.")
 	}
 
+	if ip.IsLoopback() || ip.IsMulticast() || ip.IsLinkLocalUnicast() {
+		return errors.New("Nonroutable IP is invalid")
+	}
+	
 	if ip.To4() != nil {
 		// Check whether it is a private IP.
 		_, private24BitBlock, _ := net.ParseCIDR("10.0.0.0/8")
@@ -41,8 +45,7 @@ func ValidateIP(ipStr string) error {
 		// check whether it is nonroutable IP
 		_, nonroutable1, _ := net.ParseCIDR("0.0.0.0/8")
 		_, nonroutable2, _ := net.ParseCIDR("192.0.2.0/24")
-		if nonroutable1.Contains(ip) || nonroutable2.Contains(ip) ||
-			ip.IsLoopback() || ip.IsMulticast() || ip.IsLinkLocalUnicast() {
+		if nonroutable1.Contains(ip) || nonroutable2.Contains(ip) {
 			return errors.New("Nonroutable IPv4 is invalid")
 		}
 	} else if ip.To16() != nil {
@@ -53,8 +56,7 @@ func ValidateIP(ipStr string) error {
 
 		_, nonroutable1, _ := net.ParseCIDR("2001:db8::/32")
 		_, nonroutable2, _ := net.ParseCIDR("fec0::/10")
-		if nonroutable1.Contains(ip) || nonroutable2.Contains(ip) ||
-			ip.IsLoopback() || ip.IsMulticast() || ip.IsLinkLocalUnicast() {
+		if nonroutable1.Contains(ip) || nonroutable2.Contains(ip) {
 			return errors.New("Nonroutable IPv6 is invalid")
 		}
 	}
