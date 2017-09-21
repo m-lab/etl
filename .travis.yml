@@ -123,6 +123,18 @@ deploy:
     all_branches: true
     tag: true
     condition: $TRAVIS_TAG == ndt-prod-*
+    
++# PROD: Should be used AFTER code review and commit to master branch.  Triggers
+ +# when *ANY* branch is tagged with pt-prod-*'
+ +- provider: script
+ +  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+ +    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-prod.yaml
+ +  skip_cleanup: true
+ +  on:
+ +    repo: m-lab/etl
+ +    all_branches: true
+ +    tag: true
+ +    condition: $TRAVIS_TAG == pt-prod-*
 
 ######################################################################
 ## Service: etl-sidestream-parser -- AppEngine Flexible Environment.
