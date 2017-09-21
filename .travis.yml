@@ -13,6 +13,10 @@
 language: go
 
 before_install:
+# Coverage tools
+- go get github.com/mattn/goveralls
+- go get github.com/wadey/gocovmerge
+
 # NB: Encrypted values are not defined in forks or pull requests.
 # Decrypt the tar archive containing the GCP service account key files.
 #
@@ -34,13 +38,18 @@ cache:
 script:
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
-- go test -v github.com/m-lab/etl/bq
-- go test -v github.com/m-lab/etl/parser
-- go test -v github.com/m-lab/etl/task
-- go test -v github.com/m-lab/etl/web100
+- go test -covermode=count -coverprofile=bq.cov -v github.com/m-lab/etl/bq
+- go test -covermode=count -coverprofile=parser.cov -v github.com/m-lab/etl/parser
+- go test -covermode=count -coverprofile=task.cov -v github.com/m-lab/etl/task
+- go test -covermode=count -coverprofile=web100.cov -v github.com/m-lab/etl/web100
+
+# Coveralls
+- $HOME/gopath/bin/gocovmerge bq.cov parser.cov task.cov web100.cov > merge.cov
+- $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
+
+# Build and prepare for deployment
 - cd $TRAVIS_BUILD_DIR/cmd/etl_worker && go build
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
-
 
 # Deploy steps never trigger on a new Pull Request. Deploy steps will trigger
 # after a merge with matching "on:" conditions.
