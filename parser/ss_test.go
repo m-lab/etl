@@ -3,7 +3,6 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
-	"syscall"
 	"testing"
 
 	"github.com/m-lab/etl/parser"
@@ -14,12 +13,6 @@ func TestExtractLogtimeFromFilename(t *testing.T) {
 	if log_time != 1489539600 {
 		fmt.Println(log_time)
 		t.Fatalf("log time not parsed correctly.")
-	}
-}
-
-func TestParseIPFamily(t *testing.T) {
-	if parser.ParseIPFamily("1.2.3.4") != syscall.AF_INET {
-		t.Fatalf("IPv4 address not parsed correctly.")
 	}
 }
 

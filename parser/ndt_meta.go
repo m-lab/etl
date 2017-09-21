@@ -7,10 +7,8 @@ import (
 	"encoding/json"
 	"io"
 	"log"
-	"net"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/m-lab/etl/metrics"
@@ -57,17 +55,15 @@ var fieldPairs = map[string]string{
 
 func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
 	connSpec.SetString(prefix+"_ip", ipString)
-	ip := net.ParseIP(ipString)
-	if ip == nil {
+	if ValidateIP(ipString) != nil {
 		log.Printf("Failed parsing connSpec IP: %s\n", ipString)
 		metrics.WarningCount.WithLabelValues(
 			"ndt", "unknown", "failed parsing connSpec IP").Inc()
 	} else {
-		connSpec.SetString(prefix+"_ip", ip.String())
-		if ip.To4() != nil {
-			connSpec.SetInt64(prefix+"_af", syscall.AF_INET)
-		} else if ip.To16() != nil {
-			connSpec.SetInt64(prefix+"_af", syscall.AF_INET6)
+		connSpec.SetString(prefix+"_ip", ipString)
+		family := ParseIPFamily(ipString)
+		if family != -1 {
+			connSpec.SetInt64(prefix+"_af", family)
 		}
 	}
 }

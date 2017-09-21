@@ -6,12 +6,10 @@ import (
 	"cloud.google.com/go/bigquery"
 	"errors"
 	"log"
-	"net"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/m-lab/etl/etl"
@@ -45,16 +43,6 @@ func ExtractLogtimeFromFilename(fileName string) (int64, error) {
 	}
 
 	return t.Unix(), nil
-}
-
-func ParseIPFamily(ipStr string) int {
-	ip := net.ParseIP(ipStr)
-	if ip.To4() != nil {
-		return syscall.AF_INET
-	} else if ip.To16() != nil {
-		return syscall.AF_INET6
-	}
-	return -1
 }
 
 // the first line of SS test is in format "K: cid PollTime LocalAddress LocalPort ... other_web100_variables_separated_by_space"
@@ -109,9 +97,13 @@ func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName str
 	if err != nil {
 		return schema.SS{}, err
 	}
+	if ValidateIP(ss_value["LocalAddress"]) != nil || ValidateIP(ss_value["RemAddress"]) != nil {
+		return schema.SS{}, errors.New("Invalid server or client IP address.")
+	}
+
 	conn_spec := &schema.Web100ConnectionSpecification{
 		Local_ip:    ss_value["LocalAddress"],
-		Local_af:    int64(ParseIPFamily(ss_value["LocalAddress"])),
+		Local_af:    ParseIPFamily(ss_value["LocalAddress"]),
 		Local_port:  int64(local_port),
 		Remote_ip:   ss_value["RemAddress"],
 		Remote_port: int64(remote_port),
