@@ -123,7 +123,7 @@ deploy:
     all_branches: true
     tag: true
     condition: $TRAVIS_TAG == ndt-prod-*
-    
+
 ######################################################################
 ## Service: etl-sidestream-parser -- AppEngine Flexible Environment.
 # SANDBOX: before code review for development code in a specific branch.
