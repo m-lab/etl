@@ -4,7 +4,7 @@ service: etl-traceroute-parser
 
 # Resource and scaling options. For more background, see:
 #   https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml
-# To deplot this yaml file, run
+# To deploy this yaml file, run
 #   gcloud --project mlab-oti app deploy app-traceroute-prod.yaml
 
 # TODO(dev): adjust CPU and memory based on actual requirements.
