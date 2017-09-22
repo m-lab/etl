@@ -182,7 +182,7 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     tag: true
-    condition: $TRAVIS_TAG == pt-prod-*
+    condition: $TRAVIS_TAG == pt-prod*
 
 ######################################################################
 ## Service: queue-pusher -- AppEngine Standard Environment.
