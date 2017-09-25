@@ -143,7 +143,7 @@ deploy:
     condition: $TRAVIS_BRANCH == ss-sandbox-*
 
 # STAGING: Should be used AFTER code review and commit to dev branch.  Triggers
-# when *ANY* branch is tagged with ss-staging-*'
+# when *ANY* branch is tagged with ss-staging*'
 - provider: script
   script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-staging.yaml
