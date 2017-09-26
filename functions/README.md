@@ -13,6 +13,15 @@ gcloud beta functions deploy createSandboxTaskOnFileNotification \
     --trigger-bucket=m-lab-sandbox \
     --project=mlab-sandbox
 ```
+
+To deploy this cloud function to staging, use:
+```bash
+gcloud beta functions deploy createStagingTaskOnFileNotification \
+    --stage-bucket=functions-mlab-staging \
+    --trigger-bucket=archive-mlab-staging \
+    --project=mlab-staging
+```
+
 To deploy this cloud function to production, use:
 ```bash
 gcloud beta functions deploy createProdTaskOnFileNotification \
