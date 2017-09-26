@@ -30,7 +30,7 @@ func ValidateIP(ipStr string) error {
 	if ip.IsLoopback() || ip.IsMulticast() || ip.IsLinkLocalUnicast() {
 		return errors.New("Nonroutable IP is invalid")
 	}
-	
+
 	if ip.To4() != nil {
 		// Check whether it is a private IP.
 		_, private24BitBlock, _ := net.ParseCIDR("10.0.0.0/8")

@@ -97,9 +97,6 @@ func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName str
 	if err != nil {
 		return schema.SS{}, err
 	}
-	if ValidateIP(ss_value["LocalAddress"]) != nil || ValidateIP(ss_value["RemAddress"]) != nil {
-		return schema.SS{}, errors.New("Invalid server or client IP address.")
-	}
 
 	conn_spec := &schema.Web100ConnectionSpecification{
 		Local_ip:    ss_value["LocalAddress"],
@@ -216,6 +213,16 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "corrupted content").Inc()
 			return err
+		}
+		if ValidateIP(ss_value["LocalAddress"]) != nil {
+			metrics.TestCount.WithLabelValues(
+				ss.TableName(), "ss", "Invalid server IP").Inc()
+			return errors.New("Invalid server IP address: " + ss_value["LocalAddress"])
+		}
+		if ValidateIP(ss_value["RemAddress"]) != nil {
+			metrics.TestCount.WithLabelValues(
+				ss.TableName(), "ss", "Invalid client IP").Inc()
+			return errors.New("Invalid client IP address: " + ss_value["RemAddress"])
 		}
 		ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
 		if err != nil {
