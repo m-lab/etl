@@ -218,15 +218,13 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid server IP").Inc()
-			return errors.New("Invalid server IP address: " + ss_value["LocalAddress"] +
-					  " with error: " + err.Error())
+			return fmt.Errorf("Invalid server IP address: %s with error: %s", ss_value["LocalAddress"], err)
 		}
 		err = ValidateIP(ss_value["RemAddress"])
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid client IP").Inc()
-			return errors.New("Invalid client IP address: " + ss_value["RemAddress"] +
-					  " with error: " + err.Error())
+			return fmt.Errorf("Invalid client IP address: %s with error: %s", ss_value["RemAddress"], err)
 		}
 		ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
 		if err != nil {
