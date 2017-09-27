@@ -97,7 +97,7 @@ var (
 	// TODO - this should be loaded from a config.
 	DataTypeToTable = map[DataType]string{
 		NDT:     "ndt",
-		SS:      "ss_test",
+		SS:      "sidestream",
 		PT:      "traceroute",
 		SW:      "disco_test",
 		INVALID: "invalid",
