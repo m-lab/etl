@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
@@ -30,24 +29,6 @@ func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec, timestamp)
 }
 
-// GetAndInsertNDT takes a timestamp, an NDT connection spec, and a
-// string indicating whether it should get the metadata for the client
-// end or the server end of the connection. It will either insert the
-// data into the connection spec or silently fail.
-func GetAndInsertMetaIntoNDTConnSpec(side string, spec schema.Web100ValueMap, timestamp time.Time) {
-	ip, ok := spec.GetString([]string{side + "_ip"})
-	if ok {
-		url := geo.BaseURL + "ip_addr=" + url.QueryEscape(ip) +
-			"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
-		annotationData := geo.GetMetaData(url)
-		if annotationData != nil && annotationData.Geo != nil {
-			CopyStructToMap(annotationData.Geo, spec.Get(side+"_geolocation"))
-		} else {
-			metrics.AnnotationErrorCount.With(prometheus.
-				Labels{"source": "Couldn't get metadata for the " + side + " side."}).Inc()
-		}
-	}
-}
 
 // CopyStructToMap takes a POINTER to an arbitrary struct and copies
 // it's fields into a value map. It will also make fields entirely
@@ -116,8 +97,6 @@ func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timesta
 				metrics.AnnotationErrorCount.With(prometheus.
 					Labels{"source": "Couldn't get metadata for the server side."}).Inc()
 			}
-
 		}
 	}
-
 }

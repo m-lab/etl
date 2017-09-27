@@ -110,67 +110,6 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 	}
 }
 
-func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
-	tests := []struct {
-		side      string
-		spec      schema.Web100ValueMap
-		timestamp time.Time
-		url       string
-		res       schema.Web100ValueMap
-	}{
-		{
-			side:      "broken",
-			spec:      schema.EmptyConnectionSpec(),
-			timestamp: time.Now(),
-			url:       "/notUsed?",
-			res:       schema.EmptyConnectionSpec(),
-		},
-		{
-			side:      "client",
-			spec:      schema.EmptyConnectionSpec(),
-			timestamp: time.Now(),
-			url:       "portGarbage",
-			res:       schema.EmptyConnectionSpec(),
-		},
-		{
-			side: "client",
-			spec: func() schema.Web100ValueMap {
-				spec := schema.EmptyConnectionSpec()
-				spec["client_ip"] = "127.0.0.1"
-				return spec
-			}(),
-			timestamp: time.Now(),
-			url:       "/10583?",
-			res: func() schema.Web100ValueMap {
-				spec := schema.EmptyConnectionSpec()
-				spec["client_ip"] = "127.0.0.1"
-				geo := spec.Get("client_geolocation")
-				geo["country_code"] = "US"
-				geo["country_code3"] = "USA"
-				geo["country_name"] = "United States of America"
-				geo["region"] = "NY"
-				geo["city"] = "Scarsdale"
-				geo["area_code"] = int64(10583)
-				geo["postal_code"] = "10583"
-				geo["latitude"] = float64(41.0051)
-				geo["longitude"] = float64(73.7846)
-				return spec
-			}(),
-		},
-	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`)
-	}))
-	for _, test := range tests {
-		geo.BaseURL = ts.URL + test.url
-		parser.GetAndInsertMetaIntoNDTConnSpec(test.side, test.spec, test.timestamp)
-		if !reflect.DeepEqual(test.spec, test.res) {
-			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
-		}
-	}
-
-}
-
 func TestGetAndInsertTwoSidedMetaIntoNDTConnSpec(t *testing.T) {
 	tst, _ := time.Parse(time.RFC3339, "2002-10-02T15:00:00Z")
 	tests := []struct {
