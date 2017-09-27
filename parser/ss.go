@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"cloud.google.com/go/bigquery"
 	"errors"
+	"fmt"
 	"log"
 	"path/filepath"
 	"reflect"
@@ -214,15 +215,17 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				ss.TableName(), "ss", "corrupted content").Inc()
 			return err
 		}
-		if ValidateIP(ss_value["LocalAddress"]) != nil {
+		err = ValidateIP(ss_value["LocalAddress"])
+		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid server IP").Inc()
-			return errors.New("Invalid server IP address: " + ss_value["LocalAddress"])
+			return fmt.Errorf("Invalid server IP address: %s with error: %s", ss_value["LocalAddress"], err)
 		}
-		if ValidateIP(ss_value["RemAddress"]) != nil {
+		err = ValidateIP(ss_value["RemAddress"])
+		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid client IP").Inc()
-			return errors.New("Invalid client IP address: " + ss_value["RemAddress"])
+			return fmt.Errorf("Invalid client IP address: %s with error: %s", ss_value["RemAddress"], err)
 		}
 		ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
 		if err != nil {
