@@ -143,6 +143,30 @@ deploy:
     # Integration branch will not use decorated service names.
     condition: $TRAVIS_BRANCH == ss-sandbox-*
 
+# STAGING: Should be used AFTER code review and commit to dev branch.  Triggers
+# when *ANY* branch is tagged with ss-staging*'
+- provider: script
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-staging.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    tag: true
+    condition: $TRAVIS_TAG == ss-staging*
+    
+# PROD: Should be used AFTER code review and commit to master branch.  Triggers
+# when *ANY* branch is tagged with ss-prod-*'
+- provider: script
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-prod.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    tag: true
+    condition: $TRAVIS_TAG == ss-prod-*
+
 ######################################################################
 ## Service: etl-traceroute-parser -- AppEngine Flexible Environment.
 # SANDBOX: before code review for development code in a specific branch.

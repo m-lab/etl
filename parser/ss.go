@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"cloud.google.com/go/bigquery"
 	"errors"
+	"fmt"
 	"log"
 	"path/filepath"
 	"reflect"
@@ -96,9 +97,6 @@ func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName str
 	remote_port, err := strconv.Atoi(ss_value["RemPort"])
 	if err != nil {
 		return schema.SS{}, err
-	}
-	if ValidateIP(ss_value["LocalAddress"]) != nil || ValidateIP(ss_value["RemAddress"]) != nil {
-		return schema.SS{}, errors.New("Invalid server or client IP address.")
 	}
 
 	conn_spec := &schema.Web100ConnectionSpecification{
@@ -216,6 +214,18 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "corrupted content").Inc()
 			return err
+		}
+		err = ValidateIP(ss_value["LocalAddress"])
+		if err != nil {
+			metrics.TestCount.WithLabelValues(
+				ss.TableName(), "ss", "Invalid server IP").Inc()
+			return fmt.Errorf("Invalid server IP address: %s with error: %s", ss_value["LocalAddress"], err)
+		}
+		err = ValidateIP(ss_value["RemAddress"])
+		if err != nil {
+			metrics.TestCount.WithLabelValues(
+				ss.TableName(), "ss", "Invalid client IP").Inc()
+			return fmt.Errorf("Invalid client IP address: %s with error: %s", ss_value["RemAddress"], err)
 		}
 		ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
 		if err != nil {
