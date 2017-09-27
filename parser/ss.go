@@ -214,15 +214,17 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				ss.TableName(), "ss", "corrupted content").Inc()
 			return err
 		}
-		if ValidateIP(ss_value["LocalAddress"]) != nil {
+		if err := ValidateIP(ss_value["LocalAddress"]), err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid server IP").Inc()
-			return errors.New("Invalid server IP address: " + ss_value["LocalAddress"])
+			return errors.New("Invalid server IP address: " + ss_value["LocalAddress"] +
+					  " with error: " + err.Error())
 		}
-		if ValidateIP(ss_value["RemAddress"]) != nil {
+		if err := ValidateIP(ss_value["RemAddress"]), err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid client IP").Inc()
-			return errors.New("Invalid client IP address: " + ss_value["RemAddress"])
+			return errors.New("Invalid client IP address: " + ss_value["RemAddress"] +
+					  " with error: " + err.Error())
 		}
 		ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
 		if err != nil {
