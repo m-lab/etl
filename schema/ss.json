@@ -42,7 +42,7 @@
 		  { "name": "metro_code", "type": "INTEGER"},
 		  { "name": "postal_code", "type": "STRING"},
 		  { "name": "region", "type": "STRING"}
-		], "name": "remote_geolocation", "type": "RECORD"},
+		], "name": "remote_geolocation", "type": "RECORD"}
             ], "name": "connection_spec", "type": "RECORD"},
           {
             "fields": [
