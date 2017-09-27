@@ -1,7 +1,6 @@
 package parser_test
 
 import (
-	"fmt"
 	"log"
 	"testing"
 	"time"
@@ -16,20 +15,6 @@ import (
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
-
-// PrintingInserter prints out the items passed in.
-// Inject into Parser for testing.
-type PrintingInserter struct {
-	bq.NullInserter
-}
-
-func (ti *PrintingInserter) InsertRow(data interface{}) error {
-	fmt.Printf("%T: %v\n", data, data)
-	return nil
-}
-func (ti *PrintingInserter) Flush() error {
-	return nil
 }
 
 var test_data []byte = []byte(`{
