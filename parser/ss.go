@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"cloud.google.com/go/bigquery"
 	"errors"
+	"fmt"
 	"log"
 	"path/filepath"
 	"reflect"
