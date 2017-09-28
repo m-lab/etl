@@ -99,11 +99,46 @@ var tests = []struct {
 			return spec
 		}(),
 	},
+	{ // This test exercises the error path one missing IP
+		spec: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			spec["client_ip"] = "127.0.0.1"
+			return spec
+		}(),
+		timestamp: testTime(),
+		url:       "/10583?",
+		res: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			spec["client_ip"] = "127.0.0.1"
+			geoc := spec.Get("client_geolocation")
+			geoc["country_code"] = "US"
+			geoc["country_code3"] = "USA"
+			geoc["country_name"] = "United States of America"
+			geoc["region"] = "NY"
+			geoc["city"] = "Scarsdale"
+			geoc["area_code"] = int64(10583)
+			geoc["postal_code"] = "10583"
+			geoc["latitude"] = float64(41.0051)
+			geoc["longitude"] = float64(73.7846)
+			return spec
+		}(),
+	},
+	{ // This test exercises the error path for missing IP addresses.
+		spec: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			return spec
+		}(),
+		timestamp: testTime(),
+		url:       "/10583?",
+		res: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			return spec
+		}(),
+	},
 }
 
-var callCount = 0
-
 func TestDisabledAnnotation(t *testing.T) {
+	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount += 1
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
@@ -119,8 +154,10 @@ func TestDisabledAnnotation(t *testing.T) {
 }
 
 func TestAddMetaDataNDTConnSpec(t *testing.T) {
+	callCount := 0
 	parser.EnableAnnotation()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount += 1
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
@@ -130,6 +167,9 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
 		}
+	}
+	if callCount != 2 {
+		t.Errorf("Annotator should have been called twice.  Call count: %d", callCount)
 	}
 }
 
