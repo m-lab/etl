@@ -59,8 +59,8 @@ var (
 	endPattern  = regexp.MustCompile(suffix + `$`)
 )
 
-// testInfo contains all the fields from a valid NDT test file name.
-type testInfo struct {
+// TestInfo contains all the fields from a valid NDT test file name.
+type TestInfo struct {
 	DateDir   string    // Optional leading date yyyy/mm/dd/
 	Date      string    // The date field from the test file name
 	Time      string    // The time field
@@ -69,7 +69,7 @@ type testInfo struct {
 	Timestamp time.Time // The parsed timestamp, with microsecond resolution
 }
 
-func ParseNDTFileName(path string) (*testInfo, error) {
+func ParseNDTFileName(path string) (*TestInfo, error) {
 	fields := gzTestFilePattern.FindStringSubmatch(path)
 
 	if fields == nil {
@@ -91,7 +91,7 @@ func ParseNDTFileName(path string) (*testInfo, error) {
 		log.Println(fields[2] + "T" + fields[3] + "   " + err.Error())
 		return nil, errors.New("Invalid test path: " + path)
 	}
-	return &testInfo{fields[1], fields[2], fields[3], fields[4], fields[5], timestamp}, nil
+	return &TestInfo{fields[1], fields[2], fields[3], fields[4], fields[5], timestamp}, nil
 }
 
 //=========================================================================
@@ -100,7 +100,7 @@ func ParseNDTFileName(path string) (*testInfo, error) {
 
 type fileInfoAndData struct {
 	fn   string
-	info testInfo
+	info TestInfo
 	data []byte
 }
 
