@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -13,11 +14,33 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var ipAnnotationEnabled = false
+
+func init() {
+	// Check for ANNOTATE_IP = 'true'
+	flag, ok := os.LookupEnv("ANNOTATE_IP")
+	if ok {
+		ipAnnotationEnabled, _ = strconv.ParseBool(flag)
+		// If parse fails, then ipAnn will be set to false.
+	}
+}
+
+// For testing.
+func EnableAnnotation() {
+	ipAnnotationEnabled = true
+}
+
 // AddMetaDataNDTConnSpec takes a connection spec and a timestamp and
 // annotates the connection spec with metadata associated with each IP
 // Address. It will either sucessfully add the metadata or fail
 // silently and make no changes.
 func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
+	// Only annotate if flag enabled...
+	if !ipAnnotationEnabled {
+		metrics.AnnotationErrorCount.With(prometheus.Labels{
+			"source": "IP Annotation Disabled."}).Inc()
+		return
+	}
 	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
@@ -28,7 +51,6 @@ func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 
 	GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec, timestamp)
 }
-
 
 // CopyStructToMap takes a POINTER to an arbitrary struct and copies
 // it's fields into a value map. It will also make fields entirely
