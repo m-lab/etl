@@ -17,6 +17,10 @@ import (
 var ipAnnotationEnabled = false
 
 func init() {
+	checkFlags()
+}
+
+func checkFlags() {
 	// Check for ANNOTATE_IP = 'true'
 	flag, ok := os.LookupEnv("ANNOTATE_IP")
 	if ok {
@@ -27,7 +31,8 @@ func init() {
 
 // For testing.
 func EnableAnnotation() {
-	ipAnnotationEnabled = true
+	os.Setenv("ANNOTATE_IP", "True")
+	checkFlags()
 }
 
 // AddMetaDataNDTConnSpec takes a connection spec and a timestamp and
