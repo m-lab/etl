@@ -3,15 +3,15 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
+	"reflect"
 	"testing"
+	"time"
 
+	"cloud.google.com/go/bigquery"
+	"github.com/kr/pretty"
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
-
-	"github.com/kr/pretty"
-
-	"cloud.google.com/go/bigquery"
 )
 
 // A handful of file names from a single ndt tar file.
@@ -243,4 +243,69 @@ func (in *inMemoryInserter) Committed() int {
 }
 func (in *inMemoryInserter) Failed() int {
 	return 0
+}
+
+func parseTime(t string) time.Time {
+	time, err := time.Parse("2006-01-02T15:04:05.999999999 MST", t)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return time
+}
+
+// Incomplete - see coverage.
+func TestParseNDTFileName(t *testing.T) {
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name     string
+		filename string
+		want     parser.TestInfo
+		wantErr  string
+	}{
+		// TODO: Add test cases.
+		{
+			name:     "normal s2c",
+			filename: `20170509T13:45:13.590210000Z_eb.measurementlab.net:44160.s2c_snaplog`,
+			want: parser.TestInfo{"", "20170509",
+				"13:45:13.590210000", "eb.measurementlab.net:44160", "s2c_snaplog",
+				parseTime("2017-05-09T13:45:13.59021 UTC")},
+			wantErr: "",
+		},
+		{
+			filename: `20170509T13:45:13.590210000Z_eb.`,
+			wantErr:  "Invalid test path: 20170509T13:45:13.590210000Z_eb.",
+		},
+		{
+			filename: `20170509`,
+			wantErr:  "Path should contain Thh:mm:ss.ff...Z_: 20170509",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parser.ParseNDTFileName(tt.filename)
+			if err != nil {
+				if tt.wantErr == "" {
+					t.Errorf("ParseNDTFileName() should not have errored: %v", err)
+				}
+				if err.Error() != tt.wantErr {
+					t.Errorf("ParseNDTFileName() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				return
+			}
+			if !reflect.DeepEqual(*got, tt.want) {
+				t.Errorf("ParseNDTFileName() = %v, want %v", got, &tt.want)
+				fmt.Printf("%+v\n", tt.want)
+				fmt.Printf("%+v\n", *got)
+				fmt.Println(tt.want == *got)
+				fmt.Println(tt.want.DateDir == got.DateDir)
+				fmt.Println(tt.want.Date == got.Date)
+				fmt.Println(tt.want.Time == got.Time)
+				fmt.Println(tt.want.Address == got.Address)
+				fmt.Println(tt.want.Suffix == got.Suffix)
+				fmt.Println(tt.want.Timestamp == got.Timestamp)
+			}
+		})
+	}
 }
