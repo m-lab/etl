@@ -1,4 +1,6 @@
-package schema
+package geo
+
+// TODO - merge this into annotation.go
 
 import "time"
 
