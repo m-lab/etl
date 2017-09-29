@@ -21,6 +21,27 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var ipAnnotationEnabled = false
+
+func init() {
+	checkFlags()
+}
+
+func checkFlags() {
+	// Check for ANNOTATE_IP = 'true'
+	flag, ok := os.LookupEnv("ANNOTATE_IP")
+	if ok {
+		ipAnnotationEnabled, _ = strconv.ParseBool(flag)
+		// If parse fails, then ipAnn will be set to false.
+	}
+}
+
+// For testing.
+func EnableAnnotation() {
+	os.Setenv("ANNOTATE_IP", "True")
+	checkFlags()
+}
+
 // TODO(JosephMarques) See if there is a better way of determining
 // where to send the request (there almost certainly is)
 var AnnotatorURL = "https://annotator-dot-" +
@@ -235,6 +256,15 @@ func GetAndInsertGeolocationIPStruct(geo *schema.GeolocationIP, ip string, times
 // Address. It will either sucessfully add the metadata or fail
 // silently and make no changes.
 func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
+	// Only annotate if flag enabled...
+	// TODO(gfr) - should propogate this to other pipelines, or push to a common
+	// intercept point.
+	if !ipAnnotationEnabled {
+		metrics.AnnotationErrorCount.With(prometheus.Labels{
+			"source": "IP Annotation Disabled."}).Inc()
+		return
+	}
+
 	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
@@ -365,9 +395,15 @@ func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timesta
 	reqData := []schema.RequestData{}
 	if cok {
 		reqData = append(reqData, schema.RequestData{IP: cip, Timestamp: timestamp})
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
 		reqData = append(reqData, schema.RequestData{IP: sip, Timestamp: timestamp})
+	} else {
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "Missing server side IP."}).Inc()
 	}
 	if cok || sok {
 		annotationDataMap := GetBatchMetaData(BatchURL, reqData)
