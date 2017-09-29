@@ -257,6 +257,8 @@ func GetAndInsertGeolocationIPStruct(geo *schema.GeolocationIP, ip string, times
 // silently and make no changes.
 func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// Only annotate if flag enabled...
+	// TODO(gfr) - should propogate this to other pipelines, or push to a common
+	// intercept point.
 	if !ipAnnotationEnabled {
 		metrics.AnnotationErrorCount.With(prometheus.Labels{
 			"source": "IP Annotation Disabled."}).Inc()
