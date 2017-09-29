@@ -257,40 +257,6 @@ func (in *BQInserter) Failed() int {
 
 //----------------------------------------------------------------------------
 
-type NullInserter struct {
-	etl.Inserter
-}
-
-func (in *NullInserter) InsertRow(data interface{}) error {
-	return nil
-}
-func (in *NullInserter) InsertRows(data []interface{}) error {
-	return nil
-}
-func (in *NullInserter) Flush() error {
-	return nil
-}
-func (in *NullInserter) FullTableName() string {
-	return "base_suffix"
-}
-func (in *NullInserter) TableBase() string {
-	return "base"
-}
-func (in *NullInserter) TableSuffix() string {
-	return "_suffix"
-}
-func (in *NullInserter) Dataset() string {
-	return ""
-}
-func (in *NullInserter) RowsInBuffer() int {
-	return 0
-}
-func (in *NullInserter) Count() int {
-	return 0
-}
-
-//----------------------------------------------------------------------------
-
 // Inserter wrapper that handles flush metrics.
 // TODO - add prometheus counters for attempts, number of rows.
 type DurationWrapper struct {
