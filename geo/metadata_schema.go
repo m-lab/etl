@@ -1,4 +1,4 @@
-package schema
+package geo
 
 import "time"
 

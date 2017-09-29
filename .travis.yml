@@ -42,9 +42,10 @@ script:
 - go test -covermode=count -coverprofile=parser.cov -v github.com/m-lab/etl/parser
 - go test -covermode=count -coverprofile=task.cov -v github.com/m-lab/etl/task
 - go test -covermode=count -coverprofile=web100.cov -v github.com/m-lab/etl/web100
+- go test -covermode=count -coverprofile=geo.cov -v github.com/m-lab/etl/geo
 
 # Coveralls
-- $HOME/gopath/bin/gocovmerge bq.cov parser.cov task.cov web100.cov > merge.cov
+- $HOME/gopath/bin/gocovmerge bq.cov parser.cov task.cov web100.cov geo.cov > merge.cov
 - $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
 
 # Build and prepare for deployment
