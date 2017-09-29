@@ -376,51 +376,109 @@ func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
 
 }
 
-func TestAddMetaDataNDTConnSpec(t *testing.T) {
+func testTime() time.Time {
 	tst, _ := time.Parse(time.RFC3339, "2002-10-02T15:00:00Z")
-	tests := []struct {
-		spec      schema.Web100ValueMap
-		timestamp time.Time
-		url       string
-		res       schema.Web100ValueMap
-	}{
-		{
-			spec: func() schema.Web100ValueMap {
-				spec := schema.EmptyConnectionSpec()
-				spec["client_ip"] = "127.0.0.1"
-				spec["server_ip"] = "1.0.0.127"
-				return spec
-			}(),
-			timestamp: tst,
-			url:       "/10583?",
-			res: func() schema.Web100ValueMap {
-				spec := schema.EmptyConnectionSpec()
-				spec["client_ip"] = "127.0.0.1"
-				spec["server_ip"] = "1.0.0.127"
-				geoc := spec.Get("client_geolocation")
-				geoc["country_code"] = "US"
-				geoc["country_code3"] = "USA"
-				geoc["country_name"] = "United States of America"
-				geoc["region"] = "NY"
-				geoc["city"] = "Scarsdale"
-				geoc["area_code"] = int64(10583)
-				geoc["postal_code"] = "10583"
-				geoc["latitude"] = float64(41.0051)
-				geoc["longitude"] = float64(73.7846)
-				geos := spec.Get("server_geolocation")
-				geos["country_code"] = "US"
-				geos["country_code3"] = "USA"
-				geos["country_name"] = "United States of America"
-				geos["region"] = "NY"
-				geos["city"] = "Scarsdale"
-				geos["area_code"] = int64(10584)
-				geos["postal_code"] = "10584"
-				geos["latitude"] = float64(41.0051)
-				geos["longitude"] = float64(73.7846)
-				return spec
-			}(),
-		},
+	return tst
+}
+
+var tests = []struct {
+	spec      schema.Web100ValueMap
+	timestamp time.Time
+	url       string
+	res       schema.Web100ValueMap
+}{
+	{
+		spec: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			spec["client_ip"] = "127.0.0.1"
+			spec["server_ip"] = "1.0.0.127"
+			return spec
+		}(),
+		timestamp: testTime(),
+		url:       "/10583?",
+		res: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			spec["client_ip"] = "127.0.0.1"
+			spec["server_ip"] = "1.0.0.127"
+			geoc := spec.Get("client_geolocation")
+			geoc["country_code"] = "US"
+			geoc["country_code3"] = "USA"
+			geoc["country_name"] = "United States of America"
+			geoc["region"] = "NY"
+			geoc["city"] = "Scarsdale"
+			geoc["area_code"] = int64(10583)
+			geoc["postal_code"] = "10583"
+			geoc["latitude"] = float64(41.0051)
+			geoc["longitude"] = float64(73.7846)
+			geos := spec.Get("server_geolocation")
+			geos["country_code"] = "US"
+			geos["country_code3"] = "USA"
+			geos["country_name"] = "United States of America"
+			geos["region"] = "NY"
+			geos["city"] = "Scarsdale"
+			geos["area_code"] = int64(10584)
+			geos["postal_code"] = "10584"
+			geos["latitude"] = float64(41.0051)
+			geos["longitude"] = float64(73.7846)
+			return spec
+		}(),
+	},
+	{ // This test exercises the error path one missing IP
+		spec: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			spec["client_ip"] = "127.0.0.1"
+			return spec
+		}(),
+		timestamp: testTime(),
+		url:       "/10583?",
+		res: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			spec["client_ip"] = "127.0.0.1"
+			geoc := spec.Get("client_geolocation")
+			geoc["country_code"] = "US"
+			geoc["country_code3"] = "USA"
+			geoc["country_name"] = "United States of America"
+			geoc["region"] = "NY"
+			geoc["city"] = "Scarsdale"
+			geoc["area_code"] = int64(10583)
+			geoc["postal_code"] = "10583"
+			geoc["latitude"] = float64(41.0051)
+			geoc["longitude"] = float64(73.7846)
+			return spec
+		}(),
+	},
+	{ // This test exercises the error path for missing IP addresses.
+		spec: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			return spec
+		}(),
+		timestamp: testTime(),
+		url:       "/10583?",
+		res: func() schema.Web100ValueMap {
+			spec := schema.EmptyConnectionSpec()
+			return spec
+		}(),
+	},
+}
+
+func TestDisabledAnnotation(t *testing.T) {
+	callCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount += 1
+		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
+			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
+	}))
+	for _, test := range tests {
+		p.BatchURL = ts.URL + test.url
+		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
 	}
+	if callCount != 0 {
+		t.Errorf("Annotator should not have been called.  Call count: %d", callCount)
+	}
+}
+
+func TestAddMetaDataNDTConnSpec(t *testing.T) {
+	p.EnableAnnotation()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
