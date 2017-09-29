@@ -58,6 +58,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 }
 
 /* These should be in ss.go and pt.go
+// TODO(gfr) Create a common ConnSpec function for use across all parsers.
 // AddMetaDataSSConnSpec takes a pointer to a
 // Web100ConnectionSpecification struct and a timestamp. With these,
 // it will fetch the appropriate metadata and add it to the hop struct
