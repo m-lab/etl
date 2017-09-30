@@ -19,7 +19,7 @@ import (
 // NOTE: the code was cut and pasted from parser version of file, to
 // ensure no code was lost or duplicated.
 
-var ipAnnotationEnabled = false
+var IPAnnotationEnabled = false
 
 func init() {
 	checkFlags()
@@ -29,7 +29,7 @@ func checkFlags() {
 	// Check for ANNOTATE_IP = 'true'
 	flag, ok := os.LookupEnv("ANNOTATE_IP")
 	if ok {
-		ipAnnotationEnabled, _ = strconv.ParseBool(flag)
+		IPAnnotationEnabled, _ = strconv.ParseBool(flag)
 		// If parse fails, then ipAnn will be set to false.
 	}
 }
