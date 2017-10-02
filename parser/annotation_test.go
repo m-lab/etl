@@ -10,7 +10,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/geo"
+	"github.com/m-lab/etl/annotation"
 	p "github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 )
@@ -36,7 +36,7 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 			url:       "/src",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:          "127.0.0.1",
-				Local_geolocation: geo.GeolocationIP{Postal_code: "10583"},
+				Local_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
 			},
 		},
 		{
@@ -45,7 +45,7 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 			url:       "/dest",
 			res: schema.Web100ConnectionSpecification{
 				Remote_ip:          "127.0.0.1",
-				Remote_geolocation: geo.GeolocationIP{Postal_code: "10583"},
+				Remote_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
 			},
 		},
 		{
@@ -54,9 +54,9 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 			url:       "/both",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:           "127.0.0.1",
-				Local_geolocation:  geo.GeolocationIP{Postal_code: "10583"},
+				Local_geolocation:  annotation.GeolocationIP{Postal_code: "10583"},
 				Remote_ip:          "127.0.0.2",
-				Remote_geolocation: geo.GeolocationIP{Postal_code: "10584"},
+				Remote_geolocation: annotation.GeolocationIP{Postal_code: "10584"},
 			},
 		},
 	}
@@ -65,7 +65,7 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataSSConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
@@ -92,7 +92,7 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 			url:       "/src",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
-				Server_geolocation: geo.GeolocationIP{Postal_code: "10583"},
+				Server_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
 			},
 		},
 		{
@@ -101,7 +101,7 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 			url:       "/dest",
 			res: schema.MLabConnectionSpecification{
 				Client_ip:          "127.0.0.1",
-				Client_geolocation: geo.GeolocationIP{Postal_code: "10583"},
+				Client_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
 			},
 		},
 		{
@@ -110,9 +110,9 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 			url:       "/both",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
-				Server_geolocation: geo.GeolocationIP{Postal_code: "10583"},
+				Server_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
 				Client_ip:          "127.0.0.2",
-				Client_geolocation: geo.GeolocationIP{Postal_code: "10584"},
+				Client_geolocation: annotation.GeolocationIP{Postal_code: "10584"},
 			},
 		},
 	}
@@ -121,7 +121,7 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataPTConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
@@ -148,9 +148,9 @@ func TestAddMetaDataPTHopBatch(t *testing.T) {
 			res: []*schema.ParisTracerouteHop{
 				&schema.ParisTracerouteHop{
 					Src_ip:           "127.0.0.1",
-					Src_geolocation:  geo.GeolocationIP{Area_code: 10583},
+					Src_geolocation:  annotation.GeolocationIP{Area_code: 10583},
 					Dest_ip:          "1.0.0.127",
-					Dest_geolocation: geo.GeolocationIP{Area_code: 10584},
+					Dest_geolocation: annotation.GeolocationIP{Area_code: 10584},
 				},
 			},
 		},
@@ -160,7 +160,7 @@ func TestAddMetaDataPTHopBatch(t *testing.T) {
 			`,"1.0.0.1270" : {"Geo":{"area_code":10584},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataPTHopBatch(test.hops, test.timestamp)
 		if !reflect.DeepEqual(test.hops, test.res) {
 			t.Errorf("Expected %s, got %s from data %s", test.res, test.hops, test.url)
@@ -171,7 +171,7 @@ func TestAddMetaDataPTHopBatch(t *testing.T) {
 func TestAnnotatePTHops(t *testing.T) {
 	tests := []struct {
 		hops           []*schema.ParisTracerouteHop
-		annotationData map[string]geo.MetaData
+		annotationData map[string]annotation.MetaData
 		timestamp      time.Time
 		res            []*schema.ParisTracerouteHop
 	}{
@@ -183,25 +183,25 @@ func TestAnnotatePTHops(t *testing.T) {
 		},
 		{
 			hops:           []*schema.ParisTracerouteHop{nil},
-			annotationData: map[string]geo.MetaData{},
+			annotationData: map[string]annotation.MetaData{},
 			timestamp:      epoch,
 			res:            []*schema.ParisTracerouteHop{nil},
 		},
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
-			annotationData: map[string]geo.MetaData{"127.0.0.10": geo.MetaData{
-				Geo: &geo.GeolocationIP{}, ASN: nil}},
+			annotationData: map[string]annotation.MetaData{"127.0.0.10": annotation.MetaData{
+				Geo: &annotation.GeolocationIP{}, ASN: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1",
-				Src_geolocation: geo.GeolocationIP{}}},
+				Src_geolocation: annotation.GeolocationIP{}}},
 		},
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
-			annotationData: map[string]geo.MetaData{"1.0.0.1270": geo.MetaData{
-				Geo: &geo.GeolocationIP{}, ASN: nil}},
+			annotationData: map[string]annotation.MetaData{"1.0.0.1270": annotation.MetaData{
+				Geo: &annotation.GeolocationIP{}, ASN: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127",
-				Dest_geolocation: geo.GeolocationIP{}}},
+				Dest_geolocation: annotation.GeolocationIP{}}},
 		},
 	}
 	for _, test := range tests {
@@ -217,22 +217,22 @@ func TestCreateRequestDataFromPTHops(t *testing.T) {
 	tests := []struct {
 		hops      []*schema.ParisTracerouteHop
 		timestamp time.Time
-		res       []geo.RequestData
+		res       []annotation.RequestData
 	}{
 		{
 			hops:      []*schema.ParisTracerouteHop{},
 			timestamp: epoch,
-			res:       []geo.RequestData{},
+			res:       []annotation.RequestData{},
 		},
 		{
 			hops:      []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
 			timestamp: epoch,
-			res:       []geo.RequestData{geo.RequestData{"1.0.0.127", 0, epoch}},
+			res:       []annotation.RequestData{annotation.RequestData{"1.0.0.127", 0, epoch}},
 		},
 		{
 			hops:      []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
 			timestamp: epoch,
-			res:       []geo.RequestData{geo.RequestData{"127.0.0.1", 0, epoch}},
+			res:       []annotation.RequestData{annotation.RequestData{"127.0.0.1", 0, epoch}},
 		},
 	}
 	for _, test := range tests {
@@ -262,7 +262,7 @@ func TestAddMetaDataPTHop(t *testing.T) {
 			url:       "/src",
 			res: schema.ParisTracerouteHop{
 				Src_ip:          "127.0.0.1",
-				Src_geolocation: geo.GeolocationIP{Postal_code: "10583"},
+				Src_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
 			},
 		},
 		{
@@ -271,7 +271,7 @@ func TestAddMetaDataPTHop(t *testing.T) {
 			url:       "/dest",
 			res: schema.ParisTracerouteHop{
 				Dest_ip:          "127.0.0.1",
-				Dest_geolocation: geo.GeolocationIP{Postal_code: "10583"},
+				Dest_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
 			},
 		},
 		{
@@ -280,9 +280,9 @@ func TestAddMetaDataPTHop(t *testing.T) {
 			url:       "/both",
 			res: schema.ParisTracerouteHop{
 				Src_ip:           "127.0.0.1",
-				Src_geolocation:  geo.GeolocationIP{Postal_code: "10583"},
+				Src_geolocation:  annotation.GeolocationIP{Postal_code: "10583"},
 				Dest_ip:          "127.0.0.2",
-				Dest_geolocation: geo.GeolocationIP{Postal_code: "10583"},
+				Dest_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
 			},
 		},
 	}
@@ -290,7 +290,7 @@ func TestAddMetaDataPTHop(t *testing.T) {
 		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
 	}))
 	for _, test := range tests {
-		geo.BaseURL = ts.URL + test.url
+		annotation.BaseURL = ts.URL + test.url
 		p.AddMetaDataPTHop(&test.hop, test.timestamp)
 		if !reflect.DeepEqual(test.hop, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.hop, test.url)
@@ -393,7 +393,7 @@ func TestDisabledAnnotation(t *testing.T) {
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
 	}
 	if callCount != 0 {
@@ -402,13 +402,13 @@ func TestDisabledAnnotation(t *testing.T) {
 }
 
 func TestAddMetaDataNDTConnSpec(t *testing.T) {
-	geo.EnableAnnotation()
+	annotation.EnableAnnotation()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
@@ -468,7 +468,7 @@ func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
 		fmt.Fprint(w, `{"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`)
 	}))
 	for _, test := range tests {
-		geo.BaseURL = ts.URL + test.url
+		annotation.BaseURL = ts.URL + test.url
 		p.GetAndInsertMetaIntoNDTConnSpec(test.side, test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
@@ -564,7 +564,7 @@ func TestGetAndInsertTwoSidedMetaIntoNDTConnSpec(t *testing.T) {
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.GetAndInsertTwoSidedMetaIntoNDTConnSpec(test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)

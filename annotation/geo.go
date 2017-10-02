@@ -1,4 +1,4 @@
-package geo
+package annotation
 
 import (
 	"bytes"
