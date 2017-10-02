@@ -34,13 +34,8 @@ func AddMetaDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp
 	}(timerStart)
 
 	ipSlice := []string{spec.Local_ip, spec.Remote_ip}
-<<<<<<< HEAD:parser/metadata.go
 	geoSlice := []*annotation.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
-	FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
-=======
-	geoSlice := []*geo.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
-	geo.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
->>>>>>> aa41f64... Finish fixing and rename metadata -> annotation:parser/annotation.go
+	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
 // AddMetaDataPTConnSpec takes a pointer to a
@@ -61,13 +56,8 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 	ipSlice := []string{spec.Server_ip, spec.Client_ip}
-<<<<<<< HEAD:parser/metadata.go
 	geoSlice := []*annotation.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
-	FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
-=======
-	geoSlice := []*geo.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
-	geo.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
->>>>>>> aa41f64... Finish fixing and rename metadata -> annotation:parser/annotation.go
+	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
 // AddMetaDataPTHopBatch takes a slice of pointers to
@@ -82,7 +72,7 @@ func AddMetaDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Tim
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 	requestSlice := CreateRequestDataFromPTHops(hops, timestamp)
-	annotationData := geo.GetBatchMetaData(geo.BatchURL, requestSlice)
+	annotationData := annotation.GetBatchMetaData(annotation.BatchURL, requestSlice)
 	AnnotatePTHops(hops, annotationData, timestamp)
 }
 
@@ -166,13 +156,13 @@ func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 	if hop.Src_ip != "" {
-		geo.GetAndInsertGeolocationIPStruct(&hop.Src_geolocation, hop.Src_ip, timestamp)
+		annotation.GetAndInsertGeolocationIPStruct(&hop.Src_geolocation, hop.Src_ip, timestamp)
 	} else {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "PT Hop had no src_ip!"}).Inc()
 	}
 	if hop.Dest_ip != "" {
-		geo.GetAndInsertGeolocationIPStruct(&hop.Dest_geolocation, hop.Dest_ip, timestamp)
+		annotation.GetAndInsertGeolocationIPStruct(&hop.Dest_geolocation, hop.Dest_ip, timestamp)
 	} else {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "PT Hop had no dest_ip!"}).Inc()
@@ -187,7 +177,7 @@ func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// Only annotate if flag enabled...
 	// TODO(gfr) - should propogate this to other pipelines, or push to a common
 	// intercept point.
-	if !geo.IPAnnotationEnabled {
+	if !annotation.IPAnnotationEnabled {
 		metrics.AnnotationErrorCount.With(prometheus.Labels{
 			"source": "IP Annotation Disabled."}).Inc()
 		return
@@ -211,9 +201,9 @@ func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 func GetAndInsertMetaIntoNDTConnSpec(side string, spec schema.Web100ValueMap, timestamp time.Time) {
 	ip, ok := spec.GetString([]string{side + "_ip"})
 	if ok {
-		url := geo.BaseURL + "ip_addr=" + url.QueryEscape(ip) +
+		url := annotation.BaseURL + "ip_addr=" + url.QueryEscape(ip) +
 			"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
-		annotationData := geo.GetMetaData(url)
+		annotationData := annotation.GetMetaData(url)
 		if annotationData != nil && annotationData.Geo != nil {
 			CopyStructToMap(annotationData.Geo, spec.Get(side+"_geolocation"))
 		} else {
@@ -270,7 +260,7 @@ func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timesta
 			Labels{"source": "Missing server side IP."}).Inc()
 	}
 	if cok || sok {
-		annotationDataMap := geo.GetBatchMetaData(geo.BatchURL, reqData)
+		annotationDataMap := annotation.GetBatchMetaData(annotation.BatchURL, reqData)
 		// TODO(JM): Revisit decision to use base36 for
 		// encoding, rather than base64. (It had to do with
 		// library support.)

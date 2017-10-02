@@ -65,7 +65,7 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataSSConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
@@ -121,7 +121,7 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataPTConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
@@ -160,7 +160,7 @@ func TestAddMetaDataPTHopBatch(t *testing.T) {
 			`,"1.0.0.1270" : {"Geo":{"area_code":10584},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataPTHopBatch(test.hops, test.timestamp)
 		if !reflect.DeepEqual(test.hops, test.res) {
 			t.Errorf("Expected %s, got %s from data %s", test.res, test.hops, test.url)
@@ -290,7 +290,7 @@ func TestAddMetaDataPTHop(t *testing.T) {
 		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
 	}))
 	for _, test := range tests {
-		geo.BaseURL = ts.URL + test.url
+		annotation.BaseURL = ts.URL + test.url
 		p.AddMetaDataPTHop(&test.hop, test.timestamp)
 		if !reflect.DeepEqual(test.hop, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.hop, test.url)
@@ -391,7 +391,7 @@ func TestDisabledAnnotation(t *testing.T) {
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
 	}
 	if callCount != 0 {
@@ -400,13 +400,13 @@ func TestDisabledAnnotation(t *testing.T) {
 }
 
 func TestAddMetaDataNDTConnSpec(t *testing.T) {
-	geo.EnableAnnotation()
+	annotation.EnableAnnotation()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
@@ -466,7 +466,7 @@ func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
 		fmt.Fprint(w, `{"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`)
 	}))
 	for _, test := range tests {
-		geo.BaseURL = ts.URL + test.url
+		annotation.BaseURL = ts.URL + test.url
 		p.GetAndInsertMetaIntoNDTConnSpec(test.side, test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
@@ -562,7 +562,7 @@ func TestGetAndInsertTwoSidedMetaIntoNDTConnSpec(t *testing.T) {
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL + test.url
+		annotation.BatchURL = ts.URL + test.url
 		p.GetAndInsertTwoSidedMetaIntoNDTConnSpec(test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)

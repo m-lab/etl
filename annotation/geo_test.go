@@ -1,4 +1,4 @@
-package geo_test
+package annotation_test
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/etl/geo"
+	"github.com/m-lab/etl/annotation"
 )
 
 var epoch time.Time = time.Unix(0, 0)
