@@ -24,10 +24,10 @@ import (
 var IPAnnotationEnabled = false
 
 func init() {
-	checkFlags()
+	getFlagValues()
 }
 
-func checkFlags() {
+func getFlagValues() {
 	// Check for ANNOTATE_IP = 'true'
 	flag, ok := os.LookupEnv("ANNOTATE_IP")
 	if ok {
@@ -39,7 +39,7 @@ func checkFlags() {
 // For testing.
 func EnableAnnotation() {
 	os.Setenv("ANNOTATE_IP", "True")
-	checkFlags()
+	getFlagValues()
 }
 
 // TODO(JosephMarques) See if there is a better way of determining
