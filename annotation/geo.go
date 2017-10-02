@@ -112,14 +112,14 @@ func GetGeoData(url string) *GeoData {
 	}
 
 	// Safely parse the JSON response and pass it back to the caller
-	metaDataFromResponse, err := ParseJSONGeoDataResponse(annotatorResponse)
+	geoDataFromResponse, err := ParseJSONGeoDataResponse(annotatorResponse)
 	if err != nil {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Failed to parse JSON"}).Inc()
 		log.Println(err)
 		return nil
 	}
-	return metaDataFromResponse
+	return geoDataFromResponse
 }
 
 // QueryAnnotationService will connect to the annotation service and
@@ -178,14 +178,14 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 	}
 
 	// Safely parse the JSON response and pass it back to the caller
-	metaDataFromResponse, err := BatchParseJSONGeoDataResponse(annotatorResponse)
+	geoDataFromResponse, err := BatchParseJSONGeoDataResponse(annotatorResponse)
 	if err != nil {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Failed to parse JSON"}).Inc()
 		log.Println(err)
 		return nil
 	}
-	return metaDataFromResponse
+	return geoDataFromResponse
 }
 
 // BatchQueryAnnotationService takes a url to POST the request to and
