@@ -18,6 +18,7 @@ import (
 func init() {
 	// Register the metrics defined with Prometheus's default registry.
 	prometheus.MustRegister(AnnotationTimeSummary)
+	prometheus.MustRegister(AnnotationRequestCount)
 	prometheus.MustRegister(AnnotationErrorCount)
 	prometheus.MustRegister(WorkerCount)
 	prometheus.MustRegister(WorkerState)
@@ -56,6 +57,16 @@ var (
 		Help: "The total time to annotate, in nanoseconds.",
 	}, []string{"test_type"})
 
+	// Measures the number of annotation requests
+	// Provides metrics:
+	//    etl_annotator_Request_Count
+	// Example usage:
+	//    metrics.AnnotationRequestCount.Inc() / .Dec()
+	AnnotationRequestCount = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "etl_annotator_Request_Count",
+		Help: "The current number of annotation requests",
+	})
+
 	// Measures the number of annotation errors
 	// Provides metrics:
 	//    etl_annotator_Error_Count
@@ -63,7 +74,7 @@ var (
 	//    metrics.AnnotationErrorCount.Inc() / .Dec()
 	AnnotationErrorCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "etl_annotator_Error_Count",
-		Help: "The current number of errors encountered while attemting to add metadata.",
+		Help: "The current number of errors encountered while attempting to add geo data.",
 	}, []string{"source"})
 
 	// Counts the number of tasks processed by the pipeline.

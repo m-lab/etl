@@ -1,13 +1,10 @@
 package parser_test
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -20,48 +17,7 @@ import (
 
 var epoch time.Time = time.Unix(0, 0)
 
-func TestFetchGeoAnnotations(t *testing.T) {
-	tests := []struct {
-		ips       []string
-		timestamp time.Time
-		geoDest   []*annotation.GeolocationIP
-		res       []*annotation.GeolocationIP
-	}{
-		{
-			ips:       []string{},
-			timestamp: epoch,
-			geoDest:   []*annotation.GeolocationIP{},
-			res:       []*annotation.GeolocationIP{},
-		},
-		{
-			ips:       []string{"", "127.0.0.1", "2.2.2.2"},
-			timestamp: epoch,
-			geoDest: []*annotation.GeolocationIP{
-				&annotation.GeolocationIP{},
-				&annotation.GeolocationIP{},
-				&annotation.GeolocationIP{},
-			},
-			res: []*annotation.GeolocationIP{
-				&annotation.GeolocationIP{},
-				&annotation.GeolocationIP{Postal_code: "10583"},
-				&annotation.GeolocationIP{},
-			},
-		},
-	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
-			`,"2.2.2.20" : {"Geo":null,"ASN":null}}`)
-	}))
-	for _, test := range tests {
-		p.BatchURL = ts.URL
-		p.FetchGeoAnnotations(test.ips, test.timestamp, test.geoDest)
-		if !reflect.DeepEqual(test.geoDest, test.res) {
-			t.Errorf("Expected %s, got %s", test.res, test.geoDest)
-		}
-	}
-}
-
-func TestAddMetaDataSSConnSpec(t *testing.T) {
+func TestAddGeoDataSSConnSpec(t *testing.T) {
 	tests := []struct {
 		conspec   schema.Web100ConnectionSpecification
 		timestamp time.Time
@@ -109,15 +65,15 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		p.BatchURL = ts.URL + test.url
-		p.AddMetaDataSSConnSpec(&test.conspec, test.timestamp)
+		annotation.BatchURL = ts.URL + test.url
+		p.AddGeoDataSSConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
 		}
 	}
 }
 
-func TestAddMetaDataPTConnSpec(t *testing.T) {
+func TestAddGeoDataPTConnSpec(t *testing.T) {
 	tests := []struct {
 		conspec   schema.MLabConnectionSpecification
 		timestamp time.Time
@@ -165,15 +121,15 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		p.BatchURL = ts.URL + test.url
-		p.AddMetaDataPTConnSpec(&test.conspec, test.timestamp)
+		annotation.BatchURL = ts.URL + test.url
+		p.AddGeoDataPTConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
 		}
 	}
 }
 
-func TestAddMetaDataPTHopBatch(t *testing.T) {
+func TestAddGeoDataPTHopBatch(t *testing.T) {
 	tests := []struct {
 		hops      []*schema.ParisTracerouteHop
 		timestamp time.Time
@@ -204,8 +160,8 @@ func TestAddMetaDataPTHopBatch(t *testing.T) {
 			`,"1.0.0.1270" : {"Geo":{"area_code":10584},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		p.BatchURL = ts.URL + test.url
-		p.AddMetaDataPTHopBatch(test.hops, test.timestamp)
+		annotation.BatchURL = ts.URL + test.url
+		p.AddGeoDataPTHopBatch(test.hops, test.timestamp)
 		if !reflect.DeepEqual(test.hops, test.res) {
 			t.Errorf("Expected %s, got %s from data %s", test.res, test.hops, test.url)
 		}
@@ -215,7 +171,7 @@ func TestAddMetaDataPTHopBatch(t *testing.T) {
 func TestAnnotatePTHops(t *testing.T) {
 	tests := []struct {
 		hops           []*schema.ParisTracerouteHop
-		annotationData map[string]annotation.MetaData
+		annotationData map[string]annotation.GeoData
 		timestamp      time.Time
 		res            []*schema.ParisTracerouteHop
 	}{
@@ -227,13 +183,13 @@ func TestAnnotatePTHops(t *testing.T) {
 		},
 		{
 			hops:           []*schema.ParisTracerouteHop{nil},
-			annotationData: map[string]annotation.MetaData{},
+			annotationData: map[string]annotation.GeoData{},
 			timestamp:      epoch,
 			res:            []*schema.ParisTracerouteHop{nil},
 		},
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
-			annotationData: map[string]annotation.MetaData{"127.0.0.10": annotation.MetaData{
+			annotationData: map[string]annotation.GeoData{"127.0.0.10": annotation.GeoData{
 				Geo: &annotation.GeolocationIP{}, ASN: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1",
@@ -241,7 +197,7 @@ func TestAnnotatePTHops(t *testing.T) {
 		},
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
-			annotationData: map[string]annotation.MetaData{"1.0.0.1270": annotation.MetaData{
+			annotationData: map[string]annotation.GeoData{"1.0.0.1270": annotation.GeoData{
 				Geo: &annotation.GeolocationIP{}, ASN: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127",
@@ -287,7 +243,7 @@ func TestCreateRequestDataFromPTHops(t *testing.T) {
 	}
 }
 
-func TestAddMetaDataPTHop(t *testing.T) {
+func TestAddGeoDataPTHop(t *testing.T) {
 	tests := []struct {
 		hop       schema.ParisTracerouteHop
 		timestamp time.Time
@@ -334,47 +290,12 @@ func TestAddMetaDataPTHop(t *testing.T) {
 		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
 	}))
 	for _, test := range tests {
-		p.BaseURL = ts.URL + test.url
-		p.AddMetaDataPTHop(&test.hop, test.timestamp)
+		annotation.BaseURL = ts.URL + test.url
+		p.AddGeoDataPTHop(&test.hop, test.timestamp)
 		if !reflect.DeepEqual(test.hop, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.hop, test.url)
 		}
 	}
-}
-
-func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
-	tests := []struct {
-		geo       *annotation.GeolocationIP
-		ip        string
-		timestamp time.Time
-		url       string
-		res       *annotation.GeolocationIP
-	}{
-		{
-			geo:       &annotation.GeolocationIP{},
-			ip:        "123.123.123.001",
-			timestamp: time.Now(),
-			url:       "portGarbage",
-			res:       &annotation.GeolocationIP{},
-		},
-		{
-			geo: &annotation.GeolocationIP{},
-			ip:  "127.0.0.1",
-			url: "/10583",
-			res: &annotation.GeolocationIP{Postal_code: "10583"},
-		},
-	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
-	}))
-	for _, test := range tests {
-		p.BaseURL = ts.URL + test.url
-		p.GetAndInsertGeolocationIPStruct(test.geo, test.ip, test.timestamp)
-		if !reflect.DeepEqual(test.geo, test.res) {
-			t.Errorf("Expected %v, got %v for test %s", test.res, test.geo, test.url)
-		}
-	}
-
 }
 
 func testTime() time.Time {
@@ -470,30 +391,30 @@ func TestDisabledAnnotation(t *testing.T) {
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		p.BatchURL = ts.URL + test.url
-		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
+		annotation.BatchURL = ts.URL + test.url
+		p.AddGeoDataNDTConnSpec(test.spec, test.timestamp)
 	}
 	if callCount != 0 {
 		t.Errorf("Annotator should not have been called.  Call count: %d", callCount)
 	}
 }
 
-func TestAddMetaDataNDTConnSpec(t *testing.T) {
-	p.EnableAnnotation()
+func TestAddGeoDataNDTConnSpec(t *testing.T) {
+	annotation.EnableAnnotation()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		p.BatchURL = ts.URL + test.url
-		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
+		annotation.BatchURL = ts.URL + test.url
+		p.AddGeoDataNDTConnSpec(test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
 		}
 	}
 }
 
-func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
+func TestGetAndInsertGeoIntoNDTConnSpec(t *testing.T) {
 	tests := []struct {
 		side      string
 		spec      schema.Web100ValueMap
@@ -545,8 +466,8 @@ func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
 		fmt.Fprint(w, `{"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`)
 	}))
 	for _, test := range tests {
-		p.BaseURL = ts.URL + test.url
-		p.GetAndInsertMetaIntoNDTConnSpec(test.side, test.spec, test.timestamp)
+		annotation.BaseURL = ts.URL + test.url
+		p.GetAndInsertGeoIntoNDTConnSpec(test.side, test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
 		}
@@ -591,119 +512,7 @@ func TestCopyStructToMap(t *testing.T) {
 
 }
 
-func TestGetMetaData(t *testing.T) {
-	tests := []struct {
-		url string
-		res *annotation.MetaData
-	}{
-		{
-			url: "portGarbage",
-			res: nil,
-		},
-		{
-			url: "/badJson",
-			res: nil,
-		},
-		{
-			url: "/goodJson",
-			res: &annotation.MetaData{},
-		},
-	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasSuffix(path, "goodJson") {
-			fmt.Fprint(w, `{"Geo":null,"ASN":null}`)
-			return
-		}
-		fmt.Fprint(w, "{jngngfsljngsljngfsljngsljn")
-	}))
-	for _, test := range tests {
-		res := p.GetMetaData(ts.URL + test.url)
-		if res != test.res && *res != *test.res {
-			t.Errorf("Expected %+v, got %+v for data: %s\n", test.res, res, test.url)
-		}
-
-	}
-
-}
-
-func TestQueryAnnotationService(t *testing.T) {
-	tests := []struct {
-		url string
-		res []byte
-		err error
-	}{
-		{
-			url: "portGarbage",
-			res: nil,
-			err: errors.New("HTTP Protocol Error"),
-		},
-		{
-			url: "/error",
-			res: nil,
-			err: errors.New("HTTP 404 Error"),
-		},
-		{
-			url: "/Echo",
-			res: []byte("Echo"),
-			err: nil,
-		},
-	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasSuffix(path, "error") {
-			http.Error(w, "Test Error", 404)
-			return
-		}
-		fmt.Fprint(w, "Echo")
-	}))
-	for _, test := range tests {
-		json, err := p.QueryAnnotationService(ts.URL + test.url)
-		if err != nil && test.err == nil || err == nil && test.err != nil {
-			t.Errorf("Expected %s, got %s, for %s", test.err, err, test.url)
-		}
-		if !bytes.Equal(json, test.res) {
-			t.Errorf("Expected %s, got %s, for %s", string(test.res), string(json), test.url)
-		}
-
-	}
-}
-
-func TestParseJSONMetaDataResponse(t *testing.T) {
-	tests := []struct {
-		testBuffer  []byte
-		resultData  *annotation.MetaData
-		resultError error
-	}{
-		{
-			testBuffer:  []byte(`{"Geo":null,"ASN":null}`),
-			resultData:  &annotation.MetaData{Geo: nil, ASN: nil},
-			resultError: nil,
-		},
-		{
-			testBuffer:  []byte(`"Geo":{},"ASN":{`),
-			resultData:  nil,
-			resultError: errors.New("Couldn't Parse JSON"),
-		},
-	}
-	for _, test := range tests {
-		res, err := p.ParseJSONMetaDataResponse(test.testBuffer)
-		// This big mishmash of if statements is simply
-		// checking that if one err is nil, that the other is
-		// too. Because error messages can vary, this is less
-		// brittle than doing just err == test.resultError. If
-		// that is okay, then we just use DeepEqual to compare
-		// the structs.
-		if err == nil && test.resultError != nil ||
-			err != nil && test.resultError == nil {
-			t.Errorf("Expected %s, got %s for data: %s\n", test.resultError, err, string(test.testBuffer))
-		} else if !reflect.DeepEqual(res, test.resultData) {
-			t.Errorf("Expected %+v, got %+v, for data %s\n", test.resultData, res, string(test.testBuffer))
-		}
-	}
-}
-
-func TestGetAndInsertTwoSidedMetaIntoNDTConnSpec(t *testing.T) {
+func TestGetAndInsertTwoSidedGeoIntoNDTConnSpec(t *testing.T) {
 	tst, _ := time.Parse(time.RFC3339, "2002-10-02T15:00:00Z")
 	tests := []struct {
 		spec      schema.Web100ValueMap
@@ -753,125 +562,10 @@ func TestGetAndInsertTwoSidedMetaIntoNDTConnSpec(t *testing.T) {
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
-		p.BatchURL = ts.URL + test.url
-		p.GetAndInsertTwoSidedMetaIntoNDTConnSpec(test.spec, test.timestamp)
+		annotation.BatchURL = ts.URL + test.url
+		p.GetAndInsertTwoSidedGeoIntoNDTConnSpec(test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
-		}
-	}
-}
-
-func TestGetBatchMetaData(t *testing.T) {
-	tests := []struct {
-		url string
-		res map[string]annotation.MetaData
-	}{
-		{
-			url: "portGarbage",
-			res: nil,
-		},
-		{
-			url: "/badJson",
-			res: nil,
-		},
-		{
-			url: "/goodJson",
-			res: map[string]annotation.MetaData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
-		},
-	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasSuffix(path, "goodJson") {
-			fmt.Fprint(w, `{"127.0.0.1xyz": {"Geo":null,"ASN":null}}`)
-			return
-		}
-		fmt.Fprint(w, "{jngngfsljngsljngfsljngsljn")
-	}))
-	for _, test := range tests {
-		res := p.GetBatchMetaData(ts.URL+test.url, nil)
-		if !reflect.DeepEqual(res, test.res) {
-			t.Errorf("Expected %+v, got %+v for data: %s\n", test.res, res, test.url)
-		}
-
-	}
-
-}
-
-func TestBatchQueryAnnotationService(t *testing.T) {
-	tests := []struct {
-		url string
-		res []byte
-		err error
-	}{
-		{
-			url: "portGarbage",
-			res: nil,
-			err: errors.New("HTTP Protocol Error"),
-		},
-		{
-			url: "/error",
-			res: nil,
-			err: errors.New("HTTP 404 Error"),
-		},
-		{
-			url: "/Echo",
-			res: []byte("Echo"),
-			err: nil,
-		},
-	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasSuffix(path, "error") {
-			http.Error(w, "Test Error", 404)
-			return
-		}
-		fmt.Fprint(w, "Echo")
-	}))
-	for _, test := range tests {
-		json, err := p.BatchQueryAnnotationService(ts.URL+test.url, nil)
-		if err != nil && test.err == nil || err == nil && test.err != nil {
-			t.Errorf("Expected %s, got %s, for %s", test.err, err, test.url)
-		}
-		if !bytes.Equal(json, test.res) {
-			t.Errorf("Expected %s, got %s, for %s", string(test.res), string(json), test.url)
-		}
-
-	}
-}
-
-func TestBatchParseJSONMetaDataResponse(t *testing.T) {
-	tests := []struct {
-		testBuffer  []byte
-		resultData  map[string]annotation.MetaData
-		resultError error
-	}{
-		{
-			// Note: This is not testing for corruptedIP
-			// addresses. The xyz could be a base36
-			// encoded timestamp.
-			testBuffer:  []byte(`{"127.0.0.1xyz": {"Geo":null,"ASN":null}}`),
-			resultData:  map[string]annotation.MetaData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
-			resultError: nil,
-		},
-		{
-			testBuffer:  []byte(`"Geo":{},"ASN":{`),
-			resultData:  nil,
-			resultError: errors.New("Couldn't Parse JSON"),
-		},
-	}
-	for _, test := range tests {
-		res, err := p.BatchParseJSONMetaDataResponse(test.testBuffer)
-		// This big mishmash of if statements is simply
-		// checking that if one err is nil, that the other is
-		// too. Because error messages can vary, this is less
-		// brittle than doing just err == test.resultError. If
-		// that is okay, then we just use DeepEqual to compare
-		// the structs.
-		if err == nil && test.resultError != nil ||
-			err != nil && test.resultError == nil {
-			t.Errorf("Expected %s, got %s for data: %s\n", test.resultError, err, string(test.testBuffer))
-		} else if !reflect.DeepEqual(res, test.resultData) {
-			t.Errorf("Expected %+v, got %+v, for data %s\n", test.resultData, res, string(test.testBuffer))
 		}
 	}
 }
