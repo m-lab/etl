@@ -239,10 +239,10 @@ func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 }
 
 // GetAndInsertGeolocationIPStruct takes a NON-NIL pointer to a
-// pre-allocated schema.GeolocationIP struct, an IP address, and a
+// pre-allocated annotation.GeolocationIP struct, an IP address, and a
 // timestamp. It will connect to the annotation service, get the
 // metadata, and insert the metadata into the reigion pointed to by
-// the schema.GeolocationIP pointer.
+// the annotation.GeolocationIP pointer.
 func GetAndInsertGeolocationIPStruct(geo *annotation.GeolocationIP, ip string, timestamp time.Time) {
 	url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +
 		"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
@@ -436,7 +436,7 @@ func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timesta
 // GetBatchMetaData combines the functionality of
 // BatchQueryAnnotationService and BatchParseJSONMetaDataResponse to
 // query the annotator service and return the corresponding map of
-// ip-timestamp strings to schema.MetaData structs, or a nil map if it
+// ip-timestamp strings to annotation.MetaData structs, or a nil map if it
 // encounters any error and cannot get the data for any reason
 func GetBatchMetaData(url string, data []annotation.RequestData) map[string]annotation.MetaData {
 	// Query the service and grab the response safely
@@ -460,7 +460,7 @@ func GetBatchMetaData(url string, data []annotation.RequestData) map[string]anno
 }
 
 // BatchQueryAnnotationService takes a url to POST the request to and
-// a slice of schema.RequestDatas to be sent in the body in a JSON
+// a slice of annotation.RequestDatas to be sent in the body in a JSON
 // format. It will copy the response into a []byte and return it to
 // the user, returning an error if any occurs
 func BatchQueryAnnotationService(url string, data []annotation.RequestData) ([]byte, error) {
