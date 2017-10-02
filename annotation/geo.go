@@ -88,7 +88,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 // GetAndInsertGeolocationIPStruct takes a NON-NIL pointer to a
 // pre-allocated GeolocationIP struct, an IP address, and a
 // timestamp. It will connect to the annotation service, get the
-// metadata, and insert the metadata into the reigion pointed to by
+// geo data, and insert the geo data into the reigion pointed to by
 // the GeolocationIP pointer.
 func GetAndInsertGeolocationIPStruct(geo *GeolocationIP, ip string, timestamp time.Time) {
 	url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +

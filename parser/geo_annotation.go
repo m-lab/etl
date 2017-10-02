@@ -17,7 +17,7 @@ import (
 
 // AddGeoDataSSConnSpec takes a pointer to a
 // Web100ConnectionSpecification struct and a timestamp. With these,
-// it will fetch the appropriate metadata and add it to the hop struct
+// it will fetch the appropriate geo data and add it to the hop struct
 // referenced by the pointer.
 func AddGeoDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp time.Time) {
 	if spec == nil {
@@ -40,7 +40,7 @@ func AddGeoDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp 
 
 // AddGeoDataPTConnSpec takes a pointer to a
 // MLabConnectionSpecification struct and a timestamp. With these, it
-// will fetch the appropriate metadata and add it to the hop struct
+// will fetch the appropriate geo data and add it to the hop struct
 // referenced by the pointer.
 func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
 	if spec == nil {
@@ -77,8 +77,8 @@ func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time
 }
 
 // AnnotatePTHops takes a slice of hop pointers, the annotation data
-// mapping ip addresses to metadata and a timestamp. It will then use
-// these to attach the appropriate metadata to the PT hops.
+// mapping ip addresses to geo data and a timestamp. It will then use
+// these to attach the appropriate geo data to the PT hops.
 func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]annotation.GeoData, timestamp time.Time) {
 	if annotationData == nil {
 		return
@@ -140,7 +140,7 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 }
 
 // AddGeoDataPTHop takes a pointer to a ParisTracerouteHop and a
-// timestamp. With these, it will fetch the appropriate metadata and
+// timestamp. With these, it will fetch the appropriate geo data and
 // add it to the hop struct referenced by the pointer.
 func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	if hop == nil {
@@ -170,8 +170,8 @@ func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 }
 
 // AddGeoDataNDTConnSpec takes a connection spec and a timestamp and
-// annotates the connection spec with metadata associated with each IP
-// Address. It will either sucessfully add the metadata or fail
+// annotates the connection spec with geo data associated with each IP
+// Address. It will either sucessfully add the geo data or fail
 // silently and make no changes.
 func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// Only annotate if flag enabled...
@@ -195,7 +195,7 @@ func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 }
 
 // GetAndInsertNDT takes a timestamp, an NDT connection spec, and a
-// string indicating whether it should get the metadata for the client
+// string indicating whether it should get the geo data for the client
 // end or the server end of the connection. It will either insert the
 // data into the connection spec or silently fail.
 func GetAndInsertGeoIntoNDTConnSpec(side string, spec schema.Web100ValueMap, timestamp time.Time) {
@@ -208,7 +208,7 @@ func GetAndInsertGeoIntoNDTConnSpec(side string, spec schema.Web100ValueMap, tim
 			CopyStructToMap(annotationData.Geo, spec.Get(side+"_geolocation"))
 		} else {
 			metrics.AnnotationErrorCount.With(prometheus.
-				Labels{"source": "Couldn't get metadata for the " + side + " side."}).Inc()
+				Labels{"source": "Couldn't get geo data for the " + side + " side."}).Inc()
 		}
 	}
 }
@@ -270,7 +270,7 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 				CopyStructToMap(data.Geo, spec.Get("client_geolocation"))
 			} else {
 				metrics.AnnotationErrorCount.With(prometheus.
-					Labels{"source": "Couldn't get metadata for the client side."}).Inc()
+					Labels{"source": "Couldn't get geo data for the client side."}).Inc()
 			}
 		}
 		if sok {
@@ -278,7 +278,7 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 				CopyStructToMap(data.Geo, spec.Get("server_geolocation"))
 			} else {
 				metrics.AnnotationErrorCount.With(prometheus.
-					Labels{"source": "Couldn't get metadata for the server side."}).Inc()
+					Labels{"source": "Couldn't get geo data for the server side."}).Inc()
 			}
 
 		}

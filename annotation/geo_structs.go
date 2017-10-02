@@ -27,7 +27,7 @@ type GeolocationIP struct {
 // schema. Currently empty and unused.
 type IPASNData struct{}
 
-// The main struct for the metadata, which holds pointers to the
+// The main struct for the geo data, which holds pointers to the
 // Geolocation data and the IP/ASN data. This is what we parse the JSON
 // response from the annotator into.
 type GeoData struct {
