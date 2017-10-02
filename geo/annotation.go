@@ -16,8 +16,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// TODO(gfr) Remove this comment after review.
 // NOTE: the code was cut and pasted from parser version of file, to
-// ensure no code was lost or duplicated.
+// ensure no code was lost or duplicated.  Only minor additions and edits
+// were made, which should be apparent in the diff.
 
 var IPAnnotationEnabled = false
 
@@ -99,7 +101,6 @@ func GetAndInsertGeolocationIPStruct(geo *GeolocationIP, ip string, timestamp ti
 // ParseJSONMetaDataResponse to query the annotator service and return
 // the corresponding MetaData if it can, or a nil pointer if it
 // encounters any error and cannot get the data for any reason
-// TODO - is this code dead?
 func GetMetaData(url string) *MetaData {
 	// Query the service and grab the response safely
 	annotatorResponse, err := QueryAnnotationService(url)
