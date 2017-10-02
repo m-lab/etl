@@ -63,6 +63,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 	reqData := make([]RequestData, 0, len(ips))
 	for _, ip := range ips {
 		if ip == "" {
+			// TODO(gfr) These should be warning, else we have error > request
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "Empty IP Address!!!"}).Inc()
 			continue
@@ -74,6 +75,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 	for index, ip := range ips {
 		data, ok := annotationData[ip+timeString]
 		if !ok || data.Geo == nil {
+			// TODO(gfr) These should be warning, else we have error > request
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "Missing or empty data for IP Address!!!"}).Inc()
 			continue
@@ -105,8 +107,6 @@ func GetGeoData(url string) *GeoData {
 	// Query the service and grab the response safely
 	annotatorResponse, err := QueryAnnotationService(url)
 	if err != nil {
-		metrics.AnnotationErrorCount.
-			With(prometheus.Labels{"source": "Error querying annotation service"}).Inc()
 		log.Println(err)
 		return nil
 	}
@@ -126,6 +126,7 @@ func GetGeoData(url string) *GeoData {
 // copy the body of a valid response to a byte slice and return it to a
 // user, returning an error if any occurs
 func QueryAnnotationService(url string) ([]byte, error) {
+	metrics.AnnotationRequestCount.Inc()
 	// Make the actual request
 	resp, err := http.Get(url)
 
@@ -171,8 +172,6 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 	// Query the service and grab the response safely
 	annotatorResponse, err := BatchQueryAnnotationService(url, data)
 	if err != nil {
-		metrics.AnnotationErrorCount.
-			With(prometheus.Labels{"source": "Error querying annotation service"}).Inc()
 		log.Println(err)
 		return nil
 	}
@@ -193,6 +192,8 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 // format. It will copy the response into a []byte and return it to
 // the user, returning an error if any occurs
 func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error) {
+	metrics.AnnotationRequestCount.Inc()
+
 	encodedData, err := json.Marshal(data)
 	if err != nil {
 		metrics.AnnotationErrorCount.
