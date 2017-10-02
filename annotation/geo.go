@@ -191,6 +191,7 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 // a slice of RequestDatas to be sent in the body in a JSON
 // format. It will copy the response into a []byte and return it to
 // the user, returning an error if any occurs
+// TODO(gfr) Should pass the annotator's request context through and use it here.
 func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error) {
 	metrics.AnnotationRequestCount.Inc()
 
@@ -200,20 +201,24 @@ func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error)
 			With(prometheus.Labels{"source": "Couldn't Marshal Data"}).Inc()
 		return nil, err
 	}
-	// Make the actual request
-	resp, err := http.Post(url, "raw", bytes.NewReader(encodedData))
 
+	var netClient = &http.Client{
+		Timeout: time.Second,
+	}
+
+	// Make the actual request
+	resp, err := netClient.Post(url, "raw", bytes.NewReader(encodedData))
 	// Catch http errors
 	if err != nil {
 		metrics.AnnotationErrorCount.
-			With(prometheus.Labels{"source": "Request to Annotator failed"}).Inc()
+			With(prometheus.Labels{"source": err.Error()}).Inc()
 		return nil, err
 	}
 
 	// Catch errors reported by the service
 	if resp.StatusCode != http.StatusOK {
 		metrics.AnnotationErrorCount.
-			With(prometheus.Labels{"source": "Webserver gave non-ok response"}).Inc()
+			With(prometheus.Labels{"source": http.StatusText(resp.StatusCode)}).Inc()
 		return nil, errors.New("URL:" + url + " gave response code " + resp.Status)
 	}
 	defer resp.Body.Close()

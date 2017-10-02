@@ -198,6 +198,7 @@ func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 // string indicating whether it should get the geo data for the client
 // end or the server end of the connection. It will either insert the
 // data into the connection spec or silently fail.
+// TODO - remove - this is dead code.
 func GetAndInsertGeoIntoNDTConnSpec(side string, spec schema.Web100ValueMap, timestamp time.Time) {
 	ip, ok := spec.GetString([]string{side + "_ip"})
 	if ok {
