@@ -414,7 +414,7 @@ func TestAddGeoDataNDTConnSpec(t *testing.T) {
 	}
 }
 
-func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
+func TestGetAndInsertGeoIntoNDTConnSpec(t *testing.T) {
 	tests := []struct {
 		side      string
 		spec      schema.Web100ValueMap
@@ -467,7 +467,7 @@ func TestGetAndInsertMetaIntoNDTConnSpec(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BaseURL = ts.URL + test.url
-		p.GetAndInsertMetaIntoNDTConnSpec(test.side, test.spec, test.timestamp)
+		p.GetAndInsertGeoIntoNDTConnSpec(test.side, test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
 		}
@@ -512,7 +512,7 @@ func TestCopyStructToMap(t *testing.T) {
 
 }
 
-func TestGetAndInsertTwoSidedMetaIntoNDTConnSpec(t *testing.T) {
+func TestGetAndInsertTwoSidedGeoIntoNDTConnSpec(t *testing.T) {
 	tst, _ := time.Parse(time.RFC3339, "2002-10-02T15:00:00Z")
 	tests := []struct {
 		spec      schema.Web100ValueMap
@@ -563,7 +563,7 @@ func TestGetAndInsertTwoSidedMetaIntoNDTConnSpec(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
-		p.GetAndInsertTwoSidedMetaIntoNDTConnSpec(test.spec, test.timestamp)
+		p.GetAndInsertTwoSidedGeoIntoNDTConnSpec(test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
 		}

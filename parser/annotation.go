@@ -191,14 +191,14 @@ func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 
-	GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec, timestamp)
+	GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec, timestamp)
 }
 
 // GetAndInsertNDT takes a timestamp, an NDT connection spec, and a
 // string indicating whether it should get the metadata for the client
 // end or the server end of the connection. It will either insert the
 // data into the connection spec or silently fail.
-func GetAndInsertMetaIntoNDTConnSpec(side string, spec schema.Web100ValueMap, timestamp time.Time) {
+func GetAndInsertGeoIntoNDTConnSpec(side string, spec schema.Web100ValueMap, timestamp time.Time) {
 	ip, ok := spec.GetString([]string{side + "_ip"})
 	if ok {
 		url := annotation.BaseURL + "ip_addr=" + url.QueryEscape(ip) +
@@ -239,10 +239,10 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 
 }
 
-// GetAndInsertTwoSidedMetaIntoNDTConnSpec takes a timestamp and an
+// GetAndInsertTwoSidedGeoIntoNDTConnSpec takes a timestamp and an
 // NDT connection spec. It will either insert the data into the
 // connection spec or silently fail.
-func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
+func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// TODO(JM): Make metrics for sok and cok failures. And double check metrics for cleanliness.
 	cip, cok := spec.GetString([]string{"client_ip"})
 	sip, sok := spec.GetString([]string{"server_ip"})
