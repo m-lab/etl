@@ -17,7 +17,7 @@ import (
 
 var epoch time.Time = time.Unix(0, 0)
 
-func TestAddMetaDataSSConnSpec(t *testing.T) {
+func TestAddGeoDataSSConnSpec(t *testing.T) {
 	tests := []struct {
 		conspec   schema.Web100ConnectionSpecification
 		timestamp time.Time
@@ -66,14 +66,14 @@ func TestAddMetaDataSSConnSpec(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
-		p.AddMetaDataSSConnSpec(&test.conspec, test.timestamp)
+		p.AddGeoDataSSConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
 		}
 	}
 }
 
-func TestAddMetaDataPTConnSpec(t *testing.T) {
+func TestAddGeoDataPTConnSpec(t *testing.T) {
 	tests := []struct {
 		conspec   schema.MLabConnectionSpecification
 		timestamp time.Time
@@ -122,14 +122,14 @@ func TestAddMetaDataPTConnSpec(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
-		p.AddMetaDataPTConnSpec(&test.conspec, test.timestamp)
+		p.AddGeoDataPTConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
 		}
 	}
 }
 
-func TestAddMetaDataPTHopBatch(t *testing.T) {
+func TestAddGeoDataPTHopBatch(t *testing.T) {
 	tests := []struct {
 		hops      []*schema.ParisTracerouteHop
 		timestamp time.Time
@@ -161,7 +161,7 @@ func TestAddMetaDataPTHopBatch(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
-		p.AddMetaDataPTHopBatch(test.hops, test.timestamp)
+		p.AddGeoDataPTHopBatch(test.hops, test.timestamp)
 		if !reflect.DeepEqual(test.hops, test.res) {
 			t.Errorf("Expected %s, got %s from data %s", test.res, test.hops, test.url)
 		}
@@ -171,7 +171,7 @@ func TestAddMetaDataPTHopBatch(t *testing.T) {
 func TestAnnotatePTHops(t *testing.T) {
 	tests := []struct {
 		hops           []*schema.ParisTracerouteHop
-		annotationData map[string]annotation.MetaData
+		annotationData map[string]annotation.GeoData
 		timestamp      time.Time
 		res            []*schema.ParisTracerouteHop
 	}{
@@ -183,13 +183,13 @@ func TestAnnotatePTHops(t *testing.T) {
 		},
 		{
 			hops:           []*schema.ParisTracerouteHop{nil},
-			annotationData: map[string]annotation.MetaData{},
+			annotationData: map[string]annotation.GeoData{},
 			timestamp:      epoch,
 			res:            []*schema.ParisTracerouteHop{nil},
 		},
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
-			annotationData: map[string]annotation.MetaData{"127.0.0.10": annotation.MetaData{
+			annotationData: map[string]annotation.GeoData{"127.0.0.10": annotation.GeoData{
 				Geo: &annotation.GeolocationIP{}, ASN: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1",
@@ -197,7 +197,7 @@ func TestAnnotatePTHops(t *testing.T) {
 		},
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
-			annotationData: map[string]annotation.MetaData{"1.0.0.1270": annotation.MetaData{
+			annotationData: map[string]annotation.GeoData{"1.0.0.1270": annotation.GeoData{
 				Geo: &annotation.GeolocationIP{}, ASN: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127",
@@ -243,7 +243,7 @@ func TestCreateRequestDataFromPTHops(t *testing.T) {
 	}
 }
 
-func TestAddMetaDataPTHop(t *testing.T) {
+func TestAddGeoDataPTHop(t *testing.T) {
 	tests := []struct {
 		hop       schema.ParisTracerouteHop
 		timestamp time.Time
@@ -291,7 +291,7 @@ func TestAddMetaDataPTHop(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BaseURL = ts.URL + test.url
-		p.AddMetaDataPTHop(&test.hop, test.timestamp)
+		p.AddGeoDataPTHop(&test.hop, test.timestamp)
 		if !reflect.DeepEqual(test.hop, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.hop, test.url)
 		}
@@ -392,14 +392,14 @@ func TestDisabledAnnotation(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
-		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
+		p.AddGeoDataNDTConnSpec(test.spec, test.timestamp)
 	}
 	if callCount != 0 {
 		t.Errorf("Annotator should not have been called.  Call count: %d", callCount)
 	}
 }
 
-func TestAddMetaDataNDTConnSpec(t *testing.T) {
+func TestAddGeoDataNDTConnSpec(t *testing.T) {
 	annotation.EnableAnnotation()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
@@ -407,7 +407,7 @@ func TestAddMetaDataNDTConnSpec(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
-		p.AddMetaDataNDTConnSpec(test.spec, test.timestamp)
+		p.AddGeoDataNDTConnSpec(test.spec, test.timestamp)
 		if !reflect.DeepEqual(test.spec, test.res) {
 			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
 		}

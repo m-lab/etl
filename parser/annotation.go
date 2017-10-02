@@ -15,11 +15,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// AddMetaDataSSConnSpec takes a pointer to a
+// AddGeoDataSSConnSpec takes a pointer to a
 // Web100ConnectionSpecification struct and a timestamp. With these,
 // it will fetch the appropriate metadata and add it to the hop struct
 // referenced by the pointer.
-func AddMetaDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp time.Time) {
+func AddGeoDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp time.Time) {
 	if spec == nil {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "SS ConnSpec was nil!!!"}).Inc()
@@ -38,11 +38,11 @@ func AddMetaDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp
 	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
-// AddMetaDataPTConnSpec takes a pointer to a
+// AddGeoDataPTConnSpec takes a pointer to a
 // MLabConnectionSpecification struct and a timestamp. With these, it
 // will fetch the appropriate metadata and add it to the hop struct
 // referenced by the pointer.
-func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
+func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
 	if spec == nil {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "PT ConnSpec was nil!!!"}).Inc()
@@ -60,10 +60,10 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
-// AddMetaDataPTHopBatch takes a slice of pointers to
+// AddGeoDataPTHopBatch takes a slice of pointers to
 // schema.ParisTracerouteHops and will annotate all of them or fail
 // silently. It sends them all in a single remote request.
-func AddMetaDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time) {
+func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time) {
 	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
@@ -72,14 +72,14 @@ func AddMetaDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Tim
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 	requestSlice := CreateRequestDataFromPTHops(hops, timestamp)
-	annotationData := annotation.GetBatchMetaData(annotation.BatchURL, requestSlice)
+	annotationData := annotation.GetBatchGeoData(annotation.BatchURL, requestSlice)
 	AnnotatePTHops(hops, annotationData, timestamp)
 }
 
 // AnnotatePTHops takes a slice of hop pointers, the annotation data
 // mapping ip addresses to metadata and a timestamp. It will then use
 // these to attach the appropriate metadata to the PT hops.
-func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]annotation.MetaData, timestamp time.Time) {
+func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]annotation.GeoData, timestamp time.Time) {
 	if annotationData == nil {
 		return
 	}
@@ -139,10 +139,10 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 	return requestSlice
 }
 
-// AddMetaDataPTHop takes a pointer to a ParisTracerouteHop and a
+// AddGeoDataPTHop takes a pointer to a ParisTracerouteHop and a
 // timestamp. With these, it will fetch the appropriate metadata and
 // add it to the hop struct referenced by the pointer.
-func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
+func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	if hop == nil {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "PT Hop was nil!!!"}).Inc()
@@ -169,11 +169,11 @@ func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	}
 }
 
-// AddMetaDataNDTConnSpec takes a connection spec and a timestamp and
+// AddGeoDataNDTConnSpec takes a connection spec and a timestamp and
 // annotates the connection spec with metadata associated with each IP
 // Address. It will either sucessfully add the metadata or fail
 // silently and make no changes.
-func AddMetaDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
+func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// Only annotate if flag enabled...
 	// TODO(gfr) - should propogate this to other pipelines, or push to a common
 	// intercept point.
@@ -203,7 +203,7 @@ func GetAndInsertMetaIntoNDTConnSpec(side string, spec schema.Web100ValueMap, ti
 	if ok {
 		url := annotation.BaseURL + "ip_addr=" + url.QueryEscape(ip) +
 			"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
-		annotationData := annotation.GetMetaData(url)
+		annotationData := annotation.GetGeoData(url)
 		if annotationData != nil && annotationData.Geo != nil {
 			CopyStructToMap(annotationData.Geo, spec.Get(side+"_geolocation"))
 		} else {
@@ -260,7 +260,7 @@ func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timesta
 			Labels{"source": "Missing server side IP."}).Inc()
 	}
 	if cok || sok {
-		annotationDataMap := annotation.GetBatchMetaData(annotation.BatchURL, reqData)
+		annotationDataMap := annotation.GetBatchGeoData(annotation.BatchURL, reqData)
 		// TODO(JM): Revisit decision to use base36 for
 		// encoding, rather than base64. (It had to do with
 		// library support.)

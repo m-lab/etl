@@ -69,7 +69,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 		}
 		reqData = append(reqData, RequestData{ip, 0, timestamp})
 	}
-	annotationData := GetBatchMetaData(BatchURL, reqData)
+	annotationData := GetBatchGeoData(BatchURL, reqData)
 	timeString := strconv.FormatInt(timestamp.Unix(), 36)
 	for index, ip := range ips {
 		data, ok := annotationData[ip+timeString]
@@ -91,17 +91,17 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 func GetAndInsertGeolocationIPStruct(geo *GeolocationIP, ip string, timestamp time.Time) {
 	url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +
 		"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
-	annotationData := GetMetaData(url)
+	annotationData := GetGeoData(url)
 	if annotationData != nil && annotationData.Geo != nil {
 		*geo = *annotationData.Geo
 	}
 }
 
-// GetMetaData combines the functionality of QueryAnnotationService and
-// ParseJSONMetaDataResponse to query the annotator service and return
-// the corresponding MetaData if it can, or a nil pointer if it
+// GetGeoData combines the functionality of QueryAnnotationService and
+// ParseJSONGeoDataResponse to query the annotator service and return
+// the corresponding GeoData if it can, or a nil pointer if it
 // encounters any error and cannot get the data for any reason
-func GetMetaData(url string) *MetaData {
+func GetGeoData(url string) *GeoData {
 	// Query the service and grab the response safely
 	annotatorResponse, err := QueryAnnotationService(url)
 	if err != nil {
@@ -112,7 +112,7 @@ func GetMetaData(url string) *MetaData {
 	}
 
 	// Safely parse the JSON response and pass it back to the caller
-	metaDataFromResponse, err := ParseJSONMetaDataResponse(annotatorResponse)
+	metaDataFromResponse, err := ParseJSONGeoDataResponse(annotatorResponse)
 	if err != nil {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Failed to parse JSON"}).Inc()
@@ -148,12 +148,12 @@ func QueryAnnotationService(url string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-// ParseJSONMetaDataResponse takes a byte slice containing the test of
-// the JSON from the annotator service and parses it into a MetaData
+// ParseJSONGeoDataResponse takes a byte slice containing the test of
+// the JSON from the annotator service and parses it into a GeoData
 // struct, for easy manipulation. It returns a pointer to the struct on
 // success and an error if an error occurs.
-func ParseJSONMetaDataResponse(jsonBuffer []byte) (*MetaData, error) {
-	parsedJSON := &MetaData{}
+func ParseJSONGeoDataResponse(jsonBuffer []byte) (*GeoData, error) {
+	parsedJSON := &GeoData{}
 	err := json.Unmarshal(jsonBuffer, parsedJSON)
 	if err != nil {
 		return nil, err
@@ -161,13 +161,13 @@ func ParseJSONMetaDataResponse(jsonBuffer []byte) (*MetaData, error) {
 	return parsedJSON, nil
 }
 
-// GetBatchMetaData combines the functionality of
-// BatchQueryAnnotationService and BatchParseJSONMetaDataResponse to
+// GetBatchGeoData combines the functionality of
+// BatchQueryAnnotationService and BatchParseJSONGeoDataResponse to
 // query the annotator service and return the corresponding map of
-// ip-timestamp strings to MetaData structs, or a nil map if it
+// ip-timestamp strings to GeoData structs, or a nil map if it
 // encounters any error and cannot get the data for any reason
-// TODO - dedup common code in GetMetaData
-func GetBatchMetaData(url string, data []RequestData) map[string]MetaData {
+// TODO - dedup common code in GetGeoData
+func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 	// Query the service and grab the response safely
 	annotatorResponse, err := BatchQueryAnnotationService(url, data)
 	if err != nil {
@@ -178,7 +178,7 @@ func GetBatchMetaData(url string, data []RequestData) map[string]MetaData {
 	}
 
 	// Safely parse the JSON response and pass it back to the caller
-	metaDataFromResponse, err := BatchParseJSONMetaDataResponse(annotatorResponse)
+	metaDataFromResponse, err := BatchParseJSONGeoDataResponse(annotatorResponse)
 	if err != nil {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Failed to parse JSON"}).Inc()
@@ -221,14 +221,14 @@ func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error)
 	return ioutil.ReadAll(resp.Body)
 }
 
-// BatchParseJSONMetaDataResponse takes a byte slice containing the
+// BatchParseJSONGeoDataResponse takes a byte slice containing the
 // text of the JSON from the annoator service's batch request endpoint
-// and parses it into a map of strings to MetaData structs, for
+// and parses it into a map of strings to GeoData structs, for
 // easy manipulation. It returns a pointer to the struct on success
 // and an error if one occurs.
 // TODO - is there duplicate code with ParseJSON... ?
-func BatchParseJSONMetaDataResponse(jsonBuffer []byte) (map[string]MetaData, error) {
-	parsedJSON := make(map[string]MetaData)
+func BatchParseJSONGeoDataResponse(jsonBuffer []byte) (map[string]GeoData, error) {
+	parsedJSON := make(map[string]GeoData)
 	err := json.Unmarshal(jsonBuffer, &parsedJSON)
 	if err != nil {
 		return nil, err

@@ -20,27 +20,27 @@ func TestFetchGeoAnnotations(t *testing.T) {
 	tests := []struct {
 		ips       []string
 		timestamp time.Time
-		geoDest   []*geo.GeolocationIP
-		res       []*geo.GeolocationIP
+		geoDest   []*annotation.GeolocationIP
+		res       []*annotation.GeolocationIP
 	}{
 		{
 			ips:       []string{},
 			timestamp: epoch,
-			geoDest:   []*geo.GeolocationIP{},
-			res:       []*geo.GeolocationIP{},
+			geoDest:   []*annotation.GeolocationIP{},
+			res:       []*annotation.GeolocationIP{},
 		},
 		{
 			ips:       []string{"", "127.0.0.1", "2.2.2.2"},
 			timestamp: epoch,
-			geoDest: []*geo.GeolocationIP{
-				&geo.GeolocationIP{},
-				&geo.GeolocationIP{},
-				&geo.GeolocationIP{},
+			geoDest: []*annotation.GeolocationIP{
+				&annotation.GeolocationIP{},
+				&annotation.GeolocationIP{},
+				&annotation.GeolocationIP{},
 			},
-			res: []*geo.GeolocationIP{
-				&geo.GeolocationIP{},
-				&geo.GeolocationIP{Postal_code: "10583"},
-				&geo.GeolocationIP{},
+			res: []*annotation.GeolocationIP{
+				&annotation.GeolocationIP{},
+				&annotation.GeolocationIP{Postal_code: "10583"},
+				&annotation.GeolocationIP{},
 			},
 		},
 	}
@@ -49,8 +49,8 @@ func TestFetchGeoAnnotations(t *testing.T) {
 			`,"2.2.2.20" : {"Geo":null,"ASN":null}}`)
 	}))
 	for _, test := range tests {
-		geo.BatchURL = ts.URL
-		geo.FetchGeoAnnotations(test.ips, test.timestamp, test.geoDest)
+		annotation.BatchURL = ts.URL
+		annotation.FetchGeoAnnotations(test.ips, test.timestamp, test.geoDest)
 		if !reflect.DeepEqual(test.geoDest, test.res) {
 			t.Errorf("Expected %s, got %s", test.res, test.geoDest)
 		}
@@ -59,32 +59,32 @@ func TestFetchGeoAnnotations(t *testing.T) {
 
 func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
 	tests := []struct {
-		geo       *geo.GeolocationIP
+		geo       *annotation.GeolocationIP
 		ip        string
 		timestamp time.Time
 		url       string
-		res       *geo.GeolocationIP
+		res       *annotation.GeolocationIP
 	}{
 		{
-			geo:       &geo.GeolocationIP{},
+			geo:       &annotation.GeolocationIP{},
 			ip:        "123.123.123.001",
 			timestamp: time.Now(),
 			url:       "portGarbage",
-			res:       &geo.GeolocationIP{},
+			res:       &annotation.GeolocationIP{},
 		},
 		{
-			geo: &geo.GeolocationIP{},
+			geo: &annotation.GeolocationIP{},
 			ip:  "127.0.0.1",
 			url: "/10583",
-			res: &geo.GeolocationIP{Postal_code: "10583"},
+			res: &annotation.GeolocationIP{Postal_code: "10583"},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
 	}))
 	for _, test := range tests {
-		geo.BaseURL = ts.URL + test.url
-		geo.GetAndInsertGeolocationIPStruct(test.geo, test.ip, test.timestamp)
+		annotation.BaseURL = ts.URL + test.url
+		annotation.GetAndInsertGeolocationIPStruct(test.geo, test.ip, test.timestamp)
 		if !reflect.DeepEqual(test.geo, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.geo, test.url)
 		}
@@ -92,10 +92,10 @@ func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
 
 }
 
-func TestGetMetaData(t *testing.T) {
+func TestGetGeoData(t *testing.T) {
 	tests := []struct {
 		url string
-		res *geo.MetaData
+		res *annotation.GeoData
 	}{
 		{
 			url: "portGarbage",
@@ -107,7 +107,7 @@ func TestGetMetaData(t *testing.T) {
 		},
 		{
 			url: "/goodJson",
-			res: &geo.MetaData{},
+			res: &annotation.GeoData{},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +119,7 @@ func TestGetMetaData(t *testing.T) {
 		fmt.Fprint(w, "{jngngfsljngsljngfsljngsljn")
 	}))
 	for _, test := range tests {
-		res := geo.GetMetaData(ts.URL + test.url)
+		res := annotation.GetGeoData(ts.URL + test.url)
 		if res != test.res && *res != *test.res {
 			t.Errorf("Expected %+v, got %+v for data: %s\n", test.res, res, test.url)
 		}
@@ -159,7 +159,7 @@ func TestQueryAnnotationService(t *testing.T) {
 		fmt.Fprint(w, "Echo")
 	}))
 	for _, test := range tests {
-		json, err := geo.QueryAnnotationService(ts.URL + test.url)
+		json, err := annotation.QueryAnnotationService(ts.URL + test.url)
 		if err != nil && test.err == nil || err == nil && test.err != nil {
 			t.Errorf("Expected %s, got %s, for %s", test.err, err, test.url)
 		}
@@ -170,15 +170,15 @@ func TestQueryAnnotationService(t *testing.T) {
 	}
 }
 
-func TestParseJSONMetaDataResponse(t *testing.T) {
+func TestParseJSONGeoDataResponse(t *testing.T) {
 	tests := []struct {
 		testBuffer  []byte
-		resultData  *geo.MetaData
+		resultData  *annotation.GeoData
 		resultError error
 	}{
 		{
 			testBuffer:  []byte(`{"Geo":null,"ASN":null}`),
-			resultData:  &geo.MetaData{Geo: nil, ASN: nil},
+			resultData:  &annotation.GeoData{Geo: nil, ASN: nil},
 			resultError: nil,
 		},
 		{
@@ -188,7 +188,7 @@ func TestParseJSONMetaDataResponse(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		res, err := geo.ParseJSONMetaDataResponse(test.testBuffer)
+		res, err := annotation.ParseJSONGeoDataResponse(test.testBuffer)
 		// This big mishmash of if statements is simply
 		// checking that if one err is nil, that the other is
 		// too. Because error messages can vary, this is less
@@ -204,10 +204,10 @@ func TestParseJSONMetaDataResponse(t *testing.T) {
 	}
 }
 
-func TestGetBatchMetaData(t *testing.T) {
+func TestGetBatchGeoData(t *testing.T) {
 	tests := []struct {
 		url string
-		res map[string]geo.MetaData
+		res map[string]annotation.GeoData
 	}{
 		{
 			url: "portGarbage",
@@ -219,7 +219,7 @@ func TestGetBatchMetaData(t *testing.T) {
 		},
 		{
 			url: "/goodJson",
-			res: map[string]geo.MetaData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
+			res: map[string]annotation.GeoData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -231,7 +231,7 @@ func TestGetBatchMetaData(t *testing.T) {
 		fmt.Fprint(w, "{jngngfsljngsljngfsljngsljn")
 	}))
 	for _, test := range tests {
-		res := geo.GetBatchMetaData(ts.URL+test.url, nil)
+		res := annotation.GetBatchGeoData(ts.URL+test.url, nil)
 		if !reflect.DeepEqual(res, test.res) {
 			t.Errorf("Expected %+v, got %+v for data: %s\n", test.res, res, test.url)
 		}
@@ -271,7 +271,7 @@ func TestBatchQueryAnnotationService(t *testing.T) {
 		fmt.Fprint(w, "Echo")
 	}))
 	for _, test := range tests {
-		json, err := geo.BatchQueryAnnotationService(ts.URL+test.url, nil)
+		json, err := annotation.BatchQueryAnnotationService(ts.URL+test.url, nil)
 		if err != nil && test.err == nil || err == nil && test.err != nil {
 			t.Errorf("Expected %s, got %s, for %s", test.err, err, test.url)
 		}
@@ -282,10 +282,10 @@ func TestBatchQueryAnnotationService(t *testing.T) {
 	}
 }
 
-func TestBatchParseJSONMetaDataResponse(t *testing.T) {
+func TestBatchParseJSONGeoDataResponse(t *testing.T) {
 	tests := []struct {
 		testBuffer  []byte
-		resultData  map[string]geo.MetaData
+		resultData  map[string]annotation.GeoData
 		resultError error
 	}{
 		{
@@ -293,7 +293,7 @@ func TestBatchParseJSONMetaDataResponse(t *testing.T) {
 			// addresses. The xyz could be a base36
 			// encoded timestamp.
 			testBuffer:  []byte(`{"127.0.0.1xyz": {"Geo":null,"ASN":null}}`),
-			resultData:  map[string]geo.MetaData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
+			resultData:  map[string]annotation.GeoData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
 			resultError: nil,
 		},
 		{
@@ -303,7 +303,7 @@ func TestBatchParseJSONMetaDataResponse(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		res, err := geo.BatchParseJSONMetaDataResponse(test.testBuffer)
+		res, err := annotation.BatchParseJSONGeoDataResponse(test.testBuffer)
 		// This big mishmash of if statements is simply
 		// checking that if one err is nil, that the other is
 		// too. Because error messages can vary, this is less
