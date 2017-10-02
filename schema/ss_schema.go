@@ -2,14 +2,16 @@
 // Any changes here should also be made in ss.json
 package schema
 
+import "github.com/m-lab/etl/annotation"
+
 type Web100ConnectionSpecification struct {
-	Local_ip           string        `json:"local_ip, string"`
-	Local_af           int64         `json:"local_af, int64"`
-	Local_port         int64         `json:"local_port, int64"`
-	Remote_ip          string        `json:"remote_ip, string"`
-	Remote_port        int64         `json:"remote_port, int64"`
-	Local_geolocation  GeolocationIP `json:"local_geolocation"`
-	Remote_geolocation GeolocationIP `json:"remote_geolocation"`
+	Local_ip           string                   `json:"local_ip, string"`
+	Local_af           int64                    `json:"local_af, int64"`
+	Local_port         int64                    `json:"local_port, int64"`
+	Remote_ip          string                   `json:"remote_ip, string"`
+	Remote_port        int64                    `json:"remote_port, int64"`
+	Local_geolocation  annotation.GeolocationIP `json:"local_geolocation"`
+	Remote_geolocation annotation.GeolocationIP `json:"remote_geolocation"`
 }
 
 type Web100Snap struct {

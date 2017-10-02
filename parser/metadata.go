@@ -16,6 +16,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,15 +60,15 @@ var BatchURL = AnnotatorURL + "/batch_annotate"
 // same length. It will then make a call to the batch annotator, using
 // the ip addresses and the timestamp. Then, it uses that data to fill
 // in the structs pointed to by the slice of GeolocationIP pointers.
-func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*schema.GeolocationIP) {
-	reqData := make([]schema.RequestData, 0, len(ips))
+func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*annotation.GeolocationIP) {
+	reqData := make([]annotation.RequestData, 0, len(ips))
 	for _, ip := range ips {
 		if ip == "" {
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "Empty IP Address!!!"}).Inc()
 			continue
 		}
-		reqData = append(reqData, schema.RequestData{ip, 0, timestamp})
+		reqData = append(reqData, annotation.RequestData{ip, 0, timestamp})
 	}
 	annotationData := GetBatchMetaData(BatchURL, reqData)
 	timeString := strconv.FormatInt(timestamp.Unix(), 36)
@@ -102,7 +103,7 @@ func AddMetaDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp
 	}(timerStart)
 
 	ipSlice := []string{spec.Local_ip, spec.Remote_ip}
-	geoSlice := []*schema.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
+	geoSlice := []*annotation.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
 	FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
@@ -124,7 +125,7 @@ func AddMetaDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp t
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 	ipSlice := []string{spec.Server_ip, spec.Client_ip}
-	geoSlice := []*schema.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
+	geoSlice := []*annotation.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
 	FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
@@ -147,7 +148,7 @@ func AddMetaDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Tim
 // AnnotatePTHops takes a slice of hop pointers, the annotation data
 // mapping ip addresses to metadata and a timestamp. It will then use
 // these to attach the appropriate metadata to the PT hops.
-func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]schema.MetaData, timestamp time.Time) {
+func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]annotation.MetaData, timestamp time.Time) {
 	if annotationData == nil {
 		return
 	}
@@ -177,8 +178,8 @@ func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string
 // and the associate timestamp. From those, it will create a slice of
 // requests to send to the annotation service, removing duplicates
 // along the way.
-func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp time.Time) []schema.RequestData {
-	hopMap := map[string]schema.RequestData{}
+func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp time.Time) []annotation.RequestData {
+	hopMap := map[string]annotation.RequestData{}
 	for _, hop := range hops {
 		if hop == nil {
 			metrics.AnnotationErrorCount.With(prometheus.
@@ -186,21 +187,21 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 			continue
 		}
 		if hop.Src_ip != "" {
-			hopMap[hop.Src_ip] = schema.RequestData{hop.Src_ip, 0, timestamp}
+			hopMap[hop.Src_ip] = annotation.RequestData{hop.Src_ip, 0, timestamp}
 		} else {
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()
 		}
 
 		if hop.Dest_ip != "" {
-			hopMap[hop.Dest_ip] = schema.RequestData{hop.Dest_ip, 0, timestamp}
+			hopMap[hop.Dest_ip] = annotation.RequestData{hop.Dest_ip, 0, timestamp}
 		} else {
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()
 		}
 	}
 
-	requestSlice := make([]schema.RequestData, 0, len(hopMap))
+	requestSlice := make([]annotation.RequestData, 0, len(hopMap))
 	for _, req := range hopMap {
 		requestSlice = append(requestSlice, req)
 	}
@@ -238,11 +239,11 @@ func AddMetaDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 }
 
 // GetAndInsertGeolocationIPStruct takes a NON-NIL pointer to a
-// pre-allocated schema.GeolocationIP struct, an IP address, and a
+// pre-allocated annotation.GeolocationIP struct, an IP address, and a
 // timestamp. It will connect to the annotation service, get the
 // metadata, and insert the metadata into the reigion pointed to by
-// the schema.GeolocationIP pointer.
-func GetAndInsertGeolocationIPStruct(geo *schema.GeolocationIP, ip string, timestamp time.Time) {
+// the annotation.GeolocationIP pointer.
+func GetAndInsertGeolocationIPStruct(geo *annotation.GeolocationIP, ip string, timestamp time.Time) {
 	url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +
 		"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
 	annotationData := GetMetaData(url)
@@ -325,7 +326,7 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 // ParseJSONMetaDataResponse to query the annotator service and return
 // the corresponding MetaData if it can, or a nil pointer if it
 // encounters any error and cannot get the data for any reason
-func GetMetaData(url string) *schema.MetaData {
+func GetMetaData(url string) *annotation.MetaData {
 	// Query the service and grab the response safely
 	annotatorResponse, err := QueryAnnotationService(url)
 	if err != nil {
@@ -376,8 +377,8 @@ func QueryAnnotationService(url string) ([]byte, error) {
 // the JSON from the annotator service and parses it into a MetaData
 // struct, for easy manipulation. It returns a pointer to the struct on
 // success and an error if an error occurs.
-func ParseJSONMetaDataResponse(jsonBuffer []byte) (*schema.MetaData, error) {
-	parsedJSON := &schema.MetaData{}
+func ParseJSONMetaDataResponse(jsonBuffer []byte) (*annotation.MetaData, error) {
+	parsedJSON := &annotation.MetaData{}
 	err := json.Unmarshal(jsonBuffer, parsedJSON)
 	if err != nil {
 		return nil, err
@@ -392,15 +393,15 @@ func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timesta
 	// TODO(JM): Make metrics for sok and cok failures. And double check metrics for cleanliness.
 	cip, cok := spec.GetString([]string{"client_ip"})
 	sip, sok := spec.GetString([]string{"server_ip"})
-	reqData := []schema.RequestData{}
+	reqData := []annotation.RequestData{}
 	if cok {
-		reqData = append(reqData, schema.RequestData{IP: cip, Timestamp: timestamp})
+		reqData = append(reqData, annotation.RequestData{IP: cip, Timestamp: timestamp})
 	} else {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
-		reqData = append(reqData, schema.RequestData{IP: sip, Timestamp: timestamp})
+		reqData = append(reqData, annotation.RequestData{IP: sip, Timestamp: timestamp})
 	} else {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Missing server side IP."}).Inc()
@@ -435,9 +436,9 @@ func GetAndInsertTwoSidedMetaIntoNDTConnSpec(spec schema.Web100ValueMap, timesta
 // GetBatchMetaData combines the functionality of
 // BatchQueryAnnotationService and BatchParseJSONMetaDataResponse to
 // query the annotator service and return the corresponding map of
-// ip-timestamp strings to schema.MetaData structs, or a nil map if it
+// ip-timestamp strings to annotation.MetaData structs, or a nil map if it
 // encounters any error and cannot get the data for any reason
-func GetBatchMetaData(url string, data []schema.RequestData) map[string]schema.MetaData {
+func GetBatchMetaData(url string, data []annotation.RequestData) map[string]annotation.MetaData {
 	// Query the service and grab the response safely
 	annotatorResponse, err := BatchQueryAnnotationService(url, data)
 	if err != nil {
@@ -459,10 +460,10 @@ func GetBatchMetaData(url string, data []schema.RequestData) map[string]schema.M
 }
 
 // BatchQueryAnnotationService takes a url to POST the request to and
-// a slice of schema.RequestDatas to be sent in the body in a JSON
+// a slice of annotation.RequestDatas to be sent in the body in a JSON
 // format. It will copy the response into a []byte and return it to
 // the user, returning an error if any occurs
-func BatchQueryAnnotationService(url string, data []schema.RequestData) ([]byte, error) {
+func BatchQueryAnnotationService(url string, data []annotation.RequestData) ([]byte, error) {
 	encodedData, err := json.Marshal(data)
 	if err != nil {
 		metrics.AnnotationErrorCount.
@@ -493,11 +494,11 @@ func BatchQueryAnnotationService(url string, data []schema.RequestData) ([]byte,
 
 // BatchParseJSONMetaDataResponse takes a byte slice containing the
 // text of the JSON from the annoator service's batch request endpoint
-// and parses it into a map of strings to schema.MetaData structs, for
+// and parses it into a map of strings to annotation.MetaData structs, for
 // easy manipulation. It returns a pointer to the struct on success
 // and an error if one occurs.
-func BatchParseJSONMetaDataResponse(jsonBuffer []byte) (map[string]schema.MetaData, error) {
-	parsedJSON := make(map[string]schema.MetaData)
+func BatchParseJSONMetaDataResponse(jsonBuffer []byte) (map[string]annotation.MetaData, error) {
+	parsedJSON := make(map[string]annotation.MetaData)
 	err := json.Unmarshal(jsonBuffer, &parsedJSON)
 	if err != nil {
 		return nil, err
