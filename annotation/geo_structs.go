@@ -1,4 +1,4 @@
-package geo
+package annotation
 
 // TODO - merge this into annotation.go
 
