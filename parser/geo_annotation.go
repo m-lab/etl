@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
@@ -194,25 +193,6 @@ func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec, timestamp)
 }
 
-// GetAndInsertNDT takes a timestamp, an NDT connection spec, and a
-// string indicating whether it should get the geo data for the client
-// end or the server end of the connection. It will either insert the
-// data into the connection spec or silently fail.
-func GetAndInsertGeoIntoNDTConnSpec(side string, spec schema.Web100ValueMap, timestamp time.Time) {
-	ip, ok := spec.GetString([]string{side + "_ip"})
-	if ok {
-		url := annotation.BaseURL + "ip_addr=" + url.QueryEscape(ip) +
-			"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
-		annotationData := annotation.GetGeoData(url)
-		if annotationData != nil && annotationData.Geo != nil {
-			CopyStructToMap(annotationData.Geo, spec.Get(side+"_geolocation"))
-		} else {
-			metrics.AnnotationErrorCount.With(prometheus.
-				Labels{"source": "Couldn't get geo data for the " + side + " side."}).Inc()
-		}
-	}
-}
-
 // CopyStructToMap takes a POINTER to an arbitrary struct and copies
 // it's fields into a value map. It will also make fields entirely
 // lower case, for convienece when working with exported structs. Also,
@@ -234,9 +214,7 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 			}
 		}
 		destinationMap[strings.ToLower(typeOfStruct.Field(i).Name)] = v
-
 	}
-
 }
 
 // GetAndInsertTwoSidedGeoIntoNDTConnSpec takes a timestamp and an

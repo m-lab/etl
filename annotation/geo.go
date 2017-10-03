@@ -16,11 +16,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// TODO(gfr) Remove this comment after review.
-// NOTE: the code was cut and pasted from parser version of file, to
-// ensure no code was lost or duplicated.  Only minor additions and edits
-// were made, which should be apparent in the diff.
-
 var IPAnnotationEnabled = false
 
 func init() {
@@ -42,7 +37,46 @@ func EnableAnnotation() {
 	getFlagValues()
 }
 
-// TODO(JosephMarques) See if there is a better way of determining
+// The GeolocationIP struct contains all the information needed for the
+// geolocation data that will be inserted into big query. The fiels are
+// capitalized for exporting, although the originals in the DB schema
+// are not.
+type GeolocationIP struct {
+	Continent_code string  `json:"continent_code, string,omitempty"` // Gives a shorthand for the continent
+	Country_code   string  `json:"country_code, string,omitempty"`   // Gives a shorthand for the country
+	Country_code3  string  `json:"country_code3, string,omitempty"`  // Gives a shorthand for the country
+	Country_name   string  `json:"country_name, string,omitempty"`   // Name of the country
+	Region         string  `json:"region, string,omitempty"`         // Region or State within the country
+	Metro_code     int64   `json:"metro_code, integer,omitempty"`    // Metro code within the country
+	City           string  `json:"city, string,omitempty"`           // City within the region
+	Area_code      int64   `json:"area_code, integer,omitempty"`     // Area code, similar to metro code
+	Postal_code    string  `json:"postal_code, string,omitempty"`    // Postal code, again similar to metro
+	Latitude       float64 `json:"latitude, float"`                  // Latitude
+	Longitude      float64 `json:"longitude, float"`                 // Longitude
+
+}
+
+// The struct that will hold the IP/ASN data when it gets added to the
+// schema. Currently empty and unused.
+type IPASNData struct{}
+
+// The main struct for the geo metadata, which holds pointers to the
+// Geolocation data and the IP/ASN data. This is what we parse the JSON
+// response from the annotator into.
+type GeoData struct {
+	Geo *GeolocationIP // Holds the geolocation data
+	ASN *IPASNData     // Holds the IP/ASN data
+}
+
+// The RequestData schema is the schema for the json that we will send
+// down the pipe to the annotation service.
+type RequestData struct {
+	IP        string    // Holds the IP from an incoming request
+	IPFormat  int       // Holds the ip format, 4 or 6
+	Timestamp time.Time // Holds the timestamp from an incoming request
+}
+
+// TODO(gfr) See if there is a better way of determining
 // where to send the request (there almost certainly is)
 var AnnotatorURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
@@ -191,6 +225,7 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 // a slice of RequestDatas to be sent in the body in a JSON
 // format. It will copy the response into a []byte and return it to
 // the user, returning an error if any occurs
+// TODO(gfr) Should pass the annotator's request context through and use it here.
 func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error) {
 	metrics.AnnotationRequestCount.Inc()
 
@@ -200,20 +235,24 @@ func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error)
 			With(prometheus.Labels{"source": "Couldn't Marshal Data"}).Inc()
 		return nil, err
 	}
-	// Make the actual request
-	resp, err := http.Post(url, "raw", bytes.NewReader(encodedData))
 
+	var netClient = &http.Client{
+		Timeout: time.Second,
+	}
+
+	// Make the actual request
+	resp, err := netClient.Post(url, "raw", bytes.NewReader(encodedData))
 	// Catch http errors
 	if err != nil {
 		metrics.AnnotationErrorCount.
-			With(prometheus.Labels{"source": "Request to Annotator failed"}).Inc()
+			With(prometheus.Labels{"source": err.Error()}).Inc()
 		return nil, err
 	}
 
 	// Catch errors reported by the service
 	if resp.StatusCode != http.StatusOK {
 		metrics.AnnotationErrorCount.
-			With(prometheus.Labels{"source": "Webserver gave non-ok response"}).Inc()
+			With(prometheus.Labels{"source": http.StatusText(resp.StatusCode)}).Inc()
 		return nil, errors.New("URL:" + url + " gave response code " + resp.Status)
 	}
 	defer resp.Body.Close()

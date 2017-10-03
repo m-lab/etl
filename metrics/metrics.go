@@ -61,7 +61,7 @@ var (
 	// Provides metrics:
 	//    etl_annotator_Request_Count
 	// Example usage:
-	//    metrics.AnnotationRequestCount.Inc() / .Dec()
+	//    metrics.AnnotationRequestCount.Inc()
 	AnnotationRequestCount = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "etl_annotator_Request_Count",
 		Help: "The current number of annotation requests",
@@ -71,7 +71,7 @@ var (
 	// Provides metrics:
 	//    etl_annotator_Error_Count
 	// Example usage:
-	//    metrics.AnnotationErrorCount.Inc() / .Dec()
+	//    metrics.AnnotationErrorCount.Inc()
 	AnnotationErrorCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "etl_annotator_Error_Count",
 		Help: "The current number of errors encountered while attempting to add geo data.",
