@@ -76,7 +76,7 @@ type RequestData struct {
 	Timestamp time.Time // Holds the timestamp from an incoming request
 }
 
-// TODO(JosephMarques) See if there is a better way of determining
+// TODO(gfr) See if there is a better way of determining
 // where to send the request (there almost certainly is)
 var AnnotatorURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
