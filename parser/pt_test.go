@@ -46,7 +46,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 	if len(hops) != 9 {
 		t.Fatalf("Do not process hops correctly.")
 	}
-	if logTime != 1452559544 {
+	if logTime.Unix() != 1452559544 {
 		fmt.Println(logTime)
 		t.Fatalf("Do not process log time correctly.")
 	}
@@ -58,7 +58,7 @@ func TestPTParser(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if logTime != 1490053990 {
+	if logTime.Unix() != 1490053990 {
 		t.Fatalf("Do not process log time correctly.")
 	}
 
@@ -119,10 +119,10 @@ func TestPTParser(t *testing.T) {
 	}
 
 	for i := 0; i < len(hops); i++ {
-		if !reflect.DeepEqual(hops[i], expected_hops[i]) {
+		if !reflect.DeepEqual(*hops[i], expected_hops[i]) {
 			fmt.Println(i)
 			fmt.Printf("Here is expected    : %v\n", expected_hops[i])
-			fmt.Printf("Here is what is real: %v\n", hops[i])
+			fmt.Printf("Here is what is real: %v\n", *hops[i])
 			t.Fatalf("Wrong results for PT hops!")
 		}
 	}

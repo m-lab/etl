@@ -221,25 +221,19 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 // NDT connection spec. It will either insert the data into the
 // connection spec or silently fail.
 func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
-	// TODO(JM): Make metrics for sok and cok failures. And double check metrics for cleanliness.
+	// TODO: Make metrics for sok and cok failures. And double check metrics for cleanliness.
 	cip, cok := spec.GetString([]string{"client_ip"})
 	sip, sok := spec.GetString([]string{"server_ip"})
 	reqData := []annotation.RequestData{}
 	if cok {
 		reqData = append(reqData, annotation.RequestData{IP: cip, Timestamp: timestamp})
-	} else {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
 		reqData = append(reqData, annotation.RequestData{IP: sip, Timestamp: timestamp})
-	} else {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Missing server side IP."}).Inc()
 	}
 	if cok || sok {
 		annotationDataMap := annotation.GetBatchGeoData(annotation.BatchURL, reqData)
-		// TODO(JM): Revisit decision to use base36 for
+		// TODO: Revisit decision to use base36 for
 		// encoding, rather than base64. (It had to do with
 		// library support.)
 		timeString := strconv.FormatInt(timestamp.Unix(), 36)

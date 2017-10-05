@@ -506,6 +506,8 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	results["connection_spec"] = connSpec
 
 	n.fixValues(results)
+	// TODO(yachang): check whether client_ip or server_ip in connSpec are empty
+	// before trying to add GeoLocation to connSpec.
 	AddGeoDataNDTConnSpec(connSpec, test.info.Timestamp)
 	// TODO fix InsertRow so that we can distinguish errors from prior rows.
 	metrics.EntryFieldCountHistogram.WithLabelValues(n.TableName()).
