@@ -227,9 +227,15 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 	reqData := []annotation.RequestData{}
 	if cok {
 		reqData = append(reqData, annotation.RequestData{IP: cip, Timestamp: timestamp})
+	} else {
+		metrics.AnnotationWarningCount.With(prometheus.
+			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
 		reqData = append(reqData, annotation.RequestData{IP: sip, Timestamp: timestamp})
+	} else {
+		metrics.AnnotationWarningCount.With(prometheus.
+			Labels{"source": "Missing server side IP."}).Inc()
 	}
 	if cok || sok {
 		annotationDataMap := annotation.GetBatchGeoData(annotation.BatchURL, reqData)
