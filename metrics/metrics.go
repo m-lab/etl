@@ -73,20 +73,22 @@ var (
 	//    etl_annotator_Error_Count
 	// Example usage:
 	//    metrics.AnnotationErrorCount.Inc()
-	AnnotationErrorCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "etl_annotator_Error_Count",
-		Help: "The current number of errors encountered while attempting to add geo data.",
-	}, []string{"source"})
+	AnnotationErrorCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_annotator_Error_Count",
+			Help: "The current number of errors encountered while attempting to add geo data.",
+		}, []string{"source"})
 
 	// Measures the number of annotation warnings
 	// Provides metrics:
 	//    etl_annotator_Warning_Count
 	// Example usage:
 	//    metrics.AnnotationWarningCount.Inc()
-	AnnotationWarningCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "etl_annotator_Warning_Count",
-		Help: "The current number of Warnings encountered while attempting to add geo data.",
-	}, []string{"source"})
+	AnnotationWarningCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_annotator_Warning_Count",
+			Help: "The current number of Warnings encountered while attempting to add geo data.",
+		}, []string{"source"})
 
 	// Counts the number of tasks processed by the pipeline.
 	//
