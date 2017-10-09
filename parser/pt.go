@@ -13,9 +13,11 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type PTFileName struct {
@@ -58,8 +60,8 @@ func NewPTParser(ins etl.Inserter) *PTParser {
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
-func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName string) []schema.ParisTracerouteHop {
-	var results []schema.ParisTracerouteHop
+func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName string) []*schema.ParisTracerouteHop {
+	var results []*schema.ParisTracerouteHop
 	if len(all_nodes) == 0 {
 		return nil
 	}
@@ -77,7 +79,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 				Src_af:        IPv4_AF,
 				Dest_af:       IPv4_AF,
 			}
-			results = append(results, *one_hop)
+			results = append(results, one_hop)
 			break
 		} else {
 			one_hop := &schema.ParisTracerouteHop{
@@ -90,7 +92,7 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 				Src_af:        IPv4_AF,
 				Dest_af:       IPv4_AF,
 			}
-			results = append(results, *one_hop)
+			results = append(results, one_hop)
 		}
 	}
 	return results
@@ -148,18 +150,19 @@ func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP 
 	return protocol, dest_IP, server_IP, nil
 }
 
-func GetLogtime(filename PTFileName) int64 {
+// Return timestamp parsed from file name.
+func GetLogtime(filename PTFileName) (time.Time, error) {
 	date, _ := filename.GetDate()
 	// data is in format like "20170320T23:53:10Z"
 	revised_date := date[0:4] + "-" + date[4:6] + "-" + date[6:18]
 
 	t, err := time.Parse(time.RFC3339, revised_date)
 	if err != nil {
-		fmt.Println(err)
-		return 0
+		log.Println(err)
+		return time.Time{}, err
 	}
 
-	return t.Unix()
+	return t, nil
 }
 
 func (pt *PTParser) TableName() string {
@@ -208,9 +211,9 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	for _, hop := range hops {
 		pt_test := schema.PT{
 			Test_id:              test_id,
-			Log_time:             logTime,
+			Log_time:             logTime.Unix(),
 			Connection_spec:      *conn_spec,
-			Paris_traceroute_hop: hop,
+			Paris_traceroute_hop: *hop,
 			Type:                 int32(2),
 			Project:              int32(3),
 		}
@@ -345,7 +348,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]schema.ParisTracerouteHop, int64, *schema.MLabConnectionSpecification, error) {
+func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
 	//log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("parse").Inc()
@@ -359,7 +362,10 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	server_IP := ""
 	// We do not need to get dest_IP and server_IP from file name, since they are at the first line
 	// of test content as well.
-	t := GetLogtime(fn)
+	t, err := GetLogtime(fn)
+	if err != nil {
+		return nil, time.Time{}, nil, err
+	}
 
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
@@ -387,7 +393,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				log.Println(oneLine)
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
-				return nil, 0, nil, err
+				return nil, time.Time{}, nil, err
 			}
 		} else {
 			// Handle each line of test file after the first line.
@@ -409,7 +415,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				err := ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
 				if err != nil {
 					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(float64(len(all_nodes)))
-					return nil, 0, nil, err
+					return nil, time.Time{}, nil, err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
 				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i += 1 {
@@ -427,6 +433,15 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 		Client_ip:      dest_IP,
 		Client_af:      IPv4_AF,
 		Data_direction: 0,
+	}
+
+	// Only annotate if flag enabled...
+	if !annotation.IPAnnotationEnabled {
+		metrics.AnnotationErrorCount.With(prometheus.Labels{
+			"source": "IP Annotation Disabled."}).Inc()
+	} else {
+		AddGeoDataPTConnSpec(conn_spec, t)
+		AddGeoDataPTHopBatch(PT_hops, t)
 	}
 	return PT_hops, t, conn_spec, nil
 }
