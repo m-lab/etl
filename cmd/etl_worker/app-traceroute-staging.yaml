@@ -43,5 +43,6 @@ env_variables:
   MAX_WORKERS: 30
   BIGQUERY_PROJECT: 'mlab-staging'
   BIGQUERY_DATASET: 'staging'
+  ANNOTATE_IP: 'true'
   # TODO add custom service-account, instead of using default credentials.
 
