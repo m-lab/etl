@@ -39,4 +39,3 @@ env_variables:
   MAX_WORKERS: 50
   BIGQUERY_PROJECT: 'mlab-staging'
   BIGQUERY_DATASET: 'staging'
-  ANNOTATE_IP: 'true'
