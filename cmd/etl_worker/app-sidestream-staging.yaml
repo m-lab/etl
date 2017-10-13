@@ -22,7 +22,7 @@ automatic_scaling:
   cool_down_period_sec: 300
   # We don't care much about latency, so a high utilization is desireable.
   cpu_utilization:
-    target_utilization: 0.90
+    target_utilization: 0.80
 
 # Note: add a public port for GCE auto discovery by prometheus.
 # TODO(dev): are any values redundant or irrelevant?
