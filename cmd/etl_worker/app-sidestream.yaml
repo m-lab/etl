@@ -37,3 +37,6 @@ network:
 
 env_variables:
   MAX_WORKERS: 50
+  BIGQUERY_PROJECT: 'mlab-sandbox'
+  BIGQUERY_DATASET: 'mlab_sandbox'
+  ANNOTATE_IP: 'true'

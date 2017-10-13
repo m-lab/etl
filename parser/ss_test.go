@@ -10,8 +10,8 @@ import (
 
 func TestExtractLogtimeFromFilename(t *testing.T) {
 	log_time, _ := parser.ExtractLogtimeFromFilename("20170315T01:00:00Z_173.205.3.39_0.web100")
-	if log_time != 1489539600 {
-		fmt.Println(log_time)
+	if log_time.Unix() != 1489539600 {
+		fmt.Println(log_time.Unix())
 		t.Fatalf("log time not parsed correctly.")
 	}
 }

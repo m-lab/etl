@@ -31,19 +31,19 @@ func NewSSParser(ins etl.Inserter) *SSParser {
 // The legacy filename is like  "20170203T00:00:00Z_ALL0.web100"
 // The current filename is like "20170315T01:00:00Z_173.205.3.39_0.web100"
 // Return time stamp if the filename is in right format
-func ExtractLogtimeFromFilename(fileName string) (int64, error) {
+func ExtractLogtimeFromFilename(fileName string) (time.Time, error) {
 	testName := filepath.Base(fileName)
 	if len(testName) < 19 || !strings.Contains(testName, ".web100") {
 		log.Println(testName)
-		return 0, errors.New("Invalid sidestream filename")
+		return time.Time{}, errors.New("Invalid sidestream filename")
 	}
 
 	t, err := time.Parse("20060102T15:04:05.999999999Z_", testName[0:17]+".000000000Z_")
 	if err != nil {
-		return 0, err
+		return time.Time{}, err
 	}
 
-	return t.Unix(), nil
+	return t, nil
 }
 
 // the first line of SS test is in format "K: cid PollTime LocalAddress LocalPort ... other_web100_variables_separated_by_space"
@@ -89,7 +89,7 @@ func (ss *SSParser) Flush() error {
 }
 
 // Prepare data into sidestream BigQeury schema and insert it.
-func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName string) (schema.SS, error) {
+func PackDataIntoSchema(ss_value map[string]string, log_time time.Time, testName string) (schema.SS, error) {
 	local_port, err := strconv.Atoi(ss_value["LocalPort"])
 	if err != nil {
 		return schema.SS{}, err
@@ -106,12 +106,14 @@ func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName str
 		Remote_ip:   ss_value["RemAddress"],
 		Remote_port: int64(remote_port),
 	}
+
+	AddGeoDataSSConnSpec(conn_spec, log_time)
 	snap, err := PopulateSnap(ss_value)
 	if err != nil {
 		return schema.SS{}, err
 	}
 	web100_log := &schema.Web100LogEntry{
-		Log_time:        log_time,
+		Log_time:        log_time.Unix(),
 		Version:         "unknown",
 		Group_name:      "read",
 		Connection_spec: *conn_spec,
@@ -120,7 +122,7 @@ func PackDataIntoSchema(ss_value map[string]string, log_time int64, testName str
 
 	ss_test := &schema.SS{
 		Test_id:          testName,
-		Log_time:         log_time,
+		Log_time:         log_time.Unix(),
 		Type:             int64(1),
 		Project:          int64(2),
 		Web100_log_entry: *web100_log,
