@@ -1,9 +1,8 @@
-# To deploy (from cmd/etl_worker):
-# go build etl_worker.go && gcloud beta app deploy --project=mlab-staging app-ndt-staging.yaml
+# Use github release to trigger deployment.
 
 runtime: custom
 env: flex
-service: etl-ndt-parser
+service: etl-ndt-batch-parser
 
 # Resource and scaling options. For more background, see:
 #   https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml
