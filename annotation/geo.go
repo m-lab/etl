@@ -237,7 +237,8 @@ func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error)
 	}
 
 	var netClient = &http.Client{
-		Timeout: time.Second,
+		// Median response time is < 10 msec, but 99th percentile is 0.6 seconds.
+		Timeout: 2 * time.Second,
 	}
 
 	// Make the actual request
