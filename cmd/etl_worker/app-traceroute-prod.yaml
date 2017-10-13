@@ -41,3 +41,4 @@ env_variables:
   MAX_WORKERS: 30
   BIGQUERY_PROJECT: 'measurement-lab'
   BIGQUERY_DATASET: 'public'
+  ANNOTATE_IP: 'true'
