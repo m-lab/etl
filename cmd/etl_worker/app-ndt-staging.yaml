@@ -1,4 +1,6 @@
-# To deploy (from cmd/etl_worker):
+# Use github release to trigger deployment.
+#
+# To deploy from workstation cmd/etl_worker (discouraged!):
 # go build etl_worker.go && gcloud beta app deploy --project=mlab-staging app-ndt-staging.yaml
 
 runtime: custom
@@ -19,12 +21,9 @@ resources:
   disk_size_gb: 10
 
 automatic_scaling:
-  # This is intended for batch jobs.  A single instance is required, and we allow
-  # it to scale up to 50 instances to get work done quickly.  However, note that
-  # more than 1.5 tasks/sec may result in bigquery stream quota problems, so this
-  # may require changes.
-  min_num_instances: 1
-  max_num_instances: 50
+  # We expect fairly steady load, so a modest minimum will rarely cost us anything.
+  min_num_instances: 2
+  max_num_instances: 20
   # Very long cool down period, to reduce the likelihood of tasks being truncated.
   cool_down_period_sec: 1800
   # We don't care much about latency, so a high utilization is desireable.
@@ -43,7 +42,7 @@ network:
     - 9090/tcp
 
 env_variables:
-  MAX_WORKERS: 25
+  MAX_WORKERS: 20
   BIGQUERY_PROJECT: 'mlab-staging'
   BIGQUERY_DATASET: 'staging'
   ANNOTATE_IP: 'true'
