@@ -112,11 +112,15 @@ deploy:
     tag: true
     condition: $TRAVIS_TAG == ndt-staging-*
 
-# PROD: Should be used AFTER code review and commit to master branch.  Triggers
-# when *ANY* branch is tagged with ndt-prod-*'
+# PROD: Should be used AFTER code review and commit to master branch.
+# Triggers when *ANY* branch is tagged with ndt-prod-*'
+# Deploys BOTH STREAMING AND BATCH services.
 - provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+  script:
+  - $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
+  - $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
