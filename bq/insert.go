@@ -46,8 +46,8 @@ func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inse
 
 	return NewBQInserter(
 		etl.InserterParams{Dataset: dataset, Table: table, Suffix: suffix,
-			Timeout: 15 * time.Minute, BufferSize: etl.DataTypeToBQBufferSize[dt]}, nil)
-
+			Timeout: 15 * time.Minute, BufferSize: etl.DataTypeToBQBufferSize[dt], RetryDelay: 30 * time.Second},
+		nil)
 }
 
 // TODO - improve the naming between here and NewInserter.
@@ -224,11 +224,12 @@ func (in *BQInserter) Flush() error {
 		// This is heavyweight, and may run forever without a context deadline.
 		ctx, _ := context.WithTimeout(context.Background(), in.timeout)
 		err = in.uploader.Put(ctx, in.rows)
-		if err == nil || !strings.Contains(err.Error(), "Error 403: Quota exceeded:") {
+		log.Println(err)
+		if err == nil || !strings.Contains(err.Error(), "Quota exceeded:") {
 			break
 		}
 		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Quota Exceeded").Inc()
-		time.Sleep(30 * time.Second)
+		time.Sleep(in.params.RetryDelay)
 	}
 
 	// If there is still an error, then handle it.

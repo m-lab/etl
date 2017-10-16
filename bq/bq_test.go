@@ -1,6 +1,7 @@
 package bq_test
 
 import (
+	"errors"
 	"log"
 	"testing"
 	"time"
@@ -45,7 +46,7 @@ func xTestRealPartitionInsert(t *testing.T) {
 		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
 
 	in, err := bq.NewBQInserter(
-		etl.InserterParams{"mlab_sandbox", "test2", "_20160201", 10 * time.Second, 1}, nil)
+		etl.InserterParams{"mlab_sandbox", "test2", "_20160201", 10 * time.Second, 1, 0 * time.Second}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,8 +72,9 @@ func TestBasicInsert(t *testing.T) {
 		Item{Name: tag + "_x0", Count: 17, Foobar: 44},
 		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
 
-	in, err := fake.NewFakeInserter(
-		etl.InserterParams{"mlab_sandbox", "test2", "", 10 * time.Second, 1})
+	in, err := bq.NewBQInserter(
+		etl.InserterParams{"mlab_sandbox", "test2", "", 10 * time.Second, 1, 0 * time.Second},
+		fake.NewFakeUploader())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,8 +99,9 @@ func TestBufferingAndFlushing(t *testing.T) {
 
 	// Set up an Inserter with a fake Uploader backend for testing.
 	// Buffer 3 rows, so that we can test the buffering.
-	in, err := fake.NewFakeInserter(
-		etl.InserterParams{"mlab_sandbox", "test2", "", 10 * time.Second, 3})
+	in, err := bq.NewBQInserter(
+		etl.InserterParams{"mlab_sandbox", "test2", "", 10 * time.Second, 3, 0 * time.Second},
+		fake.NewFakeUploader())
 	if err != nil {
 		log.Printf("%v\n", err)
 		t.Fatal()
@@ -160,7 +163,7 @@ func TestBufferingAndFlushing(t *testing.T) {
 // Just manual testing for now - need to assert something useful.
 func TestHandleInsertErrors(t *testing.T) {
 	in, e := bq.NewBQInserter(
-		etl.InserterParams{"dataset", "table", "", time.Minute, 5},
+		etl.InserterParams{"dataset", "table", "", time.Minute, 5, 0 * time.Second},
 		fake.NewFakeUploader())
 	if e != nil {
 		log.Printf("%v\n", e)
@@ -181,4 +184,69 @@ func TestHandleInsertErrors(t *testing.T) {
 	in.(*bq.BQInserter).HandleInsertErrors(pme)
 
 	// TODO - assert something.
+}
+
+func TestQuotaError(t *testing.T) {
+	fakeUploader := fake.NewFakeUploader()
+
+	// Set up an Inserter with a fake Uploader backend for testing.
+	// Buffer 3 rows, so that we can test the buffering.
+	in, e := bq.NewBQInserter(
+		etl.InserterParams{"dataset", "table", "", time.Minute, 5, 1 * time.Millisecond},
+		fakeUploader)
+	if e != nil {
+		log.Printf("%v\n", e)
+		t.Fatal()
+	}
+
+	var items []interface{}
+	items = append(items, Item{Name: "x1", Count: 17, Foobar: 44})
+	items = append(items, Item{Name: "x2", Count: 12, Foobar: 44})
+
+	// Insert two rows.
+	if err := in.InsertRows(items); err != nil {
+		t.Fatal()
+	}
+	if in.Accepted() != 2 {
+		t.Error("Accepted = ", in.Accepted())
+	}
+
+	// Set up an arbitrary error and ensure it causes a failure.
+	fakeUploader.SetErr(errors.New("Foobar"))
+	err := in.Flush()
+
+	if err != nil {
+		t.Error("Error should have been consumed.")
+	}
+	if fakeUploader.CallCount != 1 {
+		t.Error("Call count should be 1: ", fakeUploader.CallCount)
+	}
+	if in.Failed() != 2 {
+		// Should have failed two rows.
+		t.Error("Should have increased Failed to 2: ", in.Failed())
+	}
+
+	// Insert the rows again, since they were lost in previous Flush call.
+	if err = in.InsertRows(items); err != nil {
+		t.Fatal()
+	}
+	if in.Accepted() != 4 {
+		t.Error("Accepted = ", in.Accepted())
+	}
+	// This should fail, because the uploader has a preloaded error.
+	fakeUploader.SetErr(errors.New("Quota exceeded:"))
+	err = in.Flush()
+
+	if err != nil {
+		t.Error("Error should have been consumed.")
+	}
+	// The Quota exceeded error should have caused a retry, resulting in 2 additional calls.
+	if fakeUploader.CallCount != 3 {
+		t.Error("Call count should be 3: ", fakeUploader.CallCount)
+	}
+	// The second call should have succeeded, increasing the Committed count.
+	if in.Committed() != 2 {
+		t.Error("Should have increased Committed to 2: ", in.Committed())
+	}
+
 }

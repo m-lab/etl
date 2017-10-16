@@ -18,16 +18,7 @@ import (
 	"cloud.google.com/go/civil"
 	"golang.org/x/net/context"
 	bqv2 "google.golang.org/api/bigquery/v2"
-
-	"github.com/m-lab/etl/bq"
-	"github.com/m-lab/etl/etl"
 )
-
-// Create a test inserter, that uses a dummy Uploader instead of contacting BQ.
-func NewFakeInserter(params etl.InserterParams) (etl.Inserter, error) {
-	uploader := NewFakeUploader()
-	return bq.NewBQInserter(params, uploader)
-}
 
 //---------------------------------------------------------------------------------------
 // Stuff from params.go
@@ -256,10 +247,16 @@ type FakeUploader struct {
 
 	Rows    []*InsertionRow // Most recently inserted rows, for testing/debugging.
 	Request *bqv2.TableDataInsertAllRequest
-	Err     error
+	// Set this with SetErr to return an error.  Error is cleared on each call.
+	Err       error
+	CallCount int // Number of times Put is called.
 }
 
-func NewFakeUploader() etl.Uploader {
+func (up *FakeUploader) SetErr(err error) {
+	up.Err = err
+}
+
+func NewFakeUploader() *FakeUploader {
 	return new(FakeUploader)
 }
 
@@ -283,6 +280,13 @@ func NewFakeUploader() etl.Uploader {
 // the call will run indefinitely. Pass a context with a timeout to prevent
 // hanging calls.
 func (u *FakeUploader) Put(ctx context.Context, src interface{}) error {
+	u.CallCount++
+	if u.Err != nil {
+		t := u.Err
+		u.Err = nil
+		return t
+	}
+
 	savers, err := valueSavers(src)
 	if err != nil {
 		log.Printf("Put: %v\n", err)
@@ -360,8 +364,9 @@ func (u *FakeUploader) putMulti(ctx context.Context, src []bigquery.ValueSaver) 
 	u.Rows = rows
 
 	// Substitute for service call.
-	u.Request, u.Err = insertRows(rows)
-	return nil
+	var err error
+	u.Request, err = insertRows(rows)
+	return err
 }
 
 // An InsertionRow represents a row of data to be inserted into a table.

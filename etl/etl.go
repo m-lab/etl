@@ -57,6 +57,7 @@ type InserterParams struct {
 	Suffix     string        // Table name suffix for templated tables or partitions.
 	Timeout    time.Duration // max duration of backend calls.  (for context)
 	BufferSize int           // Number of rows to buffer before writing to backend.
+	RetryDelay time.Duration // Time to sleep between retries on Quota exceeded failures.
 }
 
 type Parser interface {
