@@ -17,6 +17,7 @@ package bq
 import (
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -213,9 +214,24 @@ func (in *BQInserter) Flush() error {
 		return nil
 	}
 
-	// This is heavyweight, and may run forever without a context deadline.
-	ctx, _ := context.WithTimeout(context.Background(), in.timeout)
-	err := in.uploader.Put(ctx, in.rows)
+	// If we exceed the quota, this basically backs off and tries again.  When
+	// operating near quota, this will fire enough times to slow down each task
+	// enough to stay within quota.  It may result in AppEngine reducing the
+	// number of workers, but that is fine - it will also result in staying
+	// under the quota.
+	var err error
+	for i := 0; i < 10; i++ {
+		// This is heavyweight, and may run forever without a context deadline.
+		ctx, _ := context.WithTimeout(context.Background(), in.timeout)
+		err = in.uploader.Put(ctx, in.rows)
+		if err == nil || !strings.Contains(err.Error(), "Error 403: Quota exceeded:") {
+			break
+		}
+		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Quota Exceeded").Inc()
+		time.Sleep(30 * time.Second)
+	}
+
+	// If there is still an error, then handle it.
 	if err == nil {
 		in.inserted += len(in.rows)
 	} else {
