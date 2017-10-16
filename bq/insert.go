@@ -263,7 +263,7 @@ func (in *BQInserter) Flush() error {
 		}
 		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Quota Exceeded").Inc()
 		// Use some randomness to reduce risk of synchronization across tasks.
-		time.Sleep(time.Duration((0.5 + rand.Float64()) * in.params.RetryDelay.Seconds()))
+		time.Sleep(time.Seconds((0.5 + rand.Float64()) * in.params.RetryDelay.Seconds()))
 	}
 
 	// If there is still an error, then handle it.
