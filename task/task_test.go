@@ -79,6 +79,9 @@ func (tp *TestParser) FullTableName() string {
 func (tp *TestParser) Flush() error {
 	return nil
 }
+func (tp *TestParser) TaskError() error {
+	return nil
+}
 
 // TODO - pass testName through to BQ inserter?
 func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
