@@ -76,6 +76,9 @@ type Parser interface {
 	// including $YYYYMMNN, or _YYYYMMNN
 	FullTableName() string
 
+	// Task level error, based on failed rows, or any other criteria.
+	TaskError() error
+
 	RowStats // Parser must implement RowStats
 }
 
