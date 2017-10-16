@@ -165,6 +165,10 @@ func GetLogtime(filename PTFileName) (time.Time, error) {
 	return t, nil
 }
 
+func (pt *PTParser) TaskError() error {
+	return nil
+}
+
 func (pt *PTParser) TableName() string {
 	return pt.inserter.TableBase()
 }

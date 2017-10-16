@@ -54,9 +54,11 @@ func (np *NullParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 	metrics.TestCount.WithLabelValues("table", "null", "ok").Inc()
 	return nil
 }
-
 func (np *NullParser) TableName() string {
 	return "null-table"
+}
+func (np *NullParser) TaskError() error {
+	return nil
 }
 
 //------------------------------------------------------------------------------------
@@ -94,4 +96,7 @@ func (tp *TestParser) TableName() string {
 }
 func (tp *TestParser) FullTableName() string {
 	return "test-table"
+}
+func (tp *TestParser) TaskError() error {
+	return nil
 }

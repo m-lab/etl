@@ -52,6 +52,10 @@ func NewDiscoParser(ins etl.Inserter) etl.Parser {
 		RowStats: ins} // Delegate RowStats functions to the Inserter.
 }
 
+func (dp *DiscoParser) TaskError() error {
+	return nil
+}
+
 // Disco data a JSON representation that should be pushed directly into BigQuery.
 // For now, though, we parse into a struct, for compatibility with current inserter
 // backend.

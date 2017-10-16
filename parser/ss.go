@@ -3,7 +3,6 @@ package parser
 
 import (
 	"bytes"
-	"cloud.google.com/go/bigquery"
 	"errors"
 	"fmt"
 	"log"
@@ -12,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -74,6 +75,10 @@ func ParseKHeader(header string) ([]string, error) {
 		}
 	}
 	return var_names, nil
+}
+
+func (ss *SSParser) TaskError() error {
+	return nil
 }
 
 func (ss *SSParser) TableName() string {

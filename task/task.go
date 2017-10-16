@@ -132,5 +132,10 @@ OUTER:
 	if err != io.EOF {
 		return files, err
 	}
+
+	// Check if the overall task is OK, or should be rejected.
+	if tt.Parser.TaskError() != nil {
+		return files, tt.Parser.TaskError()
+	}
 	return files, nil
 }

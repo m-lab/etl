@@ -139,6 +139,25 @@ func TestNDTParser(t *testing.T) {
 	}
 }
 
+func TestNDTTaskError(t *testing.T) {
+	// Load test data.
+	ins := newInMemoryInserter()
+	n := parser.NewNDTParser(ins)
+
+	if n.TaskError() != nil {
+		t.Error(n.TaskError())
+	}
+
+	ins.committed = 10
+	if n.TaskError() != nil {
+		t.Error(n.TaskError())
+	}
+	ins.failed = 2
+	if n.TaskError() == nil {
+		t.Error("Should have non-nil TaskError")
+	}
+}
+
 // compare recursively checks whether actual values equal values in the expected values.
 // The expected values may be a subset of the actual values, but not a superset.
 func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100ValueMap) bool {
@@ -201,11 +220,12 @@ func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100V
 type inMemoryInserter struct {
 	data      []interface{}
 	committed int
+	failed    int
 }
 
 func newInMemoryInserter() *inMemoryInserter {
 	data := make([]interface{}, 0)
-	return &inMemoryInserter{data, 0}
+	return &inMemoryInserter{data, 0, 0}
 }
 
 func (in *inMemoryInserter) InsertRow(data interface{}) error {
@@ -242,5 +262,5 @@ func (in *inMemoryInserter) Committed() int {
 	return in.committed
 }
 func (in *inMemoryInserter) Failed() int {
-	return 0
+	return in.failed
 }

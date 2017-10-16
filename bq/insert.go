@@ -201,8 +201,6 @@ func (in *BQInserter) HandleInsertErrors(err error) error {
 		in.badRows += len(in.rows)
 		err = nil
 	}
-	// Allocate new slice of rows.  Any failed rows are lost.
-	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	return err
 }
 
@@ -220,11 +218,12 @@ func (in *BQInserter) Flush() error {
 	err := in.uploader.Put(ctx, in.rows)
 	if err == nil {
 		in.inserted += len(in.rows)
-		in.rows = make([]interface{}, 0, in.params.BufferSize)
 	} else {
 		// This adjusts the inserted count, failure count, and updates in.rows.
 		err = in.HandleInsertErrors(err)
 	}
+	// Allocate new slice of rows.  Any failed rows are lost.
+	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	return err
 }
 
