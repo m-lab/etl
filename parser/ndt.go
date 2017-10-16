@@ -127,8 +127,8 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 
 // These functions are also required to complete the etl.Parser interface.
 func (n *NDTParser) TaskError() error {
-	if inserter.Committed() < 10 * inserter.Failed() {
-		return errors.New('Too many insertion failures.')
+	if n.inserter.Committed() < 10*n.inserter.Failed() {
+		return errors.New("Too many insertion failures.")
 	}
 	return nil
 }
