@@ -18,6 +18,7 @@
           { "name": "client_browser", "type": "STRING"},
           { "name": "client_hostname", "type": "STRING"},
           { "name": "client_ip", "type": "STRING"},
+          { "name": "client_port", "type": "STRING"},  // can this be a number?
           { "name": "client_kernel_version", "type": "STRING"},
           { "name": "client_os", "type": "STRING"},
           { "name": "client_version", "type": "STRING"},
@@ -25,6 +26,7 @@
           { "name": "server_af", "type": "INTEGER"},
           { "name": "server_hostname", "type": "STRING"},
           { "name": "server_ip", "type": "STRING"},
+          { "name": "server_port", "type": "STRING"},  // integer?
           { "name": "server_kernel_version", "type": "STRING"},
           { "name": "tls", "type": "BOOLEAN"},
           { "name": "websockets", "type": "BOOLEAN"},
