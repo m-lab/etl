@@ -1,17 +1,32 @@
-total_storage_limit: 2000M
+total_storage_limit: 2.0G
+
+# General notes:
+# It appears that appengine scales on the basis of whether SOME of the instances
+# are running hot.  This means that if just one or two instances have high cpu
+# for a few minutes, more instances will be started.  The cpu utilization
+# closely reflects the number of concurrent tasks, together with the percentage
+# of time spent blocked on annotation and insertion requests.
+#
+# This makes it difficult to achieve both stability and high cpu utilization.
+# Could we monitor the cpu utilization, or perhaps the time each task spends
+# blocked on I/O?  If each task is spending 50% of wall time blocked on I/O,
+# then 4 tasks should be enough to produce fairly good utilization?  We want
+# to reject additional tasks if they would push us over utilization target,
+# so that they can be directed to other instances.
 
 queue:
 - name: etl-ndt-queue
   target: etl-ndt-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
-  # 1.0 allow processing a day's data (about 11K tasks) in 3 to 4 hours.
-  rate: 1.0/s
+  # 1.0 allow processing a day's data (about 16K tasks) in about 4 hours.
+  # 0.3 keeps the load close to 2 instances, processing whole day in about 14 hours.
+  rate: 0.3/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
-  bucket_size: 10
-  # Maximum number of concurrent requests.
-  max_concurrent_requests: 360
+  bucket_size: 20  # To quickly fill the minimum two instances.
+  # Maximum number of concurrent requests.  Should be 0.9 * max concurrent tasks.
+  max_concurrent_requests: 110  # For max of 10 instances, 12 workers per instance.
 
 - name: etl-ndt-batch-queue
   target: etl-ndt-batch-parser

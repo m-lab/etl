@@ -18,7 +18,7 @@ resources:
 automatic_scaling:
   # We expect fairly steady load, so a modest minimum will rarely cost us anything.
   min_num_instances: 2
-  max_num_instances: 20
+  max_num_instances: 10
   # Very long cool down period, to reduce the likelihood of tasks being truncated.
   cool_down_period_sec: 1800
   # We don't care much about latency, so a high utilization is desireable.
@@ -37,7 +37,7 @@ network:
     - 9090/tcp
 
 env_variables:
-  MAX_WORKERS: 20
+  MAX_WORKERS: 12
   BIGQUERY_PROJECT: 'mlab-sandbox'
   BIGQUERY_DATASET: 'mlab_sandbox'
   ANNOTATE_IP: 'true'
