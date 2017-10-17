@@ -27,7 +27,7 @@ func TestPopulateSnap(t *testing.T) {
 	}
 }
 
-func TestParser(t *testing.T) {
+func TestParseOneLine(t *testing.T) {
 	header := "K: cid PollTime LocalAddress LocalPort RemAddress RemPort State SACKEnabled TimestampsEnabled NagleEnabled ECNEnabled SndWinScale RcvWinScale ActiveOpen MSSRcvd WinScaleRcvd WinScaleSent PktsOut DataPktsOut DataBytesOut PktsIn DataPktsIn DataBytesIn SndUna SndNxt SndMax ThruBytesAcked SndISS RcvNxt ThruBytesReceived RecvISS StartTimeSec StartTimeUsec Duration SndLimTransSender SndLimBytesSender SndLimTimeSender SndLimTransCwnd SndLimBytesCwnd SndLimTimeCwnd SndLimTransRwin SndLimBytesRwin SndLimTimeRwin SlowStart CongAvoid CongestionSignals OtherReductions X_OtherReductionsCV X_OtherReductionsCM CongestionOverCount CurCwnd MaxCwnd CurSsthresh LimCwnd MaxSsthresh MinSsthresh FastRetran Timeouts SubsequentTimeouts CurTimeoutCount AbruptTimeouts PktsRetrans BytesRetrans DupAcksIn SACKsRcvd SACKBlocksRcvd PreCongSumCwnd PreCongSumRTT PostCongSumRTT PostCongCountRTT ECERcvd SendStall QuenchRcvd RetranThresh NonRecovDA AckAfterFR DSACKDups SampleRTT SmoothedRTT RTTVar MaxRTT MinRTT SumRTT CountRTT CurRTO MaxRTO MinRTO CurMSS MaxMSS MinMSS X_Sndbuf X_Rcvbuf CurRetxQueue MaxRetxQueue CurAppWQueue MaxAppWQueue CurRwinSent MaxRwinSent MinRwinSent LimRwin DupAcksOut CurReasmQueue MaxReasmQueue CurAppRQueue MaxAppRQueue X_rcv_ssthresh X_wnd_clamp X_dbg1 X_dbg2 X_dbg3 X_dbg4 CurRwinRcvd MaxRwinRcvd MinRwinRcvd LocalAddressType X_RcvRTT WAD_IFQ WAD_MaxBurst WAD_MaxSsthresh WAD_NoAI WAD_CwndAdjust"
 	var_names, err := parser.ParseKHeader(header)
 	if err != nil {
