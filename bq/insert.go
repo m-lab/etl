@@ -16,7 +16,9 @@ package bq
 
 import (
 	"log"
+	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,8 +47,8 @@ func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inse
 
 	return NewBQInserter(
 		etl.InserterParams{Dataset: dataset, Table: table, Suffix: suffix,
-			Timeout: 15 * time.Minute, BufferSize: etl.DataTypeToBQBufferSize[dt]}, nil)
-
+			Timeout: 15 * time.Minute, BufferSize: etl.DataTypeToBQBufferSize[dt], RetryDelay: 30 * time.Second},
+		nil)
 }
 
 // TODO - improve the naming between here and NewInserter.
@@ -213,9 +215,59 @@ func (in *BQInserter) Flush() error {
 		return nil
 	}
 
-	// This is heavyweight, and may run forever without a context deadline.
-	ctx, _ := context.WithTimeout(context.Background(), in.timeout)
-	err := in.uploader.Put(ctx, in.rows)
+	// If we exceed the quota, this basically backs off and tries again.  When
+	// operating near quota, this will fire enough times to slow down each task
+	// enough to stay within quota.  It may result in AppEngine reducing the
+	// number of workers, but that is fine - it will also result in staying
+	// under the quota.
+	// Analysis:
+	//  We can handle a minimum of 10 inserts per second, because
+	//   the default quota is 100MB/sec, and the limit on requests
+	//   is 10MB per request.  Since generally inserts are smaller,
+	//   the typical number is more like 20 inserts/sec.
+	//  The net effect we need to see is that, if the pipeline capacity
+	//   exceeds the quota by 10%, then the pipeline needs to slow down
+	//   by roughly 10% to fit within the quota.  The incoming request
+	//   rate is dictated by the task queue, and ultimately the handler
+	//   must reject 10% of the incoming requests.  This only happens
+	//   when 10% of the instances have hit MAX_WORKERS.
+	//  If the capacity of the pipeline is, e.g., 2X the task queue rate,
+	//   then each task will need to be slowed down to the point that it
+	//   takes roughly 2.2X longer than it would without any Quota exceeded
+	//   errors.  For NDT, the 100MB tasks require about 35 concurrent tasks
+	//   to process 60 tasks/min, indicating that they require about 35
+	//   seconds per task.  There are about 70 tests/task, so this is about
+	//   7 buffer flushes per second (of 10 tests each), or on average, about
+	//   one buffer flush every 5 seconds for each task.
+	//  The batch job might have 50 instances, and process 900 tasks
+	//   concurrently.  If this had to be scaled back to 50%, the tasks
+	//   would have to spend 50% of their time sleeping between Put requests.
+	//   Since each task typically takes about 35 seconds, each task would
+	//   on average experience just over one 'Quota exceeded' error in order
+	//   to slow the pipeline down by 50%.
+	//  Note that a secondary effect is to reduce the CPU utilization, which
+	//   will likely trigger a reduction in the number of instances running.
+	//   Under these conditions, AppEngine would reduce the number of instances
+	//   until the target utilization is reaches, reducing the number of
+	//   concurrent tasks, and thus the frequency at which the tasks would
+	//   experience 'Quota error' events.
+
+	var err error
+	for i := 0; i < 10; i++ {
+		// This is heavyweight, and may run forever without a context deadline.
+		ctx, _ := context.WithTimeout(context.Background(), in.timeout)
+		err = in.uploader.Put(ctx, in.rows)
+		log.Println(err)
+		if err == nil || !strings.Contains(err.Error(), "Quota exceeded:") {
+			break
+		}
+		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Quota Exceeded").Inc()
+		// Use some randomness to reduce risk of synchronization across tasks.
+		t := in.params.RetryDelay.Seconds() * (0.5 + rand.Float64()) // between 0.5 and 1.5 * RetryDelay
+		time.Sleep(time.Duration(1000000*t) * time.Microsecond)
+	}
+
+	// If there is still an error, then handle it.
 	if err == nil {
 		in.inserted += len(in.rows)
 	} else {

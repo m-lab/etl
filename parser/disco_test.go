@@ -32,7 +32,7 @@ func TestJSONParsing(t *testing.T) {
 	// This creates a real inserter, with a fake uploader, for local testing.
 	uploader := fake.FakeUploader{}
 	ins, err := bq.NewBQInserter(etl.InserterParams{
-		"mlab_sandbox", "disco_test", "", 10 * time.Second, 3}, &uploader)
+		"mlab_sandbox", "disco_test", "", 10 * time.Second, 3, 0 * time.Second}, &uploader)
 
 	var parser etl.Parser = parser.NewDiscoParser(ins)
 
