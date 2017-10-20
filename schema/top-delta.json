@@ -17,16 +17,16 @@
           { "name": "client_application", "type": "STRING"},
           { "name": "client_browser", "type": "STRING"},
           { "name": "client_hostname", "type": "STRING"},
-          { "name": "client_ip", "type": "STRING"},
-          { "name": "client_port", "type": "STRING"},  // can this be a number?
+          { "name": "client_ip", "type": "STRING", "description": "From .meta file or remote_ip"},
+          { "name": "client_port", "type": "INTEGER"},
           { "name": "client_kernel_version", "type": "STRING"},
           { "name": "client_os", "type": "STRING"},
           { "name": "client_version", "type": "STRING"},
           { "name": "data_direction", "type": "INTEGER"},
           { "name": "server_af", "type": "INTEGER"},
           { "name": "server_hostname", "type": "STRING"},
-          { "name": "server_ip", "type": "STRING"},
-          { "name": "server_port", "type": "STRING"},  // integer?
+          { "name": "server_ip", "type": "STRING", "description": "From .meta file or local_ip"},
+          { "name": "server_port", "type": "INTEGER"},
           { "name": "server_kernel_version", "type": "STRING"},
           { "name": "tls", "type": "BOOLEAN"},
           { "name": "websockets", "type": "BOOLEAN"},
@@ -43,7 +43,7 @@
               { "name": "metro_code", "type": "INTEGER"},
               { "name": "postal_code", "type": "STRING"},
               { "name": "region", "type": "STRING"}
-            ], "name": "client_geolocation", "type": "RECORD"},
+            ], "name": "client_geolocation", "type": "RECORD", "description": "From annotation based on client_ip"},
           {
             "fields": [
               { "name": "area_code", "type": "INTEGER"},
@@ -57,18 +57,18 @@
               { "name": "metro_code", "type": "INTEGER"},
               { "name": "postal_code", "type": "STRING"},
               { "name": "region", "type": "STRING"}
-            ], "name": "server_geolocation", "type": "RECORD"}
+            ], "name": "server_geolocation", "type": "RECORD", "description": "From annotation based on server_ip"}
         ], "name": "connection_spec", "type": "RECORD"},
       {
         "fields": [
-          { "name": "log_time", "type": "INTEGER"},
-          { "name": "version", "type": "STRING"},
+          { "name": "log_time", "type": "INTEGER", "description": "From final snaplog.LogTime"},
+          { "name": "version", "type": "STRING", "description": "From final snaplog.Version"},
           {
             "fields": [
-              { "name": "local_af", "type": "INTEGER"},
-              { "name": "local_ip", "type": "STRING"},
+              { "name": "local_af", "type": "INTEGER", "description": "From final snaplog.LocalAddressType"},
+              { "name": "local_ip", "type": "STRING", "description": "From final snaplog.LocalAddress"},
               { "name": "local_port", "type": "INTEGER"},
-              { "name": "remote_ip", "type": "STRING"},
+              { "name": "remote_ip", "type": "STRING", "description": "From final snaplog.RemAddress"},
               { "name": "remote_port", "type": "INTEGER"}
             ], "name": "connection_spec", "type": "RECORD", "description": "Deprecated.  Use top level connection_spec"},
           {

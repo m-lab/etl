@@ -10,9 +10,12 @@ To deploy this cloud function to sandbox, use:
 ```bash
 gcloud beta functions deploy createSandboxTaskOnFileNotification \
     --stage-bucket=functions-mlab-sandbox \
-    --trigger-bucket=m-lab-sandbox \
+    --trigger-bucket=archive-mlab-oti \
     --project=mlab-sandbox
 ```
+This will trigger on archive-mlab-oti, so that the sandbox pipeline operates on the same stream as the production pipeline.
+
+NOTE: Since this is a cross project trigger, the projectEditor:mlab-sandbox member must have StorageLegacyBucketOwner privilege in order to install the function.
 
 To deploy this cloud function to staging, use:
 ```bash

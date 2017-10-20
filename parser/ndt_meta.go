@@ -69,6 +69,7 @@ func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
 }
 
 func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
+	// This populates most of the fields...
 	for k, v := range fieldPairs {
 		s, ok := mfd.Fields[k]
 		if ok {
@@ -77,6 +78,7 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 			}
 		}
 	}
+
 	// Only set the value for tls & websocket if the field is present.
 	if s, ok := mfd.Fields["tls"]; ok {
 		if s != "" {
@@ -88,6 +90,8 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 			connSpec.SetBool("websockets", mfd.Websockets)
 		}
 	}
+
+	// Note: this field is usually empty in legacy NDT .meta files.
 	s, ok := connSpec["server_ip"]
 	// TODO - extract function for this stanza
 	if ok {
@@ -98,6 +102,7 @@ func (mfd *MetaFileData) PopulateConnSpec(connSpec schema.Web100ValueMap) {
 		metrics.WarningCount.WithLabelValues(
 			"ndt", "unknown", "missing server_ip").Inc()
 	}
+
 	s, ok = connSpec["client_ip"]
 	if ok {
 		if s != "" {
