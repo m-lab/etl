@@ -552,9 +552,9 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 }
 
 const (
-	WC_ADDRTYPE_IPV4 = 1
+	WC_ADDRTYPE_IPV4 = 1  // These appear in snap.LocalAddressType
 	WC_ADDRTYPE_IPV6 = 2
-	LOCAL_AF_IPV4    = 0
+	LOCAL_AF_IPV4    = 0  // These are used for nested connspec local_af
 	LOCAL_AF_IPV6    = 1
 )
 
