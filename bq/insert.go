@@ -257,7 +257,6 @@ func (in *BQInserter) Flush() error {
 		// This is heavyweight, and may run forever without a context deadline.
 		ctx, _ := context.WithTimeout(context.Background(), in.timeout)
 		err = in.uploader.Put(ctx, in.rows)
-		log.Println(err)
 		if err == nil || !strings.Contains(err.Error(), "Quota exceeded:") {
 			break
 		}
