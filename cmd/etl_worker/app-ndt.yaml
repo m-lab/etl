@@ -37,8 +37,10 @@ network:
     - 9090/tcp
 
 env_variables:
-  MAX_WORKERS: 20
+  MAX_WORKERS: 12
   BIGQUERY_PROJECT: 'mlab-sandbox'
   BIGQUERY_DATASET: 'mlab_sandbox'
   ANNOTATE_IP: 'true'
   # TODO add custom service-account, instead of using default credentials.
+  PUBSUB_SUBSCRIPTION: 'sandbox-pipeline'
+  PUBSUB_CREDS: 'xxx-yyy'
