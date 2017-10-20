@@ -2,7 +2,10 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +13,8 @@ import (
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"cloud.google.com/go/pubsub"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -249,6 +254,57 @@ func setMaxInFlight() {
 	}
 }
 
+func runPubSubHandler(subscription string) error {
+	project := os.Getenv("GCLOUD_PROJECT")
+
+	ctx := context.Background()
+	client, err := pubsub.NewClient(ctx, project)
+
+	if err != nil {
+		return err
+	}
+
+	sub := client.Subscription(subscription)
+
+	// This definitely limits the number of messages being
+	// concurrently processed, but NOT the number of messages
+	// in some kind of queue.
+	sub.ReceiveSettings.MaxOutstandingMessages = int(maxInFlight)
+
+	// This seems to have no impact on the number of concurrent
+	// messages, and each concurrently processed message is
+	//  handled in its own (new) goroutine.
+	// sub.ReceiveSettings.NumGoroutines = 1
+
+	err = sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+		jdata := html.UnescapeString(string(msg.Data))
+		data := make(map[string]string)
+		json.Unmarshal([]byte(jdata), &data)
+		bucket, ok := data["bucket"]
+		if !ok {
+			// "id" may not be informative either.  8-(
+			log.Printf("Request missing bucket name: %s\n", data["id"])
+			msg.Ack() // No point in trying again.
+		}
+		filename, ok := data["name"]
+		if !ok {
+			// "id" may not be informative either.  8-(
+			log.Printf("Request missing file name: %s\n", data["id"])
+		}
+		fullname := "gs://" + bucket + "/" + filename
+
+		status, outcome := subworker(fullname, 0, 0)
+		if status != http.StatusOK {
+			log.Println(outcome)
+		}
+	})
+	if err != nil {
+		log.Printf("%+v\n", err)
+	}
+
+	return nil
+}
+
 func main() {
 	// Define a custom serve mux for prometheus to listen on a separate port.
 	// We listen on a separate port so we can forward this port on the host VM.
@@ -278,5 +334,10 @@ func main() {
 	// path name will be accessible through the AppEngine service address,
 	// however it will be served by a random instance.
 	http.Handle("/random-metrics", promhttp.Handler())
-	http.ListenAndServe(":8080", nil)
+	go http.ListenAndServe(":8080", nil)
+
+	subscription := os.Getenv("PUBSUB_SUBSCRIPTION")
+	if subscription != "" {
+		runPubSubHandler(subscription)
+	}
 }
