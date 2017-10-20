@@ -87,28 +87,21 @@ func decrementInFlight() {
 	atomic.AddInt32(&inFlight, -1)
 }
 
-func worker(w http.ResponseWriter, r *http.Request) {
-	// TODO(dev) Check how many times a request has already been attempted.
-
-	// These keep track of the (nested) state of the worker.
-	metrics.WorkerState.WithLabelValues("worker").Inc()
-	defer metrics.WorkerState.WithLabelValues("worker").Dec()
-
+// TODO(gfr) unify counting for http and pubsub paths?
+func worker(rwr http.ResponseWriter, rq *http.Request) {
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
 		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
-		w.WriteHeader(http.StatusTooManyRequests)
-		fmt.Fprintf(w, `{"message": "Too many tasks."}`)
+		rwr.WriteHeader(http.StatusTooManyRequests)
+		fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
 		return
 	}
+
 	// Decrement counter when worker finishes.
 	defer decrementInFlight()
 
-	metrics.WorkerCount.Inc()
-	defer metrics.WorkerCount.Dec()
-
 	var err error
-	retryCountStr := r.Header.Get("X-AppEngine-TaskRetryCount")
+	retryCountStr := rq.Header.Get("X-AppEngine-TaskRetryCount")
 	retryCount := 0
 	if retryCountStr != "" {
 		retryCount, err = strconv.Atoi(retryCountStr)
@@ -116,7 +109,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Invalid retries string: %s\n", retryCountStr)
 		}
 	}
-	executionCountStr := r.Header.Get("X-AppEngine-TaskExecutionCount")
+	executionCountStr := rq.Header.Get("X-AppEngine-TaskExecutionCount")
 	executionCount := 0
 	if executionCountStr != "" {
 		executionCount, err = strconv.Atoi(executionCountStr)
@@ -125,20 +118,35 @@ func worker(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	r.ParseForm()
+	rq.ParseForm()
 	// Log request data.
-	for key, value := range r.Form {
+	for key, value := range rq.Form {
 		log.Printf("Form:   %q == %q\n", key, value)
 	}
 
+	rawFileName := rq.FormValue("filename")
+	status, msg := subworker(rawFileName, executionCount, retryCount)
+	rwr.WriteHeader(status)
+	fmt.Fprintf(rwr, msg)
+}
+
+func subworker(rawFileName string, executionCount, retryCount int) (status int, msg string) {
+	// TODO(dev) Check how many times a request has already been attempted.
+
+	// These keep track of the (nested) state of the worker.
+	metrics.WorkerState.WithLabelValues("worker").Inc()
+	defer metrics.WorkerState.WithLabelValues("worker").Dec()
+
+	metrics.WorkerCount.Inc()
+	defer metrics.WorkerCount.Dec()
+
+	var err error
 	// This handles base64 encoding, and requires a gs:// prefix.
-	fn, err := storage.GetFilename(r.FormValue("filename"))
+	fn, err := storage.GetFilename(rawFileName)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
-		return
+		return http.StatusBadRequest, `{"message": "Invalid filename."}`
 	}
 
 	// TODO(dev): log the originating task queue name from headers.
@@ -148,9 +156,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	data, err := etl.ValidateTestPath(fn)
 	if err != nil {
 		log.Printf("Invalid filename: %v\n", err)
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
-		return
+		return http.StatusBadRequest, `{"message": "Invalid filename."}`
 	}
 	dataType := data.GetDataType()
 
@@ -158,18 +164,14 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	if dataType == etl.INVALID {
 		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
-		return
+		return http.StatusBadRequest, `{"message": "Invalid filename."}`
 	}
 
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues("unknown", "ServiceUnavailable").Inc()
 		log.Printf("Error getting storage client: %v\n", err)
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, `{"message": "Could not create client."}`)
-		return
+		return http.StatusServiceUnavailable, `{"message": "Could not create client."}`
 	}
 
 	// TODO - add a timer for reading the file.
@@ -177,9 +179,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(string(dataType), "ETLSourceError").Inc()
 		log.Printf("Error opening gcs file: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"message": "Problem opening gcs file."}`)
-		return
+		return http.StatusInternalServerError, `{"message": "Problem opening gcs file."}`
 		// TODO - anything better we could do here?
 	}
 	defer tr.Close()
@@ -196,9 +196,7 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"message": "Problem creating BQ inserter."}`)
-		return
+		return http.StatusInternalServerError, `{"message": "Problem creating BQ inserter."}`
 		// TODO - anything better we could do here?
 	}
 
@@ -222,17 +220,12 @@ func worker(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(string(dataType), "TaskError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, `{"message": "Error in ProcessAllTests"}`)
-		return
+		return http.StatusInternalServerError, `{"message": "Error in ProcessAllTests"}`
 		// TODO - anything better we could do here?
 	}
 
-	// TODO - if there are any errors, consider sending back a meaningful response
-	// for web browser and queue-pusher debugging.
-	fmt.Fprintf(w, `{"message": "Success"}`)
-
 	metrics.TaskCount.WithLabelValues(string(dataType), "OK").Inc()
+	return http.StatusOK, `{"message": "Success"}`
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
