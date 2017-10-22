@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -257,8 +258,17 @@ func setMaxInFlight() {
 }
 
 func runPubSubHandler() error {
+	keybucket := os.Getenv("SUBSCRIPTION_KEY_BUCKET")
+	keyfile := os.Getenv("SUBSCRIPTION_KEY_FILE")
+	cmd := exec.Command("gsutil", "cp", keybucket+keyfile, "/tmp/"+keyfile)
+	stdoutStderr, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Println(stdoutStderr)
+		return err
+	}
+
 	ctx := context.Background()
-	opt := option.WithServiceAccountFile(os.Getenv("SUBSCRIPTION_KEY"))
+	opt := option.WithServiceAccountFile("/tmp/" + keyfile)
 	// Must use the project where the subscription resides, or else
 	// we can't find it.
 	proj := os.Getenv("SUBSCRIPTION_PROJECT")
@@ -301,6 +311,11 @@ func runPubSubHandler() error {
 		status, outcome := subworker(fullname, 0, 0)
 		if status != http.StatusOK {
 			log.Println(outcome)
+			// TODO(gfr) Remove once we it looks ok.
+			msg.Nack()
+			time.Sleep(30*time.Second)
+		} else {
+			msg.Ack()
 		}
 	})
 	return err
@@ -341,7 +356,7 @@ func main() {
 	if subscription != "" {
 		err := runPubSubHandler()
 		if err != nil {
-			panic(err)
+			log.Fatalln(err)
 		}
 	}
 }
