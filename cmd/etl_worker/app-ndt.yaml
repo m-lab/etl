@@ -44,5 +44,6 @@ env_variables:
   # Location of subscription, and service account key.
   SUBSCRIPTION_PROJECT: 'mlab-oti'
   SUBSCRIPTION_NAME: 'sandbox-pipeline'
-  SUBSCRIPTION_KEY: 'gs://keys-mlab-sandbox/pubsub-reader.mlab-oti.json'
+  SUBSCRIPTION_KEY_BUCKET: 'gs://keys-mlab-sandbox/'
+  SUBSCRIPTION_KEY_FILE: 'pubsub-reader.mlab-oti.json'
   # TODO add custom service-account, instead of using default credentials.
