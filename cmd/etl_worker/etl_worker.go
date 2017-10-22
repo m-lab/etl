@@ -2,7 +2,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -14,7 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"google.golang.org/api/option"
+
 	"cloud.google.com/go/pubsub"
+	"golang.org/x/net/context"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -254,11 +256,14 @@ func setMaxInFlight() {
 	}
 }
 
-func runPubSubHandler(subscription string) error {
-	project := os.Getenv("GCLOUD_PROJECT")
-
+func runPubSubHandler() error {
 	ctx := context.Background()
-	client, err := pubsub.NewClient(ctx, project)
+	opt := option.WithServiceAccountFile(os.Getenv("SUBSCRIPTION_KEY"))
+	// Must use the project where the subscription resides, or else
+	// we can't find it.
+	proj := os.Getenv("SUBSCRIPTION_PROJECT")
+	subscription := os.Getenv("SUBSCRIPTION_NAME")
+	client, err := pubsub.NewClient(ctx, proj, opt)
 
 	if err != nil {
 		return err
@@ -276,7 +281,7 @@ func runPubSubHandler(subscription string) error {
 	//  handled in its own (new) goroutine.
 	// sub.ReceiveSettings.NumGoroutines = 1
 
-	err = sub.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+	err = sub.Receive(ctx, func(cctx context.Context, msg *pubsub.Message) {
 		jdata := html.UnescapeString(string(msg.Data))
 		data := make(map[string]string)
 		json.Unmarshal([]byte(jdata), &data)
@@ -298,11 +303,7 @@ func runPubSubHandler(subscription string) error {
 			log.Println(outcome)
 		}
 	})
-	if err != nil {
-		log.Printf("%+v\n", err)
-	}
-
-	return nil
+	return err
 }
 
 func main() {
@@ -336,8 +337,11 @@ func main() {
 	http.Handle("/random-metrics", promhttp.Handler())
 	go http.ListenAndServe(":8080", nil)
 
-	subscription := os.Getenv("PUBSUB_SUBSCRIPTION")
+	subscription := os.Getenv("SUBSCRIPTION_NAME")
 	if subscription != "" {
-		runPubSubHandler(subscription)
+		err := runPubSubHandler()
+		if err != nil {
+			panic(err)
+		}
 	}
 }
