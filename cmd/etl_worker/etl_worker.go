@@ -285,6 +285,11 @@ func runPubSubHandler() error {
 	// concurrently processed, but NOT the number of messages
 	// in some kind of queue.
 	sub.ReceiveSettings.MaxOutstandingMessages = int(maxInFlight)
+	// The Receive function will automatically extend the deadline
+	// to this value.
+	// TODO(gfr) This may not be enough.  Do we need to add logic
+	// inside ProcessAllTests?
+	sub.ReceiveSettings.MaxExtension = 600 * time.Second
 
 	// This seems to have no impact on the number of concurrent
 	// messages, and each concurrently processed message is
