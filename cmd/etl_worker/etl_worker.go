@@ -8,13 +8,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"sync/atomic"
 	"time"
-
-	"google.golang.org/api/option"
 
 	"cloud.google.com/go/pubsub"
 	"golang.org/x/net/context"
@@ -258,22 +255,12 @@ func setMaxInFlight() {
 }
 
 func runPubSubHandler() error {
-	keybucket := os.Getenv("SUBSCRIPTION_KEY_BUCKET")
-	keyfile := os.Getenv("SUBSCRIPTION_KEY_FILE")
-	cmd := exec.Command("gsutil", "cp", keybucket+keyfile, "/tmp/"+keyfile)
-	stdoutStderr, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Println(stdoutStderr)
-		return err
-	}
-
 	ctx := context.Background()
-	opt := option.WithServiceAccountFile("/tmp/" + keyfile)
 	// Must use the project where the subscription resides, or else
 	// we can't find it.
 	proj := os.Getenv("SUBSCRIPTION_PROJECT")
 	subscription := os.Getenv("SUBSCRIPTION_NAME")
-	client, err := pubsub.NewClient(ctx, proj, opt)
+	client, err := pubsub.NewClient(ctx, proj)
 
 	if err != nil {
 		return err
@@ -318,7 +305,7 @@ func runPubSubHandler() error {
 			log.Println(outcome)
 			// TODO(gfr) Remove once we it looks ok.
 			msg.Nack()
-			time.Sleep(30*time.Second)
+			time.Sleep(30 * time.Second)
 		} else {
 			msg.Ack()
 		}
