@@ -26,7 +26,6 @@ before_install:
 
 - travis/decrypt.sh "$encrypted_361547783275_key" "$encrypted_361547783275_iv"
   keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
-- tar tvf /tmp/service-accounts.tar
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
 # These directories will be cached on successful "script" builds, and restored,
