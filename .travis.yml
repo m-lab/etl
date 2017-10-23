@@ -26,7 +26,6 @@ before_install:
 
 - travis/decrypt.sh "$encrypted_361547783275_key" "$encrypted_361547783275_iv"
   keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
-- tar tvf /tmp/service-accounts.tar
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
 # These directories will be cached on successful "script" builds, and restored,
@@ -220,6 +219,30 @@ deploy:
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
     condition: $TRAVIS_BRANCH == qp-sandbox-*
+
+# STAGING: After code review and commits to master branch. Triggers when *ANY*
+# branch is tagged with qp-staging-*
+- provider: script
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    tag: true
+    condition: $TRAVIS_TAG == qp-staging-*
+
+# PROD: After code review and commits to master branch. Triggers when *ANY*
+# branch is tagged with qp-prod-*
+- provider: script
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    tag: true
+    condition: $TRAVIS_TAG == qp-prod-*
 
 # NOTE: Cloud functions only support primitive IAM roles: Owner, Editor, Viewer.
 # See: https://cloud.google.com/functions/docs/concepts/iam
