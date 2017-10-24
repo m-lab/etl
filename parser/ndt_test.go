@@ -17,6 +17,7 @@ import (
 // A handful of file names from a single ndt tar file.
 var testFileNames []string = []string{
 	`20170509T00:05:13.863119000Z_45.56.98.222.c2s_ndttrace`,
+	`20170509T00:05:13.863119000Z_45.56.98.222.c2s_ndttrace`,
 	`20170509T00:05:13.863119000Z_45.56.98.222.s2c_ndttrace`,
 	`20170509T00:05:13.863119000Z_eb.measurementlab.net:40074.s2c_snaplog`,
 	`20170509T00:05:13.863119000Z_eb.measurementlab.net:43628.c2s_snaplog`,
@@ -53,6 +54,10 @@ var testFileNames []string = []string{
 func TestValidation(t *testing.T) {
 	for _, test := range testFileNames {
 		_, err := parser.ParseNDTFileName("2017/05/09/" + test)
+		if err != nil {
+			t.Error(err)
+		}
+		_, err = parser.ParseNDTFileName("./2017/05/09/" + test)
 		if err != nil {
 			t.Error(err)
 		}
