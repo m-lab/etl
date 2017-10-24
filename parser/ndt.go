@@ -39,7 +39,7 @@ const (
 //=========================================================================
 
 // TODO - should this be optional?
-const dateDir = `^(?P<dir>\d{4}/\d{2}/\d{2}/)?`
+const dateDir = `^(./)?(?P<dir>\d{4}/\d{2}/\d{2}/)?`
 
 // TODO - use time.Parse to parse this part of the filename.
 const dateField = `(?P<date>\d{8})`
