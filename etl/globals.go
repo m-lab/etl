@@ -7,7 +7,7 @@ import (
 
 const start = `^gs://(?P<prefix>.*)/(?P<exp>[^/]*)/`
 const datePath = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
-const dateTime = `(\d{4}[01]\d[0123]\d)T000000Z`
+const dateTime = `(\d{4}[01]\d[0123]\d)T\d{6}Z`
 const mlabN_podNN = `-(mlab\d)-([[:alpha:]]{3}\d[0-9t])-`
 const exp_NNNN = `(.*)-(\d{4})`
 const suffix = `(?:\.tar|\.tar.gz|\.tgz)$`
@@ -18,7 +18,7 @@ var (
 	// This matches any valid test file name, and some invalid ones.
 	TaskPattern = regexp.MustCompile(start + // #1 #2
 		datePath + // #3 - YYYY/MM/DD
-		dateTime + // #4 - YYYYMMDDT000000Z
+		dateTime + // #4 - YYYYMMDDTHHMMSSZ
 		mlabN_podNN + // #5 #6 - e.g. -mlab1-lax04-
 		exp_NNNN + // #7 #8 e.g. ndt-0001
 		suffix) // #9 typically .tgz

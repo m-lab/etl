@@ -11,7 +11,7 @@ func TestValidation(t *testing.T) {
 	// These should fail:
 	// Leading character before gs://
 	_, err := etl.ValidateTestPath(
-		`xgs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz`)
+		`xgs://m-lab-sandbox/ndt/2016/01/26/20160126T123456Z-mlab1-prg01-ndt-0007.tgz`)
 	if err == nil {
 		t.Error("Should be invalid: ")
 	}
@@ -35,12 +35,12 @@ func TestValidation(t *testing.T) {
 		t.Error(err)
 	}
 	data, err = etl.ValidateTestPath(
-		`gs://m-lab-sandbox/ndt/2016/07/14/20160714T000000Z-mlab1-lax04-ndt-0001.tar`)
+		`gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar`)
 	if err != nil {
 		t.Error(err)
 	}
 	data, err = etl.ValidateTestPath(
-		`gs://m-lab-sandbox/ndt/2016/07/14/20160714T000000Z-mlab1-lax04-ndt-0001.tar.gz`)
+		`gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar.gz`)
 	if err != nil {
 		t.Error(err)
 	}
