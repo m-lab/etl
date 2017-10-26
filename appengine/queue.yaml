@@ -13,45 +13,49 @@ queue:
   # Maximum number of concurrent requests.
   max_concurrent_requests: 360
 
+# We want multiple separate queue, to ensure that batch processing doesn't
+# exceed the per table quota.  Collectively they should be able to fill
+# 50 instances at 12 workers per instance, or about 600 altogether.
+# Some adjustments may be needed once this is running regularly.
 - name: etl-ndt-batch-monday
   target: etl-ndt-batch-parser
-  rate: 0.5/s
+  rate: 0.8/s
   bucket_size: 10
   max_concurrent_requests: 100
 
 - name: etl-ndt-batch-tuesday
   target: etl-ndt-batch-parser
-  rate: 0.5/s
+  rate: 0.8/s
   bucket_size: 10
   max_concurrent_requests: 100
 
 - name: etl-ndt-batch-wednesday
   target: etl-ndt-batch-parser
-  rate: 0.5/s
+  rate: 0.8/s
   bucket_size: 10
   max_concurrent_requests: 100
 
 - name: etl-ndt-batch-thursday
   target: etl-ndt-batch-parser
-  rate: 0.5/s
+  rate: 0.8/s
   bucket_size: 10
   max_concurrent_requests: 100
 
 - name: etl-ndt-batch-friday
   target: etl-ndt-batch-parser
-  rate: 0.5/s
+  rate: 0.8/s
   bucket_size: 10
   max_concurrent_requests: 100
 
 - name: etl-ndt-batch-saturday
   target: etl-ndt-batch-parser
-  rate: 0.5/s
+  rate: 0.8/s
   bucket_size: 10
   max_concurrent_requests: 100
 
 - name: etl-ndt-batch-sunday
   target: etl-ndt-batch-parser
-  rate: 0.5/s
+  rate: 0.8/s
   bucket_size: 10
   max_concurrent_requests: 100
 
