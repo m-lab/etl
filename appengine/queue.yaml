@@ -13,51 +13,63 @@ queue:
   # Maximum number of concurrent requests.
   max_concurrent_requests: 360
 
-# We want multiple separate queue, to ensure that batch processing doesn't
-# exceed the per table quota.  Collectively they should be able to fill
-# 50 instances at 12 workers per instance, or about 600 altogether.
+# BigQuery has a streaming insert quota per table, which we seem to hit
+# at around 3.0 tasks/second.  When reprocessing data older than 30 days,
+# the pipeline inserts rows into templated tables, which means there is
+# a separate table per day.
+# We create multiple queues, with modest rate limits on each queue, and
+# then partition batch jobs across the queues.  Day of the week works
+# nicely, though many other schemes would work just as well.
+#
+# This will be used in conjunction with a batch reprocessing script
+# that will spray the requested tasks, by date, across the different
+# queues.
+# Collectively they should be able to fill
+# 50 instances at 12 workers per instance, or 600 altogether.  We
+# allow a total of 560 (80 * 7), which should result in relatively
+# few rejected requests once App Engine fully scales up.
 # Some adjustments may be needed once this is running regularly.
 - name: etl-ndt-batch-monday
   target: etl-ndt-batch-parser
-  rate: 0.8/s
+  rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 80
 
 - name: etl-ndt-batch-tuesday
   target: etl-ndt-batch-parser
-  rate: 0.8/s
+  rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 80
 
 - name: etl-ndt-batch-wednesday
   target: etl-ndt-batch-parser
-  rate: 0.8/s
+  rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 80
 
 - name: etl-ndt-batch-thursday
   target: etl-ndt-batch-parser
-  rate: 0.8/s
+  rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 80
 
 - name: etl-ndt-batch-friday
   target: etl-ndt-batch-parser
-  rate: 0.8/s
+  rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 80
 
 - name: etl-ndt-batch-saturday
   target: etl-ndt-batch-parser
-  rate: 0.8/s
+  rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 80
 
 - name: etl-ndt-batch-sunday
   target: etl-ndt-batch-parser
-  rate: 0.8/s
+  rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 80
 
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
