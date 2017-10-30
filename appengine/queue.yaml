@@ -13,17 +13,92 @@ queue:
   # Maximum number of concurrent requests.
   max_concurrent_requests: 360
 
-- name: etl-ndt-batch-queue
+# For processing archival data, we want to be able to process roughly one month
+# per day, which for current data rates of 1 million tests per day, is
+# about 30 million rows per day, or about 350 rows/second.
+#
+# BigQuery has a streaming insert quota per table.  The published quota is
+# 100MB/sec per table, but we have been hitting the quota at seemingly
+# lower rates - around 200 rows/second for NDT, which is about 20MB/sec of
+# data in the final table.
+# Not clear what is going on - perhaps the quota is on the size of incoming
+# HTTP request data - but we will design to stay well within 200
+# rows/second limit.
+#
+# When reprocessing data older than 30 days, the pipeline inserts rows 
+# into templated tables, which means there is a separate table per day.
+# So for archive reprocessing more than 30 days in the past, the BQ quota
+# ends up being rows/sec per day/date.
+#
+# Let's choose a conservative BQ rate limit of 100 rows/second, per
+# table, and therefore per archive date.
+#
+# The new scraper produces about 16K tasks per day, with about 60 row inserts
+# per task.  But older archives are much larger, with perhaps 1000 to 2000 tar
+# files per day, and 600 to 1000 tests per file.
+# 
+# The individual tasks in the new pipeline complete in roughly 45 seconds,
+# so the net row insert rate is around 1.3 rows/sec per task, at least
+# when instances are running at modest CPU load of 60% or so.  (The
+# throughput per task drops when CPU utilization exceeds 90% or so).
+#
+# Using task queue rate/sec, we would have to very conservative because
+# of the very large older archives. But by limiting the rate based on
+# number of concurrent tasks, we can regulate the throughput independent
+# of the size of the archive files.  100 rows/second, divided by 1.3 rows/sec
+# per task, results in a target of roughly 75 concurrent tasks per archive date.
+#
+# To reach the desired 350 rows/second required to process one month's
+# data each day, we need to process at least 4 days of data in parallel.
+# The quota gaurantee comes from putting any one day's data into a single
+# task queue, and the desired aggregate throughput can be achieved by
+# having multiple queues, and spraying different days across different
+# queues.
+#
+# To make things conceptually simple, we will just create queues with
+# suffixes like _0, _1, _2 ...
+# A corresponding batch reprocessing script will use Gregorian ordinal
+# of the date, mod N, to determine which queue to drop any given date
+# into.  We just choose an appropriate N that gives us the throughput
+# we need.  For now, N=5 gives us a bit of headroom, so this config
+# sets up _0 through _4.
+#
+# The current pipeline config has up to 50 instances with 2 cpus and
+# 12 workers each.  This could handle up to 0.9 * 50 * 12 or 560
+# concurrent tasks, which is well in excess of what we currently need.
+# Some adjustments may be needed once this is running regularly.
+#
+# SUMMARY:
+# 1. Each queue must limit concurrent requests to about 75 to limit
+#    rate into individual tables to around 100 rows/second.
+# 2. We have 5 queues, to allow up to about 500 rows/second, to
+#    allow 30 days of data to be processed within one day, with
+#    some headroom for future growth.
+- name: etl-ndt-batch_0
   target: etl-ndt-batch-parser
-  # Average rate at which to release tasks to the service.  Default is 5/sec
-  # This is actually the rate at which tokens are added to the bucket.
-  # 1.0 allow processing a day's data (about 11K tasks) in 3 to 4 hours.
-  rate: 5.0/s
-  # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
-  # have very little impact for our environment.
+  rate: 1.0/s
   bucket_size: 10
-  # Maximum number of concurrent requests. 90% of max_workers * max instances
-  max_concurrent_requests: 900
+  max_concurrent_requests: 75
+- name: etl-ndt-batch_1
+  target: etl-ndt-batch-parser
+  rate: 1.0/s
+  bucket_size: 10
+  max_concurrent_requests: 75
+- name: etl-ndt-batch_2
+  target: etl-ndt-batch-parser
+  rate: 1.0/s
+  bucket_size: 10
+  max_concurrent_requests: 75
+- name: etl-ndt-batch_3
+  target: etl-ndt-batch-parser
+  rate: 1.0/s
+  bucket_size: 10
+  max_concurrent_requests: 75
+- name: etl-ndt-batch_4
+  target: etl-ndt-batch-parser
+  rate: 1.0/s
+  bucket_size: 10
+  max_concurrent_requests: 75
 
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
@@ -58,12 +133,3 @@ queue:
   # Maximum number of concurrent requests.
   max_concurrent_requests: 180
 
-
-###################################################################################
-- name: etl-pull-queue
-  mode: pull
-  acl:
-  # Provide full access to the taskqueue by the mlab-sandbox default GCE service account.
-  # This should apply to default GCE VMs and AppEngine Flex VMs.
-  - user_email: 581276032543-compute@developer.gserviceaccount.com
-  - writer_email: 581276032543-compute@developer.gserviceaccount.com
