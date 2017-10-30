@@ -41,12 +41,19 @@ def parse_cmdline(args):
         required=False,
         help='The project that owns the queues.')
     parser.add_argument(
-        '--queue_prefix',
-        metavar='QUEUE_PREFIX',
+        '--queue_base',
+        metavar='QUEUE_BASE',
         type=str,
-        default='etl-ndt-batch-',
+        default='etl-ndt-batch',
         required=False,
         help='The prefix of the batch queues.')
+    parser.add_argument(
+        '--modN',
+        metavar='MOD_N',
+        type=int,
+        default=5,
+        required=False,
+        help='Gregorian ordinal mod to use with multiple queues.')
     parser.add_argument(
         '--bucket',
         metavar='BUCKET',
@@ -82,35 +89,51 @@ class ArchiveProcessor:
     and destination queue set or pubsub topic.
     """
 
-    def __init__(self, bucket, prefix, queue):
+    def __init__(self, bucket, file_prefix, queue_base, num_queues):
         """
         Args:
-           bucket:
-           prefix:
-           queue:
+           bucket: Google Cloud Storage bucket containing archive files.
+           file_prefix: Common file prefix for all files.
+           queue_base: Base string for queue names.
+           modN:  Number of queues.  If zero or one, use single queue.
         """
-        self.prefix = prefix
-        self.queue = queue
-        self.client = storage.Client()
+        self.file_prefix = file_prefix
+        self.queue_base = queue_base
+        self.num_queues = num_queues
         try:
+            self.client = storage.Client()
             self.bucket = self.client.get_bucket(bucket)
         except exceptions.NotFound:
             print 'Oops no bucket', bucket
-        raise 
 
-    def post(tags, files):
+    def post(self, tags, files):
         """ Post all tasks in list to the queue.
         Args:
           tags: map of tags to attach to the tasks.  The special tag
-                "day" is used to choose the day of the week for
-                batch task queues.
+                "queue_num" is used to choose the queue suffix (_0, _1, ...)
+                for batch task queues.
           file: list of filenames to post as tasks.
-        Returns:
+        Returns
 
         """
         pass
 
-    def one_day(date, files):
+    def list_date(self, date):
+        """Add all tasks for a single day to appropriate queue.
+        Args:
+          date: a datetime.date indicating which date to list.
+        Returns:
+          List of all files within prefix that match date.
+        """
+        prefix = '{} {}'.format(self.file_prefix, date)
+        print prefix
+
+        it = self.bucket.list_blobs(prefix=self.file_prefix, max_results=10)
+        list(it)
+
+        
+
+    def post_whole_day(self, date):
         """Add all tasks for a single day to appropriate queue.
         Args:
           date: a datetime.date indicating which date to post.
@@ -118,19 +141,22 @@ class ArchiveProcessor:
         Returns:
           the results of ArgumentParser.parse_args
         """
-        pass
+        queue_name = self.queue_base
+        if self.num_queues > 1:
+            ordinal = date.toordinal()
+            queue_name = '{}_{}'.format(queue_name, self.num_queues)
+                
 
 def main(argv):
-    print 'hello world'
     print datetime.datetime.strptime('20171025', '%Y%m%d')
-    """Run scraper.py in an infinite loop."""
     args = parse_cmdline(argv[1:])
 
     try:
-        processor = ArchiveProcessor(args.bucket, "", "")
+        processor = ArchiveProcessor(args.bucket, "", "", 5)
         print processor.bucket
-        it = processor.bucket.list_blobs(prefix=args.prefix, max_results=10)
-        print list(it)
+        today = datetime.date.today()
+        day = today - datetime.timedelta(days=2)
+        processor.list_date(day)
     except exceptions.NotFound:
         print 'Oops no bucket', args.bucket
 
