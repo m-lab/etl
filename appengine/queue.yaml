@@ -14,20 +14,31 @@ queue:
   max_concurrent_requests: 360
 
 # BigQuery has a streaming insert quota per table, which we seem to hit
-# at around 3.0 tasks/second.  When reprocessing data older than 30 days,
-# the pipeline inserts rows into templated tables, which means there is
-# a separate table per day.
-# We create multiple queues, with modest rate limits on each queue, and
-# then partition batch jobs across the queues.  Day of the week works
-# nicely, though many other schemes would work just as well.
+# at around 3.0 tasks/second.  For processing archival data, we want to
+# be able to process roughly one month per day.  At 16K tasks per day,
+# this is about 500K tasks per input month, 20K tasks per processing hour,
+# or just under 6 tasks/second.   
+# When reprocessing data older than 30 days, the pipeline inserts rows 
+# into templated tables, which means there is a separate table per day.
+# So, we can exceed the 3 tasks/second rate if we have multiple queues,
+# feed each table from a single queue, and rate limit each queue to
+# less than 3 tasks/second.
+# Below we create 7 queues, one for each day of the week.  This allows
+# us, for example, to process 7 days concurrently, into seven distinct
+# tables.  We can put multiple weeks of data into the queues as well. 
 #
 # This will be used in conjunction with a batch reprocessing script
 # that will spray the requested tasks, by date, across the different
 # queues.
-# Collectively they should be able to fill
-# 50 instances at 12 workers per instance, or 600 altogether.  We
-# allow a total of 560 (80 * 7), which should result in relatively
-# few rejected requests once App Engine fully scales up.
+# Since each queue is rate limited to 1 task/sec, and any given table
+# receives data from a single day, and any given day's data will be
+# directed to a single queue, this will limit the insert rate into 
+# any single table to well below the table quota.
+#
+# The current pipeline config has up to 50 instances with 2 cpus and
+# 12 workers each.  We allow a total of 560 (80 * 7) concurrent tasks,
+# which should result in relatively few rejected requests once App
+# Engine fully scales up.
 # Some adjustments may be needed once this is running regularly.
 - name: etl-ndt-batch-monday
   target: etl-ndt-batch-parser
