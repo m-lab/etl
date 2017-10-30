@@ -77,6 +77,48 @@ def parse_cmdline(args):
         help='Optional end date.')
     return parser.parse_args(args)
 
+class ArchiveProcessor:
+    """ ArchiveProcessor encapsulates the source bucket and prefix,
+    and destination queue set or pubsub topic.
+    """
+
+    def __init__(self, bucket, prefix, queue):
+        """
+        Args:
+           bucket:
+           prefix:
+           queue:
+        """
+        self.prefix = prefix
+        self.queue = queue
+        self.client = storage.Client()
+        try:
+            self.bucket = self.client.get_bucket(bucket)
+        except exceptions.NotFound:
+            print 'Oops no bucket', bucket
+        raise 
+
+    def post(tags, files):
+        """ Post all tasks in list to the queue.
+        Args:
+          tags: map of tags to attach to the tasks.  The special tag
+                "day" is used to choose the day of the week for
+                batch task queues.
+          file: list of filenames to post as tasks.
+        Returns:
+
+        """
+        pass
+
+    def one_day(date, files):
+        """Add all tasks for a single day to appropriate queue.
+        Args:
+          date: a datetime.date indicating which date to post.
+          files: list of file names to post.
+        Returns:
+          the results of ArgumentParser.parse_args
+        """
+        pass
 
 def main(argv):
     print 'hello world'
@@ -84,14 +126,10 @@ def main(argv):
     """Run scraper.py in an infinite loop."""
     args = parse_cmdline(argv[1:])
 
-    print args
-    print args.bucket
-
-    client = storage.Client()
     try:
-        bucket = client.get_bucket(args.bucket)
-        print bucket
-        it = bucket.list_blobs(prefix=args.prefix, max_results=10)
+        processor = ArchiveProcessor(args.bucket, "", "")
+        print processor.bucket
+        it = processor.bucket.list_blobs(prefix=args.prefix, max_results=10)
         print list(it)
     except exceptions.NotFound:
         print 'Oops no bucket', args.bucket
