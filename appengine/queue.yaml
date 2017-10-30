@@ -46,7 +46,7 @@ queue:
 # of the very large older archives. But by limiting the rate based on
 # number of concurrent tasks, we can regulate the throughput independent
 # of the size of the archive files.  100 rows/second, divided by 1.3 rows/sec
-# per task, results in a target of roughly 60 concurrent tasks per archive date.
+# per task, results in a target of roughly 75 concurrent tasks per archive date.
 #
 # To reach the desired 350 rows/second required to process one month's
 # data each day, we need to process at least 4 days of data in parallel.
@@ -69,7 +69,7 @@ queue:
 # Some adjustments may be needed once this is running regularly.
 #
 # SUMMARY:
-# 1. Each queue must limit concurrent requests to about 60 to limit
+# 1. Each queue must limit concurrent requests to about 75 to limit
 #    rate into individual tables to around 100 rows/second.
 # 2. We have 5 queues, to allow up to about 500 rows/second, to
 #    allow 30 days of data to be processed within one day, with
@@ -78,27 +78,27 @@ queue:
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 60
+  max_concurrent_requests: 75
 - name: etl-ndt-batch_1
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 60
+  max_concurrent_requests: 75
 - name: etl-ndt-batch_2
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 60
+  max_concurrent_requests: 75
 - name: etl-ndt-batch_3
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 60
+  max_concurrent_requests: 75
 - name: etl-ndt-batch_4
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
-  max_concurrent_requests: 60
+  max_concurrent_requests: 75
 
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
