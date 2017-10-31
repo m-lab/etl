@@ -18,6 +18,7 @@
 
 import argparse
 import datetime
+import requests
 import sys
 from google.cloud import storage
 from google.cloud import exceptions
@@ -84,9 +85,20 @@ def parse_cmdline(args):
         help='Optional end date.')
     return parser.parse_args(args)
 
+def AddTask(queue, file):
+    """ AddTask sends a new task to the queue_pusher.
+    """    
+    req = 'queue-pusher-dot-mlab-oti.appspot.com/receiver?queue={}?filename={}'.format(queue, file)
+    r = requests.get(req) 
+    return r.status_code
+
 class ArchiveProcessor:
     """ ArchiveProcessor encapsulates the source bucket and prefix,
     and destination queue set or pubsub topic.
+
+    Archives are assumed to be organized like:
+          arbitrary-path-prefix/YYYY/MM/DD/any-filename
+          arbitrary-path-prefix/YYYY/MM/DD/...
     """
 
     def __init__(self, bucket, file_prefix, queue_base, num_queues):
@@ -119,24 +131,24 @@ class ArchiveProcessor:
         pass
 
     def list_date(self, date):
-        """Add all tasks for a single day to appropriate queue.
+        """List all the filenames for a specific date.
         Args:
           date: a datetime.date indicating which date to list.
         Returns:
-          List of all files within prefix that match date.
+          List of all files within prefix that match date, in unicode strings.
         """
         prefix = '{}{:%Y/%m/%d}'.format(self.file_prefix, date)
-        print "Full prefix: ", prefix
         print(self.bucket.list_blobs())
 
-        it = self.bucket.list_blobs(prefix=prefix, max_results=10)
+        paths = []
+        it = self.bucket.list_blobs(prefix=prefix)
+        // The HTTPIterator returns pages of results, each of which is an Iterator.
+        // So do the two level iteration, assembling the list.
         for p in it.pages:
-            print p.num_items
             while p.remaining > 0:
-                print p.next()
+                paths.append(p.next().name)
 
-        print "done iterating"
-        
+        return paths
 
     def post_whole_day(self, date):
         """Add all tasks for a single day to appropriate queue.
@@ -161,7 +173,9 @@ def main(argv):
         print processor.bucket
         today = datetime.date.today()
         day = today - datetime.timedelta(days=2)
-        processor.list_date(day)
+        list = processor.list_date(day)
+        for f in list:
+            print f
     except exceptions.NotFound:
         print 'Oops no bucket', args.bucket
 
