@@ -125,12 +125,17 @@ class ArchiveProcessor:
         Returns:
           List of all files within prefix that match date.
         """
-        prefix = '{} {}'.format(self.file_prefix, date)
-        print prefix
+        prefix = '{}{:%Y/%m/%d}'.format(self.file_prefix, date)
+        print "Full prefix: ", prefix
+        print(self.bucket.list_blobs())
 
-        it = self.bucket.list_blobs(prefix=self.file_prefix, max_results=10)
-        list(it)
+        it = self.bucket.list_blobs(prefix=prefix, max_results=10)
+        for p in it.pages:
+            print p.num_items
+            while p.remaining > 0:
+                print p.next()
 
+        print "done iterating"
         
 
     def post_whole_day(self, date):
@@ -144,7 +149,7 @@ class ArchiveProcessor:
         queue_name = self.queue_base
         if self.num_queues > 1:
             ordinal = date.toordinal()
-            queue_name = '{}_{}'.format(queue_name, self.num_queues)
+            queue_name = '{}_{}'.format(queue_name, ordinal % self.num_queues)
                 
 
 def main(argv):
@@ -152,7 +157,7 @@ def main(argv):
     args = parse_cmdline(argv[1:])
 
     try:
-        processor = ArchiveProcessor(args.bucket, "", "", 5)
+        processor = ArchiveProcessor(args.bucket, "ndt/", "base", 5)
         print processor.bucket
         today = datetime.date.today()
         day = today - datetime.timedelta(days=2)
