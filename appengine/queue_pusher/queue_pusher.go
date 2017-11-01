@@ -53,6 +53,7 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 // queueStats provides statistics for a given queue.
 func queueStats(w http.ResponseWriter, r *http.Request) {
 	queuename := r.FormValue("queuename")
+	test := r.FormValue("test-bypass")
 
 	if queuename == "" {
 		http.Error(w, `{"message": "Bad request parameters"}`, http.StatusBadRequest)
@@ -67,6 +68,11 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 	if !validQueue {
 		// TODO(dev): return a list of valid queues
 		http.Error(w, `{"message": "Given queue name is not acceptable"}`, http.StatusNotAcceptable)
+		return
+	}
+
+	// Bypass action if test mode.
+	if test != "" {
 		return
 	}
 
@@ -88,12 +94,9 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, string(b))
 }
 
-func receiver(w http.ResponseWriter, r *http.Request) {
-	receiverWithTestBypass(false, w, r)
-}
-
 // receiver accepts a GET request, and transforms the given parameters into a TaskQueue Task.
-func receiverWithTestBypass(bypass bool, w http.ResponseWriter, r *http.Request) {
+// TODO - this should expect a POST, for consistency with REST api?
+func receiver(w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): require a POST instead of working with both POST and GET
 	// after we update the Cloud Function to use POST.
 	filename := r.FormValue("filename")
@@ -132,22 +135,21 @@ func receiverWithTestBypass(bypass bool, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Skip queue if bypass for test.
-	if bypass {
-		fmt.Fprintf(w, `{"message": "StatusOK", "queue": %s, "filename": "filename"}`, queuename)
-		return
-	}
-
 	// Lots of files will be archived that should not be enqueued. Pass
 	// over those files without comment.
 	// TODO(dev) count how many names we skip over using prometheus
 	if ok {
-		ctx := appengine.NewContext(r)
 		params := url.Values{"filename": []string{filename}}
 		t := taskqueue.NewPOSTTask("/worker", params)
-		if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		test := r.FormValue("test-bypass")
+		if test == "" {
+			// Skip queuing if bypass for test.
+			ctx := appengine.NewContext(r)
+			if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
 		}
 	}
 }

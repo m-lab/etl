@@ -13,6 +13,37 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+func TestDefaultHandler(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "http://foobar.com/", nil)
+	defaultHandler(w, r)
+	if w.Result().StatusCode != http.StatusOK {
+		b, _ := ioutil.ReadAll(w.Body)
+		log.Println(string(b))
+		t.Error(w.Result().StatusCode)
+	}
+
+	// TODO - is this working as intended?
+	r = httptest.NewRequest("POST", "http://foobar.com/", nil)
+	defaultHandler(w, r)
+	if w.Result().StatusCode != http.StatusOK {
+		b, _ := ioutil.ReadAll(w.Body)
+		log.Println(string(b))
+		t.Error(w.Result().StatusCode)
+	}
+}
+
+func TestStats(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(`GET`, `http://foobar.com/stats?queuename=etl-ndt-queue&test-bypass="true"`, nil)
+	queueStats(w, r)
+	if w.Result().StatusCode != http.StatusOK {
+		b, _ := ioutil.ReadAll(w.Body)
+		log.Println(string(b))
+		t.Error(w.Result().StatusCode)
+	}
+}
+
 func TestReceiver(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -56,15 +87,15 @@ func TestReceiver(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var req_str string
+			var reqStr string
 			if tt.queue != "" {
-				req_str = "?filename=" + tt.filename + "&queue=" + tt.queue
+				reqStr = "?filename=" + tt.filename + "&queue=" + tt.queue + "&test-bypass=true"
 			} else {
-				req_str = "?filename=" + tt.filename + "&queue=" + tt.queue
+				reqStr = "?filename=" + tt.filename + "&test-bypass=true"
 			}
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "http://foobar.com/receiver"+req_str, nil)
-			receiverWithTestBypass(true, w, r)
+			r := httptest.NewRequest("GET", "http://foobar.com/receiver"+reqStr, nil)
+			receiver(w, r)
 			b, _ := ioutil.ReadAll(w.Body)
 			log.Println(string(b))
 			if w.Result().StatusCode != tt.status {
@@ -113,13 +144,13 @@ func TestReceiverWithQueue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var reqStr string
 			if tt.queue != "" {
-				reqStr = "?filename=" + tt.filename + "&queue=" + tt.queue
+				reqStr = "?filename=" + tt.filename + "&queue=" + tt.queue + "&test-bypass=true"
 			} else {
-				reqStr = "?filename=" + tt.filename + "&queue=" + tt.queue
+				reqStr = "?filename=" + tt.filename + "&test-bypass=true"
 			}
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", "http://foobar.com/receiver"+reqStr, nil)
-			receiverWithTestBypass(true, w, r)
+			receiver(w, r)
 			if w.Result().StatusCode != tt.status {
 				b, _ := ioutil.ReadAll(w.Body)
 				log.Println(string(b))
