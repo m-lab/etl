@@ -1,5 +1,5 @@
-// A microservice that accepts HTTP requests, creates a Task from given
-// parameters, and adds the Task to a Push TaskQueue.
+// Package pushqueue provides a microservice that accepts HTTP requests, creates
+// a Task from given parameters, and adds the Task to a TaskQueue.
 package pushqueue
 
 import (
@@ -17,12 +17,22 @@ import (
 
 const defaultMessage = "<html><body>This is not the app you're looking for.</body></html>"
 
-// Requests can only add tasks to one of these whitelisted queue names.
+// The following queues should not be directly addressed.
 var queueForType = map[etl.DataType]string{
 	etl.NDT: "etl-ndt-queue",
 	etl.SS:  "etl-sidestream-queue",
 	etl.PT:  "etl-traceroute-queue",
 	etl.SW:  "etl-disco-queue",
+}
+
+// Disallow any queue name that is an automatic queue target.
+func isDirectQueueNameOK(name string) bool {
+	for _, value := range queueForType {
+		if value == name {
+			return false
+		}
+	}
+	return true
 }
 
 func init() {
@@ -34,7 +44,8 @@ func init() {
 // A default handler for root path.
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		// TODO - this is actually returning StatusOK.  Weird!
+		http.Error(w, `{"message": "Method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
 	fmt.Fprintf(w, defaultMessage)
@@ -43,20 +54,16 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 // queueStats provides statistics for a given queue.
 func queueStats(w http.ResponseWriter, r *http.Request) {
 	queuename := r.FormValue("queuename")
+	test := r.FormValue("test-bypass")
 
 	if queuename == "" {
 		http.Error(w, `{"message": "Bad request parameters"}`, http.StatusBadRequest)
+		log.Printf("%+v\n", w)
 		return
 	}
 
-	// TODO(dev): maybe this should be made more efficient?
-	validQueue := false
-	for _, queue := range queueForType {
-		validQueue = validQueue || (queuename == queue)
-	}
-	if !validQueue {
-		// TODO(dev): return a list of valid queues
-		http.Error(w, `{"message": "Given queue name is not acceptable"}`, http.StatusNotAcceptable)
+	// Bypass action if test mode.
+	if test != "" {
 		return
 	}
 
@@ -88,33 +95,51 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decoded_filename, err := storage.GetFilename(filename)
+	decodedFilename, err := storage.GetFilename(filename)
 	if err != nil {
 		http.Error(w, `{"message": "Could not base64decode filename"}`, http.StatusBadRequest)
 		return
 	}
 
 	// Validate filename.
-	fn_data, err := etl.ValidateTestPath(decoded_filename)
+	fnData, err := etl.ValidateTestPath(decodedFilename)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		return
 	}
-	// determine correct queue based on file name.
-	queuename, ok := queueForType[fn_data.GetDataType()]
+
+	// determine correct queue based on parameter or file name.
+	var ok bool
+	queuename := r.FormValue("queue")
+	if queuename != "" {
+		ok = isDirectQueueNameOK(queuename)
+	} else {
+		queuename, ok = queueForType[fnData.GetDataType()]
+	}
+
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"message": "Invalid queuename."}`)
+		return
+	}
 
 	// Lots of files will be archived that should not be enqueued. Pass
 	// over those files without comment.
 	// TODO(dev) count how many names we skip over using prometheus
 	if ok {
-		ctx := appengine.NewContext(r)
 		params := url.Values{"filename": []string{filename}}
 		t := taskqueue.NewPOSTTask("/worker", params)
-		if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		test := r.FormValue("test-bypass")
+		if test == "" {
+			// Skip queuing if bypass for test.
+			ctx := appengine.NewContext(r)
+			if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
 		}
 	}
 }
