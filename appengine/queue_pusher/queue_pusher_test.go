@@ -22,7 +22,7 @@ func TestDefaultHandler(t *testing.T) {
 	defaultHandler(w, r)
 	if w.Result().StatusCode != http.StatusOK {
 		b, _ := ioutil.ReadAll(w.Body)
-		log.Println(string(b))
+		t.Log(string(b))
 		t.Error(w.Result().StatusCode)
 	}
 
@@ -31,7 +31,7 @@ func TestDefaultHandler(t *testing.T) {
 	defaultHandler(w, r)
 	if w.Result().StatusCode != http.StatusOK {
 		b, _ := ioutil.ReadAll(w.Body)
-		log.Println(string(b))
+		t.Log(string(b))
 		t.Error(w.Result().StatusCode)
 	}
 }
@@ -66,7 +66,7 @@ func TestStats(t *testing.T) {
 			queueStats(w, r)
 			if w.Result().StatusCode != tt.status {
 				b, _ := ioutil.ReadAll(w.Body)
-				log.Println(string(b))
+				t.Log(string(b))
 				t.Error(w.Result().StatusCode)
 			}
 		})
@@ -91,31 +91,26 @@ func TestReceiver(t *testing.T) {
 			// This will fail GetFilename, which tries to base64 decode if it doesn't start with gs://
 			name:     "xgs",
 			filename: `xgs://m-lab-sandbox/ndt/2016/01/26/20160126T123456Z-mlab1-prg01-ndt-0007.tgz`,
-			queue:    "",
 			status:   http.StatusBadRequest,
 		},
 		{
 			name:     ".baz",
 			filename: `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.gz.baz`,
-			queue:    "",
 			status:   http.StatusBadRequest,
 		},
 		{
 			name:     "-pod1", // should have two digit pod index
 			filename: `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg1-ndt-0007.tar.gz`,
-			queue:    "",
 			status:   http.StatusBadRequest,
 		},
 		{
 			name:     "ok2",
 			filename: `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz`,
-			queue:    "",
 			status:   http.StatusOK,
 		},
 		{
 			name:     "ok3",
 			filename: `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar`,
-			queue:    "",
 			status:   http.StatusOK,
 		},
 	}
@@ -123,17 +118,13 @@ func TestReceiver(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var reqStr string
-			if tt.queue != "" {
-				reqStr = "?filename=" + tt.filename + "&queue=" + tt.queue + "&test-bypass=true"
-			} else {
-				reqStr = "?filename=" + tt.filename + "&test-bypass=true"
-			}
+			reqStr = "?filename=" + tt.filename + "&test-bypass=true"
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", "http://foobar.com/receiver"+reqStr, nil)
 			receiver(w, r)
-			b, _ := ioutil.ReadAll(w.Body)
-			log.Println(string(b))
 			if w.Result().StatusCode != tt.status {
+				b, _ := ioutil.ReadAll(w.Body)
+				t.Log(string(b))
 				t.Error(w.Result().StatusCode)
 			}
 		})
@@ -177,17 +168,13 @@ func TestReceiverWithQueue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var reqStr string
-			if tt.queue != "" {
-				reqStr = "?filename=" + tt.filename + "&queue=" + tt.queue + "&test-bypass=true"
-			} else {
-				reqStr = "?filename=" + tt.filename + "&test-bypass=true"
-			}
+			reqStr = "?filename=" + tt.filename + "&queue=" + tt.queue + "&test-bypass=true"
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", "http://foobar.com/receiver"+reqStr, nil)
 			receiver(w, r)
 			if w.Result().StatusCode != tt.status {
 				b, _ := ioutil.ReadAll(w.Body)
-				log.Println(string(b))
+				t.Log(string(b))
 				t.Error(w.Result().StatusCode)
 			}
 		})

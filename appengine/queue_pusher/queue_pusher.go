@@ -44,7 +44,8 @@ func init() {
 // A default handler for root path.
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		// TODO - this is actually returning StatusOK.  Weird!
+		http.Error(w, `{"message": "Method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
 	fmt.Fprintf(w, defaultMessage)
@@ -57,6 +58,7 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 
 	if queuename == "" {
 		http.Error(w, `{"message": "Bad request parameters"}`, http.StatusBadRequest)
+		log.Printf("%+v\n", w)
 		return
 	}
 
@@ -84,7 +86,6 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 }
 
 // receiver accepts a GET request, and transforms the given parameters into a TaskQueue Task.
-// TODO - this should expect a POST, for consistency with REST api?
 func receiver(w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): require a POST instead of working with both POST and GET
 	// after we update the Cloud Function to use POST.
