@@ -80,7 +80,13 @@ func TestReceiver(t *testing.T) {
 		queue    string
 		status   int
 	}{
-		// TODO: Add test cases.
+		{
+			// This will fail initial check for missing filename.
+			// Note that this does not test for missing ?filename=
+			name:     "blank",
+			filename: "",
+			status:   http.StatusBadRequest,
+		},
 		{
 			// This will fail GetFilename, which tries to base64 decode if it doesn't start with gs://
 			name:     "xgs",
@@ -141,7 +147,6 @@ func TestReceiverWithQueue(t *testing.T) {
 		queue    string
 		status   int
 	}{
-		// TODO: Add test cases.
 		{
 			name:     "ok1",
 			filename: `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tar.gz`,
