@@ -26,7 +26,8 @@ func TestDefaultHandler(t *testing.T) {
 		t.Error(w.Result().StatusCode)
 	}
 
-	// TODO - is this working as intended?
+	// TODO - The handler code is not working as intended here.
+	// Noted in the prod code as a TODO.
 	r = httptest.NewRequest("POST", "http://foobar.com/", nil)
 	defaultHandler(w, r)
 	if w.Result().StatusCode == http.StatusOK {
