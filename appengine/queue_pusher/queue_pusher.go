@@ -17,12 +17,22 @@ import (
 
 const defaultMessage = "<html><body>This is not the app you're looking for.</body></html>"
 
-// Requests can only add tasks to one of these whitelisted queue names.
+// The following queues should not be directly addressed.
 var queueForType = map[etl.DataType]string{
 	etl.NDT: "etl-ndt-queue",
 	etl.SS:  "etl-sidestream-queue",
 	etl.PT:  "etl-traceroute-queue",
 	etl.SW:  "etl-disco-queue",
+}
+
+// Disallow any queue name that is an automatic queue target.
+func isDirectQueueNameOK(name string) bool {
+	for _, value := range queueForType {
+		if value == name {
+			return false
+		}
+	}
+	return true
 }
 
 func init() {
@@ -78,8 +88,12 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, string(b))
 }
 
-// receiver accepts a GET request, and transforms the given parameters into a TaskQueue Task.
 func receiver(w http.ResponseWriter, r *http.Request) {
+	receiverWithTestBypass(false, w, r)
+}
+
+// receiver accepts a GET request, and transforms the given parameters into a TaskQueue Task.
+func receiverWithTestBypass(bypass bool, w http.ResponseWriter, r *http.Request) {
 	// TODO(dev): require a POST instead of working with both POST and GET
 	// after we update the Cloud Function to use POST.
 	filename := r.FormValue("filename")
@@ -88,22 +102,41 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decoded_filename, err := storage.GetFilename(filename)
+	decodedFilename, err := storage.GetFilename(filename)
 	if err != nil {
 		http.Error(w, `{"message": "Could not base64decode filename"}`, http.StatusBadRequest)
 		return
 	}
 
 	// Validate filename.
-	fn_data, err := etl.ValidateTestPath(decoded_filename)
+	fnData, err := etl.ValidateTestPath(decodedFilename)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		return
 	}
-	// determine correct queue based on file name.
-	queuename, ok := queueForType[fn_data.GetDataType()]
+
+	// determine correct queue based on parameter or file name.
+	var ok bool
+	queuename := r.FormValue("queue")
+	if queuename != "" {
+		ok = isDirectQueueNameOK(queuename)
+	} else {
+		queuename, ok = queueForType[fnData.GetDataType()]
+	}
+
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"message": "Invalid queuename."}`)
+		return
+	}
+
+	// Skip queue if bypass for test.
+	if bypass {
+		fmt.Fprintf(w, `{"message": "StatusOK", "queue": %s, "filename": "filename"}`, queuename)
+		return
+	}
 
 	// Lots of files will be archived that should not be enqueued. Pass
 	// over those files without comment.
