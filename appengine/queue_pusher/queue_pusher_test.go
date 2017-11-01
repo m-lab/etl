@@ -1,5 +1,8 @@
 package pushqueue
 
+// TODO
+// 1. Convert most of the tests to use an actual server.
+
 import (
 	"io/ioutil"
 	"log"
@@ -34,13 +37,39 @@ func TestDefaultHandler(t *testing.T) {
 }
 
 func TestStats(t *testing.T) {
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(`GET`, `http://foobar.com/stats?queuename=etl-ndt-queue&test-bypass="true"`, nil)
-	queueStats(w, r)
-	if w.Result().StatusCode != http.StatusOK {
-		b, _ := ioutil.ReadAll(w.Body)
-		log.Println(string(b))
-		t.Error(w.Result().StatusCode)
+	tests := []struct {
+		name   string
+		queue  string
+		status int
+	}{
+		{
+			name:   "blank",
+			queue:  "",
+			status: http.StatusBadRequest,
+		},
+		{
+			name:   "ndt",
+			queue:  "etl-ndt-queue",
+			status: http.StatusOK,
+		},
+		{
+			// We should allow querying any arbitrary queue status...
+			name:   "other",
+			queue:  "other-queue",
+			status: http.StatusOK,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(`GET`, `http://foobar.com/stats?queuename=`+tt.queue+`&test-bypass=true`, nil)
+			queueStats(w, r)
+			if w.Result().StatusCode != tt.status {
+				b, _ := ioutil.ReadAll(w.Body)
+				log.Println(string(b))
+				t.Error(w.Result().StatusCode)
+			}
+		})
 	}
 }
 

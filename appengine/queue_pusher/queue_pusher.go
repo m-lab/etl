@@ -1,5 +1,5 @@
-// A microservice that accepts HTTP requests, creates a Task from given
-// parameters, and adds the Task to a Push TaskQueue.
+// Package pushqueue provides a microservice that accepts HTTP requests, creates
+// a Task from given parameters, and adds the Task to a TaskQueue.
 package pushqueue
 
 import (
@@ -57,17 +57,6 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 
 	if queuename == "" {
 		http.Error(w, `{"message": "Bad request parameters"}`, http.StatusBadRequest)
-		return
-	}
-
-	// TODO(dev): maybe this should be made more efficient?
-	validQueue := false
-	for _, queue := range queueForType {
-		validQueue = validQueue || (queuename == queue)
-	}
-	if !validQueue {
-		// TODO(dev): return a list of valid queues
-		http.Error(w, `{"message": "Given queue name is not acceptable"}`, http.StatusNotAcceptable)
 		return
 	}
 
