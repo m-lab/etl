@@ -21,8 +21,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/spaolacci/murmur3"
 	"google.golang.org/api/iterator"
@@ -39,7 +41,7 @@ var (
 	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
 	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
 
-	errCount      = 1
+	errCount      int32
 	storageClient *storage.Client
 	bucket        *storage.BucketHandle
 
@@ -47,6 +49,8 @@ var (
 )
 
 func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
 func postOne(queue string, bucket string, fn string) error {
@@ -67,22 +71,22 @@ func postOne(queue string, bucket string, fn string) error {
 // queue.
 func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 	defer wg.Done()
-	wg.Add(1)
+	log.Printf("%+v\n", it)
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
-		fmt.Println(o.Name)
+		log.Println(o.Name)
 		if err != nil {
-			fmt.Println(err)
-			errCount++
-			if errCount > 10 {
+			log.Println(err)
+			ec := atomic.AddInt32(&errCount, 1)
+			if ec > 10 {
 				panic(err)
 			}
 		}
 
 		err = postOne(*fQueue, *fBucket, o.Name)
 		if err != nil {
-			fmt.Println(err)
-			errCount++
-			if errCount > 10 {
+			log.Println(err)
+			ec := atomic.AddInt32(&errCount, 1)
+			if ec > 10 {
 				panic(err)
 			}
 		}
@@ -97,22 +101,23 @@ func queueFor(prefix string) string {
 }
 
 func day(prefix string) {
-	fmt.Println(prefix)
+	log.Println(prefix)
 	q := storage.Query{
 		Delimiter: "/",
 		// TODO - validate.
 		Prefix: prefix,
 	}
 	it := bucket.Objects(context.Background(), &q)
-	fmt.Printf("%+v\n", it)
 	queue := queueFor(prefix)
 	var wg sync.WaitGroup
-	defer wg.Wait()
+	wg.Add(1)
 	go postDay(&wg, queue, it)
+	log.Println("Waiting")
+	wg.Wait()
 }
 
 func month(prefix string) {
-	fmt.Println(prefix)
+	log.Println(prefix)
 	q := storage.Query{
 		Delimiter: "/",
 		// TODO - validate.
@@ -120,13 +125,12 @@ func month(prefix string) {
 	}
 	it := bucket.Objects(context.Background(), &q)
 
-	fmt.Printf("%+v\n", it.PageInfo())
 	var wg sync.WaitGroup
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
-		fmt.Printf("%+v\n", o)
+		//		log.Printf("%+v\n", o)
 		if o.Prefix != "" {
 			q := storage.Query{
 				Delimiter: "/",
@@ -135,11 +139,14 @@ func month(prefix string) {
 			}
 			it := bucket.Objects(context.Background(), &q)
 			queue := queueFor(o.Prefix)
+			wg.Add(1)
 			go postDay(&wg, queue, it)
 		} else {
-			fmt.Println("Skipping: ", o.Name)
+			log.Println("Skipping: ", o.Name)
 		}
 	}
+	log.Println("Waiting")
+	wg.Wait()
 }
 
 func main() {
@@ -148,17 +155,17 @@ func main() {
 	var err error
 	storageClient, err = storage.NewClient(context.Background())
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		panic(err)
 	}
 
 	bucket = storageClient.Bucket(*fBucket)
 	attr, err := bucket.Attrs(context.Background())
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		panic(err)
 	}
-	fmt.Println(attr)
+	log.Println(attr)
 
 	if *fMonth != "" {
 		month(*fExper + "/" + *fMonth + "/")
