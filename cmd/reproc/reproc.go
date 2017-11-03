@@ -35,15 +35,17 @@ import (
 )
 
 var (
-	fProject   = flag.String("project", "mlab-oti", "Project containing queues.")
+	fProject   = flag.String("project", "", "Project containing queues.")
 	fQueue     = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
+	// TODO implement listing queues to determine number of queue, and change this to 0
 	fNumQueues = flag.Int("num_queues", 5, "Number of queues.  Normally determined by listing queues.")
 	fBucket    = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
 	fExper     = flag.String("experiment", "ndt", "Experiment prefix, trailing slash optional")
 	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
 	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
 
-	errCount      int32
+	qpErrCount      int32
+	gcsErrCount int32
 	storageClient *storage.Client
 	bucket        *storage.BucketHandle
 )
@@ -54,7 +56,7 @@ func init() {
 }
 
 func postOne(queue string, bucket string, fn string) error {
-	reqStr := fmt.Sprintf("http://queue-pusher-dot-%s.appspot.com/receiver?queue=%s&filename=gs://%s/%s", *fProject, queue, bucket, fn)
+	reqStr := fmt.Sprintf("https://queue-pusher-dot-%s.appspot.com/receiver?queue=%s&filename=gs://%s/%s", *fProject, queue, bucket, fn)
 	resp, err := http.Get(reqStr)
 	if err != nil {
 		return err
@@ -77,7 +79,7 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 		if err != nil {
 			// TODO - should this retry?
 			log.Println(err)
-			ec := atomic.AddInt32(&errCount, 1)
+			ec := atomic.AddInt32(&gcsErrCount, 1)
 			if ec > 10 {
 				panic(err)
 			}
@@ -87,7 +89,7 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 		if err != nil {
 			// TODO - should this retry?
 			log.Println(err)
-			ec := atomic.AddInt32(&errCount, 1)
+			ec := atomic.AddInt32(&qpErrCount, 1)
 			if ec > 10 {
 				panic(err)
 			}

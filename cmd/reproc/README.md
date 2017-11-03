@@ -12,14 +12,21 @@ go run cmd/reproc/reproc.go -month 2017/10
 ```
 
 The command line flags are:
-```go
-	fProject   = flag.String("project", "mlab-oti", "Project containing queues.")
-	fQueue     = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
-	fNumQueues = flag.Int("num_queues", 5, "Number of queues.  Normally determined by listing queues.")
-	fBucket    = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
-	fExper     = flag.String("experiment", "ndt", "Experiment prefix, trailing slash optional")
-	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
-	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
+```code
+  -bucket string
+    	Source bucket. (default "archive-mlab-oti")
+  -day string
+    	Single day spec, as YYYY/MM/DD
+  -experiment string
+    	Experiment prefix, trailing slash optional (default "ndt")
+  -month string
+    	Single month spec, as YYYY/MM
+  -num_queues int
+    	Number of queues.  Normally determined by listing queues. (default 5)
+  -project string
+    	Project containing queues.
+  -queue string
+    	Base of queue name. (default "etl-ndt-batch-")
 ```
 
 The default queues feed into etl-ndt-batch pipeline, which pushes rows to measurement-lab:batch.ndt.  This table is created by
