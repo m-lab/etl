@@ -2,6 +2,8 @@
 // ranges for reprocessing
 package main
 
+// TODO - note about setting up batch table and giving permission.
+
 /*
 Strategies...
   1. Work from a prefix, or range of prefixes.
@@ -33,8 +35,8 @@ import (
 )
 
 var (
-	fProject   = flag.String("project", "", "Project containing queues.")
-	fQueue     = flag.String("queue", "etl-ndt-batch_", "Base of queue name.")
+	fProject   = flag.String("project", "mlab-oti", "Project containing queues.")
+	fQueue     = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
 	fNumQueues = flag.Int("num_queues", 5, "Number of queues.  Normally determined by listing queues.")
 	fBucket    = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
 	fExper     = flag.String("experiment", "ndt", "Experiment prefix, trailing slash optional")
@@ -54,7 +56,7 @@ func init() {
 }
 
 func postOne(queue string, bucket string, fn string) error {
-	reqStr := fmt.Sprintf("http://queue-pusher-dot-mlab-oti.appspot.com/receiver?queue=%s?filename=gs://%s/%s", queue, bucket, fn)
+	reqStr := fmt.Sprintf("http://queue-pusher-dot-%s.appspot.com/receiver?queue=%s&filename=gs://%s/%s", *fProject, queue, bucket, fn)
 	resp, err := http.Get(reqStr)
 	if err != nil {
 		return err
@@ -73,7 +75,6 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 	defer wg.Done()
 	log.Printf("%+v\n", it)
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
-		log.Println(o.Name)
 		if err != nil {
 			log.Println(err)
 			ec := atomic.AddInt32(&errCount, 1)
@@ -82,7 +83,7 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 			}
 		}
 
-		err = postOne(*fQueue, *fBucket, o.Name)
+		err = postOne(queue, *fBucket, o.Name)
 		if err != nil {
 			log.Println(err)
 			ec := atomic.AddInt32(&errCount, 1)
@@ -108,10 +109,9 @@ func day(prefix string) {
 		Prefix: prefix,
 	}
 	it := bucket.Objects(context.Background(), &q)
-	queue := queueFor(prefix)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go postDay(&wg, queue, it)
+	go postDay(&wg, queueFor(prefix), it)
 	log.Println("Waiting")
 	wg.Wait()
 }
