@@ -74,27 +74,27 @@ queue:
 # 2. We have 5 queues, to allow up to about 500 rows/second, to
 #    allow 30 days of data to be processed within one day, with
 #    some headroom for future growth.
-- name: etl-ndt-batch_0
+- name: etl-ndt-batch-0
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
   max_concurrent_requests: 75
-- name: etl-ndt-batch_1
+- name: etl-ndt-batch-1
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
   max_concurrent_requests: 75
-- name: etl-ndt-batch_2
+- name: etl-ndt-batch-2
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
   max_concurrent_requests: 75
-- name: etl-ndt-batch_3
+- name: etl-ndt-batch-3
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
   max_concurrent_requests: 75
-- name: etl-ndt-batch_4
+- name: etl-ndt-batch-4
   target: etl-ndt-batch-parser
   rate: 1.0/s
   bucket_size: 10
