@@ -27,8 +27,8 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 
-	"github.com/spaolacci/murmur3"
 	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/storage"
@@ -46,8 +46,6 @@ var (
 	errCount      int32
 	storageClient *storage.Client
 	bucket        *storage.BucketHandle
-
-	hasher = murmur3.New32()
 )
 
 func init() {
@@ -72,10 +70,12 @@ func postOne(queue string, bucket string, fn string) error {
 // Post all items in an ObjectIterator into specific
 // queue.
 func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
-	defer wg.Done()
-	log.Printf("%+v\n", it)
+	if wg != nil {
+		defer wg.Done()
+	}
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
 		if err != nil {
+			// TODO - should this retry?
 			log.Println(err)
 			ec := atomic.AddInt32(&errCount, 1)
 			if ec > 10 {
@@ -85,6 +85,7 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 
 		err = postOne(queue, *fBucket, o.Name)
 		if err != nil {
+			// TODO - should this retry?
 			log.Println(err)
 			ec := atomic.AddInt32(&errCount, 1)
 			if ec > 10 {
@@ -94,30 +95,35 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 	}
 }
 
-func queueFor(prefix string) string {
-	hasher.Reset()
-	hasher.Write([]byte(prefix))
-	hash := hasher.Sum32()
-	return fmt.Sprintf("%s%d", *fQueue, int(hash)%*fNumQueues)
+// Initially this used a hash, but using day ordinal is better
+// as it distributes across the queues more evenly.
+func queueFor(date time.Time) string {
+	day := date.Unix() / (24 * 60 * 60)
+	return fmt.Sprintf("%s%d", *fQueue, int(day)%*fNumQueues)
 }
 
-func day(prefix string) {
-	log.Println(prefix)
+func dateFromPrefixOrDie(prefix string) time.Time {
+	date, err := time.Parse("ndt/2006/01/02/", prefix)
+	if err != nil {
+		log.Println(err)
+		panic(err)
+	}
+	return date
+}
+
+func day(wg *sync.WaitGroup, prefix string) {
+	queue := queueFor(dateFromPrefixOrDie(prefix))
+	log.Println("Adding ", prefix, " to ", queue)
 	q := storage.Query{
 		Delimiter: "/",
 		// TODO - validate.
 		Prefix: prefix,
 	}
 	it := bucket.Objects(context.Background(), &q)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go postDay(&wg, queueFor(prefix), it)
-	log.Println("Waiting")
-	wg.Wait()
+	go postDay(wg, queue, it)
 }
 
 func month(prefix string) {
-	log.Println(prefix)
 	q := storage.Query{
 		Delimiter: "/",
 		// TODO - validate.
@@ -129,23 +135,13 @@ func month(prefix string) {
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
 		if err != nil {
 			log.Println(err)
-		}
-		//		log.Printf("%+v\n", o)
-		if o.Prefix != "" {
-			q := storage.Query{
-				Delimiter: "/",
-				// TODO - validate.
-				Prefix: o.Prefix,
-			}
-			it := bucket.Objects(context.Background(), &q)
-			queue := queueFor(o.Prefix)
+		} else if o.Prefix != "" {
 			wg.Add(1)
-			go postDay(&wg, queue, it)
+			day(&wg, o.Prefix)
 		} else {
 			log.Println("Skipping: ", o.Name)
 		}
 	}
-	log.Println("Waiting")
 	wg.Wait()
 }
 
@@ -160,16 +156,15 @@ func main() {
 	}
 
 	bucket = storageClient.Bucket(*fBucket)
-	attr, err := bucket.Attrs(context.Background())
+	_, err = bucket.Attrs(context.Background())
 	if err != nil {
 		log.Println(err)
 		panic(err)
 	}
-	log.Println(attr)
 
 	if *fMonth != "" {
 		month(*fExper + "/" + *fMonth + "/")
 	} else if *fDay != "" {
-		day(*fExper + "/" + *fDay + "/")
+		day(nil, *fExper+"/"+*fDay+"/")
 	}
 }
