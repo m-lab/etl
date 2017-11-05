@@ -126,6 +126,19 @@ deploy:
     all_branches: true
     condition: $TRAVIS_TAG == ndt-prod-*
 
+# BATCH: Should be used AFTER code review and commit to master branch.
+# Triggers when *ANY* branch is tagged with ndt-batch-*'
+# Deploys BATCH services.
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_TAG == ndt-batch-*
+
 ######################################################################
 ## Service: etl-sidestream-parser -- AppEngine Flexible Environment.
 # SANDBOX: before code review for development code in a specific branch.
