@@ -38,7 +38,7 @@ var (
 	fProject   = flag.String("project", "", "Project containing queues.")
 	fQueue     = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
 	// TODO implement listing queues to determine number of queue, and change this to 0
-	fNumQueues = flag.Int("num_queues", 5, "Number of queues.  Normally determined by listing queues.")
+	fNumQueues = flag.Int("num_queues", 8, "Number of queues.  Normally determined by listing queues.")
 	fBucket    = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
 	fExper     = flag.String("experiment", "ndt", "Experiment prefix, trailing slash optional")
 	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
