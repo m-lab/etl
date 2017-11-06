@@ -26,7 +26,6 @@ import (
 	"log"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"google.golang.org/api/iterator"
@@ -34,20 +33,26 @@ import (
 	"cloud.google.com/go/storage"
 )
 
+// BucketHandle defines the interface for either storage.BucketHandle or
+// test fakes.
+type BucketHandle interface {
+	Attrs(ctx context.Context) (*storage.BucketAttrs, error)
+	Objects(ctx context.Context, q *storage.Query) *storage.ObjectIterator
+}
+
 var (
-	fProject   = flag.String("project", "", "Project containing queues.")
-	fQueue     = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
+	fProject = flag.String("project", "", "Project containing queues.")
+	fQueue   = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
 	// TODO implement listing queues to determine number of queue, and change this to 0
 	fNumQueues = flag.Int("num_queues", 8, "Number of queues.  Normally determined by listing queues.")
 	fBucket    = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
 	fExper     = flag.String("experiment", "ndt", "Experiment prefix, trailing slash optional")
 	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
 	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
+	fDryRun    = flag.Bool("dry_run", false, "Prevents all output to queue_pusher.")
 
-	qpErrCount      int32
-	gcsErrCount int32
 	storageClient *storage.Client
-	bucket        *storage.BucketHandle
+	bucket        BucketHandle
 )
 
 func init() {
@@ -55,8 +60,14 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+// postOne sends a single https request to the queue pusher to add a task.
+// Iff dryRun is true, this does nothing.
 func postOne(queue string, bucket string, fn string) error {
 	reqStr := fmt.Sprintf("https://queue-pusher-dot-%s.appspot.com/receiver?queue=%s&filename=gs://%s/%s", *fProject, queue, bucket, fn)
+	if *fDryRun {
+		return nil
+	}
+
 	resp, err := http.Get(reqStr)
 	if err != nil {
 		return err
@@ -72,6 +83,9 @@ func postOne(queue string, bucket string, fn string) error {
 // Post all items in an ObjectIterator into specific
 // queue.
 func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
+	qpErrCount := 0
+	gcsErrCount := 0
+	fileCount := 0
 	if wg != nil {
 		defer wg.Done()
 	}
@@ -79,9 +93,9 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 		if err != nil {
 			// TODO - should this retry?
 			log.Println(err)
-			ec := atomic.AddInt32(&gcsErrCount, 1)
-			if ec > 10 {
-				panic(err)
+			if gcsErrCount > 3 {
+				log.Printf("Failed after %d files to %s.\n", fileCount, queue)
+				return
 			}
 		}
 
@@ -89,12 +103,15 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 		if err != nil {
 			// TODO - should this retry?
 			log.Println(err)
-			ec := atomic.AddInt32(&qpErrCount, 1)
-			if ec > 10 {
-				panic(err)
+			if qpErrCount > 3 {
+				log.Printf("Failed after %d files to %s.\n", fileCount, queue)
+				return
 			}
+		} else {
+			fileCount++
 		}
 	}
+	log.Println("Added ", fileCount, " tasks to ", queue)
 }
 
 // Initially this used a hash, but using day ordinal is better
@@ -104,23 +121,27 @@ func queueFor(date time.Time) string {
 	return fmt.Sprintf("%s%d", *fQueue, int(day)%*fNumQueues)
 }
 
-func dateFromPrefixOrDie(prefix string) time.Time {
+// day fetches an iterator over the objects with ndt/YYYY/MM/DD prefix,
+// and passes the iterator to postDay with appropriate queue.
+// Iff wq is not nil, postDay will call done on wg when finished
+// posting.
+func day(wg *sync.WaitGroup, prefix string) {
 	date, err := time.Parse("ndt/2006/01/02/", prefix)
 	if err != nil {
+		log.Println("Failed parsing date from ", prefix)
 		log.Println(err)
-		panic(err)
+		if wg != nil {
+			wg.Done()
+		}
+		return
 	}
-	return date
-}
-
-func day(wg *sync.WaitGroup, prefix string) {
-	queue := queueFor(dateFromPrefixOrDie(prefix))
+	queue := queueFor(date)
 	log.Println("Adding ", prefix, " to ", queue)
 	q := storage.Query{
 		Delimiter: "/",
-		// TODO - validate.
-		Prefix: prefix,
+		Prefix:    prefix,
 	}
+	// TODO - can this error?
 	it := bucket.Objects(context.Background(), &q)
 	go postDay(wg, queue, it)
 }
@@ -149,6 +170,11 @@ func month(prefix string) {
 
 func main() {
 	flag.Parse()
+	if *fProject == "" && !*fDryRun {
+		log.Println("Must specify project (or --dry_run)")
+		flag.PrintDefaults()
+		return
+	}
 
 	var err error
 	storageClient, err = storage.NewClient(context.Background())
