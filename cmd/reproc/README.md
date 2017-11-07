@@ -4,11 +4,16 @@ overridden with the -project flag.
 
 For example:
 ```bash
-go run cmd/reproc/reproc.go -day 2017/10/01
+go run cmd/reproc/reproc.go -project mlab-oti -day 2017/10/01
 ```
 OR
 ```bash
-go run cmd/reproc/reproc.go -month 2017/10
+go run cmd/reproc/reproc.go -project mlab-oti -month 2017/10
+```
+
+You can also dry-run a request:
+```bash
+go run cmd/reproc/reproc.go -dry_run -month 2017/10
 ```
 
 The command line flags are:
@@ -17,12 +22,14 @@ The command line flags are:
     	Source bucket. (default "archive-mlab-oti")
   -day string
     	Single day spec, as YYYY/MM/DD
+  -dry_run
+    	Prevents all output to queue_pusher.
   -experiment string
     	Experiment prefix, trailing slash optional (default "ndt")
   -month string
     	Single month spec, as YYYY/MM
   -num_queues int
-    	Number of queues.  Normally determined by listing queues. (default 5)
+    	Number of queues.  Normally determined by listing queues. (default 8)
   -project string
     	Project containing queues.
   -queue string
