@@ -19,10 +19,12 @@ Usage:
 */
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
@@ -33,11 +35,20 @@ import (
 	"cloud.google.com/go/storage"
 )
 
-// BucketHandle defines the interface for either storage.BucketHandle or
-// test fakes.
-type BucketHandle interface {
-	Attrs(ctx context.Context) (*storage.BucketAttrs, error)
-	Objects(ctx context.Context, q *storage.Query) *storage.ObjectIterator
+type httpClientIntf interface {
+	Get(url string) (resp *http.Response, err error)
+}
+
+// This is used to intercept Get requests to the queue_pusher when invoked
+// with -dry_run.
+type dryRunHTTP struct{}
+
+func (dr *dryRunHTTP) Get(url string) (resp *http.Response, err error) {
+	resp = &http.Response{}
+	resp.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+	resp.Status = "200 OK"
+	resp.StatusCode = 200
+	return
 }
 
 var (
@@ -51,8 +62,9 @@ var (
 	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
 	fDryRun    = flag.Bool("dry_run", false, "Prevents all output to queue_pusher.")
 
-	storageClient *storage.Client
-	bucket        BucketHandle
+	bucket *storage.BucketHandle
+	// Use an interface to allow test fake.
+	httpClient httpClientIntf = http.DefaultClient
 )
 
 func init() {
@@ -64,11 +76,8 @@ func init() {
 // Iff dryRun is true, this does nothing.
 func postOne(queue string, bucket string, fn string) error {
 	reqStr := fmt.Sprintf("https://queue-pusher-dot-%s.appspot.com/receiver?queue=%s&filename=gs://%s/%s", *fProject, queue, bucket, fn)
-	if *fDryRun {
-		return nil
-	}
 
-	resp, err := http.Get(reqStr)
+	resp, err := httpClient.Get(reqStr)
 	if err != nil {
 		return err
 	}
@@ -97,6 +106,7 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 				log.Printf("Failed after %d files to %s.\n", fileCount, queue)
 				return
 			}
+			continue
 		}
 
 		err = postOne(queue, *fBucket, o.Name)
@@ -143,9 +153,15 @@ func day(wg *sync.WaitGroup, prefix string) {
 	}
 	// TODO - can this error?
 	it := bucket.Objects(context.Background(), &q)
-	go postDay(wg, queue, it)
+	if wg != nil {
+		go postDay(wg, queue, it)
+	} else {
+		postDay(nil, queue, it)
+	}
 }
 
+// month adds all of the files from dates within a specified month.
+// It is difficult to test without hitting GCS.  8-(
 func month(prefix string) {
 	q := storage.Query{
 		Delimiter: "/",
@@ -168,16 +184,15 @@ func month(prefix string) {
 	wg.Wait()
 }
 
-func main() {
-	flag.Parse()
-	if *fProject == "" && !*fDryRun {
-		log.Println("Must specify project (or --dry_run)")
-		flag.PrintDefaults()
-		return
+func setup(fakeHTTP httpClientIntf) {
+	if *fDryRun {
+		httpClient = &dryRunHTTP{}
+	}
+	if fakeHTTP != nil {
+		httpClient = fakeHTTP
 	}
 
-	var err error
-	storageClient, err = storage.NewClient(context.Background())
+	storageClient, err := storage.NewClient(context.Background())
 	if err != nil {
 		log.Println(err)
 		panic(err)
@@ -189,10 +204,24 @@ func main() {
 		log.Println(err)
 		panic(err)
 	}
+}
 
+func run() {
 	if *fMonth != "" {
 		month(*fExper + "/" + *fMonth + "/")
 	} else if *fDay != "" {
 		day(nil, *fExper+"/"+*fDay+"/")
 	}
+}
+
+func main() {
+	flag.Parse()
+	if *fProject == "" && !*fDryRun {
+		log.Println("Must specify project (or --dry_run)")
+		flag.PrintDefaults()
+		return
+	}
+
+	setup(nil)
+	run()
 }
