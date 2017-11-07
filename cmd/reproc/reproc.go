@@ -2,19 +2,12 @@
 // ranges for reprocessing
 package main
 
-// TODO - note about setting up batch table and giving permission.
-
 /*
 Strategies...
-  1. Work from a prefix, or range of prefixes.
-  2. Work from a date range
-  3. Work from a month prefix, but explicitly iterate over days.
-      maybe use a separate goroutine for each date?
-
-Usage:
-
-
-
+  1. Work from a month prefix, but explicitly iterate over days.
+      maybe use a separate goroutine for each date? (DONE)
+  2. Work from a prefix, or range of prefixes.
+  3. Work from a date range
 
 */
 
@@ -151,7 +144,7 @@ func day(wg *sync.WaitGroup, prefix string) {
 		Delimiter: "/",
 		Prefix:    prefix,
 	}
-	// TODO - can this error?
+	// TODO - can this error?  Or do errors only occur on iterator ops?
 	it := bucket.Objects(context.Background(), &q)
 	if wg != nil {
 		go postDay(wg, queue, it)
