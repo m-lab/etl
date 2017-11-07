@@ -44,13 +44,16 @@ func (dr *dryRunHTTP) Get(url string) (resp *http.Response, err error) {
 	return
 }
 
+// TODO - should move this to a command line specific module,
+// and replace with fields in a struct that is used as the receiver
+// for most of the functions.
 var (
 	fProject = flag.String("project", "", "Project containing queues.")
 	fQueue   = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
 	// TODO implement listing queues to determine number of queue, and change this to 0
 	fNumQueues = flag.Int("num_queues", 8, "Number of queues.  Normally determined by listing queues.")
 	fBucket    = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
-	fExper     = flag.String("experiment", "ndt", "Experiment prefix, trailing slash optional")
+	fExper     = flag.String("experiment", "ndt", "Experiment prefix, without trailing slash.")
 	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
 	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
 	fDryRun    = flag.Bool("dry_run", false, "Prevents all output to queue_pusher.")
@@ -119,7 +122,7 @@ func postDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
 
 // Initially this used a hash, but using day ordinal is better
 // as it distributes across the queues more evenly.
-func queueFor(date time.Time) string {
+func queueForDate(date time.Time) string {
 	day := date.Unix() / (24 * 60 * 60)
 	return fmt.Sprintf("%s%d", *fQueue, int(day)%*fNumQueues)
 }
@@ -138,7 +141,7 @@ func day(wg *sync.WaitGroup, prefix string) {
 		}
 		return
 	}
-	queue := queueFor(date)
+	queue := queueForDate(date)
 	log.Println("Adding ", prefix, " to ", queue)
 	q := storage.Query{
 		Delimiter: "/",
@@ -177,12 +180,15 @@ func month(prefix string) {
 	wg.Wait()
 }
 
-func setup(fakeHTTP httpClientIntf) {
+// setup configures the storage client and bucket.
+// If altHTTP is non-nil, or dry_run is set, then it also installs
+// an alternate http client.
+func setup(altHTTP httpClientIntf) {
 	if *fDryRun {
 		httpClient = &dryRunHTTP{}
 	}
-	if fakeHTTP != nil {
-		httpClient = fakeHTTP
+	if altHTTP != nil {
+		httpClient = altHTTP
 	}
 
 	storageClient, err := storage.NewClient(context.Background())
@@ -192,6 +198,7 @@ func setup(fakeHTTP httpClientIntf) {
 	}
 
 	bucket = storageClient.Bucket(*fBucket)
+	// Check that the bucket is valid, by fetching it's attributes.
 	_, err = bucket.Attrs(context.Background())
 	if err != nil {
 		log.Println(err)
@@ -209,6 +216,9 @@ func run() {
 
 func main() {
 	flag.Parse()
+	// Check that either project or dry-run is set.
+	// If dry-run, it is ok for the project to be unset, as the URLs
+	// only are seen by a fake http client.
 	if *fProject == "" && !*fDryRun {
 		log.Println("Must specify project (or --dry_run)")
 		flag.PrintDefaults()
