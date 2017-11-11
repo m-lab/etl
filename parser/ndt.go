@@ -341,51 +341,18 @@ func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 	n.getAndInsertValues(test, testType)
 }
 
-func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
-	// Extract the values from the last snapshot.
-	metrics.WorkerState.WithLabelValues("parse").Inc()
-	defer metrics.WorkerState.WithLabelValues("parse").Dec()
-
-	if !strings.HasSuffix(test.fn, ".gz") {
-		metrics.WarningCount.WithLabelValues(
-			n.TableName(), testType, "uncompressed file").Inc()
-	}
-
-	snaplog, err := web100.NewSnapLog(test.data)
-	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
-			n.TableName(), testType, "snaplog failure").Inc()
-		log.Printf("Unable to parse snaplog for %s, when processing: %s\n%s\n",
-			test.fn, n.taskFileName, err)
-		return
-	}
-
-	valid := true
-	err = snaplog.ValidateSnapshots()
-	if err != nil {
-		log.Printf("ValidateSnapshots failed for %s, when processing: %s (%s)\n",
-			test.fn, n.taskFileName, err)
-		metrics.WarningCount.WithLabelValues(
-			n.TableName(), testType, "validate failed").Inc()
-		// If ValidateSnapshots returns error, it generally means that there
-		// is a problem with the last snapshot, typically a truncated file.
-		// In most cases, there are still many valid snapshots.
-		valid = false
-	}
-
-	// HACK - just to see how expensive the Values() call is...
-	// parse ALL the snapshots.
-	last := &web100.Snapshot{}
+func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schema.Web100ValueMap, int) {
 	var deltas []schema.Web100ValueMap
 	deltaFieldCount := 0
 	snapshotCount := 0
+	last := &web100.Snapshot{}
 	for count := 0; count < snaplog.SnapCount() && count < maxNumSnapshots; count++ {
 		snap, err := snaplog.Snapshot(count)
 		if err != nil {
 			// TODO - refine label and maybe write a log?
 			metrics.TestCount.WithLabelValues(
 				n.TableName(), testType, "snapshot failure").Inc()
-			return
+			return nil, 0
 		}
 		// Proper sizing avoids evacuate, saving about 20%, excluding BQ code.
 		delta := schema.EmptySnap10()
@@ -393,7 +360,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				n.TableName(), testType, "snapValues failure").Inc()
-			return
+			return nil, 0
 		}
 
 		// Delete the constant fields.
@@ -429,6 +396,47 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		// to find.  is_last is the first, but more will be added as we work
 		// out the most useful tags.
 		deltas[len(deltas)-1]["is_last"] = true
+	}
+
+	return deltas, deltaFieldCount
+}
+
+func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
+	// Extract the values from the last snapshot.
+	metrics.WorkerState.WithLabelValues("parse").Inc()
+	defer metrics.WorkerState.WithLabelValues("parse").Dec()
+
+	if !strings.HasSuffix(test.fn, ".gz") {
+		metrics.WarningCount.WithLabelValues(
+			n.TableName(), testType, "uncompressed file").Inc()
+	}
+
+	snaplog, err := web100.NewSnapLog(test.data)
+	if err != nil {
+		metrics.ErrorCount.WithLabelValues(
+			n.TableName(), testType, "snaplog failure").Inc()
+		log.Printf("Unable to parse snaplog for %s, when processing: %s\n%s\n",
+			test.fn, n.taskFileName, err)
+		return
+	}
+
+	valid := true
+	err = snaplog.ValidateSnapshots()
+	if err != nil {
+		log.Printf("ValidateSnapshots failed for %s, when processing: %s (%s)\n",
+			test.fn, n.taskFileName, err)
+		metrics.WarningCount.WithLabelValues(
+			n.TableName(), testType, "validate failed").Inc()
+		// If ValidateSnapshots returns error, it generally means that there
+		// is a problem with the last snapshot, typically a truncated file.
+		// In most cases, there are still many valid snapshots.
+		valid = false
+	}
+
+	deltas, deltaFieldCount := n.getDeltas(snaplog, testType)
+	if deltas == nil {
+		// There was some kind of failure parsing snapshots.
+		return
 	}
 	final := snaplog.SnapCount() - 1
 	if final > maxNumSnapshots {
