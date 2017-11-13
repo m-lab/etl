@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -18,6 +19,10 @@ import (
 	"github.com/m-lab/etl/web100"
 )
 
+var (
+	NDTOmitDeltas = os.GetEnv("NDT_OMIT_DELTAS")
+)
+
 const (
 	// Some snaplogs are very large, and we don't want to parse the entire
 	// snaplog, when there is no value.  However, although the nominal test
@@ -29,7 +34,6 @@ const (
 	// TODO - in future, we should probably detect when the connection state changes
 	// from established, as there is little reason to parse snapshots beyond that
 	// point.
-
 	minNumSnapshots = 1600 // If fewer than this, then set anomalies.num_snaps
 	maxNumSnapshots = 2800 // If more than this, truncate, and set anomolies.num_snaps
 )
@@ -342,8 +346,11 @@ func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 }
 
 func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schema.Web100ValueMap, int) {
-	var deltas []schema.Web100ValueMap
+	deltas := make([]schema.Web100ValueMap, 1000)
 	deltaFieldCount := 0
+	if true {
+		return deltas, deltaFieldCount
+	}
 	snapshotCount := 0
 	last := &web100.Snapshot{}
 	for count := 0; count < snaplog.SnapCount() && count < maxNumSnapshots; count++ {
@@ -433,9 +440,11 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		valid = false
 	}
 
-	deltas, deltaFieldCount := n.getDeltas(snaplog, testType)
+	var deltas []schema.Web100ValueMap
+	deltaFieldCount := 0
+	deltas, deltaFieldCount = n.getDeltas(snaplog, testType)
 	if deltas == nil {
-		// There was some kind of failure parsing snapshots.
+		// There was some kind of major failure parsing snapshots.
 		return
 	}
 	final := snaplog.SnapCount() - 1
