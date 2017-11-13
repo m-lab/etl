@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	NDTOmitDeltas = os.GetEnv("NDT_OMIT_DELTAS")
+	NDTOmitDeltas = os.Getenv("NDT_OMIT_DELTAS")
 )
 
 const (
