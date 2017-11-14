@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,7 +21,8 @@ import (
 )
 
 var (
-	NDTOmitDeltas = os.Getenv("NDT_OMIT_DELTAS")
+	// NDTOmitDeltas flag indicates if deltas should be suppressed.
+	NDTOmitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
 )
 
 const (
@@ -346,9 +348,9 @@ func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 }
 
 func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schema.Web100ValueMap, int) {
-	deltas := make([]schema.Web100ValueMap, 1000)
+	deltas := []schema.Web100ValueMap{}
 	deltaFieldCount := 0
-	if true {
+	if NDTOmitDeltas {
 		return deltas, deltaFieldCount
 	}
 	snapshotCount := 0
