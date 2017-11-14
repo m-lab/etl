@@ -570,7 +570,7 @@ func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 		a := other.raw[field.Offset : field.Offset+field.Size]
 		b := snap.raw[field.Offset : field.Offset+field.Size]
 		if bytes.Compare(a, b) != 0 {
-			if field.Name != "Duration" {
+			if field.Name != "Duration" && field.Name[0] != '_' {
 				metrics.SnapshotDeltaFieldCount.WithLabelValues(field.Name).Inc()
 			}
 			field.Save(b, snapValues)
