@@ -9,6 +9,8 @@ import (
 	"io"
 	"net"
 	"strings"
+
+	"github.com/m-lab/etl/metrics"
 )
 
 // NOTES:
@@ -553,7 +555,7 @@ func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 	return nil
 }
 
-// SnapshotValues writes changed values into the provided Saver.
+// SnapshotDeltas writes changed values into the provided Saver.
 func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 	if snap.raw == nil {
 		return errors.New("Empty/Invalid Snaplog")
@@ -568,6 +570,9 @@ func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 		a := other.raw[field.Offset : field.Offset+field.Size]
 		b := snap.raw[field.Offset : field.Offset+field.Size]
 		if bytes.Compare(a, b) != 0 {
+			if field.Name != "Duration" {
+				metrics.SnapshotDeltaFieldCount.WithLabelValues(field.Name).Inc()
+			}
 			field.Save(b, snapValues)
 		}
 	}

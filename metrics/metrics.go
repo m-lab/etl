@@ -34,6 +34,7 @@ func init() {
 	prometheus.MustRegister(BigQueryInsert)
 	prometheus.MustRegister(RowSizeHistogram)
 	prometheus.MustRegister(DeltaNumFieldsHistogram)
+	prometheus.MustRegister(SnapshotDeltaFieldCount)
 	prometheus.MustRegister(EntryFieldCountHistogram)
 	prometheus.MustRegister(DurationHistogram)
 	prometheus.MustRegister(InsertionHistogram)
@@ -275,6 +276,20 @@ var (
 			},
 		},
 		[]string{"table"},
+	)
+
+	// Count of fields occurring in snapshot deltas.
+	//
+	// Provides metrics:
+	//   etl_ndt_snapshot_delta_field_count_count
+	// Example usage:
+	//   metrics.SnapshotDeltaFieldCount.WithLabelValues(field.Name).Inc()
+	SnapshotDeltaFieldCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_ndt_snapshot_delta_field_count_count",
+			Help: "Count of fields occurring in snapshot deltas.",
+		},
+		[]string{"field"},
 	)
 
 	// A histogram of snapshot delta field counts.  It is intended primarily for

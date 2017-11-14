@@ -348,6 +348,7 @@ func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 }
 
 func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schema.Web100ValueMap, int) {
+	// TODO - using make here causes insert error not detected by unit tests.
 	deltas := []schema.Web100ValueMap{}
 	deltaFieldCount := 0
 	if NDTOmitDeltas {
