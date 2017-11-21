@@ -1,12 +1,13 @@
 #!/bin/bash
 # Example$ for i in $(seq -w 01 30); do ./convert-legacy-to-common.sh 2010-04-$i &  done
+
 date=$1
 solid=${date//-/}
-bq --nosync query -n 0 --allow_large_results --nouse_legacy_sql --replace --noflatten_results --batch --time_partitioning_type=DAY \
+bq query -n 0 --allow_large_results --nouse_legacy_sql --replace --noflatten_results --batch \
 --destination_table measurement-lab:legacy.ndt\$$solid --parameter='start:TIMESTAMP:'$date' 00:00:00' \
 'SELECT
 test_id, 
-date(timestamp_micros(if (log_time > 0, 1000000*log_time, web100_log_entry.snap.StartTimeStamp))) as partition_date,
+# date(timestamp_micros(if (log_time > 0, 1000000*log_time, web100_log_entry.snap.StartTimeStamp))) as partition_date,
 project, # Actually missing from ETL
 timestamp_seconds(log_time) as log_time,
 "" as task_filename,
