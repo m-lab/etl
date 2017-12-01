@@ -25,13 +25,14 @@ func TestLoggingClientBasic(t *testing.T) {
 	log.SetOutput(&buf)
 	defer log.SetOutput(os.Stdout)
 
+	// Use a local test server.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello, client")
 	}))
 	defer ts.Close()
 
 	// Use a logging client.
-	client, err := test_util.LoggingClient()
+	client, err := test_util.LoggingClient(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +43,7 @@ func TestLoggingClientBasic(t *testing.T) {
 		t.Error(err)
 	}
 
-	// Check that the log buffer contains the desired output.
+	// Check that the log buffer contains the expected output.
 	if !strings.Contains(buf.String(), "Request:\n") {
 		t.Error("Should contain Request: ", buf.String())
 	}

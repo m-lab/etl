@@ -4,6 +4,7 @@ package test_util
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -34,11 +35,18 @@ func loggingReader(r io.ReadCloser) io.ReadCloser {
 
 // RoundTrip implements the RoundTripper interface, logging the
 // request, and the response body, (which may be json).
-func (rt loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// request includes functions, so we cannot json.Marshal it.
+func (t loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Using %#v results in an escaped string we can use in code.
 	log.Printf("Request:\n%#v\n", req)
-	resp, err := rt.Transport.RoundTrip(req)
+	fmt.Println(t)
+	var resp *http.Response
+	var err error
+	if t.Transport == nil {
+		resp, err = http.DefaultTransport.RoundTrip(req)
+
+	} else {
+		resp, err = t.Transport.RoundTrip(req)
+	}
 	resp.Body = loggingReader(resp.Body)
 	return resp, err
 }
@@ -46,14 +54,23 @@ func (rt loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 // LoggingClient is an HTTP client that also logs all requests and
 // responses.
 // TODO(gfr) Add support for an arbitrary logger.
-func LoggingClient() (*http.Client, error) {
-	ctx := context.Background()
-	client, err := google.DefaultClient(ctx, "https://www.googleapis.com/auth/bigquery")
-	if err != nil {
-		return nil, err
+func LoggingClient(client *http.Client) (*http.Client, error) {
+	if client == nil {
+		var err error
+		ctx := context.Background()
+		client, err = google.DefaultClient(ctx, "https://www.googleapis.com/auth/bigquery")
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if client == http.DefaultClient {
+			log.Fatal("Bad idea to add logging to default client")
+		}
 	}
 
+	fmt.Println(client)
 	client.Transport = &loggingTransport{client.Transport}
+	fmt.Println(client)
 
 	return client, nil
 }
