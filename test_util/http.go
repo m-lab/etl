@@ -3,14 +3,10 @@ package test_util
 
 import (
 	"bytes"
-	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-
-	"golang.org/x/oauth2/google"
 )
 
 // TODO(gfr) Move these to an http-util package in another repo?
@@ -38,9 +34,9 @@ func loggingReader(r io.ReadCloser) io.ReadCloser {
 func (t loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Using %#v results in an escaped string we can use in code.
 	log.Printf("Request:\n%#v\n", req)
-	fmt.Println(t)
 	var resp *http.Response
 	var err error
+	// nil Transport is valid, so check for it.
 	if t.Transport == nil {
 		resp, err = http.DefaultTransport.RoundTrip(req)
 
@@ -53,25 +49,16 @@ func (t loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // LoggingClient is an HTTP client that also logs all requests and
 // responses.
-// TODO(gfr) Add support for an arbitrary logger.
 func LoggingClient(client *http.Client) (*http.Client, error) {
 	if client == nil {
-		var err error
-		ctx := context.Background()
-		client, err = google.DefaultClient(ctx, "https://www.googleapis.com/auth/bigquery")
-		if err != nil {
-			return nil, err
-		}
+		client = &http.Client{}
 	} else {
 		if client == http.DefaultClient {
 			log.Fatal("Bad idea to add logging to default client")
 		}
 	}
 
-	fmt.Println(client)
 	client.Transport = &loggingTransport{client.Transport}
-	fmt.Println(client)
-
 	return client, nil
 }
 
