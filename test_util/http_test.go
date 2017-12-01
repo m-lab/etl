@@ -14,6 +14,11 @@ import (
 	"github.com/m-lab/etl/test_util"
 )
 
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 // Tests the LoggingClient
 func TestLoggingClientBasic(t *testing.T) {
 	var buf bytes.Buffer
@@ -26,10 +31,13 @@ func TestLoggingClientBasic(t *testing.T) {
 	defer ts.Close()
 
 	// Use a logging client.
-	client, _ := test_util.LoggingClient()
+	client, err := test_util.LoggingClient()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Send request through the client to the test URL.
-	_, err := client.Get(ts.URL)
+	_, err = client.Get(ts.URL)
 	if err != nil {
 		t.Error(err)
 	}
