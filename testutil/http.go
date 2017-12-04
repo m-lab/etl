@@ -5,6 +5,7 @@ package testutil
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"log"
@@ -52,15 +53,22 @@ func (t loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
+// NewLoggingClient returns an HTTP client that also logs all requests
+// and responses.
+func NewLoggingClient() *http.Client {
+	client := &http.Client{}
+	client.Transport = &loggingTransport{client.Transport}
+	return client
+}
+
 // LoggingClient is an HTTP client that also logs all requests and
 // responses.
 func LoggingClient(client *http.Client) (*http.Client, error) {
 	if client == nil {
-		client = &http.Client{}
-	} else {
-		if client == http.DefaultClient {
-			log.Fatal("Bad idea to add logging to default client")
-		}
+		return nil, errors.New("client must not be nil")
+	}
+	if client == http.DefaultClient {
+		return nil, errors.New("bad idea to add logging to default client")
 	}
 
 	client.Transport = &loggingTransport{client.Transport}
@@ -68,7 +76,7 @@ func LoggingClient(client *http.Client) (*http.Client, error) {
 }
 
 /////////////////////////////////////////////////////////////////////
-// ChannelTransport
+// NewChannelClient
 // Provides a transport that gets http.Response from a channel.
 /////////////////////////////////////////////////////////////////////
 
@@ -87,10 +95,9 @@ func (t channelTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// ChannelClient is an HTTP client that ignores requests and returns
+// NewChannelClient is an HTTP client that ignores requests and returns
 // responses provided by a channel.
-// responses.
-func ChannelClient(c <-chan *http.Response) *http.Client {
+func NewChannelClient(c <-chan *http.Response) *http.Client {
 	client := &http.Client{}
 	client.Transport = &channelTransport{c}
 
