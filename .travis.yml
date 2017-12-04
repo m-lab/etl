@@ -42,13 +42,13 @@ script:
 - go test -covermode=count -coverprofile=task.cov -v github.com/m-lab/etl/task
 - go test -covermode=count -coverprofile=web100.cov -v github.com/m-lab/etl/web100
 - go test -covermode=count -coverprofile=qp.cov -v github.com/m-lab/etl/appengine/queue_pusher
-- go test -covermode=count -coverprofile=test_util.cov -v github.com/m-lab/etl/test_util
+- go test -covermode=count -coverprofile=testutil.cov -v github.com/m-lab/etl/testutil
 # reproc tests are not ideal as they depend on GCS test-archive-mlab-sandbox.
 # They also require credentials, which aren't set up yet.
 # - go test -covermode=count -coverprofile=reproc.cov -v github.com/m-lab/etl/cmd/reproc
 
 # Coveralls
-- $HOME/gopath/bin/gocovmerge bq.cov parser.cov task.cov web100.cov qp.cov test_util.cov > merge.cov
+- $HOME/gopath/bin/gocovmerge bq.cov parser.cov task.cov web100.cov qp.cov testutil.cov > merge.cov
 - $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
 
 # Build and prepare for deployment
