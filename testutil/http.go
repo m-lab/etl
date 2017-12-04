@@ -1,5 +1,7 @@
-// Package test_util provides utilities useful for bigquery
-package test_util
+// Package testutil provides utilities for testing, e.g. cloud
+// service tests using mock http Transport.
+// TODO(gfr) Move these to an gcs-test-util package in another repo?
+package testutil
 
 import (
 	"bytes"
@@ -9,7 +11,10 @@ import (
 	"net/http"
 )
 
-// TODO(gfr) Move these to an http-util package in another repo?
+/////////////////////////////////////////////////////////////////////
+// LoggingTransport
+/////////////////////////////////////////////////////////////////////
+
 type loggingTransport struct {
 	Transport http.RoundTripper
 }
@@ -61,6 +66,11 @@ func LoggingClient(client *http.Client) (*http.Client, error) {
 	client.Transport = &loggingTransport{client.Transport}
 	return client, nil
 }
+
+/////////////////////////////////////////////////////////////////////
+// ChannelTransport
+// Provides a transport that gets http.Response from a channel.
+/////////////////////////////////////////////////////////////////////
 
 // channelTransport provides a RoundTripper that handles everything
 // locally.

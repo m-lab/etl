@@ -1,4 +1,4 @@
-package test_util_test
+package testutil_test
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 
 	"net/http/httptest"
 
-	"github.com/m-lab/etl/test_util"
+	"github.com/m-lab/etl/testutil"
 )
 
 func init() {
@@ -32,7 +32,7 @@ func TestLoggingClientBasic(t *testing.T) {
 	defer ts.Close()
 
 	// Use a logging client.
-	client, err := test_util.LoggingClient(nil)
+	client, err := testutil.LoggingClient(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestLoggingClientBasic(t *testing.T) {
 // channel.
 func TestChannelClientBasic(t *testing.T) {
 	c := make(chan *http.Response, 10)
-	client := test_util.ChannelClient(c)
+	client := testutil.ChannelClient(c)
 
 	resp := &http.Response{}
 	resp.StatusCode = http.StatusOK
