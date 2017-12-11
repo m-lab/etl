@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/m-lab/etl/bqutil"
+	"github.com/m-lab/etl/bqext"
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
 )
@@ -42,7 +42,7 @@ type PartitionInfo struct {
 }
 
 // GetPartitionInfo gets basic information about a partition.
-func GetPartitionInfo(util *bqutil.TableUtil, table, partition string) (PartitionInfo, error) {
+func GetPartitionInfo(dsExt *bqext.Dataset, table, partition string) (PartitionInfo, error) {
 	// This uses legacy, because PARTITION_SUMMARY is not supported in standard.
 	queryString := fmt.Sprintf(
 		`#legacySQL
@@ -54,7 +54,7 @@ func GetPartitionInfo(util *bqutil.TableUtil, table, partition string) (Partitio
 		  [%s$__PARTITIONS_SUMMARY__]
 		where partition_id = "%s" `, table, partition)
 	info := PartitionInfo{}
-	err := util.QueryAndParse(queryString, &info)
+	err := dsExt.QueryAndParse(queryString, &info)
 	return info, err
 }
 
@@ -69,7 +69,7 @@ type PartitionDetail struct {
 // GetNDTPartitionDetail fetches more detailed info about a partition or table.
 // Expects table to have test_id, task_filename, and parse_time fields.
 // `partition` should be in YYYY-MM-DD format.
-func GetNDTPartitionDetail(util *bqutil.TableUtil, table, partition string) (PartitionDetail, error) {
+func GetNDTPartitionDetail(dsExt *bqext.Dataset, table, partition string) (PartitionDetail, error) {
 	queryString := fmt.Sprintf(`
 	   #standardSQL
 	   select sum(tests) as tests, count(Task) as tasks, max(last_parse) as last_parse
@@ -80,7 +80,7 @@ func GetNDTPartitionDetail(util *bqutil.TableUtil, table, partition string) (Par
 		table, partition)
 
 	detail := PartitionDetail{}
-	err := util.QueryAndParse(queryString, &detail)
+	err := dsExt.QueryAndParse(queryString, &detail)
 	return detail, err
 }
 
@@ -89,13 +89,13 @@ func GetNDTPartitionDetail(util *bqutil.TableUtil, table, partition string) (Par
 // Returns nil error on success, or non-nil error if there was an error
 // at any point.
 // Uses flags to determine most of the parameters.
-func CheckAndDedup(util *bqutil.TableUtil, info bqutil.TableInfo) (bool, error) {
+func CheckAndDedup(dsExt *bqext.Dataset, info bqext.TableInfo) (bool, error) {
 	// Check if the last update was at least fDelay in the past.
 	if time.Now().Sub(info.LastModifiedTime).Hours() < *fDelay {
 		return false, nil
 	}
 
-	t := util.Dataset.Table(info.Name)
+	t := dsExt.Dataset.Table(info.Name)
 	ctx := context.Background()
 
 	_, err := t.Metadata(ctx)
@@ -108,7 +108,7 @@ func CheckAndDedup(util *bqutil.TableUtil, info bqutil.TableInfo) (bool, error) 
 	// TODO replace table name with destination table name.
 	re := regexp.MustCompile(".*_(.*)")
 	suffix := re.FindString(info.Name)
-	partInfo, err := GetPartitionInfo(util, "ndt", suffix)
+	partInfo, err := GetPartitionInfo(dsExt, "ndt", suffix)
 
 	// TODO fix
 	log.Println(partInfo)
@@ -125,7 +125,7 @@ func CheckAndDedup(util *bqutil.TableUtil, info bqutil.TableInfo) (bool, error) 
 
 	// If fDryRun, then don't execute the destination write.
 
-	// 	util.Dedup("ndt_20170601", true, "measurement-lab", "batch", "ndt$20170601")
+	// 	dsExt.Dedup("ndt_20170601", true, "measurement-lab", "batch", "ndt$20170601")
 
 	// If DeleteAfterDedup, then delete the source table.
 
@@ -160,8 +160,8 @@ func main() {
 		return
 	}
 
-	//setup(bqutil.LoggingClient())
-	tExt, err := bqutil.NewTableUtil(*fProject, "etl")
+	//setup(bqext.LoggingClient())
+	tExt, err := bqext.NewDataset(*fProject, "etl")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func main() {
 
 	if !*fDryRun {
 		tExt.Dedup("TestDedupSrc_19990101", true, "mlab-testing", "etl", "TestDedupDest$19990101")
-		//util.DedupInPlace("ndt_20170601")
+		//dsExt.DedupInPlace("ndt_20170601")
 	}
 	os.Exit(1)
 

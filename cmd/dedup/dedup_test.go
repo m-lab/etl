@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/bqext"
 )
 
 // ResetFlags restores the command line flags to their default
@@ -51,8 +51,8 @@ func xExample_day() {
 	// Added  76  tasks to  base-1
 }
 
-func TestPartitionInfo(t *testing.T) {
-	util, err := bq.NewTableUtil(*fProject, "public", nil)
+func xTestPartitionInfo(t *testing.T) {
+	util, err := bqext.NewDataset(*fProject, "public", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
