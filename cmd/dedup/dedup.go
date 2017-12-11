@@ -53,8 +53,9 @@ func GetPartitionInfo(util *bqutil.TableUtil, table, partition string) (Partitio
 		FROM
 		  [%s$__PARTITIONS_SUMMARY__]
 		where partition_id = "%s" `, table, partition)
-	x, err := util.QueryAndParse(queryString, PartitionInfo{})
-	return x.(PartitionInfo), err
+	info := PartitionInfo{}
+	err := util.QueryAndParse(queryString, &info)
+	return info, err
 }
 
 // PartitionDetail provides more detailed information about a partition.
@@ -78,8 +79,9 @@ func GetNDTPartitionDetail(util *bqutil.TableUtil, table, partition string) (Par
 	   where _partitiontime = timestamp("%s 00:00:00") group by task_filename)`,
 		table, partition)
 
-	x, err := util.QueryAndParse(queryString, PartitionDetail{})
-	return x.(PartitionDetail), err
+	detail := PartitionDetail{}
+	err := util.QueryAndParse(queryString, &detail)
+	return detail, err
 }
 
 // CheckAndDedup checks various criteria, and if they all pass,
@@ -159,15 +161,15 @@ func main() {
 	}
 
 	//setup(bqutil.LoggingClient())
-	util, err := bqutil.NewTableUtil(*fProject, "etl", nil)
+	tExt, err := bqutil.NewTableUtil(*fProject, "etl")
 	if err != nil {
 		log.Fatal(err)
 	}
-	util.GetTableStats("TestDedupSrc")
-	info := util.GetInfoMatching("etl", "TestDedupSrc_19990101")
+
+	info := tExt.GetInfoMatching("etl", "TestDedupSrc_19990101")
 
 	if !*fDryRun {
-		util.Dedup("TestDedupSrc_19990101", true, "mlab-testing", "etl", "TestDedupDest$19990101")
+		tExt.Dedup("TestDedupSrc_19990101", true, "mlab-testing", "etl", "TestDedupDest$19990101")
 		//util.DedupInPlace("ndt_20170601")
 	}
 	os.Exit(1)
@@ -178,7 +180,7 @@ func main() {
 
 		// TODO Query to check number of rows?
 		queryString := fmt.Sprintf("select count(test_id) as Tests, task_filename as Task from `%s` group by task_filename order by task_filename", info[i].Name)
-		q := util.ResultQuery(queryString, *fDryRun)
+		q := tExt.ResultQuery(queryString, *fDryRun)
 		it, err := q.Read(context.Background())
 		if err != nil {
 			log.Println(err)
