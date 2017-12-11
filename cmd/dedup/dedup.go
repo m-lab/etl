@@ -34,30 +34,6 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
-// PartitionInfo provides basic information about a partition.
-type PartitionInfo struct {
-	PartitionID  string    `qfield:"partition_id"`
-	CreationTime time.Time `qfield:"created"`
-	LastModified time.Time `qfield:"last_modified"`
-}
-
-// GetPartitionInfo gets basic information about a partition.
-func GetPartitionInfo(dsExt *bqext.Dataset, table, partition string) (PartitionInfo, error) {
-	// This uses legacy, because PARTITION_SUMMARY is not supported in standard.
-	queryString := fmt.Sprintf(
-		`#legacySQL
-		SELECT
-		  partition_id,
-		  msec_to_timestamp(creation_time) AS created,
-		  msec_to_timestamp(last_modified_time) AS last_modified
-		FROM
-		  [%s$__PARTITIONS_SUMMARY__]
-		where partition_id = "%s" `, table, partition)
-	info := PartitionInfo{}
-	err := dsExt.QueryAndParse(queryString, &info)
-	return info, err
-}
-
 // PartitionDetail provides more detailed information about a partition.
 type PartitionDetail struct {
 	PartitionID   string
@@ -108,7 +84,7 @@ func CheckAndDedup(dsExt *bqext.Dataset, info bqext.TableInfo) (bool, error) {
 	// TODO replace table name with destination table name.
 	re := regexp.MustCompile(".*_(.*)")
 	suffix := re.FindString(info.Name)
-	partInfo, err := GetPartitionInfo(dsExt, "ndt", suffix)
+	partInfo, err := dsExt.GetPartitionInfo("ndt", suffix)
 
 	// TODO fix
 	log.Println(partInfo)

@@ -51,12 +51,12 @@ func xExample_day() {
 	// Added  76  tasks to  base-1
 }
 
-func xTestPartitionInfo(t *testing.T) {
-	util, err := bqext.NewDataset(*fProject, "public", nil)
+func TestPartitionInfo(t *testing.T) {
+	util, err := bqext.NewDataset("mlab-testing", "etl")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	info, err := GetPartitionInfo(&util, "ndt", "20171204")
+	info, err := util.GetPartitionInfo("TestDedupDest", "19990101")
 	log.Printf("%+v\n", info)
 }

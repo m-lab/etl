@@ -32,7 +32,7 @@ func TestDedup(t *testing.T) {
 	// TODO - should have suffix in destination??
 	tExt.Dedup("TestDedupSrc_19990101", true, "mlab-testing", "etl", "TestDedupDest$19990101")
 
-	pi, err := tExt.GetPartitionInfo("TestDedupDst", "19990101")
+	pi, err := tExt.GetPartitionInfo("TestDedupDest", "19990101")
 	if err != nil {
 		t.Fatal(err)
 	}
