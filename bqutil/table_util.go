@@ -3,7 +3,6 @@ package bqutil
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -17,12 +16,12 @@ import (
 // TableUtil wraps the bqutil.TableUtil, and adds a few more methods.
 // TODO - migrate these into m-lab/go/bqutil
 type TableUtil struct {
-	go_bqutil.TableUtil
+	go_bqutil.TableExt
 }
 
 // NewTableUtil creates an underlying m-lab/go/bqutil/TableUtil, and wraps it in a TableUtil.
-func NewTableUtil(project, dataset string, httpClient *http.Client, clientOpts ...option.ClientOption) (TableUtil, error) {
-	util, err := go_bqutil.NewTableUtil(project, dataset, httpClient, clientOpts...)
+func NewTableUtil(project, dataset string, clientOpts ...option.ClientOption) (TableUtil, error) {
+	util, err := go_bqutil.NewTableExt(project, dataset, clientOpts...)
 	return TableUtil{util}, err
 }
 
