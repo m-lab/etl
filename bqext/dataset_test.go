@@ -49,7 +49,10 @@ func TestDedup(t *testing.T) {
 	tExt.GetInfoMatching("etl", "TestDedupSrc_19990101")
 
 	// TODO - should have suffix in destination??
-	tExt.Dedup("TestDedupSrc_19990101", true, "mlab-testing", "etl", "TestDedupDest$19990101")
+	_, err = tExt.Dedup("TestDedupSrc_19990101", "test_id", true, "mlab-testing", "etl", "TestDedupDest$19990101")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	pi, err := tExt.GetPartitionInfo("TestDedupDest", "19990101")
 	if err != nil {

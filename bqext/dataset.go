@@ -129,31 +129,33 @@ var dedupTemplate = "" +
 	"# Delete all duplicate rows based on test_id\n" +
 	"SELECT * except (row_number)\n" +
 	"FROM (\n" +
-	"  SELECT *, ROW_NUMBER() OVER (PARTITION BY test_id) row_number\n" +
+	"  SELECT *, ROW_NUMBER() OVER (PARTITION BY %s) row_number\n" +
 	"  FROM `%s`)\n" +
 	"WHERE row_number = 1\n"
 
 // Dedup executes a query that dedups and writes to an appropriate
 // partition.
 // src is relative to the project:dataset of dsExt.
+// dedupOn names the field to be used for dedupping.
 // project, dataset, table specify the table to write into.
-// NOTE: table should generally include the partition suffix.  Otherwise this will
-// overwrite TODAY's partition.
-func (dsExt *Dataset) Dedup(src string, overwrite bool, project, dataset, table string) (*bigquery.JobStatus, error) {
+// NOTE: destination table must include the partition suffix.  This
+// avoids accidentally overwriting TODAY's partition.
+func (dsExt *Dataset) Dedup(src string, dedupOn string, overwrite bool, project, dataset, table string) (*bigquery.JobStatus, error) {
 	if !strings.Contains(table, "$") {
 		return nil, errors.New("Destination table does not specify partition")
 	}
-	queryString := fmt.Sprintf(dedupTemplate, src)
+	queryString := fmt.Sprintf(dedupTemplate, dedupOn, src)
 	dest := dsExt.BqClient.DatasetInProject(project, dataset)
 	q := dsExt.DestinationQuery(queryString, dest.Table(table))
 	if overwrite {
 		q.QueryConfig.WriteDisposition = bigquery.WriteTruncate
 	}
+	log.Printf("Removing dups (of %s) and writing to %s\n", dedupOn, table)
 	job, err := q.Run(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	log.Println("Removing dups and writing to", table, " JobID:", job.ID())
+	log.Println("JobID:", job.ID())
 	status, err := job.Wait(context.Background())
 	if err != nil {
 		return status, err
