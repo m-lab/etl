@@ -46,9 +46,6 @@ func TestDedup(t *testing.T) {
 		t.Fatal("Source table has wrong number rows: ", result.NumRows)
 	}
 
-	tExt.GetInfoMatching("etl", "TestDedupSrc_19990101")
-
-	// TODO - should have suffix in destination??
 	_, err = tExt.Dedup("TestDedupSrc_19990101", "test_id", true, "mlab-testing", "etl", "TestDedupDest$19990101")
 	if err != nil {
 		t.Fatal(err)

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sort"
 	"strings"
 	"time"
 
@@ -35,40 +34,6 @@ type TableInfo struct {
 	NumRows          uint64
 	CreationTime     time.Time
 	LastModifiedTime time.Time
-}
-
-// GetInfoMatching finDataset all tables matching table filter.
-// and collects the basic stats about each of them.
-// Returns slice ordered by decreasing age.
-func (dsExt *Dataset) GetInfoMatching(dataset, filter string) ([]TableInfo, error) {
-	result := make([]TableInfo, 0)
-	ctx := context.Background()
-	ti := dsExt.Dataset.Tables(ctx)
-	for t, err := ti.Next(); err == nil; t, err = ti.Next() {
-		// TODO should this be starts with?  Or a regex?
-		if strings.Contains(t.TableID, filter) {
-			meta, err := t.Metadata(ctx)
-			if err != nil {
-				return []TableInfo{}, err
-			}
-			if meta.Type != bigquery.RegularTable {
-				continue
-			}
-			ts := TableInfo{
-				Name:             t.TableID,
-				IsPartitioned:    meta.TimePartitioning != nil,
-				NumBytes:         meta.NumBytes,
-				NumRows:          meta.NumRows,
-				CreationTime:     meta.CreationTime,
-				LastModifiedTime: meta.LastModifiedTime,
-			}
-			result = append(result, ts)
-		}
-	}
-	sort.Slice(result[:], func(i, j int) bool {
-		return result[i].LastModifiedTime.Before(result[j].LastModifiedTime)
-	})
-	return result, nil
 }
 
 // PartitionInfo provides basic information about a partition.
@@ -161,49 +126,4 @@ func (dsExt *Dataset) Dedup(src string, dedupOn string, overwrite bool, project,
 		return status, err
 	}
 	return status, nil
-}
-
-// TODO - really should take the one that was parsed last, instead
-// of random
-var dedupInPlace = "" +
-	"# Delete all duplicate rows based on test_id\n" +
-	"DELETE\n" +
-	"  `%s` copy\n" +
-	"WHERE\n" +
-	"  CONCAT(copy.test_id, CAST(copy.parse_time AS string)) IN (\n" +
-	"  SELECT\n" +
-	"    CONCAT(test_id, CAST(parse_time AS string))\n" +
-	"  FROM (\n" +
-	"    SELECT\n" +
-	"      test_id,\n" +
-	"      parse_time,\n" +
-	"      ROW_NUMBER() OVER (PARTITION BY test_id) row_number\n" +
-	"    FROM\n" +
-	"      `%s`)\n" +
-	"  WHERE\n" +
-	"    row_number > 1 )"
-
-// DedupInPlace executes a query that dedups a table, in place, using DELETE.
-// TODO interpret and return status.
-func (dsExt *Dataset) DedupInPlace(src string) {
-	queryString := fmt.Sprintf(dedupInPlace, src, src)
-	q := dsExt.ResultQuery(queryString, false)
-	job, err := q.Run(context.Background())
-	if err != nil {
-		// TODO add metric.
-		log.Println(err)
-	}
-	log.Println(job.ID())
-	log.Println(job.LastStatus())
-	status, err := job.Wait(context.Background())
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println(status)
-		if status.Done() {
-			log.Println("Done")
-			log.Printf("%+v\n", *status.Statistics)
-			log.Printf("%+v\n", status.Statistics.Details)
-		}
-	}
 }
