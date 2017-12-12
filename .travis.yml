@@ -49,6 +49,7 @@ script:
 # no emulator.
 # TODO - add integration test tag.
 - COVER_PKGS=./annotation/...,./appengine/...,./bq/...,./etl/...,./metrics/...,./parser/...,./schema/...,./storage/...,./task/...,./web100/...
+- go test -coverpkg=$COVER_PKGS -coverprofile=dedup.cov -v github.com/m-lab/etl/cmd/dedup -tags=integration
 - go test -coverpkg=$COVER_PKGS -coverprofile=annotation.cov -v github.com/m-lab/etl/annotation
 - go test -coverpkg=$COVER_PKGS -coverprofile=bq.cov -v github.com/m-lab/etl/bq
 - go test -coverpkg=$COVER_PKGS -coverprofile=parser.cov -v github.com/m-lab/etl/parser
@@ -60,7 +61,7 @@ script:
 # - go test -coverpkg=$COVER_PKGS -coverprofile=reproc.cov -v github.com/m-lab/etl/cmd/reproc
 
 # Coveralls
-- $HOME/gopath/bin/gocovmerge annotation.cov bq.cov parser.cov qp.cov task.cov web100.cov > merge.cov
+- $HOME/gopath/bin/gocovmerge annotation.cov bq.cov dedup.cov parser.cov qp.cov task.cov web100.cov > merge.cov
 - $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
 
 # Build and prepare for deployment

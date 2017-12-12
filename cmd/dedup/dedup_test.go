@@ -12,6 +12,15 @@ import (
 	"github.com/m-lab/etl/bqext"
 )
 
+func ClientOpts() []option.ClientOption {
+	opts := []option.ClientOption{}
+	if os.Getenv("TRAVIS") != "" {
+		authOpt := option.WithCredentialsFile("../../travis-testing.key")
+		opts = append(opts, authOpt)
+	}
+	return opts
+}
+
 // ResetFlags restores the command line flags to their default
 // values.  This does NOT reset the result of Parsed().
 func ResetFlags() {
@@ -52,7 +61,7 @@ func xExample_day() {
 }
 
 func TestPartitionInfo(t *testing.T) {
-	util, err := bqext.NewDataset("mlab-testing", "etl")
+	util, err := bqext.NewDataset("mlab-testing", "etl", ClientOpts()...)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -10,6 +10,15 @@ import (
 	"github.com/m-lab/etl/bqext"
 )
 
+func ClientOpts() []option.ClientOption {
+	opts := []option.ClientOption{}
+	if os.Getenv("TRAVIS") != "" {
+		authOpt := option.WithCredentialsFile("../../travis-testing.key")
+		opts = append(opts, authOpt)
+	}
+	return opts
+}
+
 func TestDedup(t *testing.T) {
 	start := time.Now() // Later, we will compare partition time to this.
 
