@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/m-lab/etl/bqext"
+	"google.golang.org/api/option"
 )
 
 func ClientOpts() []option.ClientOption {
@@ -58,14 +58,4 @@ func xExample_day() {
 	// Output:
 	// Adding  ndt/2017/09/24/  to  base-1
 	// Added  76  tasks to  base-1
-}
-
-func TestPartitionInfo(t *testing.T) {
-	util, err := bqext.NewDataset("mlab-testing", "etl", ClientOpts()...)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	info, err := util.GetPartitionInfo("TestDedupDest", "19990101")
-	log.Printf("%+v\n", info)
 }
