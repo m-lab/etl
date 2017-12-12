@@ -1,6 +1,7 @@
 package bqext
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -39,42 +40,35 @@ type TableInfo struct {
 // GetInfoMatching finDataset all tables matching table filter.
 // and collects the basic stats about each of them.
 // Returns slice ordered by decreasing age.
-func (dsExt *Dataset) GetInfoMatching(dataset, filter string) []TableInfo {
+func (dsExt *Dataset) GetInfoMatching(dataset, filter string) ([]TableInfo, error) {
 	result := make([]TableInfo, 0)
 	ctx := context.Background()
 	ti := dsExt.Dataset.Tables(ctx)
-	var t *bigquery.Table
-	var err error
-	for t, err = ti.Next(); err == nil; t, err = ti.Next() {
+	for t, err := ti.Next(); err == nil; t, err = ti.Next() {
 		// TODO should this be starts with?  Or a regex?
 		if strings.Contains(t.TableID, filter) {
 			meta, err := t.Metadata(ctx)
 			if err != nil {
-				log.Println(err)
-			} else {
-				if meta.Type != bigquery.RegularTable {
-					continue
-				}
-				ts := TableInfo{
-					Name:             t.TableID,
-					IsPartitioned:    meta.TimePartitioning != nil,
-					NumBytes:         meta.NumBytes,
-					NumRows:          meta.NumRows,
-					CreationTime:     meta.CreationTime,
-					LastModifiedTime: meta.LastModifiedTime,
-				}
-				log.Println(t.TableID, " : ", meta.Name, " : ", meta.LastModifiedTime)
-				result = append(result, ts)
+				return []TableInfo{}, err
 			}
+			if meta.Type != bigquery.RegularTable {
+				continue
+			}
+			ts := TableInfo{
+				Name:             t.TableID,
+				IsPartitioned:    meta.TimePartitioning != nil,
+				NumBytes:         meta.NumBytes,
+				NumRows:          meta.NumRows,
+				CreationTime:     meta.CreationTime,
+				LastModifiedTime: meta.LastModifiedTime,
+			}
+			result = append(result, ts)
 		}
-	}
-	if err != nil {
-		log.Println(err)
 	}
 	sort.Slice(result[:], func(i, j int) bool {
 		return result[i].LastModifiedTime.Before(result[j].LastModifiedTime)
 	})
-	return result
+	return result, nil
 }
 
 // PartitionInfo provides basic information about a partition.
@@ -143,8 +137,12 @@ var dedupTemplate = "" +
 // partition.
 // src is relative to the project:dataset of dsExt.
 // project, dataset, table specify the table to write into.
-// destination partition is based on the src suffix.
-func (dsExt *Dataset) Dedup(src string, overwrite bool, project, dataset, table string) {
+// NOTE: table should generally include the partition suffix.  Otherwise this will
+// overwrite TODAY's partition.
+func (dsExt *Dataset) Dedup(src string, overwrite bool, project, dataset, table string) (*bigquery.JobStatus, error) {
+	if !strings.Contains(table, "$") {
+		return nil, errors.New("Destination table does not specify partition")
+	}
 	queryString := fmt.Sprintf(dedupTemplate, src)
 	dest := dsExt.BqClient.DatasetInProject(project, dataset)
 	q := dsExt.DestinationQuery(queryString, dest.Table(table))
@@ -153,22 +151,14 @@ func (dsExt *Dataset) Dedup(src string, overwrite bool, project, dataset, table 
 	}
 	job, err := q.Run(context.Background())
 	if err != nil {
-		// TODO add metric.
-		log.Println(err)
+		return nil, err
 	}
-	log.Println(job.ID())
-	log.Println(job.LastStatus())
+	log.Println("Removing dups and writing to", table, " JobID:", job.ID())
 	status, err := job.Wait(context.Background())
 	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println(status)
-		if status.Done() {
-			log.Println("Done")
-			log.Printf("%+v\n", *status.Statistics)
-			log.Printf("%+v\n", status.Statistics.Details)
-		}
+		return status, err
 	}
+	return status, nil
 }
 
 // TODO - really should take the one that was parsed last, instead

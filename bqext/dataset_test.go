@@ -1,6 +1,6 @@
-package bqext_test
-
 // +build integration
+
+package bqext_test
 
 import (
 	"log"
@@ -12,6 +12,11 @@ import (
 
 	"github.com/m-lab/etl/bqext"
 )
+
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 func ClientOpts() []option.ClientOption {
 	opts := []option.ClientOption{}
@@ -27,7 +32,7 @@ func TestDedup(t *testing.T) {
 
 	tExt, err := bqext.NewDataset("mlab-testing", "etl", ClientOpts()...)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	// First check that source table has expected number of rows.
@@ -66,9 +71,11 @@ func TestDedup(t *testing.T) {
 func TestPartitionInfo(t *testing.T) {
 	util, err := bqext.NewDataset("mlab-testing", "etl", ClientOpts()...)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	info, err := util.GetPartitionInfo("TestDedupDest", "19990101")
-	log.Printf("%+v\n", info)
+	if info.PartitionID != "19990101" {
+		t.Error("Incorrect PartitionID", info)
+	}
 }
