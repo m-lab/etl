@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -37,28 +38,28 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
-// PartitionDetail provides more detailed information about a partition.
-type PartitionDetail struct {
-	PartitionID   string
+// Detail provides more detailed information about a partition.
+type Detail struct {
+	PartitionID   string // May be empty.  Used for slices of partitions.
 	TaskFileCount int
 	TestCount     int
 	MaxParseTime  time.Time
 }
 
-// GetNDTPartitionDetail fetches more detailed info about a partition or table.
+// GetNDTTableDetail fetches more detailed info about a partition or table.
 // Expects table to have test_id, task_filename, and parse_time fields.
 // `partition` should be in YYYY-MM-DD format.
-func GetNDTPartitionDetail(dsExt *bqext.Dataset, table, partition string) (PartitionDetail, error) {
+func GetNDTTableDetail(dsExt *bqext.Dataset, table string) (Detail, error) {
 	queryString := fmt.Sprintf(`
-	   #standardSQL
-	   select sum(tests) as tests, count(Task) as tasks, max(last_parse) as last_parse
-	   from (
-	   select count(test_id) as Tests, max(parse_time) as last_parse, task_filename as Task
-	    from `+"`"+"%s"+"`"+`
-	   where _partitiontime = timestamp("%s 00:00:00") group by task_filename)`,
-		table, partition)
+		#standardSQL
+		select sum(tests) as tests, count(Task) as tasks, max(last_parse) as last_parse
+		from (
+		  select count(test_id) as Tests, max(parse_time) as last_parse, task_filename as Task
+	      from `+"`"+"%s"+"`"+`
+		  group by Task
+		)`, table)
 
-	detail := PartitionDetail{}
+	detail := Detail{}
 	err := dsExt.QueryAndParse(queryString, &detail)
 	return detail, err
 }
@@ -74,30 +75,56 @@ type TableInfo struct {
 	LastModifiedTime time.Time
 }
 
-// GetInfoMatching finDataset all tables matching table filter.
+// Error is a simple string satisfying the error interface.
+type Error string
+
+func (e Error) Error() string { return string(e) }
+
+// ErrorNotRegularTable is returned when a table is not a regular table (e.g. views)
+const ErrorNotRegularTable = Error("Not a regular table")
+
+// ErrorSrcOlderThanDest is returned if a source table is older than the destination partition.
+const ErrorSrcOlderThanDest = Error("Source older than destination partition")
+
+// GetTableInfo returns the basic info for a single table.
+func GetTableInfo(t *bigquery.Table) (TableInfo, error) {
+	ctx := context.Background()
+	meta, err := t.Metadata(ctx)
+	if err != nil {
+		return TableInfo{}, err
+	}
+	if meta.Type != bigquery.RegularTable {
+		return TableInfo{}, ErrorNotRegularTable
+	}
+	ts := TableInfo{
+		Name:             t.TableID,
+		IsPartitioned:    meta.TimePartitioning != nil,
+		NumBytes:         meta.NumBytes,
+		NumRows:          meta.NumRows,
+		CreationTime:     meta.CreationTime,
+		LastModifiedTime: meta.LastModifiedTime,
+	}
+	return ts, nil
+}
+
+// GetInfoMatching finds all tables matching table filter
 // and collects the basic stats about each of them.
+// If filter includes a $, then this fetches just the individual metadata
+// for a single table partition.
 // Returns slice ordered by decreasing age.
-func GetInfoMatching(dsExt *bqext.Dataset, dataset, filter string) ([]TableInfo, error) {
+func GetInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
 	result := make([]TableInfo, 0)
 	ctx := context.Background()
 	ti := dsExt.Dataset.Tables(ctx)
 	for t, err := ti.Next(); err == nil; t, err = ti.Next() {
 		// TODO should this be starts with?  Or a regex?
 		if strings.Contains(t.TableID, filter) {
-			meta, err := t.Metadata(ctx)
-			if err != nil {
-				return []TableInfo{}, err
-			}
-			if meta.Type != bigquery.RegularTable {
+			ts, err := GetTableInfo(t)
+			if err == ErrorNotRegularTable {
 				continue
 			}
-			ts := TableInfo{
-				Name:             t.TableID,
-				IsPartitioned:    meta.TimePartitioning != nil,
-				NumBytes:         meta.NumBytes,
-				NumRows:          meta.NumRows,
-				CreationTime:     meta.CreationTime,
-				LastModifiedTime: meta.LastModifiedTime,
+			if err != nil {
+				return []TableInfo{}, err
 			}
 			result = append(result, ts)
 		}
@@ -113,13 +140,13 @@ func GetInfoMatching(dsExt *bqext.Dataset, dataset, filter string) ([]TableInfo,
 // Returns nil error on success, or non-nil error if there was an error
 // at any point.
 // Uses flags to determine most of the parameters.
-func CheckAndDedup(dsExt *bqext.Dataset, info TableInfo) (bool, error) {
+func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo) (bool, error) {
 	// Check if the last update was at least fDelay in the past.
-	if time.Now().Sub(info.LastModifiedTime).Hours() < *fDelay {
+	if time.Now().Sub(srcInfo.LastModifiedTime).Hours() < *fDelay {
 		return false, nil
 	}
 
-	t := dsExt.Dataset.Table(info.Name)
+	t := dsExt.Dataset.Table(srcInfo.Name)
 	ctx := context.Background()
 
 	_, err := t.Metadata(ctx)
@@ -130,19 +157,52 @@ func CheckAndDedup(dsExt *bqext.Dataset, info TableInfo) (bool, error) {
 	// Creation time of new table should be newer than last update
 	// of old table??
 	// TODO replace table name with destination table name.
-	re := regexp.MustCompile(".*_(.*)")
-	suffix := re.FindString(info.Name)
-	partInfo, err := dsExt.GetPartitionInfo("ndt", suffix)
-
-	// TODO fix
-	log.Println(partInfo)
-
-	// Get info on new table tasks and rows.
+	re := regexp.MustCompile(".*_([0-9]{8}$)")
+	match := re.FindStringSubmatch(srcInfo.Name)
+	if len(match) != 2 {
+		log.Println(match)
+		return false, errors.New("No matching partition_id: " + srcInfo.Name)
+	}
+	suffix := string(match[1])
+	destPartitionInfo, err := dsExt.GetPartitionInfo("TestDedupDest", suffix)
+	if err != nil {
+		log.Println(err)
+		return false, err
+	}
+	// If the source table is older than the destination table, then
+	// don't overwrite it.
+	if srcInfo.LastModifiedTime.Before(destPartitionInfo.LastModified) {
+		// TODO should perhaps delete the source table?
+		return false, ErrorSrcOlderThanDest
+	}
 
 	// Get info on old table tasks and rows (and age).
+	// TODO - fix so that we don't need Dataset.
+	destTable := dsExt.Dataset.Table("TestDedupDest$" + suffix)
+	destInfo, err := GetTableInfo(destTable)
+	if err != nil {
+		log.Println(err)
+		return false, err
+	}
+	log.Println(destInfo)
+
+	// Double check against destination table info.
+	// If the source table is older than the destination table, then
+	// don't overwrite it.
+	if srcInfo.LastModifiedTime.Before(destInfo.LastModifiedTime) {
+		// TODO should perhaps delete the source table?
+		return false, ErrorSrcOlderThanDest
+	}
 
 	// Check if all task files in the old table are also present
 	// in the new table.
+	srcDetail, err := GetNDTTableDetail(dsExt, srcInfo.Name)
+	log.Println(srcDetail)
+	if srcDetail.TaskFileCount == 0 {
+		// No tasks - should ignore?
+	}
+	destDetail, err := GetNDTTableDetail(dsExt, destInfo.Name)
+	log.Println(destDetail)
 
 	// Check that new table contains at least 95% as many rows as
 	// old table.
@@ -184,17 +244,17 @@ func main() {
 		return
 	}
 
-	//setup(bqext.LoggingClient())
-	tExt, err := bqext.NewDataset(*fProject, "etl")
+	dsExt, err := bqext.NewDataset(*fProject, "etl")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	info, err := GetInfoMatching(&tExt, "etl", "TestDedupSrc_19990101")
+	info, err := GetInfoMatching(&dsExt, "TestDedupSrc_19990101")
+	log.Println(info)
 
-	if !*fDryRun {
-		tExt.Dedup("TestDedupSrc_19990101", "test_id", true, "mlab-testing", "etl", "TestDedupDest$19990101")
-		//dsExt.DedupInPlace("ndt_20170601")
+	_, err = CheckAndDedup(&dsExt, info[0])
+	if err != nil {
+		log.Println(err)
 	}
 	os.Exit(1)
 
@@ -204,7 +264,7 @@ func main() {
 
 		// TODO Query to check number of rows?
 		queryString := fmt.Sprintf("select count(test_id) as Tests, task_filename as Task from `%s` group by task_filename order by task_filename", info[i].Name)
-		q := tExt.ResultQuery(queryString, *fDryRun)
+		q := dsExt.ResultQuery(queryString, *fDryRun)
 		it, err := q.Read(context.Background())
 		if err != nil {
 			log.Println(err)
