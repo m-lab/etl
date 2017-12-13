@@ -8,11 +8,14 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
+	"strings"
 	"time"
 
-	"github.com/m-lab/etl/bqext"
+	"cloud.google.com/go/bigquery"
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
+	"gopkg.in/m-lab/go.v1/bqext"
 )
 
 // TODO - should move this to a command line specific module,
@@ -60,12 +63,57 @@ func GetNDTPartitionDetail(dsExt *bqext.Dataset, table, partition string) (Parti
 	return detail, err
 }
 
+// TableInfo contains the critical stats for a specific table
+// or partition.
+type TableInfo struct {
+	Name             string
+	IsPartitioned    bool
+	NumBytes         int64
+	NumRows          uint64
+	CreationTime     time.Time
+	LastModifiedTime time.Time
+}
+
+// GetInfoMatching finDataset all tables matching table filter.
+// and collects the basic stats about each of them.
+// Returns slice ordered by decreasing age.
+func GetInfoMatching(dsExt *bqext.Dataset, dataset, filter string) ([]TableInfo, error) {
+	result := make([]TableInfo, 0)
+	ctx := context.Background()
+	ti := dsExt.Dataset.Tables(ctx)
+	for t, err := ti.Next(); err == nil; t, err = ti.Next() {
+		// TODO should this be starts with?  Or a regex?
+		if strings.Contains(t.TableID, filter) {
+			meta, err := t.Metadata(ctx)
+			if err != nil {
+				return []TableInfo{}, err
+			}
+			if meta.Type != bigquery.RegularTable {
+				continue
+			}
+			ts := TableInfo{
+				Name:             t.TableID,
+				IsPartitioned:    meta.TimePartitioning != nil,
+				NumBytes:         meta.NumBytes,
+				NumRows:          meta.NumRows,
+				CreationTime:     meta.CreationTime,
+				LastModifiedTime: meta.LastModifiedTime,
+			}
+			result = append(result, ts)
+		}
+	}
+	sort.Slice(result[:], func(i, j int) bool {
+		return result[i].LastModifiedTime.Before(result[j].LastModifiedTime)
+	})
+	return result, nil
+}
+
 // CheckAndDedup checks various criteria, and if they all pass,
 // dedups the table.  Returns true if criteria pass, false if they fail.
 // Returns nil error on success, or non-nil error if there was an error
 // at any point.
 // Uses flags to determine most of the parameters.
-func CheckAndDedup(dsExt *bqext.Dataset, info bqext.TableInfo) (bool, error) {
+func CheckAndDedup(dsExt *bqext.Dataset, info TableInfo) (bool, error) {
 	// Check if the last update was at least fDelay in the past.
 	if time.Now().Sub(info.LastModifiedTime).Hours() < *fDelay {
 		return false, nil
@@ -142,10 +190,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	info := tExt.GetInfoMatching("etl", "TestDedupSrc_19990101")
+	info, err := GetInfoMatching(&tExt, "etl", "TestDedupSrc_19990101")
 
 	if !*fDryRun {
-		tExt.Dedup("TestDedupSrc_19990101", true, "mlab-testing", "etl", "TestDedupDest$19990101")
+		tExt.Dedup("TestDedupSrc_19990101", "test_id", true, "mlab-testing", "etl", "TestDedupDest$19990101")
 		//dsExt.DedupInPlace("ndt_20170601")
 	}
 	os.Exit(1)
