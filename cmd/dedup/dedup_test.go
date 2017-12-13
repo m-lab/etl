@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"testing"
 
 	"google.golang.org/api/option"
 )
