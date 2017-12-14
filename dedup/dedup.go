@@ -1,13 +1,12 @@
-// Package main defines a command line tool for deduplicating
-// tempalte tables and copying into a destination partitions.
-package main
+// Package dedup provides facilities for deduplicating
+// template tables and copying into a destination partitions.
+package dedup
 
 import (
 	"errors"
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -15,7 +14,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"golang.org/x/net/context"
-	"google.golang.org/api/iterator"
 	"gopkg.in/m-lab/go.v1/bqext"
 )
 
@@ -88,13 +86,16 @@ type Error string
 
 func (e Error) Error() string { return string(e) }
 
-// ErrorNotRegularTable is returned when a table is not a regular table (e.g. views)
-const ErrorNotRegularTable = Error("Not a regular table")
-
-// ErrorSrcOlderThanDest is returned if a source table is older than the destination partition.
-const ErrorSrcOlderThanDest = Error("Source older than destination partition")
-const ErrorTooFewTasks = Error("Too few tasks")
-const ErrorTooFewTests = Error("Too few tests")
+const (
+	// ErrorNotRegularTable is returned when a table is not a regular table (e.g. views)
+	ErrorNotRegularTable = Error("Not a regular table")
+	// ErrorSrcOlderThanDest is returned if a source table is older than the destination partition.
+	ErrorSrcOlderThanDest = Error("Source older than destination partition")
+	// ErrorTooFewTasks is returned when the source table has fewer task files than the destination.
+	ErrorTooFewTasks = Error("Too few tasks")
+	// ErrorTooFewTests is returned when the source table has fewer tests than the destination.
+	ErrorTooFewTests = Error("Too few tests")
+)
 
 // GetTableInfo returns the basic info for a single table.
 func GetTableInfo(t *bigquery.Table) (TableInfo, error) {
@@ -245,79 +246,4 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, dest string) (bool, 
 	// If DeleteAfterDedup, then delete the source table.
 
 	return true, nil
-}
-
-// TODO - move this to the README.
-// First, the source table is checked for new template tables or
-// partitions that have been stable for long enough that it is
-// deemed safe to migrate them to the destination table.
-//
-// Tables should be processed in order of time since
-// LastModificationTime.  This means that we should start by
-// finding the age of all eligible tables.
-//
-// For each day or partition that is "ready", we then verify that
-// the new content has at least 95% as many rows as the partition
-// it will replace.  This limits the regression in cases where
-// there is some problem with the new data.  This SHOULD also
-// generate an alert.
-//
-// Once these prereqs are satisfied, we then execute a query that
-// dedups the rows from the source, and writes to the destination
-// partition.
-
-func main() {
-	flag.Parse()
-	// Check that either project is set.
-	if *fProject == "" {
-		log.Println("Must specify project")
-		flag.PrintDefaults()
-		return
-	}
-
-	dsExt, err := bqext.NewDataset(*fProject, "etl")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	info, err := GetInfoMatching(&dsExt, "TestDedupSrc_19990101")
-	log.Println(info)
-
-	_, err = CheckAndDedup(&dsExt, info[0], "TestDedupDest")
-	if err != nil {
-		log.Println(err)
-	}
-	os.Exit(1)
-
-	for i := range info {
-		// TODO Query to check number of tar files processed.
-		fmt.Printf("%v\n", info[i])
-
-		// TODO Query to check number of rows?
-		queryString := fmt.Sprintf("select count(test_id) as Tests, task_filename as Task from `%s` group by task_filename order by task_filename", info[i].Name)
-		q := dsExt.ResultQuery(queryString, *fDryRun)
-		it, err := q.Read(context.Background())
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		for {
-			var result struct {
-				Task  string
-				Tests int
-			}
-			err := it.Next(&result)
-			if err != nil {
-				if err != iterator.Done {
-					log.Println(err)
-				}
-				break
-			}
-			log.Println(result)
-			// TODO compare the tasks to those in the existing
-			// partition.  If there are some missing, then delay
-			// further, and log a warning.  If still missing when
-			// we commit or more than 3 missing, log an error.
-		}
-	}
 }
