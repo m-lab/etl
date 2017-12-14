@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"testing"
+	"time"
 
 	"github.com/m-lab/etl/dedup"
 	"golang.org/x/net/context"
@@ -16,15 +17,18 @@ import (
 func TestCheckAndDedup(t *testing.T) {
 	dsExt, err := bqext.NewDataset("mlab-testing", "etl")
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	info, err := dedup.GetInfoMatching(&dsExt, "TestDedupSrc_19990101")
-	log.Println(info)
 
-	_, err = dedup.CheckAndDedup(&dsExt, info[0], "TestDedupDest")
+	_, err = dedup.CheckAndDedup(&dsExt, info[0], "TestDedupDest", time.Hour, false)
 	if err != nil {
 		log.Println(err)
+	}
+	_, err = dedup.CheckAndDedup(&dsExt, info[0], "TestDedupDest", time.Hour, true)
+	if err != nil {
+		t.Error(err)
 	}
 }
 
@@ -34,7 +38,7 @@ func xTest() {
 		log.Fatal(err)
 	}
 
-	info, err := GetInfoMatching(&dsExt, "TestDedupSrc_19990101")
+	info, err := dedup.GetInfoMatching(&dsExt, "TestDedupSrc_19990101")
 	log.Println(info)
 
 	for i := range info {
@@ -43,7 +47,7 @@ func xTest() {
 
 		// TODO Query to check number of rows?
 		queryString := fmt.Sprintf("select count(test_id) as Tests, task_filename as Task from `%s` group by task_filename order by task_filename", info[i].Name)
-		q := dsExt.ResultQuery(queryString, *fDryRun)
+		q := dsExt.ResultQuery(queryString, false)
 		it, err := q.Read(context.Background())
 		if err != nil {
 			log.Println(err)
