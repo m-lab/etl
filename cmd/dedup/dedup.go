@@ -115,7 +115,7 @@ func GetTableInfo(t *bigquery.Table) (TableInfo, error) {
 func GetInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
 	result := make([]TableInfo, 0)
 	ctx := context.Background()
-	ti := dsExt.Dataset.Tables(ctx)
+	ti := dsExt.Tables(ctx)
 	for t, err := ti.Next(); err == nil; t, err = ti.Next() {
 		// TODO should this be starts with?  Or a regex?
 		if strings.Contains(t.TableID, filter) {
@@ -146,7 +146,7 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo) (bool, error) {
 		return false, nil
 	}
 
-	t := dsExt.Dataset.Table(srcInfo.Name)
+	t := dsExt.Table(srcInfo.Name)
 	ctx := context.Background()
 
 	_, err := t.Metadata(ctx)
@@ -178,7 +178,7 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo) (bool, error) {
 
 	// Get info on old table tasks and rows (and age).
 	// TODO - fix so that we don't need Dataset.
-	destTable := dsExt.Dataset.Table("TestDedupDest$" + suffix)
+	destTable := dsExt.Table("TestDedupDest$" + suffix)
 	destInfo, err := GetTableInfo(destTable)
 	if err != nil {
 		log.Println(err)
