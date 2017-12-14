@@ -43,23 +43,31 @@ type Detail struct {
 	PartitionID   string // May be empty.  Used for slices of partitions.
 	TaskFileCount int
 	TestCount     int
-	MaxParseTime  time.Time
 }
 
 // GetNDTTableDetail fetches more detailed info about a partition or table.
 // Expects table to have test_id, task_filename, and parse_time fields.
 // `partition` should be in YYYY-MM-DD format.
-func GetNDTTableDetail(dsExt *bqext.Dataset, table string) (Detail, error) {
+func GetNDTTableDetail(dsExt *bqext.Dataset, table string, partition string) (Detail, error) {
+	detail := Detail{}
+	where := ""
+	if len(partition) == 10 {
+		where = "where _PARTITIONTIME = timestamp(date(\"" + partition + "\"))"
+	} else if len(partition) != 0 {
+		return detail, errors.New("Invalid partition string: " + partition)
+
+	}
 	queryString := fmt.Sprintf(`
 		#standardSQL
-		select sum(tests) as tests, count(Task) as tasks, max(last_parse) as last_parse
+		select sum(tests) as TestCount, count(Task) as TaskFileCount
 		from (
-		  select count(test_id) as Tests, max(parse_time) as last_parse, task_filename as Task
-	      from `+"`"+"%s"+"`"+`
+		  select count(test_id) as Tests, task_filename as Task
+		  from `+"`"+"%s"+"`"+`
+		  %s  -- where clause
 		  group by Task
-		)`, table)
+		)`, table, where)
 
-	detail := Detail{}
+	log.Println(queryString)
 	err := dsExt.QueryAndParse(queryString, &detail)
 	return detail, err
 }
@@ -85,6 +93,8 @@ const ErrorNotRegularTable = Error("Not a regular table")
 
 // ErrorSrcOlderThanDest is returned if a source table is older than the destination partition.
 const ErrorSrcOlderThanDest = Error("Source older than destination partition")
+const ErrorTooFewTasks = Error("Too few tasks")
+const ErrorTooFewTests = Error("Too few tests")
 
 // GetTableInfo returns the basic info for a single table.
 func GetTableInfo(t *bigquery.Table) (TableInfo, error) {
@@ -140,7 +150,7 @@ func GetInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
 // Returns nil error on success, or non-nil error if there was an error
 // at any point.
 // Uses flags to determine most of the parameters.
-func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo) (bool, error) {
+func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, dest string) (bool, error) {
 	// Check if the last update was at least fDelay in the past.
 	if time.Now().Sub(srcInfo.LastModifiedTime).Hours() < *fDelay {
 		return false, nil
@@ -155,16 +165,17 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo) (bool, error) {
 	}
 
 	// Creation time of new table should be newer than last update
-	// of old table??
+	// of old table.
 	// TODO replace table name with destination table name.
-	re := regexp.MustCompile(".*_([0-9]{8}$)")
+	re := regexp.MustCompile("(.*)_([0-9]{4})([0-9]{2})([0-9]{2})")
 	match := re.FindStringSubmatch(srcInfo.Name)
-	if len(match) != 2 {
+	if len(match) != 5 {
 		log.Println(match)
 		return false, errors.New("No matching partition_id: " + srcInfo.Name)
 	}
-	suffix := string(match[1])
-	destPartitionInfo, err := dsExt.GetPartitionInfo("TestDedupDest", suffix)
+	//base := string(match[1])
+	suffix := string(match[2] + match[3] + match[4])
+	destPartitionInfo, err := dsExt.GetPartitionInfo(dest, suffix)
 	if err != nil {
 		log.Println(err)
 		return false, err
@@ -173,12 +184,12 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo) (bool, error) {
 	// don't overwrite it.
 	if srcInfo.LastModifiedTime.Before(destPartitionInfo.LastModified) {
 		// TODO should perhaps delete the source table?
-		return false, ErrorSrcOlderThanDest
+		//		return false, ErrorSrcOlderThanDest
 	}
 
 	// Get info on old table tasks and rows (and age).
 	// TODO - fix so that we don't need Dataset.
-	destTable := dsExt.Table("TestDedupDest$" + suffix)
+	destTable := dsExt.Table(dest + "$" + suffix)
 	destInfo, err := GetTableInfo(destTable)
 	if err != nil {
 		log.Println(err)
@@ -191,29 +202,49 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo) (bool, error) {
 	// don't overwrite it.
 	if srcInfo.LastModifiedTime.Before(destInfo.LastModifiedTime) {
 		// TODO should perhaps delete the source table?
-		return false, ErrorSrcOlderThanDest
+		//return false, ErrorSrcOlderThanDest
 	}
 
 	// Check if all task files in the old table are also present
 	// in the new table.
-	srcDetail, err := GetNDTTableDetail(dsExt, srcInfo.Name)
-	log.Println(srcDetail)
+	srcDetail, err := GetNDTTableDetail(dsExt, srcInfo.Name, "")
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Println(srcDetail)
+	}
 	if srcDetail.TaskFileCount == 0 {
 		// No tasks - should ignore?
 	}
-	destDetail, err := GetNDTTableDetail(dsExt, destInfo.Name)
-	log.Println(destDetail)
+	destDate := fmt.Sprintf("%s-%s-%s", match[2], match[3], match[4])
+	destDetail, err := GetNDTTableDetail(dsExt, dest, destDate)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Println(destDetail)
+	}
 
-	// Check that new table contains at least 95% as many rows as
+	// Check that new table contains at least 90% as many tasks as
 	// old table.
+	if destDetail.TaskFileCount > int(1.1*float32(srcDetail.TaskFileCount)) {
+		return false, ErrorTooFewTasks
+	}
+	// Check that new table contains at least 95% as many tests as
+	// old table.
+	if destDetail.TestCount > int(1.05*float32(srcDetail.TestCount)) {
+		return false, ErrorTooFewTests
+	}
 
 	// If fDryRun, then don't execute the destination write.
+	if *fDryRun {
+		return false, nil
+	}
 
-	// 	dsExt.Dedup("ndt_20170601", true, "measurement-lab", "batch", "ndt$20170601")
+	dsExt.Dedup_Alpha(srcInfo.Name, "test_id", destTable)
 
 	// If DeleteAfterDedup, then delete the source table.
 
-	return false, nil
+	return true, nil
 }
 
 // TODO - move this to the README.
@@ -252,7 +283,7 @@ func main() {
 	info, err := GetInfoMatching(&dsExt, "TestDedupSrc_19990101")
 	log.Println(info)
 
-	_, err = CheckAndDedup(&dsExt, info[0])
+	_, err = CheckAndDedup(&dsExt, info[0], "TestDedupDest")
 	if err != nil {
 		log.Println(err)
 	}
