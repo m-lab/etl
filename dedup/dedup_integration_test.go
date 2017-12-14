@@ -5,17 +5,27 @@ package dedup_test
 import (
 	"fmt"
 	"log"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/m-lab/etl/dedup"
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 	"gopkg.in/m-lab/go.v1/bqext"
 )
 
+func newTestingDataset(project, dataset) (*bqext.Dataset, error) {
+	if os.Getenv("TRAVIS") != "" {
+		authOpt := option.WithCredentialsFile("../travis-testing.key")
+		opts = append(opts, authOpt)
+	}
+	return bqext.NewDataset("mlab-testing", "go", opts...)
+}
+
 func TestCheckAndDedup(t *testing.T) {
-	dsExt, err := bqext.NewDataset("mlab-testing", "etl")
+	dsExt, err := NewTestingDataset("mlab-testing", "etl")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +43,7 @@ func TestCheckAndDedup(t *testing.T) {
 }
 
 func xTest() {
-	dsExt, err := bqext.NewDataset("mlab-testing", "etl")
+	dsExt, err := NewTestingDataset("mlab-testing", "etl")
 	if err != nil {
 		log.Fatal(err)
 	}
