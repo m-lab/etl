@@ -26,6 +26,22 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+// Error is a simple string satisfying the error interface.
+type Error string
+
+func (e Error) Error() string { return string(e) }
+
+const (
+	// ErrorNotRegularTable is returned when a table is not a regular table (e.g. views)
+	ErrorNotRegularTable = Error("Not a regular table")
+	// ErrorSrcOlderThanDest is returned if a source table is older than the destination partition.
+	ErrorSrcOlderThanDest = Error("Source older than destination partition")
+	// ErrorTooFewTasks is returned when the source table has fewer task files than the destination.
+	ErrorTooFewTasks = Error("Too few tasks")
+	// ErrorTooFewTests is returned when the source table has fewer tests than the destination.
+	ErrorTooFewTests = Error("Too few tests")
+)
+
 // Detail provides more detailed information about a partition.
 type Detail struct {
 	PartitionID   string // May be empty.  Used for slices of partitions.
@@ -70,22 +86,6 @@ type TableInfo struct {
 	CreationTime     time.Time
 	LastModifiedTime time.Time
 }
-
-// Error is a simple string satisfying the error interface.
-type Error string
-
-func (e Error) Error() string { return string(e) }
-
-const (
-	// ErrorNotRegularTable is returned when a table is not a regular table (e.g. views)
-	ErrorNotRegularTable = Error("Not a regular table")
-	// ErrorSrcOlderThanDest is returned if a source table is older than the destination partition.
-	ErrorSrcOlderThanDest = Error("Source older than destination partition")
-	// ErrorTooFewTasks is returned when the source table has fewer task files than the destination.
-	ErrorTooFewTasks = Error("Too few tasks")
-	// ErrorTooFewTests is returned when the source table has fewer tests than the destination.
-	ErrorTooFewTests = Error("Too few tests")
-)
 
 // GetTableInfo returns the basic info for a single table.
 func GetTableInfo(t *bigquery.Table) (TableInfo, error) {
