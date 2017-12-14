@@ -1,10 +1,14 @@
 // Package dedup provides facilities for deduplicating
 // template tables and copying into a destination partitions.
+// It is currently somewhat NDT specific:
+//  1. It expects tables to have task_filename field.
+//  2. It expected destination table to be partitioned.
+//  3. It does not explicitly check for schema compatibility,
+//      though it will fail if they are incompatible.
 package dedup
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"regexp"
@@ -15,20 +19,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"golang.org/x/net/context"
 	"gopkg.in/m-lab/go.v1/bqext"
-)
-
-// TODO - should move this to a command line specific module,
-// and replace with fields in a struct that is used as the receiver
-// for most of the functions.
-var (
-	// TODO - replace this with a service account?
-	fProject          = flag.String("project", "", "BigQuery project.")
-	fTemplatePrefix   = flag.String("template_prefix", "etl.src", "table prefix")
-	fDelay            = flag.Float64("delay", 48, "delay (hours) from last update")
-	fDestinationTable = flag.String("destination_table", "etl.dest", "destination table")
-	fDedupField       = flag.String("dedup_field", "", "Field for deduplication")
-	fDeleteAfterCopy  = flag.Bool("delete", false, "Should delete table after copy")
-	fDryRun           = flag.Bool("dry_run", false, "Print actions instead of executing")
 )
 
 func init() {
@@ -150,11 +140,15 @@ func GetInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
 // dedups the table.  Returns true if criteria pass, false if they fail.
 // Returns nil error on success, or non-nil error if there was an error
 // at any point.
-// Uses flags to determine most of the parameters.
-func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, dest string) (bool, error) {
+// dsExt
+// srcInfo
+// dest
+// minSrcAge
+// force - if true, will ignore age and test count sanity checks
+func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, dest string, minSrcAge time.Duration, force bool) (bool, error) {
 	// Check if the last update was at least fDelay in the past.
-	if time.Now().Sub(srcInfo.LastModifiedTime).Hours() < *fDelay {
-		return false, nil
+	if time.Now().Sub(srcInfo.LastModifiedTime) < minSrcAge {
+		return false, errors.New("Source is too recent")
 	}
 
 	t := dsExt.Table(srcInfo.Name)
@@ -181,64 +175,56 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, dest string) (bool, 
 		log.Println(err)
 		return false, err
 	}
-	// If the source table is older than the destination table, then
-	// don't overwrite it.
-	if srcInfo.LastModifiedTime.Before(destPartitionInfo.LastModified) {
-		// TODO should perhaps delete the source table?
-		//		return false, ErrorSrcOlderThanDest
-	}
 
-	// Get info on old table tasks and rows (and age).
-	// TODO - fix so that we don't need Dataset.
 	destTable := dsExt.Table(dest + "$" + suffix)
-	destInfo, err := GetTableInfo(destTable)
-	if err != nil {
-		log.Println(err)
-		return false, err
-	}
-	log.Println(destInfo)
+	if !force {
+		// If the source table is older than the destination table, then
+		// don't overwrite it.
+		if srcInfo.LastModifiedTime.Before(destPartitionInfo.LastModified) {
+			// TODO should perhaps delete the source table?
+			return false, ErrorSrcOlderThanDest
+		}
 
-	// Double check against destination table info.
-	// If the source table is older than the destination table, then
-	// don't overwrite it.
-	if srcInfo.LastModifiedTime.Before(destInfo.LastModifiedTime) {
-		// TODO should perhaps delete the source table?
-		//return false, ErrorSrcOlderThanDest
-	}
+		// Get info on old table tasks and rows (and age).
+		destInfo, err := GetTableInfo(destTable)
+		if err != nil {
+			log.Println(err)
+			return false, err
+		}
+		log.Println(destInfo)
 
-	// Check if all task files in the old table are also present
-	// in the new table.
-	srcDetail, err := GetNDTTableDetail(dsExt, srcInfo.Name, "")
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println(srcDetail)
-	}
-	if srcDetail.TaskFileCount == 0 {
-		// No tasks - should ignore?
-	}
-	destDate := fmt.Sprintf("%s-%s-%s", match[2], match[3], match[4])
-	destDetail, err := GetNDTTableDetail(dsExt, dest, destDate)
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println(destDetail)
-	}
+		// Double check against destination table info.
+		// If the source table is older than the destination table, then
+		// don't overwrite it.
+		if srcInfo.LastModifiedTime.Before(destInfo.LastModifiedTime) {
+			// TODO should perhaps delete the source table?
+			return false, ErrorSrcOlderThanDest
+		}
 
-	// Check that new table contains at least 90% as many tasks as
-	// old table.
-	if destDetail.TaskFileCount > int(1.1*float32(srcDetail.TaskFileCount)) {
-		return false, ErrorTooFewTasks
-	}
-	// Check that new table contains at least 95% as many tests as
-	// old table.
-	if destDetail.TestCount > int(1.05*float32(srcDetail.TestCount)) {
-		return false, ErrorTooFewTests
-	}
+		// Check if all task files in the old table are also present
+		// in the new table.
+		srcDetail, err := GetNDTTableDetail(dsExt, srcInfo.Name, "")
+		if err != nil {
+			log.Println(err)
+			return false, err
+		}
+		destDate := fmt.Sprintf("%s-%s-%s", match[2], match[3], match[4])
+		destDetail, err := GetNDTTableDetail(dsExt, dest, destDate)
+		if err != nil {
+			log.Println(err)
+			return false, err
+		}
 
-	// If fDryRun, then don't execute the destination write.
-	if *fDryRun {
-		return false, nil
+		// Check that new table contains at least 90% as many tasks as
+		// old table.
+		if destDetail.TaskFileCount > int(1.1*float32(srcDetail.TaskFileCount)) {
+			return false, ErrorTooFewTasks
+		}
+		// Check that new table contains at least 95% as many tests as
+		// old table.
+		if destDetail.TestCount > int(1.05*float32(srcDetail.TestCount)) {
+			return false, ErrorTooFewTests
+		}
 	}
 
 	dsExt.Dedup_Alpha(srcInfo.Name, "test_id", destTable)
