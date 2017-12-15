@@ -200,7 +200,6 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBas
 			log.Println(err)
 			return false, err
 		}
-		log.Println(destInfo)
 
 		// Double check against destination table info.
 		// If the source table is older than the destination table, then
@@ -225,13 +224,14 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBas
 			return false, err
 		}
 
-		// Check that new table contains at least 90% as many tasks as
+		log.Println("Details: src:", srcDetail, " dest:", destDetail)
+		// Check that new table contains at least 99% as many tasks as
 		// old table.
-		if destDetail.TaskFileCount > int(1.1*float32(srcDetail.TaskFileCount)) {
+		if destDetail.TaskFileCount > int(1.01*float32(srcDetail.TaskFileCount)) {
 			return false, ErrorTooFewTasks
 		}
 		// Check that new table contains at least 95% as many tests as
-		// old table.
+		// old table.  This may be fewer if the destination table still has dups.
 		if destDetail.TestCount > int(1.05*float32(srcDetail.TestCount)) {
 			return false, ErrorTooFewTests
 		}
@@ -255,8 +255,10 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 	}
 	log.Println("Total:", len(info))
 	for i := range info {
+		log.Println(info[i])
+	}
+	for i := range info {
 		srcInfo := info[i]
-		log.Println(srcInfo)
 		// Skip any partition that has been updated in the past 48 hours.
 		if srcInfo.LastModifiedTime.After(time.Now().Add(minAge)) {
 			continue
