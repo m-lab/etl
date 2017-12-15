@@ -1,6 +1,13 @@
 package main
 
-import "flag"
+import (
+	"flag"
+	"log"
+	"time"
+
+	"github.com/m-lab/etl/dedup"
+	"gopkg.in/m-lab/go.v1/bqext"
+)
 
 var (
 	// TODO - replace this with a service account?
@@ -13,4 +20,13 @@ var (
 	fDryRun           = flag.Bool("dry_run", false, "Print actions instead of executing")
 )
 
-func main() {}
+func main() {
+
+	dsExt, err := bqext.NewDataset(*fProject, "etl")
+
+	err = dedup.ProcessTablesMatching(&dsExt, "T", "public", "ndt", 14*24*time.Hour)
+	if err != nil {
+		log.Println(err)
+	}
+
+}

@@ -16,34 +16,55 @@ import (
 	"gopkg.in/m-lab/go.v1/bqext"
 )
 
-func newTestingDataset(project, dataset) (*bqext.Dataset, error) {
+func clientOpts() []option.ClientOption {
+	opts := []option.ClientOption{}
 	if os.Getenv("TRAVIS") != "" {
 		authOpt := option.WithCredentialsFile("../travis-testing.key")
 		opts = append(opts, authOpt)
 	}
-	return bqext.NewDataset("mlab-testing", "go", opts...)
+	return opts
+}
+
+func newTestingDataset(project, dataset string) (bqext.Dataset, error) {
+	return bqext.NewDataset(project, dataset, clientOpts()...)
 }
 
 func TestCheckAndDedup(t *testing.T) {
-	dsExt, err := NewTestingDataset("mlab-testing", "etl")
+	dsExt, err := newTestingDataset("mlab-testing", "etl")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	info, err := dedup.GetInfoMatching(&dsExt, "TestDedupSrc_19990101")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(info) != 1 {
+		t.Fatal("No info for pattern.")
+	}
 
-	_, err = dedup.CheckAndDedup(&dsExt, info[0], "TestDedupDest", time.Hour, false)
+	_, err = dedup.CheckAndDedup(&dsExt, info[0], "etl", "TestDedupDest", time.Hour, false)
 	if err != nil {
 		log.Println(err)
 	}
-	_, err = dedup.CheckAndDedup(&dsExt, info[0], "TestDedupDest", time.Hour, true)
+	_, err = dedup.CheckAndDedup(&dsExt, info[0], "etl", "TestDedupDest", time.Hour, true)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
+func xTestProcess(t *testing.T) {
+	dsExt, err := newTestingDataset("mlab-testing", "etl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO - should work with new/empty destination.
+	dedup.ProcessTablesMatching(&dsExt, "TestDedupSrc_", "etl", "TestDedupDest", 1*time.Minute)
+}
+
 func xTest() {
-	dsExt, err := NewTestingDataset("mlab-testing", "etl")
+	dsExt, err := newTestingDataset("mlab-testing", "etl")
 	if err != nil {
 		log.Fatal(err)
 	}
