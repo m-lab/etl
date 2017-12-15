@@ -2,9 +2,10 @@
 // template tables and copying into a destination partitions.
 // It is currently somewhat NDT specific:
 //  1. It expects tables to have task_filename field.
-//  2. It expected destination table to be partitioned.
+//  2. It expects destination table to be partitioned.
 //  3. It does not explicitly check for schema compatibility,
 //      though it will fail if they are incompatible.
+
 package dedup
 
 import (
@@ -22,6 +23,7 @@ import (
 )
 
 var (
+	// regexp for pulling base and date out of single date table.
 	srcTemplateRE = regexp.MustCompile("(.*)_([0-9]{4})([0-9]{2})([0-9]{2})")
 )
 

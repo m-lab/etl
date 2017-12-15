@@ -3,15 +3,12 @@
 package dedup_test
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/m-lab/etl/dedup"
-	"golang.org/x/net/context"
-	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"gopkg.in/m-lab/go.v1/bqext"
 )
@@ -41,9 +38,28 @@ func TestGetNDTTableDetail(t *testing.T) {
 		t.Fatal(err)
 	}
 	if detail.TaskFileCount > 0 || detail.TestCount > 0 {
-		t.Fatal("Should have zero counts")
+		t.Error("Should have zero counts")
 	}
 
+	// Check that it handles single partitions.
+	// TODO - update to create its own test table.
+	detail, err = dedup.GetNDTTableDetail(&dsExt, "TestDedupDest", "1999-01-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.TaskFileCount != 2 || detail.TestCount != 4 {
+		t.Error("Wrong number of tasks or tests")
+	}
+
+	// Check that it handles full table.
+	// TODO - update to create its own test table.
+	detail, err = dedup.GetNDTTableDetail(&dsExt, "TestDedupSrc_19990101", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.TaskFileCount != 2 || detail.TestCount != 6 {
+		t.Error("Wrong number of tasks or tests")
+	}
 }
 
 func TestCheckAndDedup(t *testing.T) {
@@ -70,54 +86,15 @@ func TestCheckAndDedup(t *testing.T) {
 	}
 }
 
-func xTestProcess(t *testing.T) {
+func TestProcess(t *testing.T) {
 	dsExt, err := newTestingDataset("mlab-testing", "etl")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// TODO - should work with new/empty destination.
-	dedup.ProcessTablesMatching(&dsExt, "TestDedupSrc_", "etl", "TestDedupDest", 1*time.Minute)
-}
-
-func xTest() {
-	dsExt, err := newTestingDataset("mlab-testing", "etl")
+	err = dedup.ProcessTablesMatching(&dsExt, "TestDedupSrc_", "etl", "TestDedupDest", 1*time.Minute)
 	if err != nil {
-		log.Fatal(err)
+		t.Error(err)
 	}
-
-	info, err := dedup.GetInfoMatching(&dsExt, "TestDedupSrc_19990101")
-	log.Println(info)
-
-	for i := range info {
-		// TODO Query to check number of tar files processed.
-		fmt.Printf("%v\n", info[i])
-
-		// TODO Query to check number of rows?
-		queryString := fmt.Sprintf("select count(test_id) as Tests, task_filename as Task from `%s` group by task_filename order by task_filename", info[i].Name)
-		q := dsExt.ResultQuery(queryString, false)
-		it, err := q.Read(context.Background())
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		for {
-			var result struct {
-				Task  string
-				Tests int
-			}
-			err := it.Next(&result)
-			if err != nil {
-				if err != iterator.Done {
-					log.Println(err)
-				}
-				break
-			}
-			log.Println(result)
-			// TODO compare the tasks to those in the existing
-			// partition.  If there are some missing, then delay
-			// further, and log a warning.  If still missing when
-			// we commit or more than 3 missing, log an error.
-		}
-	}
+	// TODO - actually check something interesting.
 }
