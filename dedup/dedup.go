@@ -193,6 +193,7 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBas
 		// don't overwrite it.
 		if srcInfo.LastModifiedTime.Before(destPartitionInfo.LastModified) {
 			// TODO should perhaps delete the source table?
+			log.Println(srcInfo, "older than", destPartitionInfo)
 			return false, ErrorSrcOlderThanDest
 		}
 
@@ -208,7 +209,8 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBas
 		// don't overwrite it.
 		if srcInfo.LastModifiedTime.Before(destInfo.LastModifiedTime) {
 			// TODO should perhaps delete the source table?
-			return false, ErrorSrcOlderThanDest
+			log.Println(srcInfo, "older than", destInfo)
+			//return false, ErrorSrcOlderThanDest
 		}
 
 		// Check if all task files in the old table are also present
@@ -274,6 +276,7 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 		match := srcTemplateRE.FindStringSubmatch(srcInfo.Name)
 		if len(match) != 5 {
 			log.Println("Skipping ", srcInfo.Name)
+			continue
 		}
 		destDate := fmt.Sprintf("%s-%s-%s", match[2], match[3], match[4])
 		destTable := dsExt.Table(destBase + "$" + destDate)
