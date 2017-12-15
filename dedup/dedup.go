@@ -67,12 +67,15 @@ func GetNDTTableDetail(dsExt *bqext.Dataset, table string, partition string) (De
 	}
 	queryString := fmt.Sprintf(`
 		#standardSQL
-		select sum(tests) as TestCount, count(Task) as TaskFileCount
+		select sum(Tests) as TestCount, count(Task)-1 as TaskFileCount
 		from (
-		  select count(test_id) as Tests, task_filename as Task
-		  from `+"`"+"%s"+"`"+`
-		  %s  -- where clause
-		  group by Task
+			-- This avoids null counts when the partition doesn't exist or is empty.
+  		    select 0 as Tests, "fake-task" as Task 
+  		    union all
+		  	select count(test_id) as Tests, task_filename as Task
+		  	from `+"`"+"%s"+"`"+`
+		  	%s  -- where clause
+		  	group by Task
 		)`, table, where)
 
 	err := dsExt.QueryAndParse(queryString, &detail)
@@ -215,8 +218,8 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBas
 			return false, err
 		}
 		destDate := fmt.Sprintf("%s-%s-%s", match[2], match[3], match[4])
-		// WRONG IF CROSS DATASET
-		destDetail, err := GetNDTTableDetail(dsExt, destBase, destDate)
+		// TODO - kinda hacky.
+		destDetail, err := GetNDTTableDetail(dsExt, destDataset+"."+destBase, destDate)
 		if err != nil {
 			log.Println(err)
 			return false, err
