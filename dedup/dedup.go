@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -19,6 +20,10 @@ import (
 	"cloud.google.com/go/bigquery"
 	"golang.org/x/net/context"
 	"gopkg.in/m-lab/go.v1/bqext"
+)
+
+var (
+	srcTemplateRE = regexp.MustCompile("(.*)_([0-9]{4})([0-9]{2})([0-9]{2})")
 )
 
 func init() {
@@ -71,7 +76,6 @@ func GetNDTTableDetail(dsExt *bqext.Dataset, table string, partition string) (De
 		  group by Task
 		)`, table, where)
 
-	log.Println(queryString)
 	err := dsExt.QueryAndParse(queryString, &detail)
 	return detail, err
 }
@@ -145,7 +149,7 @@ func GetInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
 // dest
 // minSrcAge
 // force - if true, will ignore age and test count sanity checks
-func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, dest string, minSrcAge time.Duration, force bool) (bool, error) {
+func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBase string, minSrcAge time.Duration, force bool) (bool, error) {
 	// Check if the last update was at least fDelay in the past.
 	if time.Now().Sub(srcInfo.LastModifiedTime) < minSrcAge {
 		return false, errors.New("Source is too recent")
@@ -162,21 +166,23 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, dest string, minSrcA
 	// Creation time of new table should be newer than last update
 	// of old table.
 	// TODO replace table name with destination table name.
-	re := regexp.MustCompile("(.*)_([0-9]{4})([0-9]{2})([0-9]{2})")
-	match := re.FindStringSubmatch(srcInfo.Name)
+	match := srcTemplateRE.FindStringSubmatch(srcInfo.Name)
 	if len(match) != 5 {
 		log.Println(match)
 		return false, errors.New("No matching partition_id: " + srcInfo.Name)
 	}
-	//base := string(match[1])
 	suffix := string(match[2] + match[3] + match[4])
-	destPartitionInfo, err := dsExt.GetPartitionInfo(dest, suffix)
+	fullDestTableName := fmt.Sprintf("%s:%s.%s", dsExt.ProjectID, destDataset, destBase)
+	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, destDataset).Table(destBase + "$" + suffix)
+	destPartitionInfo, err := dsExt.GetPartitionInfo(fullDestTableName, suffix)
 	if err != nil {
-		log.Println(err)
-		return false, err
+		// Fragile?
+		if err.Error() != "no more items in iterator" {
+			log.Println(err)
+			return false, err
+		}
 	}
 
-	destTable := dsExt.Table(dest + "$" + suffix)
 	if !force {
 		// If the source table is older than the destination table, then
 		// don't overwrite it.
@@ -209,7 +215,8 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, dest string, minSrcA
 			return false, err
 		}
 		destDate := fmt.Sprintf("%s-%s-%s", match[2], match[3], match[4])
-		destDetail, err := GetNDTTableDetail(dsExt, dest, destDate)
+		// WRONG IF CROSS DATASET
+		destDetail, err := GetNDTTableDetail(dsExt, destBase, destDate)
 		if err != nil {
 			log.Println(err)
 			return false, err
@@ -232,4 +239,49 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, dest string, minSrcA
 	// If DeleteAfterDedup, then delete the source table.
 
 	return true, nil
+}
+
+// ProcessTablesMatching lists all tables matching a template pattern, and for
+// any that are at least two days old, attempts to dedup and copy them to
+// partitions in the destination table.
+func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset, destBase string, minAge time.Duration) error {
+	// These are sorted by LastModification, oldest first.
+	info, err := GetInfoMatching(dsExt, srcPattern)
+	if err != nil {
+		return err
+	}
+	log.Println(dsExt.Dataset, dsExt.Dataset.ProjectID)
+	log.Println("Total:", len(info))
+	os.Exit(1)
+	for i := range info {
+		srcInfo := info[i]
+		log.Println(srcInfo)
+		// Skip any partition that has been updated in the past 48 hours.
+		if srcInfo.LastModifiedTime.After(time.Now().Add(minAge)) {
+			continue
+		}
+		_, err := GetNDTTableDetail(dsExt, srcInfo.Name, "")
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		match := srcTemplateRE.FindStringSubmatch(srcInfo.Name)
+		if len(match) != 5 {
+			log.Println("Skipping ", srcInfo.Name)
+		}
+		destDate := fmt.Sprintf("%s-%s-%s", match[2], match[3], match[4])
+		destTable := dsExt.Table(destBase + "$" + destDate)
+		if err != nil {
+			log.Println("Error: Skipping", destTable.TableID)
+			log.Println(err)
+			continue
+		}
+
+		_, err = CheckAndDedup(dsExt, srcInfo, destDataset, destBase, minAge, false)
+		if err != nil {
+			log.Println(err, "processing", srcInfo.Name)
+		}
+	}
+	return nil
 }
