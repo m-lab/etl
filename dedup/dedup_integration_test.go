@@ -29,6 +29,23 @@ func newTestingDataset(project, dataset string) (bqext.Dataset, error) {
 	return bqext.NewDataset(project, dataset, clientOpts()...)
 }
 
+func TestGetNDTTableDetail(t *testing.T) {
+	dsExt, err := newTestingDataset("mlab-testing", "etl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that it handles empty partitions
+	detail, err := dedup.GetNDTTableDetail(&dsExt, "TestDedupDest", "2000-12-29")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.TaskFileCount > 0 || detail.TestCount > 0 {
+		t.Fatal("Should have zero counts")
+	}
+
+}
+
 func TestCheckAndDedup(t *testing.T) {
 	dsExt, err := newTestingDataset("mlab-testing", "etl")
 	if err != nil {
