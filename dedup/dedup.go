@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -124,6 +123,7 @@ func GetInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
 	for t, err := ti.Next(); err == nil; t, err = ti.Next() {
 		// TODO should this be starts with?  Or a regex?
 		if strings.Contains(t.TableID, filter) {
+			// TODO - make this run in parallel
 			ts, err := GetTableInfo(t)
 			if err == ErrorNotRegularTable {
 				continue
@@ -250,9 +250,7 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 	if err != nil {
 		return err
 	}
-	log.Println(dsExt.Dataset, dsExt.Dataset.ProjectID)
 	log.Println("Total:", len(info))
-	os.Exit(1)
 	for i := range info {
 		srcInfo := info[i]
 		log.Println(srcInfo)
