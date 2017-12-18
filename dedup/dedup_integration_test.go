@@ -74,7 +74,7 @@ func TestCheckAndDedup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, err := dedup.GetInfoMatching(&dsExt, "TestDedupSrc_19990101")
+	info, err := dedup.GetTableInfoMatching(&dsExt, "TestDedupSrc_19990101")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,6 +19,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"golang.org/x/net/context"
+	"google.golang.org/api/iterator"
 	"gopkg.in/m-lab/go.v1/bqext"
 )
 
@@ -26,20 +27,15 @@ var (
 	denseDateRE = regexp.MustCompile("([0-9]{4})([0-9]{2})([0-9]{2})")
 )
 
-// Error is a simple string satisfying the error interface.
-type Error string
-
-func (e Error) Error() string { return string(e) }
-
-const (
+var (
 	// ErrorNotRegularTable is returned when a table is not a regular table (e.g. views)
-	ErrorNotRegularTable = Error("Not a regular table")
+	ErrorNotRegularTable = errors.New("Not a regular table")
 	// ErrorSrcOlderThanDest is returned if a source table is older than the destination partition.
-	ErrorSrcOlderThanDest = Error("Source older than destination partition")
+	ErrorSrcOlderThanDest = errors.New("Source older than destination partition")
 	// ErrorTooFewTasks is returned when the source table has fewer task files than the destination.
-	ErrorTooFewTasks = Error("Too few tasks")
+	ErrorTooFewTasks = errors.New("Too few tasks")
 	// ErrorTooFewTests is returned when the source table has fewer tests than the destination.
-	ErrorTooFewTests = Error("Too few tests")
+	ErrorTooFewTests = errors.New("Too few tests")
 )
 
 // Detail provides more detailed information about a partition or table.
@@ -75,13 +71,13 @@ func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (Detail, error)
 	}
 	queryString := fmt.Sprintf(`
 		#standardSQL
-		SELECT sum(tests) as TestCount, COUNT(task)-1 as TaskFileCount
-		from (
+		SELECT SUM(tests) AS TestCount, COUNT(task)-1 AS TaskFileCount
+		FROM (
 			-- This avoids null counts when the partition doesn't exist or is empty.
-  		    SELECT 0 as tests, "fake-task" as Task 
+  		    SELECT 0 AS tests, "fake-task" AS Task 
   		    UNION ALL
-		  	SELECT COUNT(test_id) as tests, task_filename as task
-		  	from `+"`%s.%s`"+`
+		  	SELECT COUNT(test_id) AS tests, task_filename AS task
+		  	FROM `+"`%s.%s`"+`
 		  	%s  -- where clause
 		  	GROUP BY Task
 		)`, dataset, tableName, where)
@@ -122,12 +118,12 @@ func GetTableInfo(t *bigquery.Table) (TableInfo, error) {
 	return ts, nil
 }
 
-// GetInfoMatching finds all tables matching table filter
+// GetTableInfoMatching finds all tables matching table filter
 // and collects the basic stats about each of them.
 // If filter includes a $, then this fetches just the individual metadata
 // for a single table partition.
 // Returns slice ordered by decreasing age.
-func GetInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
+func GetTableInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
 	result := make([]TableInfo, 0)
 	ctx := context.Background()
 	ti := dsExt.Tables(ctx)
@@ -179,7 +175,7 @@ func GetPartitionInfo(dsExt *bqext.Dataset, table *bigquery.Table) (bqext.Partit
 	queryString := fmt.Sprintf(
 		`#legacySQL
 		SELECT
-		  partition_id as PartitionID,
+		  partition_id AS PartitionID,
 		  MSEC_TO_TIMESTAMP(creation_time) AS CreationTime,
 		  MSEC_TO_TIMESTAMP(last_modified_time) AS LastModified
 		FROM
@@ -190,7 +186,7 @@ func GetPartitionInfo(dsExt *bqext.Dataset, table *bigquery.Table) (bqext.Partit
 	err := dsExt.QueryAndParse(queryString, &pi)
 	if err != nil {
 		// If the partition doesn't exist, just return empty Info, no error.
-		if err.Error() == "no more items in iterator" {
+		if err == iterator.Done {
 			return bqext.PartitionInfo{}, nil
 		}
 		return bqext.PartitionInfo{}, err
@@ -242,22 +238,6 @@ func checkDestOlder(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Tabl
 		// TODO should perhaps delete the source table?
 		return ErrorSrcOlderThanDest
 	}
-
-	// Get info on old table tasks and rows (and age).
-	destInfo, err := GetTableInfo(dest)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	// Double check against destination table info.
-	// If the source table is older than the destination table, then
-	// we probably don't want to overwrite it.
-	if srcInfo.LastModifiedTime.Before(destInfo.LastModifiedTime) {
-		// TODO should perhaps delete the source table?
-		log.Println(srcInfo, "older than", destInfo)
-		return ErrorSrcOlderThanDest
-	}
 	return nil
 }
 
@@ -272,7 +252,7 @@ func checkDestOlder(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Tabl
 // minSrcAge
 // ignoreDestAge - if true, will ignore destination age sanity check
 func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table, minSrcAge time.Duration, ignoreDestAge bool) (bool, error) {
-	// Check if the last update was at least fDelay in the past.
+	// Check if the last update was at least minSrcAge in the past.
 	if time.Now().Sub(srcInfo.LastModifiedTime) < minSrcAge {
 		return false, errors.New("Source is too recent")
 	}
@@ -309,7 +289,7 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.
 // partitions in the destination table.
 func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset, destBase string, minAge time.Duration) error {
 	// These are sorted by LastModification, oldest first.
-	info, err := GetInfoMatching(dsExt, srcPattern)
+	info, err := GetTableInfoMatching(dsExt, srcPattern)
 	if err != nil {
 		return err
 	}
@@ -319,13 +299,8 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 	}
 	for i := range info {
 		srcInfo := info[i]
-		// Skip any partition that has been updated in the past 48 hours.
-		if srcInfo.LastModifiedTime.After(time.Now().Add(minAge)) {
-			continue
-		}
-		_, err := GetTableDetail(dsExt, dsExt.Table(srcInfo.Name))
-		if err != nil {
-			log.Println(err)
+		// Skip any partition that has been updated in the past minAge.
+		if time.Now().Before(srcInfo.LastModifiedTime.Add(minAge)) {
 			continue
 		}
 
