@@ -11,6 +11,11 @@ import (
 	"gopkg.in/m-lab/go.v1/bqext"
 )
 
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 var (
 	// TODO - replace this with a service account?
 	fProject          = flag.String("project", "", "BigQuery project.")
@@ -41,7 +46,7 @@ func main() {
 		os.Exit(1)
 	}
 	// TODO fix delay param.
-	err = dedup.ProcessTablesMatching(&dsExt, src[1], dest[0], dest[1], 14*24*time.Hour)
+	err = dedup.ProcessTablesMatching(&dsExt, src[1], dest[0], dest[1], 7*24*time.Hour)
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)

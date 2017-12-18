@@ -23,14 +23,8 @@ import (
 )
 
 var (
-	// regexp for pulling base and date out of single date table.
-	srcTemplateRE = regexp.MustCompile("(.*)_([0-9]{4})([0-9]{2})([0-9]{2})")
+	denseDateRE = regexp.MustCompile("([0-9]{4})([0-9]{2})([0-9]{2})")
 )
-
-func init() {
-	// Always prepend the filename and line number.
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
 
 // Error is a simple string satisfying the error interface.
 type Error string
@@ -48,17 +42,29 @@ const (
 	ErrorTooFewTests = Error("Too few tests")
 )
 
-// Detail provides more detailed information about a partition.
+// Detail provides more detailed information about a partition or table.
 type Detail struct {
 	PartitionID   string // May be empty.  Used for slices of partitions.
 	TaskFileCount int
 	TestCount     int
 }
 
-// GetNDTTableDetail fetches more detailed info about a partition or table.
-// Expects table to have test_id, task_filename, and parse_time fields.
-// `partition` should be in YYYY-MM-DD format.
-func GetNDTTableDetail(dsExt *bqext.Dataset, table string, partition string) (Detail, error) {
+// GetTableDetail fetches more detailed info about a partition or table.
+// Expects table to have test_id, and task_filename fields.
+//func GetTableDetail(dsExt *bqext.Dataset, table string, partition string) (Detail, error) {
+func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (Detail, error) {
+	// If table is a partition, then we have to separate out the partition part for the query.
+	parts := strings.Split(table.TableID, "$")
+	partition := ""
+	dataset := table.DatasetID
+	tableName := parts[0]
+	if len(parts) > 1 {
+		match := denseDateRE.FindStringSubmatch(parts[1])
+		if len(match) != 4 {
+			return Detail{}, errors.New("Bad date format: " + parts[1])
+		}
+		partition = fmt.Sprintf("%s-%s-%s", match[1], match[2], match[3])
+	}
 	detail := Detail{}
 	where := ""
 	if len(partition) == 10 {
@@ -69,16 +75,16 @@ func GetNDTTableDetail(dsExt *bqext.Dataset, table string, partition string) (De
 	}
 	queryString := fmt.Sprintf(`
 		#standardSQL
-		select sum(Tests) as TestCount, count(Task)-1 as TaskFileCount
+		SELECT sum(tests) as TestCount, COUNT(task)-1 as TaskFileCount
 		from (
 			-- This avoids null counts when the partition doesn't exist or is empty.
-  		    select 0 as Tests, "fake-task" as Task 
-  		    union all
-		  	select count(test_id) as Tests, task_filename as Task
-		  	from `+"`"+"%s"+"`"+`
+  		    SELECT 0 as tests, "fake-task" as Task 
+  		    UNION ALL
+		  	SELECT COUNT(test_id) as tests, task_filename as task
+		  	from `+"`%s.%s`"+`
 		  	%s  -- where clause
-		  	group by Task
-		)`, table, where)
+		  	GROUP BY Task
+		)`, dataset, tableName, where)
 
 	err := dsExt.QueryAndParse(queryString, &detail)
 	return detail, err
@@ -145,16 +151,127 @@ func GetInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
 	return result, nil
 }
 
+// Extracts date suffix from src table name, and forms full destination table.
+func getDestTable(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBase string) (*bigquery.Table, error) {
+	parts := strings.Split(srcInfo.Name, "_")
+	if len(parts) != 2 {
+		log.Println(parts)
+		return nil, errors.New("Source doesn't have template suffix: " + srcInfo.Name)
+	}
+	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, destDataset).Table(destBase + "$" + parts[1])
+	return destTable, nil
+}
+
+// GetPartitionInfo provides basic information about a partition.
+// Unlike bqextGetPartitionInfo, this works directly on a bigquery.Table.
+// table should include partition spec.
+// dsExt should have access to the table, but its project and dataset are not used.
+// TODO - possibly migrate this to go/bqext.
+func GetPartitionInfo(dsExt *bqext.Dataset, table *bigquery.Table) (bqext.PartitionInfo, error) {
+	tableName := table.TableID
+	parts := strings.Split(tableName, "$")
+	if len(parts) != 2 {
+		return bqext.PartitionInfo{}, errors.New("TableID missing partition: " + tableName)
+	}
+	fullTable := fmt.Sprintf("%s:%s.%s", table.ProjectID, table.DatasetID, parts[0])
+
+	// This uses legacy, because PARTITION_SUMMARY is not supported in standard.
+	queryString := fmt.Sprintf(
+		`#legacySQL
+		SELECT
+		  partition_id as PartitionID,
+		  MSEC_TO_TIMESTAMP(creation_time) AS CreationTime,
+		  MSEC_TO_TIMESTAMP(last_modified_time) AS LastModified
+		FROM
+		  [%s$__PARTITIONS_SUMMARY__]
+		WHERE partition_id = "%s" `, fullTable, parts[1])
+	pi := bqext.PartitionInfo{}
+
+	err := dsExt.QueryAndParse(queryString, &pi)
+	if err != nil {
+		// If the partition doesn't exist, just return empty Info, no error.
+		if err.Error() == "no more items in iterator" {
+			return bqext.PartitionInfo{}, nil
+		}
+		return bqext.PartitionInfo{}, err
+	}
+	return pi, nil
+}
+
+func checkTasksAndTests(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Table) error {
+	// Check if all task files in the old table are also present
+	// in the new table.
+	srcTable := dsExt.Table(srcInfo.Name)
+	srcDetail, err := GetTableDetail(dsExt, srcTable)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	destDetail, err := GetTableDetail(dsExt, dest)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	log.Println("Details: src:", srcDetail, " dest:", destDetail)
+	// Check that new table contains at least 99% as many tasks as
+	// old table.
+	if destDetail.TaskFileCount > int(1.01*float32(srcDetail.TaskFileCount)) {
+		return ErrorTooFewTasks
+	}
+	// Check that new table contains at least 95% as many tests as
+	// old table.  This may be fewer if the destination table still has dups.
+	if destDetail.TestCount > int(1.05*float32(srcDetail.TestCount)) {
+		return ErrorTooFewTests
+	}
+	return nil
+}
+
+// TODO consider param to check whether source is older than dest.
+func checkDestOlder(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Table) error {
+	// Creation time of new table should be newer than last update
+	// of old table.
+	destPartitionInfo, err := GetPartitionInfo(dsExt, dest)
+	if err != nil {
+		return err
+	}
+
+	// If the source table is older than the destination table, then
+	// don't overwrite it.
+	if srcInfo.LastModifiedTime.Before(destPartitionInfo.LastModified) {
+		// TODO should perhaps delete the source table?
+		return ErrorSrcOlderThanDest
+	}
+
+	// Get info on old table tasks and rows (and age).
+	destInfo, err := GetTableInfo(dest)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	// Double check against destination table info.
+	// If the source table is older than the destination table, then
+	// we probably don't want to overwrite it.
+	if srcInfo.LastModifiedTime.Before(destInfo.LastModifiedTime) {
+		// TODO should perhaps delete the source table?
+		log.Println(srcInfo, "older than", destInfo)
+		return ErrorSrcOlderThanDest
+	}
+	return nil
+}
+
 // CheckAndDedup checks various criteria, and if they all pass,
 // dedups the table.  Returns true if criteria pass, false if they fail.
 // Returns nil error on success, or non-nil error if there was an error
 // at any point.
 // dsExt
 // srcInfo
-// dest
+// destDataset
+// destBase
 // minSrcAge
-// force - if true, will ignore age and test count sanity checks
-func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBase string, minSrcAge time.Duration, force bool) (bool, error) {
+// ignoreDestAge - if true, will ignore destination age sanity check
+func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table, minSrcAge time.Duration, ignoreDestAge bool) (bool, error) {
 	// Check if the last update was at least fDelay in the past.
 	if time.Now().Sub(srcInfo.LastModifiedTime) < minSrcAge {
 		return false, errors.New("Source is too recent")
@@ -163,82 +280,21 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBas
 	t := dsExt.Table(srcInfo.Name)
 	ctx := context.Background()
 
+	// Just check that srcInfo table exists.
 	_, err := t.Metadata(ctx)
 	if err != nil {
 		return false, err
 	}
 
-	// Creation time of new table should be newer than last update
-	// of old table.
-	// TODO replace table name with destination table name.
-	match := srcTemplateRE.FindStringSubmatch(srcInfo.Name)
-	if len(match) != 5 {
-		log.Println(match)
-		return false, errors.New("No matching partition_id: " + srcInfo.Name)
+	if !ignoreDestAge {
+		err = checkDestOlder(dsExt, srcInfo, destTable)
+		if err != nil {
+			return false, err
+		}
 	}
-	suffix := string(match[2] + match[3] + match[4])
-	fullDestTableName := fmt.Sprintf("%s:%s.%s", dsExt.ProjectID, destDataset, destBase)
-	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, destDataset).Table(destBase + "$" + suffix)
-	destPartitionInfo, err := dsExt.GetPartitionInfo(fullDestTableName, suffix)
+	err = checkTasksAndTests(dsExt, srcInfo, destTable)
 	if err != nil {
-		// Fragile?
-		if err.Error() != "no more items in iterator" {
-			log.Println(err)
-			return false, err
-		}
-	}
-
-	if !force {
-		// If the source table is older than the destination table, then
-		// don't overwrite it.
-		if srcInfo.LastModifiedTime.Before(destPartitionInfo.LastModified) {
-			// TODO should perhaps delete the source table?
-			log.Println(srcInfo, "older than", destPartitionInfo)
-			return false, ErrorSrcOlderThanDest
-		}
-
-		// Get info on old table tasks and rows (and age).
-		destInfo, err := GetTableInfo(destTable)
-		if err != nil {
-			log.Println(err)
-			return false, err
-		}
-
-		// Double check against destination table info.
-		// If the source table is older than the destination table, then
-		// don't overwrite it.
-		if srcInfo.LastModifiedTime.Before(destInfo.LastModifiedTime) {
-			// TODO should perhaps delete the source table?
-			log.Println(srcInfo, "older than", destInfo)
-			//return false, ErrorSrcOlderThanDest
-		}
-
-		// Check if all task files in the old table are also present
-		// in the new table.
-		srcDetail, err := GetNDTTableDetail(dsExt, srcInfo.Name, "")
-		if err != nil {
-			log.Println(err)
-			return false, err
-		}
-		destDate := fmt.Sprintf("%s-%s-%s", match[2], match[3], match[4])
-		// TODO - kinda hacky.
-		destDetail, err := GetNDTTableDetail(dsExt, destDataset+"."+destBase, destDate)
-		if err != nil {
-			log.Println(err)
-			return false, err
-		}
-
-		log.Println("Details: src:", srcDetail, " dest:", destDetail)
-		// Check that new table contains at least 99% as many tasks as
-		// old table.
-		if destDetail.TaskFileCount > int(1.01*float32(srcDetail.TaskFileCount)) {
-			return false, ErrorTooFewTasks
-		}
-		// Check that new table contains at least 95% as many tests as
-		// old table.  This may be fewer if the destination table still has dups.
-		if destDetail.TestCount > int(1.05*float32(srcDetail.TestCount)) {
-			return false, ErrorTooFewTests
-		}
+		return false, err
 	}
 
 	dsExt.Dedup_Alpha(srcInfo.Name, "test_id", destTable)
@@ -257,7 +313,7 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 	if err != nil {
 		return err
 	}
-	log.Println("Total:", len(info))
+	log.Println("Examining", len(info), "source tables")
 	for i := range info {
 		log.Println(info[i])
 	}
@@ -267,26 +323,18 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 		if srcInfo.LastModifiedTime.After(time.Now().Add(minAge)) {
 			continue
 		}
-		_, err := GetNDTTableDetail(dsExt, srcInfo.Name, "")
+		_, err := GetTableDetail(dsExt, dsExt.Table(srcInfo.Name))
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		match := srcTemplateRE.FindStringSubmatch(srcInfo.Name)
-		if len(match) != 5 {
-			log.Println("Skipping ", srcInfo.Name)
-			continue
-		}
-		destDate := fmt.Sprintf("%s-%s-%s", match[2], match[3], match[4])
-		destTable := dsExt.Table(destBase + "$" + destDate)
+		destTable, err := getDestTable(dsExt, srcInfo, destDataset, destBase)
 		if err != nil {
-			log.Println("Error: Skipping", destTable.TableID)
-			log.Println(err)
-			continue
+			return err
 		}
 
-		_, err = CheckAndDedup(dsExt, srcInfo, destDataset, destBase, minAge, false)
+		_, err = CheckAndDedup(dsExt, srcInfo, destTable, minAge, false)
 		if err != nil {
 			log.Println(err, "processing", srcInfo.Name)
 		}
