@@ -13,9 +13,15 @@ import (
 	"gopkg.in/m-lab/go.v1/bqext"
 )
 
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 func clientOpts() []option.ClientOption {
 	opts := []option.ClientOption{}
 	if os.Getenv("TRAVIS") != "" {
+		// See m-lab/go#11
 		authOpt := option.WithCredentialsFile("../travis-testing.key")
 		opts = append(opts, authOpt)
 	}
@@ -26,14 +32,14 @@ func newTestingDataset(project, dataset string) (bqext.Dataset, error) {
 	return bqext.NewDataset(project, dataset, clientOpts()...)
 }
 
-func TestGetNDTTableDetail(t *testing.T) {
+func TestGetTableDetail(t *testing.T) {
 	dsExt, err := newTestingDataset("mlab-testing", "etl")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Check that it handles empty partitions
-	detail, err := dedup.GetNDTTableDetail(&dsExt, "TestDedupDest", "2000-12-29")
+	detail, err := dedup.GetTableDetail(&dsExt, dsExt.Table("TestDedupDest$20001229"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +49,7 @@ func TestGetNDTTableDetail(t *testing.T) {
 
 	// Check that it handles single partitions.
 	// TODO - update to create its own test table.
-	detail, err = dedup.GetNDTTableDetail(&dsExt, "TestDedupDest", "1999-01-01")
+	detail, err = dedup.GetTableDetail(&dsExt, dsExt.Table("TestDedupDest$19990101"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +59,7 @@ func TestGetNDTTableDetail(t *testing.T) {
 
 	// Check that it handles full table.
 	// TODO - update to create its own test table.
-	detail, err = dedup.GetNDTTableDetail(&dsExt, "TestDedupSrc_19990101", "")
+	detail, err = dedup.GetTableDetail(&dsExt, dsExt.Table("TestDedupSrc_19990101"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +82,12 @@ func TestCheckAndDedup(t *testing.T) {
 		t.Fatal("No info for pattern.")
 	}
 
-	_, err = dedup.CheckAndDedup(&dsExt, info[0], "etl", "TestDedupDest", time.Hour, false)
+	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, "etl").Table("TestDedupDest$19990101")
+	_, err = dedup.CheckAndDedup(&dsExt, info[0], destTable, time.Hour, false)
 	if err != nil {
 		log.Println(err)
 	}
-	_, err = dedup.CheckAndDedup(&dsExt, info[0], "etl", "TestDedupDest", time.Hour, true)
+	_, err = dedup.CheckAndDedup(&dsExt, info[0], destTable, time.Hour, true)
 	if err != nil {
 		t.Error(err)
 	}
