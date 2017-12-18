@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -21,10 +20,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
 	"gopkg.in/m-lab/go.v1/bqext"
-)
-
-var (
-	denseDateRE = regexp.MustCompile("([0-9]{4})([0-9]{2})([0-9]{2})")
 )
 
 var (
@@ -51,24 +46,17 @@ type Detail struct {
 func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (Detail, error) {
 	// If table is a partition, then we have to separate out the partition part for the query.
 	parts := strings.Split(table.TableID, "$")
-	partition := ""
 	dataset := table.DatasetID
 	tableName := parts[0]
+	where := ""
 	if len(parts) > 1 {
-		match := denseDateRE.FindStringSubmatch(parts[1])
-		if len(match) != 4 {
-			return Detail{}, errors.New("Bad date format: " + parts[1])
+		if len(parts[1]) == 8 {
+			where = "where _PARTITIONTIME = PARSE_TIMESTAMP(\"%Y%m%d\",\"" + parts[1] + "\")"
+		} else {
+			return Detail{}, errors.New("Invalid partition string: " + parts[1])
 		}
-		partition = fmt.Sprintf("%s-%s-%s", match[1], match[2], match[3])
 	}
 	detail := Detail{}
-	where := ""
-	if len(partition) == 10 {
-		where = "where _PARTITIONTIME = timestamp(date(\"" + partition + "\"))"
-	} else if len(partition) != 0 {
-		return detail, errors.New("Invalid partition string: " + partition)
-
-	}
 	queryString := fmt.Sprintf(`
 		#standardSQL
 		SELECT SUM(tests) AS TestCount, COUNT(task)-1 AS TaskFileCount
@@ -86,7 +74,7 @@ func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (Detail, error)
 	return detail, err
 }
 
-// TableInfo contains the critical stats for a specific table
+// TableInfo contains the basic stats for a specific table
 // or partition.
 type TableInfo struct {
 	Name             string
@@ -120,8 +108,6 @@ func GetTableInfo(t *bigquery.Table) (TableInfo, error) {
 
 // GetTableInfoMatching finds all tables matching table filter
 // and collects the basic stats about each of them.
-// If filter includes a $, then this fetches just the individual metadata
-// for a single table partition.
 // Returns slice ordered by decreasing age.
 func GetTableInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
 	result := make([]TableInfo, 0)
@@ -245,11 +231,10 @@ func checkDestOlder(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Tabl
 // dedups the table.  Returns true if criteria pass, false if they fail.
 // Returns nil error on success, or non-nil error if there was an error
 // at any point.
-// dsExt
-// srcInfo
-// destDataset
-// destBase
-// minSrcAge
+// dsExt         - bqext.Dataset for operations.
+// srcInfo       - TableInfo for the source
+// destTable     - destination Table (possibly in another dataset)
+// minSrcAge     - minimum source age
 // ignoreDestAge - if true, will ignore destination age sanity check
 func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table, minSrcAge time.Duration, ignoreDestAge bool) (bool, error) {
 	// Check if the last update was at least minSrcAge in the past.
