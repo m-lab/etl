@@ -15,12 +15,6 @@
 # ndt_uploads (standardSQL)
 
 ###########################################################################
-#                            Bash Options                                 #
-###########################################################################
-# Terminate on error.
-set -e
-
-###########################################################################
 #                            Bash Parameters                              #
 ###########################################################################
 # If this is specified, then we will also redirect this dataset.
@@ -34,9 +28,10 @@ ALIAS=$1
 PUBLIC=measurement-lab:public_v3_1
 INTERNAL=measurement-lab:internal_v3_1
 
-# Uncomment these lines when creating new datasets, e.g. for new versions.
-#bq mk ${PUBLIC}
-#bq mk ${INTERNAL}
+# Create datasets, e.g. for new versions.
+# These lines may fail, so we run them before set -x
+bq mk ${PUBLIC}
+bq mk ${INTERNAL}
 
 # Note: SQL param may use "" and ``, but should NOT use ''
 create_view() {
@@ -54,7 +49,8 @@ create_view() {
   bq mk \
     --description="${DESCRIPTION}" --view="$SQL" $DATASET.$VIEW
 
-  bq show --format=prettyjson $DATASET.$VIEW > $VIEW.new.json
+  # This fetches the new table description as json.
+  bq show --format=prettyjson $DATASET.$VIEW > $VIEW.json
 }
 
 # Note: SQL param may use "" and ``, but should NOT use ''
@@ -70,12 +66,16 @@ create_public_view() {
   bq mk \
     --description="${DESCRIPTION}" --view="$SQL" $DATASET.$VIEW
 
-  bq show --format=prettyjson $DATASET.$VIEW > $VIEW.public.json
+  # This fetches the new table description as json.
+  bq show --format=prettyjson $DATASET.$VIEW > $DATASET.$VIEW.json
 }
 
 ###########################################################################
 #                        The standardSQL views                            #
 ###########################################################################
+
+# Terminate on error.
+set -e
 
 create_view ${INTERNAL} common_etl \
 'ETL table projected into common schema, for union with PLX legacy data.
