@@ -9,10 +9,10 @@
 # This means that each view must be created before being used in other
 # view definitions.
 #
-# ndt_all_v3_1​ (standardSQL)
+# ndt_all​ (standardSQL)
 # Separate views for download and upload NDT tests (data ~ XX.XX.XXXX [date]):
-# ​​​ndt_downloads_v3_1 (standardSQL)
-# ndt_uploads_v3_1 (standardSQL)
+# ​​​ndt_downloads (standardSQL)
+# ndt_uploads (standardSQL)
 
 ###########################################################################
 #                            Bash Options                                 #
@@ -21,10 +21,21 @@
 set -e
 
 ###########################################################################
+#                            Bash Parameters                              #
+###########################################################################
+# If this is specified, then we will also redirect this dataset.
+ALIAS=$1
+
+###########################################################################
 #                        The standardSQL views                            #
 ###########################################################################
+PUBLIC=measurement-lab:public_v3_1
+INTERNAL=measurement-lab:internal_v3_1
 
-VIEW=measurement-lab:internal.common_etl_v3_1
+#bq mk ${PUBLIC}
+#bq mk ${INTERNAL}
+
+VIEW=${INTERNAL}.common_etl
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
@@ -109,7 +120,7 @@ as web100_log_entry
 from `measurement-lab.public.ndt`' \
 $VIEW
 
-VIEW=measurement-lab:internal.ndt_exhaustive_v3_1
+VIEW=${INTERNAL}.ndt_exhaustive
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
@@ -122,13 +133,13 @@ Note that at present, data from May 10 to mid September does NOT have geo annota
 #  new ETL table, from May 10, 2017 onward.
 # Includes blacklisted and EB tests, which should be removed before analysis.
 # Note that at present, data from May 10 to mid September does NOT have geo annotations.
-SELECT * FROM `measurement-lab.internal.common_etl_v3_1`
+SELECT * FROM `'${INTERNAL/:/.}'.common_etl`
 where partition_date > date("2017-05-10")
 union all
 select * from `measurement-lab.legacy.ndt_plx`' \
 $VIEW
 
-VIEW=measurement-lab:internal.ndt_all_v3_1
+VIEW=${INTERNAL}.ndt_all
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
@@ -137,7 +148,7 @@ bq mk \
 -- All rows from plx and etl tables, except:
 --   internal test from EB.
 --   blacklisted tests
-select * from `measurement-lab.internal.ndt_exhaustive_v3_1`
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_exhaustive`
 where 
 -- not blacklisted
 (blacklist_flags = 0 or
@@ -149,7 +160,7 @@ and web100_log_entry.connection_spec.remote_ip != "45.56.98.222"
 and web100_log_entry.connection_spec.remote_ip != "2600:3c03::f03c:91ff:fe33:819"' \
 $VIEW
 
-VIEW=measurement-lab:internal.ndt_sensible_v3_1
+VIEW=${INTERNAL}.ndt_sensible
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
@@ -158,7 +169,7 @@ bq mk \
 --view='#standardSQL
 -- All sensible rows from plx and etl tables.
 -- Excludes very short and very long tests, and tests with bad end state.
-select * from `measurement-lab.internal.ndt_all_v3_1`
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`
 where 
 -- sensible TCP end state
 web100_log_entry.snap.State is not null
@@ -168,13 +179,13 @@ and web100_log_entry.snap.Duration is not null
 AND web100_log_entry.snap.Duration >= 9000000 AND web100_log_entry.snap.Duration < 60000000  -- between 9 seconds and 1 minute' \
 $VIEW
 
-VIEW=measurement-lab:internal.ndt_downloads_v3_1
+VIEW=${INTERNAL}.ndt_downloads
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
 --description='All good quality download tests' \
 --view='#standardSQL
-select * from `measurement-lab.internal.ndt_sensible_v3_1`
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_sensible`
 where
 connection_spec.data_direction is not null
 AND connection_spec.data_direction = 1
@@ -191,14 +202,14 @@ AND (web100_log_entry.snap.SndLimTimeRwin + web100_log_entry.snap.SndLimTimeCwnd
 and web100_log_entry.snap.CongSignals is not null and web100_log_entry.snap.CongSignals > 0' \
 $VIEW
 
-VIEW=measurement-lab:internal.ndt_uploads_v3_1
+VIEW=${INTERNAL}.ndt_uploads
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
 --description='All good quality upload tests' \
 --view='#standardSQL
 #standardSQL
-select * from `measurement-lab.internal.ndt_sensible_v3_1`
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_sensible`
 where
 connection_spec.data_direction is not null
 -- is upload
@@ -211,30 +222,65 @@ $VIEW
 # These are the simple public views linking into the corresponding internal views.
 ##################################################################################
 
-VIEW=measurement-lab:public.ndt_all_v3_1
+VIEW=${PUBLIC}.ndt_all
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
 --description='View across the all NDT data except EB and blacklisted' \
 --view='#standardSQL
-select * from `measurement-lab.internal.ndt_all_v3_1`' \
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`' \
 $VIEW
 
-VIEW=measurement-lab:public.ndt_downloads_v3_1
+VIEW=${PUBLIC}.ndt_downloads
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
 --description='All good quality download tests' \
 --view='#standardSQL
-select * from `measurement-lab.internal.ndt_downloads_v3_1`' \
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`' \
 $VIEW
 
-VIEW=measurement-lab:public.ndt_uploads_v3_1
+VIEW=${PUBLIC}.ndt_uploads
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
 --description='All good quality upload tests' \
 --view='#standardSQL
 #standardSQL
-select * from `measurement-lab.internal.ndt_uploads_v3_1`' \
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`' \
+$VIEW
+
+##################################################################################
+# Redirect stable or alpha?
+##################################################################################
+
+if [[ -z "$ALIAS" ]] exit 0
+echo "Setting $ALIAS alias"
+
+VIEW=${ALIAS}.ndt_all
+echo $VIEW
+bq rm -f $VIEW
+bq mk \
+--description='View across the all NDT data except EB and blacklisted' \
+--view='#standardSQL
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_all' \
+$VIEW
+
+VIEW=${ALIAS}.ndt_downloads
+echo $VIEW
+bq rm -f $VIEW
+bq mk \
+--description='All good quality download tests' \
+--view='#standardSQL
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`' \
+$VIEW
+
+VIEW=${ALIAS}.ndt_uploads
+echo $VIEW
+bq rm -f $VIEW
+bq mk \
+--description='All good quality upload tests' \
+--view='#standardSQL
+#standardSQL
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`' \
 $VIEW
