@@ -13,6 +13,39 @@
 # Separate views for download and upload NDT tests (data ~ XX.XX.XXXX [date]):
 # ​​​ndt_downloads (standardSQL)
 # ndt_uploads (standardSQL)
+#
+# TODO - add --help ?
+#
+
+###########################################################################
+#                        Expected evolution:                              #
+###########################################################################
+#
+# The create_view function creates views in arbitrary datasets, but the
+# intended use is to create views in datasets that use semantic versioning,
+# and that are not intended for general public use.
+#
+# The create_public_view function also creates views in arbitrary datasets,
+# but is intended for creating views in datasets that are intended for
+# direct public use.  These may or may not be versioned, but should
+# generally be simple SELECT * views on "internal" views.
+#
+# We expect this file to evolve over time, reflecting occasional changes in
+# the source table schemas, more frequent changes in semantics and query
+# details, and corresponding updates to version numbers.
+#
+# A Pull Request changing this file might thus:
+#  update one or more of the .sql files
+#  update the PUBLIC and INTERNAL tags, e.g. from v3_1 to v3_2
+#
+# Currently, the usage allows specifying as script param $1 an alias,
+# which would cause, e.g., the alpha or stable dataset to be updated to
+# point to the current version.  It isn't clear yet whether this is the
+# best approach.  Perhaps instead, the stable/alpha distinction should be
+# hardcoded into this file?  Or perhaps there should be a explicit
+# variables defined here that indicates which dataset version stable and
+# alpha aliases should point to for the current configuration.
+
 
 ###########################################################################
 #                            Bash Parameters                              #
@@ -35,6 +68,7 @@ bq mk ${INTERNAL}
 
 # Note: SQL param may use "" and ``, but should NOT use ''
 # This function expects the sql filename in parameter 4
+# TODO - should this be create_view_from_file ?
 create_view() {
   DATASET=$1
   VIEW=$2
@@ -42,7 +76,7 @@ create_view() {
   SQL="$(cat $4)"
 
   # All table FROM refs are to INTERNAL (or legacy) tables.
-  export STANDARD_SUB=${INTERNAL/:/.}
+  export STANDARD_SUB=${DATASET/:/.}
   SQL=`echo "$SQL" | envsubst '$STANDARD_SUB'`
 
   echo $DATASET.$VIEW
