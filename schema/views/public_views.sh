@@ -57,7 +57,7 @@ and web100_log_entry.snap.Duration is not null
 AND web100_log_entry.snap.Duration >= 9000000 AND web100_log_entry.snap.Duration < 60000000  -- between 9 seconds and 1 minute' \
 $VIEW
 
-VIEW=measurement-lab:public.​​​ndt_downloads_v3_1
+VIEW=measurement-lab:public.ndt_downloads_v3_1
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
@@ -80,7 +80,7 @@ AND (web100_log_entry.snap.SndLimTimeRwin + web100_log_entry.snap.SndLimTimeCwnd
 and web100_log_entry.snap.CongSignals is not null and web100_log_entry.snap.CongSignals > 0' \
 $VIEW
 
-VIEW=measurement-lab:public.​​​ndt_uploads_v3_1
+VIEW=measurement-lab:public.ndt_uploads_v3_1
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
