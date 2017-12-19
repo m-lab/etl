@@ -254,19 +254,19 @@ $VIEW
 # Redirect stable or alpha?
 ##################################################################################
 
-if [[ -z "$ALIAS" ]] exit 0
+[[ -z "$ALIAS" ]] && exit 0
 echo "Setting $ALIAS alias"
 
-VIEW=${ALIAS}.ndt_all
+VIEW=measurement-lab:${ALIAS}.ndt_all
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
 --description='View across the all NDT data except EB and blacklisted' \
 --view='#standardSQL
-SELECT * FROM `'${INTERNAL/:/.}'.ndt_all' \
+SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`' \
 $VIEW
 
-VIEW=${ALIAS}.ndt_downloads
+VIEW=measurement-lab:${ALIAS}.ndt_downloads
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
@@ -275,7 +275,7 @@ bq mk \
 SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`' \
 $VIEW
 
-VIEW=${ALIAS}.ndt_uploads
+VIEW=measurement-lab:${ALIAS}.ndt_uploads
 echo $VIEW
 bq rm -f $VIEW
 bq mk \
