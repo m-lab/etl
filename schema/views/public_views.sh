@@ -34,6 +34,7 @@ bq mk ${PUBLIC}
 bq mk ${INTERNAL}
 
 # Note: SQL param may use "" and ``, but should NOT use ''
+# This function expects the sql filename in parameter 4
 create_view() {
   DATASET=$1
   VIEW=$2
@@ -54,7 +55,7 @@ create_view() {
 }
 
 # Note: SQL param may use "" and ``, but should NOT use ''
-# This function expects the actual query string in SQL
+# This function expects the actual query string in parameter 4
 create_public_view() {
   DATASET=$1
   VIEW=$2
@@ -78,32 +79,32 @@ create_public_view() {
 set -e
 
 create_view ${INTERNAL} common_etl \
-'ETL table projected into common schema, for union with PLX legacy data.
-This also adds "ndt.iupui." prefix to the connection_spec.hostname field.' \
-common_etl.sql
+  'ETL table projected into common schema, for union with PLX legacy data.
+  This also adds "ndt.iupui." prefix to the connection_spec.hostname field.' \
+  common_etl.sql
 
 create_view ${INTERNAL} ndt_exhaustive \
-'Combined view of plx legacy fast table, up to May 10, and new ETL table, from May 11, 2017 onward.
-Includes blacklisted and EB tests, which should be removed before analysis.
-Note that at present, data from May 10 to mid September does NOT have geo annotations.' \
-ndt_exhaustive.sql
+  'Combined view of plx legacy fast table, up to May 10, and new ETL table, from May 11, 2017 onward.
+  Includes blacklisted and EB tests, which should be removed before analysis.
+  Note that at present, data from May 10 to mid September does NOT have geo annotations.' \
+  ndt_exhaustive.sql
 
 create_view ${INTERNAL} ndt_all \
-'View across the all NDT data except EB and blacklisted' \
-ndt_all.sql
+  'View across the all NDT data except EB and blacklisted' \
+  ndt_all.sql
 
 create_view ${INTERNAL} ndt_sensible \
-'View across the all NDT data excluding EB, blacklisted,
- bad end state, short or very long duration' \
-ndt_sensible.sql
+  'View across the all NDT data excluding EB, blacklisted,
+  bad end state, short or very long duration' \
+  ndt_sensible.sql
 
 create_view ${INTERNAL} ndt_downloads \
-'All good quality download tests' \
-ndt_downloads.sql
+  'All good quality download tests' \
+  ndt_downloads.sql
 
 create_view ${INTERNAL} ndt_uploads \
-'All good quality upload tests' \
-ndt_uploads.sql
+  'All good quality upload tests' \
+  ndt_uploads.sql
 
 
 ##################################################################################
@@ -111,19 +112,19 @@ ndt_uploads.sql
 ##################################################################################
 
 create_public_view ${PUBLIC} ndt_all \
-'View across the all NDT data except EB and blacklisted' \
-'#standardSQL
-SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`'
+  'View across the all NDT data except EB and blacklisted' \
+  '#standardSQL
+  SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`'
 
 create_public_view ${PUBLIC} ndt_downloads \
-'All good quality download tests' \
-'#standardSQL
-SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`'
+  'All good quality download tests' \
+  '#standardSQL
+  SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`'
 
 create_public_view ${PUBLIC} ndt_uploads \
-'All good quality upload tests' \
-'#standardSQL
-SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
+  'All good quality upload tests' \
+  '#standardSQL
+  SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
 
 ##################################################################################
 # Redirect stable or alpha?
@@ -133,17 +134,16 @@ SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
 echo "Setting $ALIAS alias"
 
 create_public_view measurement-lab:${ALIAS} ndt_all \
-'View across the all NDT data except EB and blacklisted' \
-'#standardSQL
-SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`'
+  'View across the all NDT data except EB and blacklisted' \
+  '#standardSQL
+  SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`'
 
 create_public_view measurement-lab:${ALIAS} ndt_downloads \
-'All good quality download tests' \
-'#standardSQL
-SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`'
+  'All good quality download tests' \
+  '#standardSQL
+  SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`'
 
 create_public_view measurement-lab:${ALIAS} ndt_uploads \
-'All good quality upload tests' \
-'#standardSQL
-SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
-
+  'All good quality upload tests' \
+  '#standardSQL
+  SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
