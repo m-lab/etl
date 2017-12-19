@@ -227,6 +227,13 @@ func checkDestOlder(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Tabl
 	return nil
 }
 
+// Options provides processing options for Dedup_Alpha
+type Options struct {
+	MinSrcAge     time.Duration
+	IgnoreDestAge bool
+	DryRun        bool
+}
+
 // CheckAndDedup checks various criteria, and if they all pass,
 // dedups the table.  Returns true if criteria pass, false if they fail.
 // Returns nil error on success, or non-nil error if there was an error
@@ -236,9 +243,9 @@ func checkDestOlder(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Tabl
 // destTable     - destination Table (possibly in another dataset)
 // minSrcAge     - minimum source age
 // ignoreDestAge - if true, will ignore destination age sanity check
-func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table, minSrcAge time.Duration, ignoreDestAge bool) (bool, error) {
+func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table, options Options) (bool, error) {
 	// Check if the last update was at least minSrcAge in the past.
-	if time.Now().Sub(srcInfo.LastModifiedTime) < minSrcAge {
+	if time.Now().Sub(srcInfo.LastModifiedTime) < options.MinSrcAge {
 		return false, errors.New("Source is too recent")
 	}
 
@@ -251,7 +258,7 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.
 		return false, err
 	}
 
-	if !ignoreDestAge {
+	if !options.IgnoreDestAge {
 		err = checkDestOlder(dsExt, srcInfo, destTable)
 		if err != nil {
 			return false, err
@@ -262,7 +269,11 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.
 		return false, err
 	}
 
-	dsExt.Dedup_Alpha(srcInfo.Name, "test_id", destTable)
+	if options.DryRun {
+		log.Println("Dedup dry run:", srcInfo.Name, "test_id", destTable)
+	} else {
+		dsExt.Dedup_Alpha(srcInfo.Name, "test_id", destTable)
+	}
 
 	// If DeleteAfterDedup, then delete the source table.
 
@@ -272,7 +283,7 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.
 // ProcessTablesMatching lists all tables matching a template pattern, and for
 // any that are at least two days old, attempts to dedup and copy them to
 // partitions in the destination table.
-func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset, destBase string, minAge time.Duration) error {
+func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset, destBase string, options Options) error {
 	// These are sorted by LastModification, oldest first.
 	info, err := GetTableInfoMatching(dsExt, srcPattern)
 	if err != nil {
@@ -285,7 +296,7 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 	for i := range info {
 		srcInfo := info[i]
 		// Skip any partition that has been updated in the past minAge.
-		if time.Now().Before(srcInfo.LastModifiedTime.Add(minAge)) {
+		if time.Since(srcInfo.LastModifiedTime) < options.MinSrcAge {
 			continue
 		}
 
@@ -294,7 +305,7 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 			return err
 		}
 
-		_, err = CheckAndDedup(dsExt, srcInfo, destTable, minAge, false)
+		_, err = CheckAndDedup(dsExt, srcInfo, destTable, options)
 		if err != nil {
 			log.Println(err, "processing", srcInfo.Name)
 		}
