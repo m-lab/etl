@@ -1,4 +1,15 @@
 #!/bin/bash
+# Creates the complete set of public views for a given version.
+# Also creates internal views that the public views are built on.
+# This should generally be run from a travis deployment, and the
+# arguments should be derived from the deployment tag.
+# The following standardSQL views are created in the public dataset:
+#    ndt_all​ - all (lightly filtered) tests, excluding EB,
+#              blacklisted, short and very long tests.
+#    Separate views for download and upload NDT tests:
+# ​​​     ndt_downloads
+#      ndt_uploads
+#
 # Notes:
 # 1. These are the public facing standard views.
 # 2. All views filter out EB test results and all views filter out tests where the blacklist_flags field is NULL.
@@ -9,13 +20,20 @@
 # This means that each view must be created before being used in other
 # view definitions.
 #
-# ndt_all​ (standardSQL)
-# Separate views for download and upload NDT tests (data ~ XX.XX.XXXX [date]):
-# ​​​ndt_downloads (standardSQL)
-# ndt_uploads (standardSQL)
-#
-# TODO - add --help ?
-#
+
+set -u
+###########################################################################
+#                            Bash Parameters                              #
+###########################################################################
+
+USAGE="$0 <project> <public-dataset> <internal-dataset> <alias>"
+PROJECT=${1:?Please provide the google cloud project: $USAGE}
+PUBLIC=${PROJECT}:${2:?Please specify the public dataset: $USAGE}
+INTERNAL=${PROJECT}:${3:?Please specify the internal dataset: $USAGE}
+ALIAS=${PROJECT}:${4:?Please specify the alias dataset \{alpha|stable|none\}: $USAGE}
+
+# TODO - check that public and internal aren't swapped?
+# TODO - check that project is valid?
 
 ###########################################################################
 #                        Expected evolution:                              #
@@ -25,7 +43,7 @@
 # intended use is to create views in datasets that use semantic versioning,
 # and that are not intended for general public use.
 #
-# The create_public_view function also creates views in arbitrary datasets,
+# The create_view function also creates views in arbitrary datasets,
 # but is intended for creating views in datasets that are intended for
 # direct public use.  These may or may not be versioned, but should
 # generally be simple SELECT * views on "internal" views.
@@ -38,146 +56,150 @@
 #  update one or more of the .sql files
 #  update the PUBLIC and INTERNAL tags, e.g. from v3_1 to v3_2
 #
-# Currently, the usage allows specifying as script param $1 an alias,
+# Currently, the usage allows specifying as script param $4 an alias,
 # which would cause, e.g., the alpha or stable dataset to be updated to
 # point to the current version.  It isn't clear yet whether this is the
 # best approach.  Perhaps instead, the stable/alpha distinction should be
 # hardcoded into this file?  Or perhaps there should be a explicit
 # variables defined here that indicates which dataset version stable and
 # alpha aliases should point to for the current configuration.
-
+#
+# Alternatively:
+# * Tags like X.Y.Z should trigger adding or overwriting the minor version
+#   dataset, e.g. internal_3_2.  For a new minor version, alpha is redirected.
+# * Tags like X.Y should link the major version, e.g. public_3, to the existing
+#   minor version, e.g. internal_3_2, and also update stable.
 
 ###########################################################################
-#                            Bash Parameters                              #
+#                              Scenarios                                  #
 ###########################################################################
-# If this is specified, then we will also redirect this dataset.
-ALIAS=$1
+#
+# Adding fields to the underlying table schema:
+#   Update the schema
+#   Update the SQL for views that should incorporate the new fields.
+#      (once we have all data in a single table this may not be needed)
+#   Update documentation
+#   Test the script in sandbox
+#   Tag the script with new minor version number, triggering deployment.
+#      * The new deployment should deploy to the same major version number!
+
 
 ###########################################################################
 #                       Functions and Variables                           # 
 ###########################################################################
 
-# These parameters determine the destination datasets, with semantic versioning.
-PUBLIC=measurement-lab:public_v3_1
-INTERNAL=measurement-lab:internal_v3_1
-
-# Create datasets, e.g. for new versions.
-# These lines may fail, so we run them before set -x
-bq mk ${PUBLIC}
-bq mk ${INTERNAL}
-
-# Note: SQL param may use "" and ``, but should NOT use ''
-# This function expects the sql filename in parameter 4
-# TODO - should this be create_view_from_file ?
-create_view() {
-  DATASET=$1
-  VIEW=$2
-  DESCRIPTION=$3
-  SQL="$(cat $4)"
-
-  # All table FROM refs are to INTERNAL (or legacy) tables.
-  export STANDARD_SUB=${DATASET/:/.}
-  SQL=`echo "$SQL" | envsubst '$STANDARD_SUB'`
-
-  echo $DATASET.$VIEW
-  bq rm -f $DATASET.$VIEW
-  bq mk \
-    --description="${DESCRIPTION}" --view="$SQL" $DATASET.$VIEW
-
-  # This fetches the new table description as json.
-  bq show --format=prettyjson $DATASET.$VIEW > $VIEW.json
-}
-
 # Note: SQL param may use "" and ``, but should NOT use ''
 # This function expects the actual query string in parameter 4
-create_public_view() {
-  DATASET=$1
-  VIEW=$2
-  DESCRIPTION=$3
-  SQL="$4"
+# The SQL string will have any occurance of $STANDARD_SUB replaced
+# with the dataset parameter.
+# Parameters
+#  dataset - project:dataset for the view, and for any $DATASET substitutions
+#  view - name of view, e.g. ndt_all
+#  description - description string for the view
+#  sql - optional sql string.  If not provided, it is loaded from $view.sql
+create_view() {
+  local dataset=$1
+  local view=$2
+  local description=$3
+  local sql=${4:-`cat $view.sql`}
 
-  echo $DATASET.$VIEW
-  bq rm -f $DATASET.$VIEW
+  # Some FROM targets must link to specified dataset.
+  # Substitute dataset name for STANDARD_SUB sql vars.
+  sql=`echo "$sql" | DATASET=${dataset/:/.} envsubst '$DATASET'`
+
+  echo $dataset.$view
+  bq rm --force $dataset.$view
   bq mk \
-    --description="${DESCRIPTION}" --view="$SQL" $DATASET.$VIEW
+    --description="${description}" --view="$sql" $dataset.$view
+
+  # TODO - Travis should cat the bigquery.log on non-zero exit status.
 
   # This fetches the new table description as json.
-  bq show --format=prettyjson $DATASET.$VIEW > $DATASET.$VIEW.json
+  bq show --format=prettyjson $dataset.$view > $dataset.$view.json
 }
 
 ###########################################################################
 #                        The standardSQL views                            #
 ###########################################################################
 
+# TODO - if running in travis, set -x
+
+# Create datasets, e.g. for new versions.
+# These lines may fail, so we run them before set -e
+bq mk ${PUBLIC}
+bq mk ${INTERNAL}
+
 # Terminate on error.
 set -e
-
 create_view ${INTERNAL} common_etl \
   'ETL table projected into common schema, for union with PLX legacy data.
   This also adds "ndt.iupui." prefix to the connection_spec.hostname field.' \
-  common_etl.sql
 
 create_view ${INTERNAL} ndt_exhaustive \
   'Combined view of plx legacy fast table, up to May 10, and new ETL table, from May 11, 2017 onward.
   Includes blacklisted and EB tests, which should be removed before analysis.
   Note that at present, data from May 10 to mid September does NOT have geo annotations.' \
-  ndt_exhaustive.sql
 
 create_view ${INTERNAL} ndt_all \
   'View across the all NDT data except EB and blacklisted' \
-  ndt_all.sql
 
 create_view ${INTERNAL} ndt_sensible \
   'View across the all NDT data excluding EB, blacklisted,
   bad end state, short or very long duration' \
-  ndt_sensible.sql
 
 create_view ${INTERNAL} ndt_downloads \
   'All good quality download tests' \
-  ndt_downloads.sql
 
 create_view ${INTERNAL} ndt_uploads \
   'All good quality upload tests' \
-  ndt_uploads.sql
 
 
 ##################################################################################
 # These are the simple public views linking into the corresponding internal views.
 ##################################################################################
 
-create_public_view ${PUBLIC} ndt_all \
+create_view ${PUBLIC} ndt_all \
   'View across the all NDT data except EB and blacklisted' \
   '#standardSQL
   SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`'
 
-create_public_view ${PUBLIC} ndt_downloads \
+create_view ${PUBLIC} ndt_downloads \
   'All good quality download tests' \
   '#standardSQL
   SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`'
 
-create_public_view ${PUBLIC} ndt_uploads \
+create_view ${PUBLIC} ndt_uploads \
   'All good quality upload tests' \
   '#standardSQL
   SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
+}
 
-##################################################################################
-# Redirect stable or alpha?
-##################################################################################
+#############################################################################
+# Redirect stable, alpha, beta
+#############################################################################
 
-[[ -z "$ALIAS" ]] && exit 0
-echo "Setting $ALIAS alias"
+# If alias parameter is alpha, beta, or stable, this will create the
+# corresponding alias. These datasets are assumed to already exist, so script
+# does not try to create them.
+# If last parameter is "none" then we skip this section and terminate.
+# TODO - should link alpha and beta when stable is linked?
 
-create_public_view measurement-lab:${ALIAS} ndt_all \
-  'View across the all NDT data except EB and blacklisted' \
-  '#standardSQL
-  SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`'
+if [ "${ALIAS}" != "${PROJECT}:none" ];
+then 
+  echo "Linking $ALIAS alias"
 
-create_public_view measurement-lab:${ALIAS} ndt_downloads \
-  'All good quality download tests' \
-  '#standardSQL
-  SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`'
+  create_view ${ALIAS} ndt_all \
+    'View across the all NDT data except EB and blacklisted' \
+    '#standardSQL
+    SELECT * FROM `'${INTERNAL/:/.}'.ndt_all`'
 
-create_public_view measurement-lab:${ALIAS} ndt_uploads \
-  'All good quality upload tests' \
-  '#standardSQL
-  SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
+  create_view ${ALIAS} ndt_downloads \
+    'All good quality download tests' \
+    '#standardSQL
+    SELECT * FROM `'${INTERNAL/:/.}'.ndt_downloads`'
+
+  create_view ${ALIAS} ndt_uploads \
+    'All good quality upload tests' \
+    '#standardSQL
+    SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
+fi
