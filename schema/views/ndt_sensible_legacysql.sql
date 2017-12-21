@@ -1,8 +1,8 @@
-#standardSQL
+#legacySQL
 -- All sensible rows from plx and etl tables.
 -- Excludes very short and very long tests, and tests with bad end state.
 SELECT *
-FROM `${DATASET}.ndt_all`
+FROM [${DATASET}.ndt_all_legacysql]
 WHERE
   -- sensible TCP end state
   web100_log_entry.snap.State IS NOT NULL

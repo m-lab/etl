@@ -20,7 +20,7 @@ SELECT
   connection_spec.data_direction,
   connection_spec.server_af,
   -- ETL pipeline currently drops the prefix, so we add it back here.
-  concat("ndt.iupui.", connection_spec.server_hostname) as connection_spec.server_hostname,
+  CONCAT("ndt.iupui.", connection_spec.server_hostname) as connection_spec.server_hostname,
   connection_spec.server_ip,
   connection_spec.server_kernel_version,
   connection_spec.tls,
@@ -70,5 +70,5 @@ SELECT
   web100_log_entry.snap.X_Rcvbuf, web100_log_entry.snap.X_Sndbuf, web100_log_entry.snap.X_dbg1,
   web100_log_entry.snap.X_dbg2, web100_log_entry.snap.X_dbg3, web100_log_entry.snap.X_dbg4,
   web100_log_entry.snap.X_rcv_ssthresh, web100_log_entry.snap.X_wnd_clamp
-from [measurement-lab:public.ndt]
-where _partitiontime >= timestamp("2017-05-11 00:00:00")
+FROM [measurement-lab:public.ndt]
+WHERE _PARTITIONTIME >= TIMESTAMP("2017-05-11 00:00:00")
