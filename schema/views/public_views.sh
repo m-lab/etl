@@ -36,7 +36,7 @@ ALIAS=${PROJECT}:${4:?Please specify the alias dataset \{alpha|stable|none\}: $U
 
 
 ###########################################################################
-#                       Functions and Variables                           # 
+#                       Functions and Variables                           #
 ###########################################################################
 
 # Note: SQL param may use "" and ``, but should NOT use ''
@@ -135,8 +135,7 @@ create_view ${PUBLIC} ndt_uploads \
 # If last parameter is "none" then we skip this section and terminate.
 # TODO - should link alpha and beta when stable is linked?
 
-if [ "${ALIAS}" != "${PROJECT}:none" ];
-then 
+if [ "${ALIAS}" != "${PROJECT}:none" ]; then
   echo "Linking $ALIAS alias"
 
   create_view ${ALIAS} ndt_all \

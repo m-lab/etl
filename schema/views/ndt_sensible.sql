@@ -3,7 +3,7 @@
 -- Excludes very short and very long tests, and tests with bad end state.
 SELECT *
 FROM `${DATASET}.ndt_all`
-WHERE 
+WHERE
   -- sensible TCP end state
   web100_log_entry.snap.State IS NOT NULL
   AND (web100_log_entry.snap.State = 1 OR (web100_log_entry.snap.State >= 5 AND web100_log_entry.snap.State <= 11)) -- sensible final state

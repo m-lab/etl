@@ -19,7 +19,7 @@ SELECT
     connection_spec.client_version,
     connection_spec.data_direction,
     connection_spec.server_af,
-    concat("ndt.iupui.", connection_spec.server_hostname) AS server_hostname,
+    CONCAT("ndt.iupui.", connection_spec.server_hostname) AS server_hostname,
     connection_spec.server_ip,
     connection_spec.server_kernel_version,
     connection_spec.tls,
@@ -75,5 +75,3 @@ SELECT
     AS snap)
   AS web100_log_entry
 FROM `measurement-lab.public.ndt`
-   
-   

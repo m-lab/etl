@@ -4,9 +4,9 @@
 --   blacklisted tests
 SELECT *
 FROM `${DATASET}.ndt_exhaustive`
-WHERE 
+WHERE
   -- not blacklisted
-  (blacklist_flags = 0 or
+  (blacklist_flags = 0 OR
     (blacklist_flags IS NULL AND anomalies.blacklist_flags IS NULL))
   -- not from EB monitoring client
   AND web100_log_entry.connection_spec.local_ip IS NOT NULL
