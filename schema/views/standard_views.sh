@@ -124,6 +124,7 @@ create_view ${PUBLIC} ndt_uploads \
   '#standardSQL
   SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
 
+
 #############################################################################
 # Redirect stable, alpha, beta
 #############################################################################
