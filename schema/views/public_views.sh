@@ -123,7 +123,6 @@ create_view ${PUBLIC} ndt_uploads \
   'All good quality upload tests' \
   '#standardSQL
   SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
-}
 
 #############################################################################
 # Redirect stable, alpha, beta
