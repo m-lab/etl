@@ -31,6 +31,12 @@ PUBLIC=${PROJECT}:${2:?Please specify the public dataset: $USAGE}
 INTERNAL=${PROJECT}:${3:?Please specify the internal dataset: $USAGE}
 ALIAS=${PROJECT}:${4:?Please specify the alias dataset \{alpha|stable|none\}: $USAGE}
 
+# Example:
+# ./standard_views.sh measurement-lab rc_v3_1 internal_v3_1_1 rc
+#    rc_v3_1 provides access to the minor version.
+#    internal_v3_1_1 contains the actual minor/patch version.
+#    rc creates alias for anyone querying against the latest release candidate
+#
 # TODO - check that public and internal aren't swapped?
 # TODO - check that project is valid?
 
@@ -51,7 +57,7 @@ ALIAS=${PROJECT}:${4:?Please specify the alias dataset \{alpha|stable|none\}: $U
 create_view() {
   local dataset=$1
   local view=$2
-  local description=$3
+  local description="$3 \n $TRAVIS_TAG : $TRAVIS_COMMIT"
   local sql=${4:-`cat $view.sql`}
 
   # Some FROM targets must link to specified dataset.
@@ -106,7 +112,8 @@ create_view ${INTERNAL} ndt_uploads \
 
 
 ##################################################################################
-# These are the simple public views linking into the corresponding internal views.
+# These are the minor version public views linking into the corresponding internal
+# views.
 ##################################################################################
 
 create_view ${PUBLIC} ndt_all \
@@ -126,14 +133,14 @@ create_view ${PUBLIC} ndt_uploads \
 
 
 #############################################################################
-# Redirect stable, alpha, beta
+# Redirect release, rc, alpha
 #############################################################################
 
-# If alias parameter is alpha, beta, or stable, this will create the
-# corresponding alias. These datasets are assumed to already exist, so script
-# does not try to create them.
-# If last parameter is "none" then we skip this section and terminate.
-# TODO - should link alpha and beta when stable is linked?
+# If alias parameter is not "none", this will create the corresponding aliases.
+# These datasets are assumed to already exist, so script does not try to
+# create them.
+# If last parameter is "none" then we skip this section.
+# TODO - should link alpha and rc when release is linked?
 
 if [ "${ALIAS}" != "${PROJECT}:none" ]; then
   echo "Linking $ALIAS alias"
