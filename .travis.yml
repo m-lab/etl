@@ -28,6 +28,16 @@ before_install:
   keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
+# Install gcloud, for integration tests.
+- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
+- source "${HOME}/google-cloud-sdk/path.bash.inc"
+
+# Install test credentials.
+# Note that anyone with github ACLs to push to a branch can hack .travis.yml
+# and discover these credentials in the travis logs.
+- echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key
+- gcloud auth activate-service-account --key-file=travis-testing.key
+
 # These directories will be cached on successful "script" builds, and restored,
 # if available, to save time on future builds.
 cache:
@@ -37,17 +47,20 @@ cache:
 script:
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
-- go test -covermode=count -coverprofile=bq.cov -v github.com/m-lab/etl/bq
-- go test -covermode=count -coverprofile=parser.cov -v github.com/m-lab/etl/parser
-- go test -covermode=count -coverprofile=task.cov -v github.com/m-lab/etl/task
-- go test -covermode=count -coverprofile=web100.cov -v github.com/m-lab/etl/web100
-- go test -covermode=count -coverprofile=qp.cov -v github.com/m-lab/etl/appengine/queue_pusher
+# TODO - add integration test tag.
+- COVER_PKGS=./annotation/...,./appengine/...,./bq/...,./etl/...,./metrics/...,./parser/...,./schema/...,./storage/...,./task/...,./web100/...
+- go test -coverpkg=$COVER_PKGS -coverprofile=annotation.cov -v github.com/m-lab/etl/annotation
+- go test -coverpkg=$COVER_PKGS -coverprofile=bq.cov -v github.com/m-lab/etl/bq
+- go test -coverpkg=$COVER_PKGS -coverprofile=parser.cov -v github.com/m-lab/etl/parser
+- go test -coverpkg=$COVER_PKGS -coverprofile=qp.cov -v github.com/m-lab/etl/appengine/queue_pusher
+- go test -coverpkg=$COVER_PKGS -coverprofile=task.cov -v github.com/m-lab/etl/task
+- go test -coverpkg=$COVER_PKGS -coverprofile=web100.cov -v github.com/m-lab/etl/web100
 # reproc tests are not ideal as they depend on GCS test-archive-mlab-sandbox.
 # They also require credentials, which aren't set up yet.
-# - go test -covermode=count -coverprofile=reproc.cov -v github.com/m-lab/etl/cmd/reproc
+# - go test -coverpkg=$COVER_PKGS -coverprofile=reproc.cov -v github.com/m-lab/etl/cmd/reproc
 
 # Coveralls
-- $HOME/gopath/bin/gocovmerge bq.cov parser.cov task.cov web100.cov qp.cov > merge.cov
+- $HOME/gopath/bin/gocovmerge annotation.cov bq.cov parser.cov qp.cov task.cov web100.cov > merge.cov
 - $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
 
 # Build and prepare for deployment
