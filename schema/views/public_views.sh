@@ -84,25 +84,25 @@ bq mk ${INTERNAL}
 set -e
 create_view ${INTERNAL} common_etl \
   'ETL table projected into common schema, for union with PLX legacy data.
-  This also adds "ndt.iupui." prefix to the connection_spec.hostname field.' \
+  This also adds "ndt.iupui." prefix to the connection_spec.hostname field.'
 
 create_view ${INTERNAL} ndt_exhaustive \
   'Combined view of plx legacy fast table, up to May 10, and new ETL table, from May 11, 2017 onward.
   Includes blacklisted and EB tests, which should be removed before analysis.
-  Note that at present, data from May 10 to mid September does NOT have geo annotations.' \
+  Note that at present, data from May 10 to mid September does NOT have geo annotations.'
 
 create_view ${INTERNAL} ndt_all \
-  'View across the all NDT data except EB and blacklisted' \
+  'View across the all NDT data except EB and blacklisted'
 
 create_view ${INTERNAL} ndt_sensible \
   'View across the all NDT data excluding EB, blacklisted,
-  bad end state, short or very long duration' \
+  bad end state, short or very long duration'
 
 create_view ${INTERNAL} ndt_downloads \
-  'All good quality download tests' \
+  'All good quality download tests'
 
 create_view ${INTERNAL} ndt_uploads \
-  'All good quality upload tests' \
+  'All good quality upload tests'
 
 
 ##################################################################################
