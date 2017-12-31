@@ -28,6 +28,8 @@ var (
 	podPattern   = regexp.MustCompile(mlabN_podNN)
 )
 
+
+
 type DataPath struct {
 	// TODO(dev) Delete unused fields.
 	// They are comprehensive now in anticipation of using them to populate
@@ -74,6 +76,17 @@ func (fn *DataPath) GetDataType() DataType {
 //=====================================================================
 
 type DataType string
+
+func (dt DataType) BQBufferSize() int {
+	// Special case for NDT when omitting deltas.
+	if dt == NDT {
+		omitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
+		if omitDeltas {
+			return 5 * DateTypeToBQBufferSize[dt]
+		}
+	}
+	return 5 * DateTypeToBQBufferSize[dt]
+}
 
 const (
 	NDT     = DataType("ndt")
