@@ -47,7 +47,7 @@ func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inse
 
 	return NewBQInserter(
 		etl.InserterParams{Dataset: dataset, Table: table, Suffix: suffix,
-			Timeout: 15 * time.Minute, BufferSize: etl.DataTypeToBQBufferSize[dt], RetryDelay: 30 * time.Second},
+			Timeout: 15 * time.Minute, BufferSize: dt.BQBufferSize(), RetryDelay: 30 * time.Second},
 		nil)
 }
 
