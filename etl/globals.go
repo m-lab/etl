@@ -7,13 +7,17 @@ import (
 	"strconv"
 )
 
-const start = `^gs://(?P<prefix>.*)/(?P<exp>[^/]*)/`
-const datePath = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
-const dateTime = `(\d{4}[01]\d[0123]\d)T\d{6}Z`
-const mlabN_podNN = `-(mlab\d)-([[:alpha:]]{3}\d[0-9t])-`
-const exp_NNNN = `(.*)-(\d{4})`
-const suffix = `(?:\.tar|\.tar.gz|\.tgz)$`
-const MlabDomain = `measurement-lab.org`
+const (
+	// MlabDomain is the DNS domain for all mlab servers.
+	MlabDomain = `measurement-lab.org`
+
+	start       = `^gs://(?P<prefix>.*)/(?P<exp>[^/]*)/`
+	datePath    = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
+	dateTime    = `(\d{4}[01]\d[0123]\d)T\d{6}Z`
+	mlabN_podNN = `-(mlab\d)-([[:alpha:]]{3}\d[0-9t])-`
+	exp_NNNN    = `(.*)-(\d{4})`
+	suffix      = `(?:\.tar|\.tar.gz|\.tgz)$`
+)
 
 // These are here to facilitate use across queue-pusher and parsing components.
 var (
@@ -30,6 +34,7 @@ var (
 	podPattern   = regexp.MustCompile(mlabN_podNN)
 )
 
+// DataPath breaks out the components of a task filename.
 type DataPath struct {
 	// TODO(dev) Delete unused fields.
 	// They are comprehensive now in anticipation of using them to populate
@@ -43,6 +48,7 @@ type DataPath struct {
 	FileNumber string // #8
 }
 
+// ValidateTestPath validates a task filename.
 func ValidateTestPath(path string) (*DataPath, error) {
 	fields := TaskPattern.FindStringSubmatch(path)
 
@@ -64,7 +70,7 @@ func ValidateTestPath(path string) (*DataPath, error) {
 		nil
 }
 
-// Find the type of data stored in a file from its complete filename
+// GetDataType finds the type of data stored in a file from its complete filename
 func (fn *DataPath) GetDataType() DataType {
 	dt, ok := DirToDataType[fn.Exp1]
 	if !ok {
@@ -75,29 +81,32 @@ func (fn *DataPath) GetDataType() DataType {
 
 //=====================================================================
 
+// DataType identifies the type of data handled by a parser.
 type DataType string
 
+// BQBufferSize returns the appropriate BQ insert buffer size.
 func (dt DataType) BQBufferSize() int {
 	// Special case for NDT when omitting deltas.
 	if dt == NDT {
 		omitDeltas, _ := strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
 		if omitDeltas {
-			return 5 * DataTypeToBQBufferSize[dt]
+			return dataTypeToBQBufferSize[NDT_OMIT_DELTAS]
 		}
 	}
-	return 5 * DataTypeToBQBufferSize[dt]
+	return dataTypeToBQBufferSize[dt]
 }
 
 const (
-	NDT     = DataType("ndt")
-	SS      = DataType("sidestream")
-	PT      = DataType("traceroute")
-	SW      = DataType("disco")
-	INVALID = DataType("invalid")
+	NDT             = DataType("ndt")
+	NDT_OMIT_DELTAS = DataType("ndt_nodelta") // to support larger buffer size.
+	SS              = DataType("sidestream")
+	PT              = DataType("traceroute")
+	SW              = DataType("disco")
+	INVALID         = DataType("invalid")
 )
 
 var (
-	// Map from gs:// subdirectory to data type.
+	// DirToDataType maps from gs:// subdirectory to data type.
 	// TODO - this should be loaded from a config.
 	DirToDataType = map[string]DataType{
 		"ndt":              NDT,
@@ -106,7 +115,7 @@ var (
 		"switch":           SW,
 	}
 
-	// Map from data type to BigQuery table name.
+	// DataTypeToTable maps from data type to BigQuery table name.
 	// TODO - this should be loaded from a config.
 	DataTypeToTable = map[DataType]string{
 		NDT:     "ndt",
@@ -118,12 +127,13 @@ var (
 
 	// Map from data type to number of buffer size for BQ insertion.
 	// TODO - this should be loaded from a config.
-	DataTypeToBQBufferSize = map[DataType]int{
-		NDT:     10,
-		SS:      100,
-		PT:      300,
-		SW:      100,
-		INVALID: 0,
+	dataTypeToBQBufferSize = map[DataType]int{
+		NDT:             10,
+		NDT_OMIT_DELTAS: 50,
+		SS:              100,
+		PT:              300,
+		SW:              100,
+		INVALID:         0,
 	}
 	// There is also a mapping of data types to queue names in
 	// queue_pusher.go
