@@ -115,17 +115,17 @@ create_view ${INTERNAL} ndt_uploads \
 create_view ${PUBLIC} ndt_all \
   'View across the all NDT data except EB and blacklisted' \
   '#legacySQL
-  SELECT * FROM ['${INTERNAL/:/.}'.ndt_all]'
+  SELECT * FROM ['${INTERNAL/:/.}'.ndt_all_legacysql]'
 
 create_view ${PUBLIC} ndt_downloads \
   'All good quality download tests' \
   '#legacySQL
-  SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads]'
+  SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads_legacysql]'
 
 create_view ${PUBLIC} ndt_uploads \
   'All good quality upload tests' \
   '#legacySQL
-  SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads]'
+  SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads_legacysql]'
 
 #############################################################################
 # Redirect stable, alpha, beta
@@ -143,15 +143,15 @@ if [ "${ALIAS}" != "${PROJECT}:none" ]; then
   create_view ${ALIAS} ndt_all \
     'View across the all NDT data except EB and blacklisted' \
     '#legacySQL
-    SELECT * FROM ['${INTERNAL/:/.}'.ndt_all]'
+    SELECT * FROM ['${INTERNAL/:/.}'.ndt_all_legacysql]'
 
   create_view ${ALIAS} ndt_downloads \
     'All good quality download tests' \
     '#legacySQL
-    SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads]'
+    SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads_legacysql]'
 
   create_view ${ALIAS} ndt_uploads \
     'All good quality upload tests' \
     '#legacySQL
-    SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads]'
+    SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads_legacysql]'
 fi
