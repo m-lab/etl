@@ -57,7 +57,7 @@ ALIAS=${PROJECT}:${4:?Please specify the alias dataset \{alpha|stable|none\}: $U
 create_view() {
   local dataset=$1
   local view=$2
-  local description="$3 \n $TRAVIS_TAG : $TRAVIS_COMMIT"
+  local description="$TRAVIS_TAG : $TRAVIS_COMMIT"$'\n'$3
   local sql=${4:-`cat $view.sql`}
 
   # Some FROM targets must link to specified dataset.
