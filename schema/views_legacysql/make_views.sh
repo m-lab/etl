@@ -50,9 +50,9 @@ ALIAS=${PROJECT}:${4:?Please specify the alias dataset \{alpha|stable|none\}: $U
 #  sql - optional sql string.  If not provided, it is loaded from $view.sql
 create_view() {
   local dataset=$1
-  local view=$2
+  local view=$2_legacysql
   local description=$3
-  local sql=${4:-`cat $view.sql`}
+  local sql=${4:-`cat $2.sql`}
 
   # Some FROM targets must link to specified dataset.
   # Substitute dataset name for STANDARD_SUB sql vars.
@@ -66,7 +66,8 @@ create_view() {
   # TODO - Travis should cat the bigquery.log on non-zero exit status.
 
   # This fetches the new table description as json.
-  bq show --format=prettyjson $dataset.$view > $dataset.$view.json
+  if [[ ! -d json ]];then mkdir json; fi
+  bq show --format=prettyjson $dataset.$view > json/$dataset.$view.json
 }
 
 ###########################################################################
@@ -76,53 +77,55 @@ create_view() {
 # TODO - if running in travis, set -x
 
 # Create datasets, e.g. for new versions.
-# These lines may fail, so we run them before set -e
+# These lines may fail if they already exist, so we run them before set -e.
 bq mk ${PUBLIC}
 bq mk ${INTERNAL}
 
 # Terminate on error.
 set -e
-create_view ${INTERNAL} common_etl_legacysql \
+# If executing in travis, be verbose.
+if [[ -v TRAVIS ]];then set -x; fi
+
+create_view ${INTERNAL} common_etl \
   'ETL table projected into common schema, for union with PLX legacy data.
   This also adds "ndt.iupui." prefix to the connection_spec.hostname field.' \
 
-create_view ${INTERNAL} ndt_exhaustive_legacysql \
+create_view ${INTERNAL} ndt_exhaustive \
   'Combined view of plx legacy fast table, up to May 10, and new ETL table, from May 11, 2017 onward.
   Includes blacklisted and EB tests, which should be removed before analysis.
   Note that at present, data from May 10 to mid September does NOT have geo annotations.' \
 
-create_view ${INTERNAL} ndt_all_legacysql \
+create_view ${INTERNAL} ndt_all \
   'View across the all NDT data except EB and blacklisted' \
 
-create_view ${INTERNAL} ndt_sensible_legacysql \
+create_view ${INTERNAL} ndt_sensible \
   'View across the all NDT data excluding EB, blacklisted,
   bad end state, short or very long duration' \
 
-create_view ${INTERNAL} ndt_downloads_legacysql \
+create_view ${INTERNAL} ndt_downloads \
   'All good quality download tests' \
 
-create_view ${INTERNAL} ndt_uploads_legacysql \
+create_view ${INTERNAL} ndt_uploads \
   'All good quality upload tests' \
-}
 
 ##################################################################################
 # These are the simple public views linking into the corresponding internal views.
 ##################################################################################
 
-create_view ${PUBLIC} ndt_all_legacysql \
+create_view ${PUBLIC} ndt_all \
   'View across the all NDT data except EB and blacklisted' \
   '#legacySQL
-  SELECT * FROM ['${INTERNAL/:/.}'.ndt_all_legacysql]'
+  SELECT * FROM ['${INTERNAL/:/.}'.ndt_all]'
 
-create_view ${PUBLIC} ndt_downloads_legacysql \
+create_view ${PUBLIC} ndt_downloads \
   'All good quality download tests' \
   '#legacySQL
-  SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads_legacysql]'
+  SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads]'
 
-create_view ${PUBLIC} ndt_uploads_legacysql \
+create_view ${PUBLIC} ndt_uploads \
   'All good quality upload tests' \
   '#legacySQL
-  SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads_legacysql]'
+  SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads]'
 
 #############################################################################
 # Redirect stable, alpha, beta
@@ -137,18 +140,18 @@ create_view ${PUBLIC} ndt_uploads_legacysql \
 if [ "${ALIAS}" != "${PROJECT}:none" ]; then
   echo "Creating $ALIAS aliases"
 
-  create_view ${ALIAS} ndt_all_legacysql \
+  create_view ${ALIAS} ndt_all \
     'View across the all NDT data except EB and blacklisted' \
     '#legacySQL
-    SELECT * FROM ['${INTERNAL/:/.}'.ndt_all_legacysql]'
+    SELECT * FROM ['${INTERNAL/:/.}'.ndt_all]'
 
-  create_view ${ALIAS} ndt_downloads_legacysql \
+  create_view ${ALIAS} ndt_downloads \
     'All good quality download tests' \
     '#legacySQL
-    SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads_legacysql]'
+    SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads]'
 
-  create_view ${ALIAS} ndt_uploads_legacysql \
+  create_view ${ALIAS} ndt_uploads \
     'All good quality upload tests' \
     '#legacySQL
-    SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads_legacysql]'
+    SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads]'
 fi

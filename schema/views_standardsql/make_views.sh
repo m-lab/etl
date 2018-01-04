@@ -32,7 +32,7 @@ INTERNAL=${PROJECT}:${3:?Please specify the internal dataset: $USAGE}
 ALIAS=${PROJECT}:${4:?Please specify the alias dataset \{alpha|stable|none\}: $USAGE}
 
 # Example:
-# ./standard_views.sh measurement-lab rc_v3_1 internal_v3_1_1 rc
+# TRAVIS_TAG=manual3_1 TRAVIS_COMMIT=73b671b07 ./makebq_views.sh measurement-lab rc_v3_1 internal_v3_1_1 rc
 #    rc_v3_1 provides access to the minor version.
 #    internal_v3_1_1 contains the actual minor/patch version.
 #    rc creates alias for anyone querying against the latest release candidate
@@ -72,7 +72,8 @@ create_view() {
   # TODO - Travis should cat the bigquery.log on non-zero exit status.
 
   # This fetches the new table description as json.
-  bq show --format=prettyjson $dataset.$view > $dataset.$view.json
+  if [[ ! -d json ]];then mkdir json; fi
+  bq show --format=prettyjson $dataset.$view > json/$dataset.$view.json
 }
 
 ###########################################################################
@@ -88,6 +89,9 @@ bq mk ${INTERNAL}
 
 # Terminate on error.
 set -e
+# If executing in travis, be verbose.
+if [[ -v TRAVIS ]];then set -x; fi
+
 create_view ${INTERNAL} common_etl \
   'ETL table projected into common schema, for union with PLX legacy data.
   This also adds "ndt.iupui." prefix to the connection_spec.hostname field.'
