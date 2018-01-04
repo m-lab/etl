@@ -4,10 +4,10 @@
   This should generally be run from a travis deployment, and the
   arguments should be derived from the deployment tag.
   The following standardSQL views are created in the release dataset:
-     ndt_all​ - all (lightly filtered) tests, excluding EB,
+     ndt_all - all (lightly filtered) tests, excluding EB,
                blacklisted, short and very long tests.
      Separate views for download and upload NDT tests:
-  ​​​     ndt_downloads
+       ndt_downloads
        ndt_uploads
 
   Notes:
