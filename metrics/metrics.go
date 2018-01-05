@@ -29,6 +29,7 @@ func init() {
 	prometheus.MustRegister(PTHopCount)
 	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(WarningCount)
+	prometheus.MustRegister(PTReachDestCount)
 	prometheus.MustRegister(BackendFailureCount)
 	prometheus.MustRegister(GCSRetryCount)
 	prometheus.MustRegister(BigQueryInsert)
@@ -189,6 +190,22 @@ var (
 		},
 		// Parser type, error description.
 		[]string{"table", "filetype", "kind"},
+	)
+
+	// Counts the PT tests that reached the expected destination IP
+	// at the last hop or not.
+	//
+	// Provides metrics:
+	//   etl_pt_reach_dest_count{site, kind}
+	// Example usage:
+	//   metrics.PTReachDestCount.WithLabelValues("mlab1.sea03", "PT test did not reach expected destination IP.").Inc()
+	PTReachDestCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_pt_reach_dest_count",
+			Help: "Count how many PT tests reach expected destination or not per site.",
+		},
+		// mlab1.sea03, PT test reach expected destination IP!/PT test did not reach expected destination IP..
+		[]string{"site", "kind"},
 	)
 
 	// Counts the all errors that result in test loss.

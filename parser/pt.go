@@ -193,15 +193,26 @@ func CreateTestId(fn string, bn string) string {
 	return test_id
 }
 
+// Extract site name like "mlab1.lga06" from file name like
+// 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
+func GetSiteName(raw_fn string) string {
+	if len(raw_fn) < 50 {
+		return ""
+	}
+	return raw_fn[17:22] + "." + raw_fn[23:28]
+}
+
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues("pt").Inc()
 	defer metrics.WorkerState.WithLabelValues("pt").Dec()
 	test_id := filepath.Base(testName)
+	site_name := ""
 	if meta["filename"] != nil {
 		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
+		site_name = GetSiteName(meta["filename"].(string))
 	}
 
-	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent, pt.TableName())
+	hops, logTime, conn_spec, err := Parse(meta, testName, site_name, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
@@ -352,7 +363,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
+func Parse(meta map[string]bigquery.Value, testName string, siteName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
 	//log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("parse").Inc()
@@ -381,12 +392,14 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	var all_nodes []Node
 	// TODO(dev): Handle the first line explicitly before this for loop,
 	// then run the for loop on the remainder of the slice.
+	last_line := ""
 	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
 		// Skip initial lines starting with #.
 		if len(oneLine) == 0 || oneLine[0] == '#' {
 			continue
 		}
+		last_line = oneLine
 		// This var keep all new leaves
 		var new_leaves []Node
 		if is_first_line {
@@ -429,6 +442,14 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 		current_leaves = new_leaves
 	} // Done with a test file
 
+	// Check whether the last hop is the dest_ip
+	if !strings.Contains(last_line, dest_IP) {
+		metrics.PTReachDestCount.WithLabelValues(
+			siteName, "PT test did not reach expected destination IP.").Inc()
+	} else {
+		metrics.PTReachDestCount.WithLabelValues(
+			siteName, "PT test reach expected destination IP!").Inc()
+	}
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol, tableName)
 	conn_spec := &schema.MLabConnectionSpecification{
