@@ -193,13 +193,13 @@ func CreateTestId(fn string, bn string) string {
 	return test_id
 }
 
-// Extract site name like "mlab1.lga06" from file name like
+// Extract site name like "acc" from file name like
 // 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
 func GetSiteName(raw_fn string) string {
 	if len(raw_fn) < 50 {
 		return ""
 	}
-	return raw_fn[17:22] + "." + raw_fn[23:28]
+	return raw_fn[23:26]
 }
 
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
@@ -444,12 +444,10 @@ func Parse(meta map[string]bigquery.Value, testName string, siteName string, raw
 
 	// Check whether the last hop is the dest_ip
 	if !strings.Contains(last_line, dest_IP) {
-		metrics.PTReachDestCount.WithLabelValues(
-			siteName, "PT test did not reach expected destination IP.").Inc()
-	} else {
-		metrics.PTReachDestCount.WithLabelValues(
-			siteName, "PT test reach expected destination IP!").Inc()
+		metrics.PTNotReachDestCount.WithLabelValues(siteName).Inc()
 	}
+	metrics.PTTestCountPerSite.WithLabelValues(siteName).Inc()
+
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol, tableName)
 	conn_spec := &schema.MLabConnectionSpecification{
