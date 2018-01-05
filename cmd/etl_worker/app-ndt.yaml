@@ -38,8 +38,8 @@ network:
 
 env_variables:
   # These should be substituted in the travis deployment script.
-  RELEASE_TAG: __RELEASE_TAG__
-  COMMIT_HASH: __COMMIT_HASH__
+  RELEASE_TAG: ${TRAVIS_TAG}
+  COMMIT_HASH: ${TRAVIS_COMMIT}
   MAX_WORKERS: 12
   BIGQUERY_PROJECT: 'mlab-sandbox'
   BIGQUERY_DATASET: 'mlab_sandbox'
