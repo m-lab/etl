@@ -94,11 +94,11 @@ deploy:
 - provider: script
   script:
     - pushd $TRAVIS_BUILD_DIR/cmd/etl_worker;
-      cat app-ndt.yaml | sed 's/__COMMIT_HASH__/$TRAVIS_COMMIT/' | sed 's/__RELEASE_TAG__/$TRAVIS_TAG/' | app.yaml;
+      cat app-ndt.yaml | sed 's/__COMMIT_HASH__/$TRAVIS_COMMIT/' | sed 's/__RELEASE_TAG__/$TRAVIS_TAG/' | app-tmp.yaml;
       cat app.yaml; popd
     - $TRAVIS_BUILD_DIR/.personalize_deploy.sh
       $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-      /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app.yaml
+      /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-tmp.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
