@@ -20,7 +20,7 @@ SELECT
   connection_spec.data_direction,
   connection_spec.server_af,
   -- ETL pipeline currently drops the prefix, so we add it back here.
-  CONCAT("ndt.iupui.", connection_spec.server_hostname) as connection_spec.server_hostname,
+  CONCAT("ndt.iupui.", connection_spec.server_hostname) AS connection_spec.server_hostname,
   connection_spec.server_ip,
   connection_spec.server_kernel_version,
   connection_spec.tls,
@@ -63,7 +63,7 @@ SELECT
   web100_log_entry.snap.SndLimTransCwnd, web100_log_entry.snap.SndLimTransRwin, web100_log_entry.snap.SndLimTransSnd,
   web100_log_entry.snap.SndMax, web100_log_entry.snap.SndNxt, web100_log_entry.snap.SndUna,
   web100_log_entry.snap.SndWindScale, web100_log_entry.snap.SpuriousFrDetected, web100_log_entry.snap.StartTimeStamp,
-  -- mod(web100_log_entry.snap.StartTimeStamp, 1000000) as StartTimeUsec, --TODO - consider dropping this from ETL instead
+  -- mod(web100_log_entry.snap.StartTimeStamp, 1000000) AS StartTimeUsec, --TODO - consider dropping this from ETL instead
   web100_log_entry.snap.State, web100_log_entry.snap.SubsequentTimeouts, web100_log_entry.snap.SumRTT,
   web100_log_entry.snap.TimeStamps, web100_log_entry.snap.Timeouts, web100_log_entry.snap.WinScaleRcvd,
   web100_log_entry.snap.WinScaleSent, web100_log_entry.snap.X_OtherReductionsCM, web100_log_entry.snap.X_OtherReductionsCV,
