@@ -36,6 +36,10 @@ network:
     - 9090/tcp
 
 env_variables:
+  # These should be substituted in the travis deployment script.
+  RELEASE_TAG: ${TRAVIS_TAG}
+  COMMIT_HASH: ${TRAVIS_COMMIT}
+
   MAX_WORKERS: 30
   BIGQUERY_PROJECT: 'mlab-sandbox'
   BIGQUERY_DATASET: 'mlab_sandbox'
