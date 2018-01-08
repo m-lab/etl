@@ -19,6 +19,7 @@ SELECT
     connection_spec.client_version,
     connection_spec.data_direction,
     connection_spec.server_af,
+    -- ETL pipeline currently drops the prefix, so we add it back here.
     CONCAT("ndt.iupui.", connection_spec.server_hostname) AS server_hostname,
     connection_spec.server_ip,
     connection_spec.server_kernel_version,
@@ -75,3 +76,4 @@ SELECT
     AS snap)
   AS web100_log_entry
 FROM `measurement-lab.public.ndt`
+WHERE _PARTITIONTIME >= TIMESTAMP("2017-05-11 00:00:00")
