@@ -78,9 +78,12 @@ deploy:
 ######################################################################
 ## ALL PRODUCTION ETL SERVICES
 ######################################################################
-# STAGING: Should be used AFTER code review and commit to master branch.
-# Triggers when *ANY* branch is tagged with staging-*'
-# Deploys ALL SERVICES, NDT, PT, SS, QUEUE_PUSHER, CRON
+# STAGING: Automatically deploys all pipeline services on new merge to
+# integration branch.
+# Deploys all staging services: NDT, PT, SS, QUEUE_PUSHER
+# (Currently this does not include NDT_BATCH or CRON, as CRON is in
+# development, and batch is driven by CRON.  Prod include the batch
+# pipeline because we have been using it manually.)
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
 #  the system in a mixed state.  This should be manually addresses ASAP.
@@ -97,12 +100,11 @@ deploy:
   skip_cleanup: true
   on:
     repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_TAG == staging-*
+    branch: integration
 
-# PROD: Should be used AFTER code review and commit to master branch.
+# PROD: Should be used AFTER code review, commit to integration, and staging soak.
 # Triggers when *ANY* branch is tagged with prod-*'
-# Deploys ALL SERVICES, NDT, NDT_BATCH, PT, SS, QUEUE_PUSHER, CRON
+# Deploys all production services: NDT, NDT_BATCH, PT, SS, QUEUE_PUSHER
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
 #  the system in a mixed state.  This should be manually addresses ASAP.
@@ -171,7 +173,8 @@ deploy:
     branch: integration
 
 # STAGING: Should be used AFTER code review and commit to dev branch.  Triggers
-# when *ANY* branch is tagged with ndt-staging-*'
+# when *ANY* branch is tagged with ndt-staging-*'  This allows pushing individual
+# pipeline components prior to committing to integration branch.
 - provider: script
   script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
