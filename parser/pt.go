@@ -354,7 +354,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, siteName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
+func Parse(meta map[string]bigquery.Value, testName string, metroName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
 	//log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("parse").Inc()
@@ -435,9 +435,9 @@ func Parse(meta map[string]bigquery.Value, testName string, siteName string, raw
 
 	// Check whether the last hop is the dest_ip
 	if !strings.Contains(last_line, dest_IP) {
-		metrics.PTNotReachDestCount.WithLabelValues(siteName).Inc()
+		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
 	}
-	metrics.PTTestCount.WithLabelValues(siteName).Inc()
+	metrics.PTTestCount.WithLabelValues(metroName).Inc()
 
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol, tableName)
