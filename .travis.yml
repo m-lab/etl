@@ -10,6 +10,11 @@
 #  * on success, deploy the result when the origin branch matches a supported
 #    deployment target.
 #
+# NOTE: Cloud functions only support primitive IAM roles: Owner, Editor, Viewer.
+# See: https://cloud.google.com/functions/docs/concepts/iam
+# TODO(soltesz): Add deployment automation when fine-grained permissions are
+# possible.
+
 language: go
 
 before_install:
@@ -71,6 +76,57 @@ script:
 # after a merge with matching "on:" conditions.
 deploy:
 ######################################################################
+## ALL PRODUCTION ETL SERVICES
+######################################################################
+# STAGING: Automatically deploys all pipeline services on new merge to
+# integration branch.
+# Deploys all staging services: NDT, PT, SS, QUEUE_PUSHER
+# (Currently this does not include NDT_BATCH or CRON, as CRON is in
+# development, and batch is driven by CRON.  Prod include the batch
+# pipeline because we have been using it manually.)
+# NOTE:
+#  Failure in one of the deployments will terminate the deployment sequence, leaving
+#  the system in a mixed state.  This should be manually addresses ASAP.
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml &&
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml &&
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-staging.yaml &&
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    branch: integration
+
+# PROD: Should be used AFTER code review, commit to integration, and staging soak.
+# Triggers when *ANY* branch is tagged with prod-*'
+# Deploys all production services: NDT, NDT_BATCH, PT, SS, QUEUE_PUSHER
+# NOTE:
+#  Failure in one of the deployments will terminate the deployment sequence, leaving
+#  the system in a mixed state.  This should be manually addresses ASAP.
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml &&
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml &&
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-prod.yaml &&
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-prod.yaml &&
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_TAG == prod-*
+
+######################################################################
 ## Service: etl-disco-parser -- AppEngine Flexible Environment.
 # SANDBOX: before code review for development code in a specific branch.
 - provider: script
@@ -117,7 +173,8 @@ deploy:
     branch: integration
 
 # STAGING: Should be used AFTER code review and commit to dev branch.  Triggers
-# when *ANY* branch is tagged with ndt-staging-*'
+# when *ANY* branch is tagged with ndt-staging-*'  This allows pushing individual
+# pipeline components prior to committing to integration branch.
 - provider: script
   script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
@@ -260,8 +317,3 @@ deploy:
     all_branches: true
     tag: true
     condition: $TRAVIS_TAG == qp-prod-*
-
-# NOTE: Cloud functions only support primitive IAM roles: Owner, Editor, Viewer.
-# See: https://cloud.google.com/functions/docs/concepts/iam
-# TODO(soltesz): Add deployment automation when fine-grained permissions are
-# possible.
