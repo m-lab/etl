@@ -42,8 +42,14 @@ network:
     - 9090/tcp
 
 env_variables:
+  # These should be substituted in the travis deployment script.
+  RELEASE_TAG: ${TRAVIS_TAG}
+  COMMIT_HASH: ${TRAVIS_COMMIT}
+
+  NDT_BATCH: 'true'  # Allow instances to discover they are NDT_BATCH instances.
   MAX_WORKERS: 20
   BIGQUERY_PROJECT: 'measurement-lab'
   BIGQUERY_DATASET: 'batch'
   ANNOTATE_IP: 'true'
+  NDT_OMIT_DELTAS: 'true'
   # TODO add custom service-account, instead of using default credentials.

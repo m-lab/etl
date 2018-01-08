@@ -25,7 +25,7 @@ func Test_queueFor(t *testing.T) {
 	defer ResetFlags()
 
 	tme, _ := time.Parse("2006/01/02", "2017/09/01")
-	queue := queueFor(tme)
+	queue := queueForDate(tme)
 	if queue != "base-2" {
 		t.Error("bad queue: ", queue)
 	}

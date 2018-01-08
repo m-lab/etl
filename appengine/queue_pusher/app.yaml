@@ -5,3 +5,8 @@ service: queue-pusher
 handlers:
 - url: /.*
   script: _go_app
+
+env_variables:
+  # These should be substituted in the travis deployment script.
+  RELEASE_TAG: ${TRAVIS_TAG}
+  COMMIT_HASH: ${TRAVIS_COMMIT}
