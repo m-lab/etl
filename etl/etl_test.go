@@ -46,3 +46,12 @@ func TestValidation(t *testing.T) {
 	}
 	fmt.Printf("%v\n", data)
 }
+
+func TestGetMetroName(t *testing.T) {
+	metro_name := etl.GetMetroName("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz")
+	if metro_name != "acc" {
+		fmt.Println(metro_name)
+		t.Errorf("Error in getting metro name!\n")
+		return
+	}
+}

@@ -30,6 +30,8 @@ func TestCreateTestId(t *testing.T) {
 	test_id := parser.CreateTestId("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz", "20170501T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
 	if test_id != "2017/05/01/mlab1.acc02/20170501T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris.gz" {
 		fmt.Println(test_id)
+		t.Errorf("Error in creating test id!\n")
+		return
 	}
 }
 
@@ -39,7 +41,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 		fmt.Println("cannot load test data")
 		return
 	}
-	hops, logTime, _, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", rawData, "pt-daily")
+	hops, logTime, _, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", "mlab1.sea03", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -54,7 +56,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData, "pt-daily")
+	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "mlab1.sea03", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
