@@ -49,7 +49,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	fmt.Fprint(w, "Hello world!")
+	fmt.Fprintf(w, "NOTE: This is just one of potentially many instances.\n")
+	fmt.Fprintf(w, "Release: %s   Commit: %s\n", os.Getenv("RELEASE_TAG"), os.Getenv("COMMIT_HASH"))
+	fmt.Fprintf(w, "Workers: %d / %d\n", atomic.LoadInt32(&inFlight), maxInFlight)
+	env := os.Environ()
+	for i := range env {
+		fmt.Fprintf(w, "    %s\n", env[i])
+	}
 }
 
 // Basic throttling to restrict the number of tasks in flight.
