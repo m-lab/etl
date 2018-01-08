@@ -51,7 +51,7 @@ ALIAS=${PROJECT}:${4:?Please specify the alias dataset \{alpha|stable|none\}: $U
 create_view() {
   local dataset=$1
   local view=$2
-  local description=$3
+  local description="Release tag: $TRAVIS_TAG     Commit: $TRAVIS_COMMIT"$'\n'$3
   local sql=${4:-`cat $view.sql`}
 
   # Some FROM targets must link to specified dataset.
@@ -66,7 +66,8 @@ create_view() {
   # TODO - Travis should cat the bigquery.log on non-zero exit status.
 
   # This fetches the new table description as json.
-  bq show --format=prettyjson $dataset.$view > $dataset.$view.json
+  if [[ ! -d json ]];then mkdir json; fi
+  bq show --format=prettyjson $dataset.$view > json/$dataset.$view.json
 }
 
 ###########################################################################
@@ -76,12 +77,15 @@ create_view() {
 # TODO - if running in travis, set -x
 
 # Create datasets, e.g. for new versions.
-# These lines may fail, so we run them before set -e
+# These lines may fail if they already exist, so we run them before set -e.
 bq mk ${PUBLIC}
 bq mk ${INTERNAL}
 
 # Terminate on error.
 set -e
+# If executing in travis, be verbose.
+if [[ -v TRAVIS ]];then set -x; fi
+
 create_view ${INTERNAL} common_etl \
   'ETL table projected into common schema, for union with PLX legacy data.
   This also adds "ndt.iupui." prefix to the connection_spec.hostname field.'
@@ -104,9 +108,9 @@ create_view ${INTERNAL} ndt_downloads \
 create_view ${INTERNAL} ndt_uploads \
   'All good quality upload tests'
 
-
 ##################################################################################
-# These are the simple public views linking into the corresponding internal views.
+# These are the minor version public views linking into the corresponding internal
+# views.
 ##################################################################################
 
 create_view ${PUBLIC} ndt_all \
@@ -124,15 +128,16 @@ create_view ${PUBLIC} ndt_uploads \
   '#standardSQL
   SELECT * FROM `'${INTERNAL/:/.}'.ndt_uploads`'
 
+
 #############################################################################
-# Redirect stable, alpha, beta
+# Redirect release, rc, latest
 #############################################################################
 
-# If alias parameter is alpha, beta, or stable, this will create the
-# corresponding alias. These datasets are assumed to already exist, so script
-# does not try to create them.
-# If last parameter is "none" then we skip this section and terminate.
-# TODO - should link alpha and beta when stable is linked?
+# If alias parameter is not "none", this will create the corresponding aliases.
+# These datasets are assumed to already exist, so script does not try to
+# create them.
+# If last parameter is "none" then we skip this section.
+# TODO - should link alpha and rc when release is linked?
 
 if [ "${ALIAS}" != "${PROJECT}:none" ]; then
   echo "Linking $ALIAS alias"
