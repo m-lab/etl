@@ -27,10 +27,10 @@ func init() {
 	prometheus.MustRegister(TaskCount)
 	prometheus.MustRegister(TestCount)
 	prometheus.MustRegister(PTHopCount)
+	prometheus.MustRegister(PTTestCount)
 	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(WarningCount)
 	prometheus.MustRegister(PTNotReachDestCount)
-	prometheus.MustRegister(PTTestCountPerSite)
 	prometheus.MustRegister(BackendFailureCount)
 	prometheus.MustRegister(GCSRetryCount)
 	prometheus.MustRegister(BigQueryInsert)
@@ -178,6 +178,21 @@ var (
 		[]string{"table", "filetype", "status"},
 	)
 
+	// Counts the PT tests per metro.
+	//
+	// Provides metrics:
+	//   etl_pt_test_count_per_metro{metro}
+	// Example usage:
+	//   metrics.PTTestCountPerSite.WithLabelValues("sea").Inc()
+	PTTestCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_pt_test_count_per_metro",
+			Help: "Count how many PT tests per metro.",
+		},
+		// sea
+		[]string{"metro"},
+	)
+
 	// Counts the all warnings that do NOT result in test loss.
 	//
 	// Provides metrics:
@@ -204,21 +219,6 @@ var (
 		prometheus.CounterOpts{
 			Name: "etl_pt_not_reach_dest_count",
 			Help: "Count how many PT tests did not reach expected destination per site.",
-		},
-		// sea03
-		[]string{"site"},
-	)
-
-	// Counts the PT tests per site.
-	//
-	// Provides metrics:
-	//   etl_pt_test_count_per_site{site}
-	// Example usage:
-	//   metrics.PTTestCountPerSite.WithLabelValues("sea").Inc()
-	PTTestCountPerSite = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "etl_pt_test_count_per_site",
-			Help: "Count how many PT tests per site.",
 		},
 		// sea03
 		[]string{"site"},

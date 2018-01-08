@@ -446,7 +446,7 @@ func Parse(meta map[string]bigquery.Value, testName string, siteName string, raw
 	if !strings.Contains(last_line, dest_IP) {
 		metrics.PTNotReachDestCount.WithLabelValues(siteName).Inc()
 	}
-	metrics.PTTestCountPerSite.WithLabelValues(siteName).Inc()
+	metrics.PTTestCount.WithLabelValues(siteName).Inc()
 
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol, tableName)
