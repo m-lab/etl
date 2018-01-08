@@ -197,11 +197,13 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	metrics.WorkerState.WithLabelValues("pt").Inc()
 	defer metrics.WorkerState.WithLabelValues("pt").Dec()
 	test_id := filepath.Base(testName)
+	metro_name := ""
 	if meta["filename"] != nil {
 		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
+		metro_name = etl.GetMetroName(meta["filename"].(string))
 	}
 
-	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent, pt.TableName())
+	hops, logTime, conn_spec, err := Parse(meta, testName, metro_name, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
@@ -352,7 +354,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
+func Parse(meta map[string]bigquery.Value, testName string, metroName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
 	//log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("parse").Inc()
@@ -381,12 +383,14 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	var all_nodes []Node
 	// TODO(dev): Handle the first line explicitly before this for loop,
 	// then run the for loop on the remainder of the slice.
+	last_line := ""
 	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
-		// Skip initial lines starting with #.
+		// Skip empty line or initial lines starting with #.
 		if len(oneLine) == 0 || oneLine[0] == '#' {
 			continue
 		}
+		last_line = oneLine
 		// This var keep all new leaves
 		var new_leaves []Node
 		if is_first_line {
@@ -428,6 +432,12 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 		} // Done with one line
 		current_leaves = new_leaves
 	} // Done with a test file
+
+	// Check whether the last hop is the dest_ip
+	if !strings.Contains(last_line, dest_IP) {
+		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
+	}
+	metrics.PTTestCount.WithLabelValues(metroName).Inc()
 
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol, tableName)
