@@ -317,3 +317,18 @@ deploy:
     all_branches: true
     tag: true
     condition: $TRAVIS_TAG == qp-prod-*
+
+## BigQuery Views:
+- provider: script
+  script:
+    # Update these version numbers when making changes to the views.
+    pushd $TRAVIS_BUILD_DIR/schema/views_legacysql &&
+    ./make_views.sh measurement-lab rc_v3_1 internal_v3_1_1 rc &&
+    cd $TRAVIS_BUILD_DIR/schema/views_standardsql &&
+    ./make_views.sh measurement-lab rc_v3_1 internal_v3_1_1 rc &&
+    popd
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_TAG == views-prod-*
