@@ -61,7 +61,7 @@ queue:
 # of the date, mod N, to determine which queue to drop any given date
 # into.  We just choose an appropriate N that gives us the throughput
 # we need.  For now, N=8 gives us a bit of headroom, so this config
-# sets up -0 through -4.
+# sets up -0 through -7.
 #
 # The current pipeline config has up to 40 instances with 2 cpus and
 # 12 workers each.  This could handle up to 0.9 * 40 * 12 or 432

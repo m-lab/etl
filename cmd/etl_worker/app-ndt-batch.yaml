@@ -47,7 +47,6 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   NDT_BATCH: 'true'  # Allow instances to discover they are NDT_BATCH instances.
-  MAX_WORKERS: 20
   MAX_WORKERS: 12
   BIGQUERY_PROJECT: 'measurement-lab'
   BIGQUERY_DATASET: 'batch'
