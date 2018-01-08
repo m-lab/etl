@@ -193,26 +193,17 @@ func CreateTestId(fn string, bn string) string {
 	return test_id
 }
 
-// Extract site name like "acc" from file name like
-// 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
-func GetSiteName(raw_fn string) string {
-	if len(raw_fn) < 50 {
-		return ""
-	}
-	return raw_fn[23:26]
-}
-
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues("pt").Inc()
 	defer metrics.WorkerState.WithLabelValues("pt").Dec()
 	test_id := filepath.Base(testName)
-	site_name := ""
+	metro_name := ""
 	if meta["filename"] != nil {
 		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
-		site_name = GetSiteName(meta["filename"].(string))
+		metro_name = etl.GetMetroName(meta["filename"].(string))
 	}
 
-	hops, logTime, conn_spec, err := Parse(meta, testName, site_name, rawContent, pt.TableName())
+	hops, logTime, conn_spec, err := Parse(meta, testName, metro_name, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()

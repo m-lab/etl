@@ -35,15 +35,6 @@ func TestCreateTestId(t *testing.T) {
 	}
 }
 
-func TestGetSiteName(t *testing.T) {
-	site_name := parser.GetSiteName("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz")
-	if site_name != "acc" {
-		fmt.Println(site_name)
-		t.Errorf("Error in getting site name!\n")
-		return
-	}
-}
-
 func TestParseLegacyFormatData(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20160112T00:45:44Z_ALL27409.paris")
 	if err != nil {
