@@ -74,8 +74,7 @@ func (fn *DataPath) GetDataType() DataType {
 // Extract metro name like "acc" from file name like
 // 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
 func GetMetroName(raw_fn string) string {
-	mlabN_podNN := regexp.MustCompile(`-(mlab\d)-([[:alpha:]]{3}\d[0-9t])-`)
-	pod_name := mlabN_podNN.FindString(raw_fn)
+	pod_name := podPattern.FindString(raw_fn)
 	if pod_name != "" {
 		return pod_name[7:10]
 	}
