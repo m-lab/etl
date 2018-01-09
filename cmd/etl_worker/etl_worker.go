@@ -44,18 +44,29 @@ func init() {
 //   X-AppEngine-TaskRetryCount
 //   X-AppEngine-TaskExecutionCount
 
+// TODO(gfr) Add either a black list or a white list for the environment
+// variables, so we can hide sensitive vars. https://github.com/m-lab/etl/issues/384
 func handler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	fmt.Fprintf(w, "NOTE: This is just one of potentially many instances.\n")
-	fmt.Fprintf(w, "Release: %s   Commit: %s\n", os.Getenv("RELEASE_TAG"), os.Getenv("COMMIT_HASH"))
-	fmt.Fprintf(w, "Workers: %d / %d\n", atomic.LoadInt32(&inFlight), maxInFlight)
+	fmt.Fprintf(w, "<html><body>\n")
+	fmt.Fprintf(w, "<p>NOTE: This is just one of potentially many instances.</p>\n")
+	commit := os.Getenv("COMMIT_HASH")
+	if len(commit) >= 8 {
+		fmt.Fprintf(w, "Release: %s <br>  Commit: <a href=\"%s\">%s</a><br>\n",
+			os.Getenv("RELEASE_TAG"), os.Getenv("COMMIT_HASH"), os.Getenv("COMMIT_HASH")[0:7])
+	} else {
+		fmt.Fprintf(w, "Release: %s   Commit: unknown\n", os.Getenv("RELEASE_TAG"))
+	}
+
+	fmt.Fprintf(w, "<p>Workers: %d / %d</p>\n", atomic.LoadInt32(&inFlight), maxInFlight)
 	env := os.Environ()
 	for i := range env {
-		fmt.Fprintf(w, "    %s\n", env[i])
+		fmt.Fprintf(w, "%s</br>\n", env[i])
 	}
+	fmt.Fprintf(w, "</body></html>\n")
 }
 
 // Basic throttling to restrict the number of tasks in flight.
@@ -272,6 +283,7 @@ func main() {
 	go http.ListenAndServe(":9090", mux)
 
 	http.HandleFunc("/", handler)
+	http.HandleFunc("/status", handler)
 	http.HandleFunc("/worker", metrics.DurationHandler("generic", worker))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
 
