@@ -46,13 +46,9 @@ func init() {
 
 // TODO(gfr) Add either a black list or a white list for the environment
 // variables, so we can hide sensitive vars. https://github.com/m-lab/etl/issues/384
-func handler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
+func Status(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "<html><body>\n")
-	fmt.Fprintf(w, "<p>NOTE: This is just one of potentially many instances.</p>\n")
+	fmt.Fprintf(w, "<p>NOTE: This is just one of potentially SO many instances.</p>\n")
 	commit := os.Getenv("COMMIT_HASH")
 	if len(commit) >= 8 {
 		fmt.Fprintf(w, "Release: %s <br>  Commit: <a href=\"%s\">%s</a><br>\n",
@@ -280,10 +276,12 @@ func main() {
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.HandleFunc("/", Status)
+	mux.HandleFunc("/status", Status)
 	go http.ListenAndServe(":9090", mux)
 
-	http.HandleFunc("/", handler)
-	http.HandleFunc("/status", handler)
+	http.HandleFunc("/", Status)
+	http.HandleFunc("/status", Status)
 	http.HandleFunc("/worker", metrics.DurationHandler("generic", worker))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
 
