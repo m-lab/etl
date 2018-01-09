@@ -55,3 +55,17 @@ func TestGetMetroName(t *testing.T) {
 		return
 	}
 }
+
+func TestCalculateIPDistance(t *testing.T) {
+	dist1, _ := etl.CalculateIPDistance("192.168.3.4", "192.168.3.1")
+	if dist1 != 29 {
+		t.Errorf("Error in calculating IPv4 distance!\n")
+		return
+	}
+	dist2, _ := etl.CalculateIPDistance("2001:0db8:85a3:0000:0000:8a2e:0370:7334", "2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+	if dist2 != 128 {
+		fmt.Println(dist2)
+		t.Errorf("Error in calculating IPv6 distance!\n")
+		return
+	}
+}
