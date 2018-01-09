@@ -384,6 +384,7 @@ func Parse(meta map[string]bigquery.Value, testName string, metroName string, ra
 	// TODO(dev): Handle the first line explicitly before this for loop,
 	// then run the for loop on the remainder of the slice.
 	last_line := ""
+	reach_dest := false
 	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
 		// Skip empty line or initial lines starting with #.
@@ -404,6 +405,9 @@ func Parse(meta map[string]bigquery.Value, testName string, metroName string, ra
 				return nil, time.Time{}, nil, err
 			}
 		} else {
+			if strings.Contains(oneLine, dest_IP) {
+				reach_dest = true
+			}
 			// Handle each line of test file after the first line.
 			// TODO(dev): use regexp here
 			parts := strings.Fields(oneLine)
@@ -436,6 +440,15 @@ func Parse(meta map[string]bigquery.Value, testName string, metroName string, ra
 	// Check whether the last hop is the dest_ip
 	if !strings.Contains(last_line, dest_IP) {
 		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
+		if reach_dest {
+			// This test reach dest in the middle, but then do weired things
+			metrics.PTReachDestInMiddle.WithLabelValues(metroName).Inc()
+		}
+		// Calculate how close is the last hop with the real dest.
+		// The last node of all_nodes contains the last hop IP
+		distance, _ := etl.CalculateIPDistance(dest_IP, all_nodes[len(all_nodes)-1].ip)
+		metrics.PTNotReachDistance.WithLabelValues(metroName, strconv.Itoa(distance)).Inc()
+
 	}
 	metrics.PTTestCount.WithLabelValues(metroName).Inc()
 
