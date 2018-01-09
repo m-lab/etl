@@ -29,6 +29,8 @@ func init() {
 	prometheus.MustRegister(PTHopCount)
 	prometheus.MustRegister(PTTestCount)
 	prometheus.MustRegister(PTNotReachDestCount)
+	prometheus.MustRegister(PTReachDestInMiddle)
+	prometheus.MustRegister(PTNotReachDistance)
 	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(WarningCount)
 	prometheus.MustRegister(BackendFailureCount)
@@ -207,6 +209,38 @@ var (
 		},
 		// sea
 		[]string{"metro"},
+	)
+
+	// Counts the PT tests that reach the expected destination IP
+	// in the middle of a test per metro.
+	//
+	// Provides metrics:
+	//   etl_pt_reach_dest_in_middle_count{metro}
+	// Example usage:
+	//   metrics.PTReachDestInMiddle.WithLabelValues("sea").Inc()
+	PTReachDestInMiddle = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_pt_reach_dest_in_middle_count",
+			Help: "Count how many PT tests reach expected destination in middle but not last hop per metro.",
+		},
+		// sea
+		[]string{"metro"},
+	)
+
+	// For the PT tests that did notreach the expected destination IP, count the bits
+	// overlapped between last hop and expected dist per metro.
+	//
+	// Provides metrics:
+	//   etl_pt_not_reach_dest_distance{metro, distance}
+	// Example usage:
+	//   metrics.PTNotReachDistance.WithLabelValues("sea", "24").Inc()
+	PTNotReachDistance = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_pt_not_reach_dest_distance",
+			Help: "For PT tests not reach expected destination, count the bits overlapped between last hop and expected destination per metro.",
+		},
+		// sea, 24
+		[]string{"metro", "distance"},
 	)
 
 	// Counts the all warnings that do NOT result in test loss.
