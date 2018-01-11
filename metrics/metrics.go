@@ -31,6 +31,7 @@ func init() {
 	prometheus.MustRegister(PTNotReachDestCount)
 	prometheus.MustRegister(PTReachDestInMiddle)
 	prometheus.MustRegister(PTNotReachDistance)
+	prometheus.MustRegister(PTNotReachCount)
 	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(WarningCount)
 	prometheus.MustRegister(BackendFailureCount)
@@ -242,7 +243,19 @@ var (
 		// sea, 24
 		[]string{"metro", "distance"},
 	)
-
+	
+	// Count the number of the PT tests that did notreach the expected destination IP.
+	//
+	// Provides metrics:
+	//   etl_pt_not_reach_dest
+	// Example usage:
+	//   metrics.PTNotReachCount.Inc()
+	PTNotReachCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "etl_pt_not_reach_dest",
+			Help: "Count the number of the PT tests that did notreach the expected destination IP.",
+		})
+	
 	// Counts the all warnings that do NOT result in test loss.
 	//
 	// Provides metrics:
