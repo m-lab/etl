@@ -243,7 +243,7 @@ var (
 		// sea, 24
 		[]string{"metro", "distance"},
 	)
-	
+
 	// Count the number of the PT tests that did notreach the expected destination IP.
 	//
 	// Provides metrics:
@@ -255,7 +255,7 @@ var (
 			Name: "etl_pt_not_reach_dest",
 			Help: "Count the number of the PT tests that did notreach the expected destination IP.",
 		})
-	
+
 	// Counts the all warnings that do NOT result in test loss.
 	//
 	// Provides metrics:
