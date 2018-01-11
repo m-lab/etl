@@ -90,58 +90,34 @@ func GetMetroName(raw_fn string) string {
 	return ""
 }
 
-func GetIntFromIPv4(p4 net.IP) int {
-	return int(p4[0])<<24 + int(p4[1])<<16 + int(p4[2])<<8 + int(p4[3])
+func GetIntFromIPv4(p4 net.IP) uint {
+	return uint(p4[0])<<24 + uint(p4[1])<<16 + uint(p4[2])<<8 + uint(p4[3])
 }
 
-func GetIntFromIPv6Lower(p6 net.IP) int64 {
-	return int64(p6[8])<<56 + int64(p6[9])<<48 + int64(p6[10])<<40 + int64(p6[11])<<32 + int64(p6[12])<<24 + int64(p6[13])<<16 + int64(p6[15])<<8 + int64(p6[15])
+func GetIntFromIPv6Upper(p6 net.IP) uint64 {
+	return uint64(p6[0])<<56 + uint64(p6[1])<<48 + uint64(p6[2])<<40 + uint64(p6[3])<<32 + uint64(p6[4])<<24 + uint64(p6[5])<<16 + uint64(p6[6])<<8 + uint64(p6[7])
 }
 
-func GetIntFromIPv6Upper(p6 net.IP) int64 {
-	return int64(p6[0])<<56 + int64(p6[1])<<48 + int64(p6[2])<<40 + int64(p6[3])<<32 + int64(p6[4])<<24 + int64(p6[5])<<16 + int64(p6[6])<<8 + int64(p6[7])
-}
-
-// Return how many bits that two IP address overlapp (from leftest)
-func CalculateIPDistance(first_ip string, second_ip string) (int, error) {
+// Return how many bits that two IP address Different (from rightest)
+func NumberBitsDifferent(first_ip string, second_ip string) (int, error) {
 	ip1 := net.ParseIP(first_ip)
 	ip2 := net.ParseIP(second_ip)
 	if ip1.To4() != nil && ip2.To4() != nil {
-		dist := int32(GetIntFromIPv4(ip1.To4()) ^ GetIntFromIPv4(ip2.To4()))
+		dist := uint(GetIntFromIPv4(ip1.To4()) ^ uint(GetIntFromIPv4(ip2.To4())))
 		n := 0
-		for i := 0; i < 32; i++ {
-			if dist < 0 {
-				break
-			}
+		for ; dist != 0; dist >>= 1 {
 			n++
-			dist <<= 1
 		}
 		return n, nil
 	}
 	if ip1.To16() != nil && ip2.To16() != nil {
-		dist := int64(GetIntFromIPv6Upper(ip1.To16())) ^ int64(GetIntFromIPv6Upper(ip2.To16()))
+		// We will only compare the upper 64 bits.
+		dist := uint64(GetIntFromIPv6Upper(ip1.To16())) ^ uint64(GetIntFromIPv6Upper(ip2.To16()))
 		n := 0
-		for i := 0; i < 64; i++ {
-			if dist < 0 {
-				break
-			}
+		for ; dist != 0; dist >>= 1 {
 			n++
-			dist <<= 1
 		}
-		if n == 64 {
-			dist := int64(GetIntFromIPv6Lower(ip1.To16())) ^ int64(GetIntFromIPv6Lower(ip2.To16()))
-			n := 0
-			for i := 0; i < 64; i++ {
-				if dist < 0 {
-					break
-				}
-				n++
-				dist <<= 1
-			}
-			return 64 + n, nil
-		} else {
-			return n, nil
-		}
+		return n, nil
 	}
 	return -1, errors.New("Cannot parse IP.")
 }
