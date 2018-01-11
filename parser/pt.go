@@ -447,8 +447,8 @@ func Parse(meta map[string]bigquery.Value, testName string, metroName string, ra
 		// Calculate how close is the last hop with the real dest.
 		// The last node of all_nodes contains the last hop IP
 		distance, _ := etl.CalculateIPDistance(dest_IP, all_nodes[len(all_nodes)-1].ip)
-		metrics.PTNotReachDistance.WithLabelValues(metroName, strconv.Itoa(distance)).Inc()
-
+		metrics.PTNotReachDistance.WithLabelValues(metroName, fmt.Sprintf("%2d", distance)).Inc()
+		metrics.PTNotReachCount.Inc()
 	}
 	metrics.PTTestCount.WithLabelValues(metroName).Inc()
 
