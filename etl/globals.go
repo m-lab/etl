@@ -101,7 +101,8 @@ func GetIntFromIPv6Upper(p6 net.IP) uint64 {
 }
 
 // Return how many bits that two IP address Different (from rightest)
-func NumberBitsDifferent(first_ip string, second_ip string) (int, error) {
+// The second returned number is 4 for IP_v4, 6 for IP_v6, and 0 for invalid input.
+func NumberBitsDifferent(first_ip string, second_ip string) (int, int) {
 	ip1 := net.ParseIP(first_ip)
 	ip2 := net.ParseIP(second_ip)
 	if ip1.To4() != nil && ip2.To4() != nil {
@@ -110,7 +111,7 @@ func NumberBitsDifferent(first_ip string, second_ip string) (int, error) {
 		for ; dist != 0; dist >>= 1 {
 			n++
 		}
-		return n, nil
+		return n, 4
 	}
 	if ip1.To16() != nil && ip2.To16() != nil {
 		// We will only compare the upper 64 bits.
@@ -119,9 +120,9 @@ func NumberBitsDifferent(first_ip string, second_ip string) (int, error) {
 		for ; dist != 0; dist >>= 1 {
 			n++
 		}
-		return n, nil
+		return n, 6
 	}
-	return -1, errors.New("Cannot parse IP.")
+	return -1, 0
 }
 
 //=====================================================================

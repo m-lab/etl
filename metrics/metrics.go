@@ -30,8 +30,8 @@ func init() {
 	prometheus.MustRegister(PTTestCount)
 	prometheus.MustRegister(PTNotReachDestCount)
 	prometheus.MustRegister(PTReachDestInMiddle)
-	prometheus.MustRegister(PTNotReachDistance)
-	prometheus.MustRegister(PTNotReachCount)
+	prometheus.MustRegister(PTNotReachBitsDiffV4)
+	prometheus.MustRegister(PTNotReachBitsDiffV6)
 	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(WarningCount)
 	prometheus.MustRegister(BackendFailureCount)
@@ -228,32 +228,38 @@ var (
 		[]string{"metro"},
 	)
 
-	// For the PT tests that did notreach the expected destination IP, count the bits
-	// overlapped between last hop and expected dist per metro.
+	// A histogram of number of bits difference between last hop and expected destination IP
+	// for the PT tests that did not reach the expected destination IP.
+	// This metric is only for IPv4.
 	//
 	// Provides metrics:
-	//   etl_pt_not_reach_dest_distance{metro, distance}
-	// Example usage:
-	//   metrics.PTNotReachDistance.WithLabelValues("sea", "24").Inc()
-	PTNotReachDistance = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "etl_pt_not_reach_dest_distance",
-			Help: "For PT tests not reach expected destination, count the bits overlapped between last hop and expected destination per metro.",
-		},
-		// sea, 24
-		[]string{"metro", "distance"},
-	)
+	//   etl_pt_not_reach_dest_bits_diff_v4{bits_diff}
+	// Usage example:
+	//   metrics.PTNotReachBitsDiffV4.Observe(bitsdiff)
+	PTNotReachBitsDiffV4 = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name: "etl_pt_not_reach_dest_bits_diff_v4",
+			Help: "Bits diff distribution between last hop and expected destination IP for IPv4.",
+			Buckets: []float64{
+				0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+			},
+		})
 
-	// Count the number of the PT tests that did notreach the expected destination IP.
+	// A histogram of number of bits difference between last hop and expected destination IP
+	// for the PT tests that did not reach the expected destination IP.
+	// This metric is only for IPv6.
 	//
 	// Provides metrics:
-	//   etl_pt_not_reach_dest
-	// Example usage:
-	//   metrics.PTNotReachCount.Inc()
-	PTNotReachCount = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "etl_pt_not_reach_dest",
-			Help: "Count the number of the PT tests that did notreach the expected destination IP.",
+	//   etl_pt_not_reach_dest_bits_diff_v6{bits_diff}
+	// Usage example:
+	//   metrics.PTNotReachBitsDiffV6.Observe(bitsdiff)
+	PTNotReachBitsDiffV6 = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name: "etl_pt_not_reach_dest_bits_diff_v6",
+			Help: "Bits diff distribution between last hop and expected destination IP for IPv6.",
+			Buckets: []float64{
+				0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
+			},
 		})
 
 	// Counts the all warnings that do NOT result in test loss.
