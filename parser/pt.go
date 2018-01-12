@@ -431,7 +431,7 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 			} // Done with a 4-tuple parsing
 			if strings.Contains(oneLine, dest_IP) {
 				reach_dest = true
-				// TODO: it is an option that we stop the parsing right here.
+				// TODO: It is an option that we just stop parsing right here.
 			}
 		} // Done with one line
 		current_leaves = new_leaves
