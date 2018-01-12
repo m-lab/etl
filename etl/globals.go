@@ -90,10 +90,12 @@ func GetMetroName(raw_fn string) string {
 	return ""
 }
 
+// Convert an IPv4 address into uint32.
 func GetIntFromIPv4(p4 net.IP) uint {
 	return uint(p4[0])<<24 + uint(p4[1])<<16 + uint(p4[2])<<8 + uint(p4[3])
 }
 
+// Convert the upper 64 bits of an IPv6 address into uint64.
 func GetIntFromIPv6Upper(p6 net.IP) uint64 {
 	return uint64(p6[0])<<56 + uint64(p6[1])<<48 + uint64(p6[2])<<40 + uint64(p6[3])<<32 + uint64(p6[4])<<24 + uint64(p6[5])<<16 + uint64(p6[6])<<8 + uint64(p6[7])
 }
