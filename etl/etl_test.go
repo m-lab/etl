@@ -57,13 +57,13 @@ func TestGetMetroName(t *testing.T) {
 }
 
 func TestCalculateIPDistance(t *testing.T) {
-	diff1, _ := etl.NumberBitsDifferent("192.168.3.4", "192.168.3.1")
-	if diff1 != 3 {
+	diff1, ip_type := etl.NumberBitsDifferent("192.168.3.4", "192.168.3.1")
+	if diff1 != 3 || ip_type != 4 {
 		t.Errorf("Error in calculating IPv4 distance!\n")
 		return
 	}
-	diff2, _ := etl.NumberBitsDifferent("2001:0db8:85a3:0000:0000:8a2e:0370:7334", "2001:0db8:85a3:0000:0000:8a2e:0370:7334")
-	if diff2 != 0 {
+	diff2, ip_type := etl.NumberBitsDifferent("2001:0db8:85a3:0000:0000:8a2e:0370:7334", "2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+	if diff2 != 0 || ip_type != 6 {
 		t.Errorf("Error in calculating IPv6 distance!\n")
 		return
 	}

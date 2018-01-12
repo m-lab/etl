@@ -383,7 +383,6 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 	var all_nodes []Node
 	// TODO(dev): Handle the first line explicitly before this for loop,
 	// then run the for loop on the remainder of the slice.
-	last_line := ""
 	reach_dest := false
 	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
@@ -391,7 +390,6 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 		if len(oneLine) == 0 || oneLine[0] == '#' {
 			continue
 		}
-		last_line = oneLine
 		// This var keep all new leaves
 		var new_leaves []Node
 		if is_first_line {
@@ -405,9 +403,6 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 				return nil, time.Time{}, nil, err
 			}
 		} else {
-			if strings.Contains(oneLine, dest_IP) {
-				reach_dest = true
-			}
 			// Handle each line of test file after the first line.
 			// TODO(dev): use regexp here
 			parts := strings.Fields(oneLine)
@@ -433,6 +428,10 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i += 1 {
 				}
 			} // Done with a 4-tuple parsing
+			if strings.Contains(oneLine, dest_IP) {
+				reach_dest = true
+				// TODO: it is an option that we stop the parsing right here.
+			}
 		} // Done with one line
 		current_leaves = new_leaves
 	} // Done with a test file
@@ -440,10 +439,10 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 	// Check whether the last hop is the dest_ip
 	metroName := etl.GetMetroName(fileName)
 	metrics.PTTestCount.WithLabelValues(metroName).Inc()
-	if !strings.Contains(last_line, dest_IP) {
+	if all_nodes[len(all_nodes)-1].ip != dest_IP {
 		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
 		if reach_dest {
-			// This test reach dest in the middle, but then do weired things
+			// This test reach dest in the middle, but then do weird things for unknown reason.
 			metrics.PTReachDestInMiddle.WithLabelValues(metroName).Inc()
 			log.Printf("middle mess up test_id: " + fileName + " " + testName)
 		}
