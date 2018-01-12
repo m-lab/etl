@@ -197,13 +197,13 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	metrics.WorkerState.WithLabelValues("pt").Inc()
 	defer metrics.WorkerState.WithLabelValues("pt").Dec()
 	test_id := filepath.Base(testName)
-	metro_name := ""
+	fileName := ""
 	if meta["filename"] != nil {
 		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
-		metro_name = etl.GetMetroName(meta["filename"].(string))
+		fileName = meta["filename"].(string)
 	}
 
-	hops, logTime, conn_spec, err := Parse(meta, testName, metro_name, rawContent, pt.TableName())
+	hops, logTime, conn_spec, err := Parse(meta, testName, fileName, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
@@ -354,7 +354,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, metroName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
+func Parse(meta map[string]bigquery.Value, testName string, fileName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
 	//log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("parse").Inc()
@@ -438,23 +438,25 @@ func Parse(meta map[string]bigquery.Value, testName string, metroName string, ra
 	} // Done with a test file
 
 	// Check whether the last hop is the dest_ip
+	metroName := etl.GetMetroName(fileName)
+	metrics.PTTestCount.WithLabelValues(metroName).Inc()
 	if !strings.Contains(last_line, dest_IP) {
 		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
 		if reach_dest {
 			// This test reach dest in the middle, but then do weired things
 			metrics.PTReachDestInMiddle.WithLabelValues(metroName).Inc()
-		}
-		// Calculate how close is the last hop with the real dest.
-		// The last node of all_nodes contains the last hop IP
-		bits_diff, ip_type := etl.NumberBitsDifferent(dest_IP, all_nodes[len(all_nodes)-1].ip)
-		if ip_type == 4 {
-			metrics.PTNotReachBitsDiffV4.Observe(float64(bits_diff))
-		}
-		if ip_type == 6 {
-			metrics.PTNotReachBitsDiffV6.Observe(float64(bits_diff))
+			log.Printf("middle mess up test_id: " + fileName + " " + testName)
 		}
 	}
-	metrics.PTTestCount.WithLabelValues(metroName).Inc()
+	// Calculate how close is the last hop with the real dest.
+	// The last node of all_nodes contains the last hop IP.
+	bits_diff, ip_type := etl.NumberBitsDifferent(dest_IP, all_nodes[len(all_nodes)-1].ip)
+	if ip_type == 4 {
+		metrics.PTNotReachBitsDiffV4.WithLabelValues(metroName).Observe(float64(bits_diff))
+	}
+	if ip_type == 6 {
+		metrics.PTNotReachBitsDiffV6.WithLabelValues(metroName).Observe(float64(bits_diff))
+	}
 
 	// Generate Hops from all_nodes
 	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol, tableName)
