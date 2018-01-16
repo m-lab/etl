@@ -408,7 +408,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 			if len(parts) < 4 || parts[0] == "MPLS" {
 				continue
 			}
-			lastLine = oneLine
+
 			// Drop the first 3 parts, like "1  P(6, 6)" because they are useless.
 			// The following parts are grouped into tuples, each with 4 parts:
 			for i := 3; i < len(parts); i += 4 {
@@ -430,6 +430,8 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				reachedDest = true
 				// TODO: It is an option that we just stop parsing
 			}
+			// lastLine is the last line from raw test file that contains valid hop information.
+			lastLine = oneLine
 		} // Done with one line
 		currentLeaves = newLeaves
 	} // Done with a test file
@@ -441,15 +443,14 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	}
 	metroName := etl.GetMetroName(fileName)
 	metrics.PTTestCount.WithLabelValues(metroName).Inc()
+	// lastHop is a close estimation for where the test reached at the end.
 	// It is possible that the last line contains destIP and other IP at the same time
 	// if the previous hop contains multiple paths.
 	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
 	// reach destIP at the last hop.
 	lastHop := destIP
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastLine, destIP) {
-                // This is the case that we consider the test did not reach dest_IP at the last hop.
-                // If there are multiple IPs on the last line, lastHop is a close estimation for
-                // where the test reached eventually. 
+		// This is the case that we consider the test did not reach destIP at the last hop.
 		lastHop = allNodes[len(allNodes)-1].ip
 		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
 		if reachedDest {
