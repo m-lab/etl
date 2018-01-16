@@ -442,11 +442,14 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	metroName := etl.GetMetroName(fileName)
 	metrics.PTTestCount.WithLabelValues(metroName).Inc()
 	// It is possible that the last line contains destIP and other IP at the same time
-	// since the previous hop contains multiple paths.
+	// if the previous hop contains multiple paths.
 	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
 	// reach destIP at the last hop.
 	lastHop := destIP
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastLine, destIP) {
+                // This is the case that we consider the test did not reach dest_IP at the last hop.
+                // If there are multiple IPs on the last line, lastHop is a close estimation for
+                // where the test reached eventually. 
 		lastHop = allNodes[len(allNodes)-1].ip
 		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
 		if reachedDest {
