@@ -442,7 +442,10 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	}
 	metroName := etl.GetMetroName(fileName)
 	metrics.PTTestCount.WithLabelValues(metroName).Inc()
-	// It is possible that the last line contains dest_IP and other IP at the same time.
+	// It is possible that the last line contains dest_IP and other IP at the same time
+	// since the previous hop contains multiple paths.
+	// So it is possible that all_nodes[len(all_nodes)-1].ip is not dest_IP but the test
+	// reach dest_IP at the last hop.
 	last_hop := dest_IP
 	if all_nodes[len(all_nodes)-1].ip != dest_IP && !strings.Contains(lastLine, dest_IP) {
 		last_hop = all_nodes[len(all_nodes)-1].ip
