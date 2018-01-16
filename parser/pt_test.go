@@ -41,7 +41,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 		fmt.Println("cannot load test data")
 		return
 	}
-	hops, logTime, _, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", "mlab1.sea03", rawData, "pt-daily")
+	hops, logTime, _, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -56,7 +56,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "mlab1.sea03", rawData, "pt-daily")
+	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

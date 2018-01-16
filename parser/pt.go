@@ -197,13 +197,11 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	metrics.WorkerState.WithLabelValues("pt").Inc()
 	defer metrics.WorkerState.WithLabelValues("pt").Dec()
 	test_id := filepath.Base(testName)
-	fileName := ""
 	if meta["filename"] != nil {
 		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
-		fileName = meta["filename"].(string)
 	}
 
-	hops, logTime, conn_spec, err := Parse(meta, testName, fileName, rawContent, pt.TableName())
+	hops, logTime, conn_spec, err := Parse(meta, testName, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
@@ -354,7 +352,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, fileName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
+func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
 	//log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("parse").Inc()
@@ -383,8 +381,8 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 	var all_nodes []Node
 	// TODO(dev): Handle the first line explicitly before this for loop,
 	// then run the for loop on the remainder of the slice.
-	last_line := ""
-	reach_dest := false
+	lastLine := ""
+	reachedDest := false
 	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
 		// Skip empty line or initial lines starting with #.
@@ -411,7 +409,7 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 			if len(parts) < 4 || parts[0] == "MPLS" {
 				continue
 			}
-			last_line = oneLine
+			lastLine = oneLine
 			// Drop the first 3 parts, like "1  P(6, 6)" because they are useless.
 			// The following parts are grouped into tuples, each with 4 parts:
 			for i := 3; i < len(parts); i += 4 {
@@ -430,24 +428,28 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 				}
 			} // Done with a 4-tuple parsing
 			if strings.Contains(oneLine, dest_IP) {
-				reach_dest = true
-				// TODO: It is an option that we just stop parsing right here.
+				reachedDest = true
+				// TODO: It is an option that we just stop parsing
 			}
 		} // Done with one line
 		current_leaves = new_leaves
 	} // Done with a test file
 
 	// Check whether the last hop is the dest_ip
+	fileName := ""
+	if meta["filename"] != nil {
+		fileName = meta["filename"].(string)
+	}
 	metroName := etl.GetMetroName(fileName)
 	metrics.PTTestCount.WithLabelValues(metroName).Inc()
 	// It is possible that the last line contains dest_IP and other IP at the same time.
 	last_hop := dest_IP
-	if all_nodes[len(all_nodes)-1].ip != dest_IP && !strings.Contains(last_line, dest_IP) {
+	if all_nodes[len(all_nodes)-1].ip != dest_IP && !strings.Contains(lastLine, dest_IP) {
 		last_hop = all_nodes[len(all_nodes)-1].ip
 		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
-		if reach_dest {
+		if reachedDest {
 			// This test reach dest in the middle, but then do weird things for unknown reason.
-			metrics.PTReachDestInMiddle.WithLabelValues(metroName).Inc()
+			metrics.PTMoreHopsAfterDest.WithLabelValues(metroName).Inc()
 			log.Printf("middle mess up test_id: " + fileName + " " + testName)
 		}
 	}
@@ -455,10 +457,10 @@ func Parse(meta map[string]bigquery.Value, testName string, fileName string, raw
 	// The last node of all_nodes contains the last hop IP.
 	bits_diff, ip_type := etl.NumberBitsDifferent(dest_IP, last_hop)
 	if ip_type == 4 {
-		metrics.PTNotReachBitsDiffV4.WithLabelValues(metroName).Observe(float64(bits_diff))
+		metrics.PTBitsAwayFromDestV4.WithLabelValues(metroName).Observe(float64(bits_diff))
 	}
 	if ip_type == 6 {
-		metrics.PTNotReachBitsDiffV6.WithLabelValues(metroName).Observe(float64(bits_diff))
+		metrics.PTBitsAwayFromDestV6.WithLabelValues(metroName).Observe(float64(bits_diff))
 	}
 
 	// Generate Hops from all_nodes
