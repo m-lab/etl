@@ -380,7 +380,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	var allNodes []Node
 	// TODO(dev): Handle the first line explicitly before this for loop,
 	// then run the for loop on the remainder of the slice.
-	lastLine := ""
+	lastValidHopLine := ""
 	reachedDest := false
 	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
@@ -430,8 +430,8 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				reachedDest = true
 				// TODO: It is an option that we just stop parsing
 			}
-			// lastLine is the last line from raw test file that contains valid hop information.
-			lastLine = oneLine
+			// lastValidHopLine is the last line from raw test file that contains valid hop information.
+			lastValidHopLine = oneLine
 		} // Done with one line
 		currentLeaves = newLeaves
 	} // Done with a test file
@@ -449,7 +449,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
 	// reach destIP at the last hop.
 	lastHop := destIP
-	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastLine, destIP) {
+	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
 		lastHop = allNodes[len(allNodes)-1].ip
 		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
