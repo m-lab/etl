@@ -60,39 +60,39 @@ func NewPTParser(ins etl.Inserter) *PTParser {
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
-func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName string) []*schema.ParisTracerouteHop {
+func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string) []*schema.ParisTracerouteHop {
 	var results []*schema.ParisTracerouteHop
-	if len(all_nodes) == 0 {
+	if len(allNodes) == 0 {
 		return nil
 	}
 
 	// Iterate from the end of the list of nodes to minimize cost of removing nodes.
-	for i := len(all_nodes) - 1; i >= 0; i-- {
+	for i := len(allNodes) - 1; i >= 0; i-- {
 		metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
-		if all_nodes[i].parent_ip == "" {
-			one_hop := &schema.ParisTracerouteHop{
+		if allNodes[i].parent_ip == "" {
+			oneHop := &schema.ParisTracerouteHop{
 				Protocol:      protocol,
-				Dest_ip:       all_nodes[i].ip,
-				Dest_hostname: all_nodes[i].hostname,
-				Rtt:           all_nodes[i].rtts,
+				Dest_ip:       allNodes[i].ip,
+				Dest_hostname: allNodes[i].hostname,
+				Rtt:           allNodes[i].rtts,
 				Src_ip:        server_IP,
 				Src_af:        IPv4_AF,
 				Dest_af:       IPv4_AF,
 			}
-			results = append(results, one_hop)
+			results = append(results, oneHop)
 			break
 		} else {
-			one_hop := &schema.ParisTracerouteHop{
+			oneHop := &schema.ParisTracerouteHop{
 				Protocol:      protocol,
-				Dest_ip:       all_nodes[i].ip,
-				Dest_hostname: all_nodes[i].hostname,
-				Rtt:           all_nodes[i].rtts,
-				Src_ip:        all_nodes[i].parent_ip,
-				Src_hostname:  all_nodes[i].parent_hostname,
+				Dest_ip:       allNodes[i].ip,
+				Dest_hostname: allNodes[i].hostname,
+				Rtt:           allNodes[i].rtts,
+				Src_ip:        allNodes[i].parent_ip,
+				Src_hostname:  allNodes[i].parent_hostname,
 				Src_af:        IPv4_AF,
 				Dest_af:       IPv4_AF,
 			}
-			results = append(results, one_hop)
+			results = append(results, oneHop)
 		}
 	}
 	return results
@@ -100,9 +100,9 @@ func ProcessAllNodes(all_nodes []Node, server_IP, protocol string, tableName str
 
 // This function was designed for hops with multiple flows. When the source IP are duplicate flows, but the destination IP is
 // single flow IP, those hops will result in just one node in the list.
-func Unique(one_node Node, list []Node) bool {
-	for _, existing_node := range list {
-		if existing_node.hostname == one_node.hostname && existing_node.ip == one_node.ip && existing_node.flow == one_node.flow {
+func Unique(oneNode Node, list []Node) bool {
+	for _, existingNode := range list {
+		if existingNode.hostname == oneNode.hostname && existingNode.ip == oneNode.ip && existingNode.flow == oneNode.flow {
 			return false
 		}
 	}
@@ -111,7 +111,7 @@ func Unique(one_node Node, list []Node) bool {
 
 // Handle the first line, like
 // "traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s"
-func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP string, err error) {
+func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP string, err error) {
 	parts := strings.Split(oneLine, ",")
 	// check protocol
 	// check algo
@@ -120,10 +120,10 @@ func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP 
 			segments := strings.Split(part, " ")
 			if len(segments) == 4 {
 				portIndex := strings.IndexByte(segments[1], ':')
-				server_IP = segments[1][2:portIndex]
+				serverIP = segments[1][2:portIndex]
 				portIndex = strings.IndexByte(segments[3], ':')
-				dest_IP = segments[3][1:portIndex]
-				if server_IP == "" || dest_IP == "" {
+				destIP = segments[3][1:portIndex]
+				if serverIP == "" || destIP == "" {
 					return "", "", "", errors.New("Invalid IP address in the first line.")
 				}
 			} else {
@@ -147,16 +147,16 @@ func ParseFirstLine(oneLine string) (protocol string, dest_IP string, server_IP 
 			}
 		}
 	}
-	return protocol, dest_IP, server_IP, nil
+	return protocol, destIP, serverIP, nil
 }
 
 // Return timestamp parsed from file name.
 func GetLogtime(filename PTFileName) (time.Time, error) {
 	date, _ := filename.GetDate()
 	// data is in format like "20170320T23:53:10Z"
-	revised_date := date[0:4] + "-" + date[4:6] + "-" + date[6:18]
+	revisedDate := date[0:4] + "-" + date[4:6] + "-" + date[6:18]
 
-	t, err := time.Parse(time.RFC3339, revised_date)
+	t, err := time.Parse(time.RFC3339, revisedDate)
 	if err != nil {
 		log.Println(err)
 		return time.Time{}, err
@@ -182,28 +182,26 @@ func (pt *PTParser) Flush() error {
 }
 
 func CreateTestId(fn string, bn string) string {
-	raw_fn := filepath.Base(fn)
+	rawFn := filepath.Base(fn)
 	// fn is in format like 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
 	// bn is in format like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// test_id is in format like 2017/05/01/mlab1.lga06/20170501T23:58:07Z-72.228.158.51-40835-128.177.119.209-8080.paris.gz
-	test_id := bn
-	if len(raw_fn) > 30 {
-		test_id = raw_fn[0:4] + "/" + raw_fn[4:6] + "/" + raw_fn[6:8] + "/" + raw_fn[17:22] + "." + raw_fn[23:28] + "/" + bn + ".gz"
+	testId := bn
+	if len(rawFn) > 30 {
+		testId = rawFn[0:4] + "/" + rawFn[4:6] + "/" + rawFn[6:8] + "/" + rawFn[17:22] + "." + rawFn[23:28] + "/" + bn + ".gz"
 	}
-	return test_id
+	return testId
 }
 
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues("pt").Inc()
 	defer metrics.WorkerState.WithLabelValues("pt").Dec()
-	test_id := filepath.Base(testName)
-	metro_name := ""
+	testId := filepath.Base(testName)
 	if meta["filename"] != nil {
-		test_id = CreateTestId(meta["filename"].(string), filepath.Base(testName))
-		metro_name = etl.GetMetroName(meta["filename"].(string))
+		testId = CreateTestId(meta["filename"].(string), filepath.Base(testName))
 	}
 
-	hops, logTime, conn_spec, err := Parse(meta, testName, metro_name, rawContent, pt.TableName())
+	hops, logTime, connSpec, err := Parse(meta, testName, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
@@ -215,15 +213,15 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 	insertErr := false
 	for _, hop := range hops {
-		pt_test := schema.PT{
-			Test_id:              test_id,
+		ptTest := schema.PT{
+			Test_id:              testId,
 			Log_time:             logTime.Unix(),
-			Connection_spec:      *conn_spec,
+			Connection_spec:      *connSpec,
 			Paris_traceroute_hop: *hop,
 			Type:                 int32(2),
 			Project:              int32(3),
 		}
-		err := pt.inserter.InsertRow(pt_test)
+		err := pt.inserter.InsertRow(ptTest)
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				pt.TableName(), "pt", "insert-err").Inc()
@@ -245,7 +243,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 // parts[1] is IP address like "(66.110.57.41)" or "(72.14.218.190):0,2,3,4,6,8,10"
 // parts[2] are rtt in numbers like "0.298/0.318/0.340/0.016"
 // parts[3] should always be "ms"
-func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all_nodes, new_leaves *[]Node) error {
+func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allNodes, newLeaves *[]Node) error {
 	if len(parts) != 4 {
 		return errors.New("corrupted input")
 	}
@@ -257,9 +255,9 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 	switch {
 	// Handle tcp or udp, parts[2] is a single number.
 	case protocol == "tcp" || protocol == "udp":
-		one_rtt, err := strconv.ParseFloat(parts[2], 64)
+		oneRtt, err := strconv.ParseFloat(parts[2], 64)
 		if err == nil {
-			rtt = append(rtt, one_rtt)
+			rtt = append(rtt, oneRtt)
 		} else {
 			log.Println("Failed to conver rtt to number with error %v", err)
 			return err
@@ -272,9 +270,9 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 			return errors.New("Failed to parse rtts for icmp test. 4 numbers expected")
 		}
 		for _, num := range nums {
-			one_rtt, err := strconv.ParseFloat(num, 64)
+			oneRtt, err := strconv.ParseFloat(num, 64)
 			if err == nil {
-				rtt = append(rtt, one_rtt)
+				rtt = append(rtt, oneRtt)
 			} else {
 				fmt.Printf("Failed to conver rtt to number with error %v", err)
 				return err
@@ -287,8 +285,8 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 	ips := strings.Split(parts[1], ":")
 
 	// Check whether it is root node.
-	if len(*all_nodes) == 0 {
-		one_node := &Node{
+	if len(*allNodes) == 0 {
+		oneNode := &Node{
 			hostname:  parts[0],
 			ip:        ips[0][1 : len(ips[0])-1],
 			rtts:      rtt,
@@ -296,17 +294,17 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 			flow:      -1,
 		}
 
-		*all_nodes = append(*all_nodes, *one_node)
-		*new_leaves = append(*new_leaves, *one_node)
+		*allNodes = append(*allNodes, *oneNode)
+		*newLeaves = append(*newLeaves, *oneNode)
 		return nil
 	}
-	// There are duplicates in all_nodes, but not in new_leaves.
+	// There are duplicates in allNodes, but not in newLeaves.
 	// TODO(dev): consider consolidating these with a repeat count.
 	switch len(ips) {
 	case 1:
 		// For single flow, the new node will be son of all current leaves
-		for _, leaf := range current_leaves {
-			one_node := &Node{
+		for _, leaf := range currentLeaves {
+			oneNode := &Node{
 				hostname:        parts[0],
 				ip:              ips[0][1 : len(ips[0])-1],
 				rtts:            rtt,
@@ -314,9 +312,9 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 				parent_hostname: leaf.hostname,
 				flow:            -1,
 			}
-			*all_nodes = append(*all_nodes, *one_node)
-			if Unique(*one_node, *new_leaves) {
-				*new_leaves = append(*new_leaves, *one_node)
+			*allNodes = append(*allNodes, *oneNode)
+			if Unique(*oneNode, *newLeaves) {
+				*newLeaves = append(*newLeaves, *oneNode)
 			}
 		}
 	case 2:
@@ -328,10 +326,9 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 				return err
 			}
 
-			for _, leaf := range current_leaves {
+			for _, leaf := range currentLeaves {
 				if leaf.flow == -1 || leaf.flow == flow_int {
-
-					one_node := &Node{
+					oneNode := &Node{
 						hostname:        parts[0],
 						ip:              ips[0][1 : len(ips[0])-1],
 						rtts:            rtt,
@@ -339,9 +336,9 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 						parent_hostname: leaf.hostname,
 						flow:            flow_int,
 					}
-					*all_nodes = append(*all_nodes, *one_node)
-					if Unique(*one_node, *new_leaves) {
-						*new_leaves = append(*new_leaves, *one_node)
+					*allNodes = append(*allNodes, *oneNode)
+					if Unique(*oneNode, *newLeaves) {
+						*newLeaves = append(*newLeaves, *oneNode)
 					}
 				}
 			}
@@ -354,7 +351,7 @@ func ProcessOneTuple(parts []string, protocol string, current_leaves []Node, all
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, metroName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
+func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
 	//log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("parse").Inc()
@@ -364,9 +361,9 @@ func Parse(meta map[string]bigquery.Value, testName string, metroName string, ra
 	fn := PTFileName{Name: filepath.Base(testName)}
 	// Check whether the file name format is old format ("20160221T23:43:25Z_ALL27695.paris")
 	// or new 5-tuple format ("20170501T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris").
-	dest_IP := ""
-	server_IP := ""
-	// We do not need to get dest_IP and server_IP from file name, since they are at the first line
+	destIP := ""
+	serverIP := ""
+	// We do not need to get destIP and serverIP from file name, since they are at the first line
 	// of test content as well.
 	t, err := GetLogtime(fn)
 	if err != nil {
@@ -375,28 +372,28 @@ func Parse(meta map[string]bigquery.Value, testName string, metroName string, ra
 
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
-	is_first_line := true
+	isFirstLine := true
 	protocol := "icmp"
 	// This var keep all current leaves
-	var current_leaves []Node
+	var currentLeaves []Node
 	// This var keep all possible nodes
-	var all_nodes []Node
+	var allNodes []Node
 	// TODO(dev): Handle the first line explicitly before this for loop,
 	// then run the for loop on the remainder of the slice.
-	last_line := ""
+	lastValidHopLine := ""
+	reachedDest := false
 	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine := strings.TrimSuffix(oneLine, "\n")
 		// Skip empty line or initial lines starting with #.
 		if len(oneLine) == 0 || oneLine[0] == '#' {
 			continue
 		}
-		last_line = oneLine
 		// This var keep all new leaves
-		var new_leaves []Node
-		if is_first_line {
-			is_first_line = false
+		var newLeaves []Node
+		if isFirstLine {
+			isFirstLine = false
 			var err error
-			protocol, dest_IP, server_IP, err = ParseFirstLine(oneLine)
+			protocol, destIP, serverIP, err = ParseFirstLine(oneLine)
 			if err != nil {
 				log.Println(oneLine)
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
@@ -419,32 +416,65 @@ func Parse(meta map[string]bigquery.Value, testName string, metroName string, ra
 					// avoid panic crash due to corrupted content
 					break
 				}
-				tuple_str := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
-				err := ProcessOneTuple(tuple_str, protocol, current_leaves, &all_nodes, &new_leaves)
+				tupleStr := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
+				err := ProcessOneTuple(tupleStr, protocol, currentLeaves, &allNodes, &newLeaves)
 				if err != nil {
-					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(float64(len(all_nodes)))
+					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(float64(len(allNodes)))
 					return nil, time.Time{}, nil, err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
 				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i += 1 {
 				}
 			} // Done with a 4-tuple parsing
+			if strings.Contains(oneLine, destIP) {
+				reachedDest = true
+				// TODO: It is an option that we just stop parsing
+			}
+			// lastValidHopLine is the last line from raw test file that contains valid hop information.
+			lastValidHopLine = oneLine
 		} // Done with one line
-		current_leaves = new_leaves
+		currentLeaves = newLeaves
 	} // Done with a test file
 
-	// Check whether the last hop is the dest_ip
-	if !strings.Contains(last_line, dest_IP) {
-		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
+	// Check whether the last hop is the destIP
+	fileName := ""
+	if meta["filename"] != nil {
+		fileName = meta["filename"].(string)
 	}
+	metroName := etl.GetMetroName(fileName)
 	metrics.PTTestCount.WithLabelValues(metroName).Inc()
+	// lastHop is a close estimation for where the test reached at the end.
+	// It is possible that the last line contains destIP and other IP at the same time
+	// if the previous hop contains multiple paths.
+	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
+	// reach destIP at the last hop.
+	lastHop := destIP
+	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
+		// This is the case that we consider the test did not reach destIP at the last hop.
+		lastHop = allNodes[len(allNodes)-1].ip
+		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
+		if reachedDest {
+			// This test reach dest in the middle, but then do weird things for unknown reason.
+			metrics.PTMoreHopsAfterDest.WithLabelValues(metroName).Inc()
+			log.Printf("middle mess up test_id: " + fileName + " " + testName)
+		}
+	}
+	// Calculate how close is the last hop with the real dest.
+	// The last node of allNodes contains the last hop IP.
+	bitsDiff, ipType := etl.NumberBitsDifferent(destIP, lastHop)
+	if ipType == 4 {
+		metrics.PTBitsAwayFromDestV4.WithLabelValues(metroName).Observe(float64(bitsDiff))
+	}
+	if ipType == 6 {
+		metrics.PTBitsAwayFromDestV6.WithLabelValues(metroName).Observe(float64(bitsDiff))
+	}
 
-	// Generate Hops from all_nodes
-	PT_hops := ProcessAllNodes(all_nodes, server_IP, protocol, tableName)
-	conn_spec := &schema.MLabConnectionSpecification{
-		Server_ip:      server_IP,
+	// Generate Hops from allNodes
+	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName)
+	connSpec := &schema.MLabConnectionSpecification{
+		Server_ip:      serverIP,
 		Server_af:      IPv4_AF,
-		Client_ip:      dest_IP,
+		Client_ip:      destIP,
 		Client_af:      IPv4_AF,
 		Data_direction: 0,
 	}
@@ -454,8 +484,8 @@ func Parse(meta map[string]bigquery.Value, testName string, metroName string, ra
 		metrics.AnnotationErrorCount.With(prometheus.Labels{
 			"source": "IP Annotation Disabled."}).Inc()
 	} else {
-		AddGeoDataPTConnSpec(conn_spec, t)
-		AddGeoDataPTHopBatch(PT_hops, t)
+		AddGeoDataPTConnSpec(connSpec, t)
+		AddGeoDataPTHopBatch(PTHops, t)
 	}
-	return PT_hops, t, conn_spec, nil
+	return PTHops, t, connSpec, nil
 }

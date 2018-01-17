@@ -2,6 +2,7 @@ package etl
 
 import (
 	"errors"
+	"net"
 	"os"
 	"regexp"
 	"strconv"
@@ -87,6 +88,41 @@ func GetMetroName(raw_fn string) string {
 		return pod_name[7:10]
 	}
 	return ""
+}
+
+// Convert an IPv4 address into uint32.
+func GetIntFromIPv4(p4 net.IP) uint {
+	return uint(p4[0])<<24 + uint(p4[1])<<16 + uint(p4[2])<<8 + uint(p4[3])
+}
+
+// Convert the upper 64 bits of an IPv6 address into uint64.
+func GetIntFromIPv6Upper(p6 net.IP) uint64 {
+	return uint64(p6[0])<<56 + uint64(p6[1])<<48 + uint64(p6[2])<<40 + uint64(p6[3])<<32 + uint64(p6[4])<<24 + uint64(p6[5])<<16 + uint64(p6[6])<<8 + uint64(p6[7])
+}
+
+// Return how many bits that two IP address Different (from rightest)
+// The second returned number is 4 for IP_v4, 6 for IP_v6, and 0 for invalid input.
+func NumberBitsDifferent(first_ip string, second_ip string) (int, int) {
+	ip1 := net.ParseIP(first_ip)
+	ip2 := net.ParseIP(second_ip)
+	if ip1.To4() != nil && ip2.To4() != nil {
+		dist := uint(GetIntFromIPv4(ip1.To4()) ^ uint(GetIntFromIPv4(ip2.To4())))
+		n := 0
+		for ; dist != 0; dist >>= 1 {
+			n++
+		}
+		return n, 4
+	}
+	if ip1.To16() != nil && ip2.To16() != nil {
+		// We will only compare the upper 64 bits.
+		dist := uint64(GetIntFromIPv6Upper(ip1.To16())) ^ uint64(GetIntFromIPv6Upper(ip2.To16()))
+		n := 0
+		for ; dist != 0; dist >>= 1 {
+			n++
+		}
+		return n, 6
+	}
+	return -1, 0
 }
 
 //=====================================================================
