@@ -63,9 +63,13 @@ func NewQueuer(altHTTP HTTPClientIntf, queueBase string, numQueues int, project,
 
 	bucket := storageClient.Bucket(bucketName)
 	// Check that the bucket is valid, by fetching it's attributes.
-	_, err = bucket.Attrs(context.Background())
-	if err != nil {
-		return Queuer{}, err
+	// Bypass check if we are running travis tests.
+	if !dryRun {
+		_, err = bucket.Attrs(context.Background())
+		if err != nil {
+			return Queuer{}, err
+		}
+
 	}
 
 	return Queuer{project, queueBase, numQueues, bucketName, bucket, httpClient}, nil
