@@ -68,7 +68,7 @@ func QueuerFromEnv() (batch.Queuer, error) {
 		return batch.Queuer{}, errors.New("Parse error on NUM_QUEUES")
 	}
 
-	return batch.NewQueuer(nil, queueBase, numQueues, project, bucketName, false)
+	return batch.NewQueuer(nil, nil, queueBase, numQueues, project, bucketName, false)
 }
 
 // TODO(gfr) Add either a black list or a white list for the environment
@@ -190,7 +190,7 @@ func main() {
 		return
 	}
 
-	q, err := batch.NewQueuer(nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
+	q, err := batch.NewQueuer(nil, nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
 	if err != nil {
 		log.Fatal(err)
 	}

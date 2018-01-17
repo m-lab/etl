@@ -53,9 +53,9 @@ script:
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
 # TODO - add integration test tag.
-- COVER_PKGS=./annotation/...,./appengine/...,./bq/...,./dedup/...,./etl/...,./metrics/...,./parser/...,./schema/...,./storage/...,./task/...,./web100/...
+- COVER_PKGS=./annotation/...,./appengine/...,./batch/...,./bq/...,./dedup/...,./etl/...,./metrics/...,./parser/...,./schema/...,./storage/...,./task/...,./web100/...
 - go test -coverpkg=$COVER_PKGS -coverprofile=annotation.cov -v github.com/m-lab/etl/annotation
-- go test -coverpkg=$COVER_PKGS -coverprofile=batch.cov -v github.com/m-lab/etl/batch
+- go test -coverpkg=$COVER_PKGS -coverprofile=batch.cov -v github.com/m-lab/etl/batch -tags integration
 - go test -coverpkg=$COVER_PKGS -coverprofile=bq.cov -v github.com/m-lab/etl/bq
 - go test -coverpkg=$COVER_PKGS -coverprofile=dedup.cov -v github.com/m-lab/etl/dedup -tags=integration
 - go test -coverpkg=$COVER_PKGS -coverprofile=etl.cov -v github.com/m-lab/etl/etl
@@ -134,8 +134,9 @@ deploy:
 # INTEGRATION: Reviewed code, merged to integration branch, will trigger
 # deployment to "standard" mlab-sandbox.
 - provider: script
-  script: 
-    INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox 
+  script:
+    # These injected params specify the project and bucket used by the service.
+    INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/cron app.yaml
   skip_cleanup: true
@@ -160,6 +161,22 @@ deploy:
     # Sandbox branches will be deployed to personalized service names.
     # Integration branch will not use decorated service names.
     condition: $TRAVIS_BRANCH == disco-sandbox-*
+
+######################################################################
+## Service: etl-cron -- Service that runs various batch jobs, such as
+#                       reprocessing and dedupping.
+#
+# INTEGRATION: Reviewed code, merged to integration branch, will trigger
+# deployment to "standard" mlab-sandbox.
+- provider: script
+  script:
+    INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/cron app.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    branch: integration
 
 ######################################################################
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
