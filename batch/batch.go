@@ -17,22 +17,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-/*
-Reprocessing strategy:
-  1. Reprocessing will run continuously, essentially as a cron job.
-  2. Processing should be throttled to avoid overfilling the task
-	 queues, and allow ordered completion of batches.
-  3. Should reprocessing always focus on the least recently processed
-	 data, or should it simply reprocess in order?
-  4. Should it reprocess more recent data more frequently than older
-	 data?
-
-For simplicity, we will start with the least recently reprocessed
-month, and work forward until we reach one month ago.  We will initially
-process whole months, since that is conceptually simple.
-
-*/
-
 // HTTPClientIntf defines interface for fake injection.
 type HTTPClientIntf interface {
 	Get(url string) (resp *http.Response, err error)
@@ -104,6 +88,8 @@ func (q Queuer) postOneTask(queue, fn string) error {
 
 	resp, err := q.HTTPClient.Get(reqStr)
 	if err != nil {
+		// TODO - we don't see errors here or below when the queue doesn't exist.
+		// That seems bad.
 		return err
 	}
 	defer resp.Body.Close()
