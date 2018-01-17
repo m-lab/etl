@@ -1,4 +1,4 @@
-package main
+package batch_test
 
 import (
 	"bytes"
@@ -8,7 +8,8 @@ import (
 	"net/http"
 	"os"
 	"testing"
-	"time"
+
+	"github.com/m-lab/etl/batch"
 )
 
 // ResetFlags restores the command line flags to their default
@@ -17,18 +18,6 @@ func ResetFlags() {
 	flag.VisitAll(func(f *flag.Flag) {
 		f.Value.Set(f.DefValue)
 	})
-}
-
-func Test_queueFor(t *testing.T) {
-	// Set the flag values?
-	flag.CommandLine.Parse([]string{"-queue", "base-", "-dry_run"})
-	defer ResetFlags()
-
-	tme, _ := time.Parse("2006/01/02", "2017/09/01")
-	queue := queueForDate(tme)
-	if queue != "base-2" {
-		t.Error("bad queue: ", queue)
-	}
 }
 
 type countingHTTP struct {
@@ -46,25 +35,38 @@ func (h *countingHTTP) Get(url string) (resp *http.Response, err error) {
 	return
 }
 
-// NOTE: This test depends on the contents of the test-archive-mlab-sandbox
-// bucket.  If it fails, check whether that bucket has been modified.
-func Test_month(t *testing.T) {
+var (
+	fProject = flag.String("project", "", "Project containing queues.")
+	fQueue   = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
+	// TODO implement listing queues to determine number of queue, and change this to 0
+	fNumQueues = flag.Int("num_queues", 8, "Number of queues.  Normally determined by listing queues.")
+	fBucket    = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
+	fExper     = flag.String("experiment", "ndt", "Experiment prefix, without trailing slash.")
+	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
+	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
+	fDryRun    = flag.Bool("dry_run", false, "Prevents all output to queue_pusher.")
+)
+
+func TestPostMonth(t *testing.T) {
 	flag.CommandLine.Parse([]string{
 		"-queue", "base-", "-dry_run", "-bucket=test-archive-mlab-sandbox",
 		"-month=2017/10"})
 	defer ResetFlags()
 
 	fake := countingHTTP{}
-	setup(&fake)
-	run()
+	q, err := batch.NewQueuer(&fake, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q.PostMonth(*fExper + "/" + *fMonth + "/")
 	if fake.count != 100 {
-		t.Error("Should have made 100 http requests.")
+		t.Errorf("Should have made 100 http requests: %d\n", fake.count)
 	}
 }
 
 // NOTE: This test depends on the contents of the test-archive-mlab-sandbox
 // bucket.  If it fails, check whether that bucket has been modified.
-func Example_month() {
+func ExampleMonth() {
 	log.SetFlags(0)
 	flag.CommandLine.Parse([]string{
 		"-queue", "base-", "-dry_run", "-bucket=test-archive-mlab-sandbox",
@@ -72,8 +74,9 @@ func Example_month() {
 	defer ResetFlags()
 
 	log.SetOutput(os.Stdout) // Redirect to stdout so test framework sees it.
-	setup(nil)
-	run()
+	q, _ := batch.NewQueuer(nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
+	q.PostMonth(*fExper + "/" + *fMonth + "/")
+
 	log.SetOutput(os.Stderr) // restore
 	// Unordered output:
 	// Adding  ndt/2017/10/28/  to  base-3
@@ -84,7 +87,7 @@ func Example_month() {
 
 // NOTE: This test depends on the contents of the test-archive-mlab-sandbox
 // bucket.  If it fails, check whether that bucket has been modified.
-func Example_day() {
+func ExampleDay() {
 	log.SetFlags(0)
 	flag.CommandLine.Parse([]string{
 		"-queue", "base-", "-dry_run", "-bucket=test-archive-mlab-sandbox",
@@ -92,8 +95,8 @@ func Example_day() {
 	defer ResetFlags()
 
 	log.SetOutput(os.Stdout) // Redirect to stdout so test framework sees it.
-	setup(nil)
-	run()
+	q, _ := batch.NewQueuer(nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
+	q.PostDay(nil, *fExper+"/"+*fDay+"/")
 	log.SetOutput(os.Stderr) // restore
 	// Output:
 	// Adding  ndt/2017/09/24/  to  base-1

@@ -1,0 +1,213 @@
+// Package batch provides tools for various batch processing actions,
+// such as reprocessing a month or day or data, and handling deduplication.
+package batch
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"sync"
+	"time"
+
+	"cloud.google.com/go/storage"
+	"google.golang.org/api/iterator"
+)
+
+/*
+Reprocessing strategy:
+  1. Reprocessing will run continuously, essentially as a cron job.
+  2. Processing should be throttled to avoid overfilling the task
+	 queues, and allow ordered completion of batches.
+  3. Should reprocessing always focus on the least recently processed
+	 data, or should it simply reprocess in order?
+  4. Should it reprocess more recent data more frequently than older
+	 data?
+
+For simplicity, we will start with the least recently reprocessed
+month, and work forward until we reach one month ago.  We will initially
+process whole months, since that is conceptually simple.
+
+*/
+
+// HTTPClientIntf defines interface for fake injection.
+type HTTPClientIntf interface {
+	Get(url string) (resp *http.Response, err error)
+}
+
+// This is used to intercept Get requests to the queue_pusher when invoked
+// with -dry_run.
+type dryRunHTTP struct{}
+
+func (dr *dryRunHTTP) Get(url string) (resp *http.Response, err error) {
+	resp = &http.Response{}
+	resp.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+	resp.Status = "200 OK"
+	resp.StatusCode = 200
+	return
+}
+
+// A Queuer provides the environment for queuing reprocessing requests.
+type Queuer struct {
+	Project    string                // project containing task queue
+	QueueBase  string                // task queue base name
+	NumQueues  int                   // number of task queues.
+	BucketName string                // name of bucket containing task files
+	Bucket     *storage.BucketHandle // bucket handle
+	HTTPClient HTTPClientIntf        // Client to be used for http requests.
+}
+
+// NewQueuer creates a Queuer struct from provided parameters.
+func NewQueuer(altHTTP HTTPClientIntf, queueBase string, numQueues int, project, bucketName string, dryRun bool) (Queuer, error) {
+	var httpClient HTTPClientIntf
+	if altHTTP != nil {
+		httpClient = altHTTP
+	} else if dryRun {
+		httpClient = &dryRunHTTP{}
+	} else {
+		httpClient = http.DefaultClient
+	}
+
+	storageClient, err := storage.NewClient(context.Background())
+	if err != nil {
+		log.Println(err)
+		panic(err)
+	}
+
+	bucket := storageClient.Bucket(bucketName)
+	// Check that the bucket is valid, by fetching it's attributes.
+	_, err = bucket.Attrs(context.Background())
+	if err != nil {
+		return Queuer{}, err
+	}
+
+	return Queuer{project, queueBase, numQueues, bucketName, bucket, httpClient}, nil
+}
+
+// Initially this used a hash, but using day ordinal is better
+// as it distributes across the queues more evenly.
+func (q Queuer) queueForDate(date time.Time) string {
+	day := date.Unix() / (24 * 60 * 60)
+	return fmt.Sprintf("%s%d", q.QueueBase, int(day)%q.NumQueues)
+}
+
+// postOne sends a single https request to the queue pusher to add a task.
+// Iff dryRun is true, this does nothing.
+// TODO - move retry into this method.
+// TODO - should use AddMulti - should be much faster.
+//   however - be careful not to exceed quotas
+func (q Queuer) postOneTask(queue, fn string) error {
+	reqStr := fmt.Sprintf("https://queue-pusher-dot-%s.appspot.com/receiver?queue=%s&filename=gs://%s/%s", q.Project, queue, q.BucketName, fn)
+
+	resp, err := q.HTTPClient.Get(reqStr)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return errors.New("http error: " + resp.Status)
+	}
+
+	return nil
+}
+
+// postOneDay posts all items in an ObjectIterator into the appropriate queue.
+func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
+	qpErrCount := 0
+	gcsErrCount := 0
+	fileCount := 0
+	if wg != nil {
+		defer wg.Done()
+	}
+	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
+		if err != nil {
+			// TODO - should this retry?
+			log.Println(err, "on it.Next")
+			gcsErrCount++
+			if gcsErrCount > 3 {
+				log.Printf("Failed after %d files to %s.\n", fileCount, queue)
+				return
+			}
+			continue
+		}
+
+		err = q.postOneTask(queue, o.Name)
+		if err != nil {
+			// TODO - should this retry?
+			log.Println(err, o.Name, "Retrying")
+			// Retry
+			time.Sleep(10 * time.Second)
+			err = q.postOneTask(queue, o.Name)
+
+			if err != nil {
+				log.Println(err, o.Name, "FAILED")
+				qpErrCount++
+				if qpErrCount > 3 {
+					log.Printf("Failed after %d files to %s (on %s).\n", fileCount, queue, o.Name)
+					return
+				}
+			}
+		} else {
+			fileCount++
+		}
+	}
+	log.Println("Added ", fileCount, " tasks to ", queue)
+}
+
+// PostDay fetches an iterator over the objects with ndt/YYYY/MM/DD prefix,
+// and passes the iterator to postDay with appropriate queue.
+// Iff wq is not nil, PostDay will call done on wg when finished
+// posting.
+// This typically takes about 10 minutes, whether single or parallel days.
+func (q Queuer) PostDay(wg *sync.WaitGroup, prefix string) {
+	date, err := time.Parse("ndt/2006/01/02/", prefix)
+	if err != nil {
+		log.Println("Failed parsing date from ", prefix)
+		log.Println(err)
+		if wg != nil {
+			wg.Done()
+		}
+		return
+	}
+	queue := q.queueForDate(date)
+	log.Println("Adding ", prefix, " to ", queue)
+	qry := storage.Query{
+		Delimiter: "/",
+		Prefix:    prefix,
+	}
+	// TODO - can this error?  Or do errors only occur on iterator ops?
+	it := q.Bucket.Objects(context.Background(), &qry)
+	if wg != nil {
+		go q.postOneDay(wg, queue, it)
+	} else {
+		q.postOneDay(nil, queue, it)
+	}
+}
+
+// PostMonth adds all of the files from dates within a specified month.
+// It is difficult to test without hitting GCS.  8-(
+// This typically takes about 10 minutes, processing all days concurrently.
+func (q Queuer) PostMonth(prefix string) {
+	qry := storage.Query{
+		Delimiter: "/",
+		// TODO - validate.
+		Prefix: prefix,
+	}
+	it := q.Bucket.Objects(context.Background(), &qry)
+
+	var wg sync.WaitGroup
+	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
+		if err != nil {
+			log.Println(err)
+		} else if o.Prefix != "" {
+			wg.Add(1)
+			q.PostDay(&wg, o.Prefix)
+		} else {
+			log.Println("Skipping: ", o.Name)
+		}
+	}
+	wg.Wait()
+}
