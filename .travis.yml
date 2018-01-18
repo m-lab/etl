@@ -298,14 +298,14 @@ deploy:
 - provider: script
   script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher app.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
-    condition: $TRAVIS_BRANCH == qp-sandbox-*
+    condition: $TRAVIS_BRANCH == qp-personal-*
 
 # SANDBOX: After code review and commits to master branch. Triggers when *ANY*
 # branch is tagged with qp-sandbox-*
