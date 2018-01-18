@@ -123,7 +123,10 @@ func (q Queuer) postOneTask(queue, fn string) error {
 
 	resp, err := q.HTTPClient.Get(reqStr)
 	if err != nil {
+<<<<<<< HEAD
 		log.Println(err)
+=======
+>>>>>>> 4cba453... add batch tests to travis
 		// TODO - we don't see errors here or below when the queue doesn't exist.
 		// That seems bad.
 		return err
