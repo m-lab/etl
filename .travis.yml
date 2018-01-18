@@ -60,9 +60,6 @@ script:
 - go test -coverpkg=$COVER_PKGS -coverprofile=qp.cov -v github.com/m-lab/etl/appengine/queue_pusher
 - go test -coverpkg=$COVER_PKGS -coverprofile=task.cov -v github.com/m-lab/etl/task
 - go test -coverpkg=$COVER_PKGS -coverprofile=web100.cov -v github.com/m-lab/etl/web100
-# reproc tests are not ideal as they depend on GCS test-archive-mlab-sandbox.
-# They also require credentials, which aren't set up yet.
-# - go test -coverpkg=$COVER_PKGS -coverprofile=reproc.cov -v github.com/m-lab/etl/cmd/reproc
 
 # Coveralls
 - $HOME/gopath/bin/gocovmerge annotation.cov bq.cov parser.cov qp.cov task.cov web100.cov > merge.cov
@@ -125,6 +122,22 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_TAG == prod-*
+
+######################################################################
+## Service: etl-cron -- Service that runs various batch jobs, such as
+#                       reprocessing and dedupping.
+#
+# INTEGRATION: Reviewed code, merged to integration branch, will trigger
+# deployment to "standard" mlab-sandbox.
+- provider: script
+  script: 
+    INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox 
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/cron app.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    branch: integration
 
 ######################################################################
 ## Service: etl-disco-parser -- AppEngine Flexible Environment.
@@ -281,7 +294,7 @@ deploy:
 
 ######################################################################
 ## Service: queue-pusher -- AppEngine Standard Environment.
-# SANDBOX: before code review for development code in a specific branch.
+# PERSONAL SANDBOX: before code review for development code in a specific branch.
 - provider: script
   script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
@@ -293,6 +306,18 @@ deploy:
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
     condition: $TRAVIS_BRANCH == qp-sandbox-*
+
+# SANDBOX: After code review and commits to master branch. Triggers when *ANY*
+# branch is tagged with qp-sandbox-*
+- provider: script
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    tag: true
+    condition: $TRAVIS_TAG == qp-sandbox-* || $TRAVIS_BRANCH == integration
 
 # STAGING: After code review and commits to master branch. Triggers when *ANY*
 # branch is tagged with qp-staging-*
