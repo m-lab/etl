@@ -35,7 +35,7 @@ var (
 	fQueue   = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
 	// TODO implement listing queues to determine number of queue, and change this to 0
 	fNumQueues = flag.Int("num_queues", 8, "Number of queues.  Normally determined by listing queues.")
-	fBucket    = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
+	fBucket    = flag.String("bucket", "", "Source bucket.")
 	fExper     = flag.String("experiment", "ndt", "Experiment prefix, without trailing slash.")
 	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
 	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
@@ -58,7 +58,7 @@ func main() {
 		return
 	}
 
-	q, err := batch.NewQueuer(nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
+	q, err := batch.NewQueuer(nil, nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
