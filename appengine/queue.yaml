@@ -13,40 +13,48 @@ queue:
   # Maximum number of concurrent requests.
   max_concurrent_requests: 360
 
-# For processing archival data, we want to be able to process roughly one month
-# per day, which for current data rates of 1 million tests per day, is
-# about 30 million rows per day, or about 350 rows/second.
-#
 # BigQuery has a streaming insert quota per table.  The published quota is
 # 100MB/sec per table, but we have been hitting the quota at seemingly
-# lower rates - around 200 rows/second for NDT, which is about 20MB/sec of
-# data in the final table.
+# lower rates - around 200 rows/second for NDT with deltas, which is about
+# 20MB/sec of data in the final table.
 # Not clear what is going on - perhaps the quota is on the size of incoming
-# HTTP request data - but we will design to stay well within 200
-# rows/second limit.
+# HTTP request data.
+#
+# We will design to stay within about 200 rows/sec/table for inserts with deltas
+# but we can run about 1200 rows/sec/table without deltas.  This unfortunately
+# means that we should update the number of concurrent requests depending on
+# whether we are doing full deltas.
+# 
+# Without deltas, we are observing about 4 instance-hours / day of data for
+# mid 2017.  This means with 40 instances, we can process about 8 months/day.
+# With deltas, this slows dramatically, to about 10-15 rows/sec/instance,
+# or about 1 day/day/instance.
+#
+# For processing archival data, we want to be able to process roughly one month
+# per day, which for currentdata rates of 1 million tests per day, is
+# about 30 million rows per day, or about 350 rows/second.
 #
 # When reprocessing data older than 30 days, the pipeline inserts rows 
 # into templated tables, which means there is a separate table per day.
 # So for archive reprocessing more than 30 days in the past, the BQ quota
 # ends up being rows/sec per day/date.
 #
-# Let's choose a conservative BQ rate limit of 200 rows/second, per
-# table, and therefore per archive date.
+# With deltas, let's choose a conservative BQ rate limit of 200 rows/second,
+# per table, and therefore per archive date.  Without deltas, we will
+# design for about 1200 rows/second.
 #
 # The new scraper produces about 16K tasks per day, with about 60 row inserts
 # per task.  But older archives are much larger, with perhaps 1000 to 2000 tar
 # files per day, and 600 to 1000 tests per file.
 # 
-# The individual tasks in the new pipeline complete in roughly 45 seconds,
-# so the net row insert rate is around 1.3 rows/sec per task, at least
-# when instances are running at modest CPU load of 60% or so.  (The
-# throughput per task drops when CPU utilization exceeds 90% or so).
+# We will limit the rate based on number of concurrent tasks, so we can
+# regulate the throughput independent of the size of the archive files.
+# With deltas, we want 200 rows/second, divided by 1.3 rows/sec per task,
+# results in a target of roughly 150 concurrent tasks per archive date,
+# or 1200 tasks across 8 queues.
 #
-# Using task queue rate/sec, we would have to very conservative because
-# of the very large older archives. But by limiting the rate based on
-# number of concurrent tasks, we can regulate the throughput independent
-# of the size of the archive files.  200 rows/second, divided by 1.3 rows/sec
-# per task, results in a target of roughly 150 concurrent tasks per archive date.
+# Without deltas, the throughput is much higher.  We will try with the
+# same number of concurrent tasks, and adjust if needed.
 #
 # To reach the desired 350 rows/second required to process one month's
 # data each day, we need to process at least 2 days of data in parallel.
@@ -70,48 +78,48 @@ queue:
 #
 # SUMMARY:
 # 1. Each queue must limit concurrent requests to about 55 to limit
-#    rate into individual tables to around 200 rows/second.
+#    rate into individual tables to around 200 rows/second (with deltas)
 # 2. We have 8 queues, to allow up to about 1600 rows/second, to
 #    allow 30 days of data to be processed within one day, with
 #    some headroom for future growth.
 - name: etl-ndt-batch-0
   target: etl-ndt-batch-parser
-  rate: 1.2/s
+  rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 55
 - name: etl-ndt-batch-1
   target: etl-ndt-batch-parser
-  rate: 1.2/s
+  rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 55
 - name: etl-ndt-batch-2
   target: etl-ndt-batch-parser
-  rate: 1.2/s
+  rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 55
 - name: etl-ndt-batch-3
   target: etl-ndt-batch-parser
-  rate: 1.2/s
+  rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 55
 - name: etl-ndt-batch-4
   target: etl-ndt-batch-parser
-  rate: 1.2/s
+  rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 55
 - name: etl-ndt-batch-5
   target: etl-ndt-batch-parser
-  rate: 1.2/s
+  rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 55
 - name: etl-ndt-batch-6
   target: etl-ndt-batch-parser
-  rate: 1.2/s
+  rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 55
 - name: etl-ndt-batch-7
   target: etl-ndt-batch-parser
-  rate: 1.2/s
+  rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 55
 
