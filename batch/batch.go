@@ -7,19 +7,46 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
-// HTTPClientIntf defines interface for fake injection.
-type HTTPClientIntf interface {
-	Get(url string) (resp *http.Response, err error)
+// *******************************************************************
+// OK Client, that just returns status ok and empty body
+// For use when -dry_run is specified.
+// *******************************************************************
+type okTransport struct {
+	lastReq *http.Request
+}
+
+type nopCloser struct {
+	io.Reader
+}
+
+func (nc *nopCloser) Close() error { return nil }
+
+// RoundTrip implements the RoundTripper interface, logging the
+// request, and the response body, (which may be json).
+func (t *okTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp := &http.Response{}
+	resp.StatusCode = http.StatusOK
+	resp.Body = &nopCloser{strings.NewReader("")}
+	return resp, nil
+}
+
+func getOKClient() *http.Client {
+	client := &http.Client{}
+	client.Transport = &okTransport{}
+	return client
 }
 
 // This is used to intercept Get requests to the queue_pusher when invoked
@@ -34,6 +61,10 @@ func (dr *dryRunHTTP) Get(url string) (resp *http.Response, err error) {
 	return
 }
 
+// *******************************************************************
+// Queuer handles queueing of reprocessing requests
+// *******************************************************************
+
 // A Queuer provides the environment for queuing reprocessing requests.
 type Queuer struct {
 	Project    string                // project containing task queue
@@ -41,21 +72,23 @@ type Queuer struct {
 	NumQueues  int                   // number of task queues.
 	BucketName string                // name of bucket containing task files
 	Bucket     *storage.BucketHandle // bucket handle
-	HTTPClient HTTPClientIntf        // Client to be used for http requests.
+	HTTPClient *http.Client          // Client to be used for http requests to queue pusher.
 }
 
 // NewQueuer creates a Queuer struct from provided parameters.
-func NewQueuer(altHTTP HTTPClientIntf, queueBase string, numQueues int, project, bucketName string, dryRun bool) (Queuer, error) {
-	var httpClient HTTPClientIntf
+//   altHTTP - allows injection of an http client to be used for queue_pusher calls.
+//   opts    - allows injection of credentials, e.g. for tests that need to access storage buckets.
+func NewQueuer(altHTTP *http.Client, opts []option.ClientOption, queueBase string, numQueues int, project, bucketName string, dryRun bool) (Queuer, error) {
+	var httpClient *http.Client
 	if altHTTP != nil {
 		httpClient = altHTTP
 	} else if dryRun {
-		httpClient = &dryRunHTTP{}
+		httpClient = getOKClient()
 	} else {
 		httpClient = http.DefaultClient
 	}
 
-	storageClient, err := storage.NewClient(context.Background())
+	storageClient, err := storage.NewClient(context.Background(), opts...)
 	if err != nil {
 		log.Println(err)
 		panic(err)
@@ -69,7 +102,6 @@ func NewQueuer(altHTTP HTTPClientIntf, queueBase string, numQueues int, project,
 		if err != nil {
 			return Queuer{}, err
 		}
-
 	}
 
 	return Queuer{project, queueBase, numQueues, bucketName, bucket, httpClient}, nil
@@ -92,20 +124,27 @@ func (q Queuer) postOneTask(queue, fn string) error {
 
 	resp, err := q.HTTPClient.Get(reqStr)
 	if err != nil {
+		log.Println(err)
 		// TODO - we don't see errors here or below when the queue doesn't exist.
 		// That seems bad.
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return errors.New("http error: " + resp.Status)
+		buf, _ := ioutil.ReadAll(resp.Body)
+		message := string(buf)
+		if strings.Contains(message, "UNKNOWN_QUEUE") {
+			return errors.New(message + " " + queue)
+		}
+		log.Println(string(buf))
+		return errors.New(resp.Status + " :: " + message)
 	}
 
 	return nil
 }
 
 // postOneDay posts all items in an ObjectIterator into the appropriate queue.
-func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) {
+func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) error {
 	qpErrCount := 0
 	gcsErrCount := 0
 	fileCount := 0
@@ -119,7 +158,7 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 			gcsErrCount++
 			if gcsErrCount > 3 {
 				log.Printf("Failed after %d files to %s.\n", fileCount, queue)
-				return
+				return err
 			}
 			continue
 		}
@@ -127,6 +166,10 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 		err = q.postOneTask(queue, o.Name)
 		if err != nil {
 			// TODO - should this retry?
+			if strings.Contains(err.Error(), "UNKNOWN_QUEUE") {
+				log.Println(err)
+				return err
+			}
 			log.Println(err, o.Name, "Retrying")
 			// Retry
 			time.Sleep(10 * time.Second)
@@ -137,7 +180,7 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 				qpErrCount++
 				if qpErrCount > 3 {
 					log.Printf("Failed after %d files to %s (on %s).\n", fileCount, queue, o.Name)
-					return
+					return err
 				}
 			}
 		} else {
@@ -145,6 +188,7 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 		}
 	}
 	log.Println("Added ", fileCount, " tasks to ", queue)
+	return nil
 }
 
 // PostDay fetches an iterator over the objects with ndt/YYYY/MM/DD prefix,
@@ -152,7 +196,7 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 // Iff wq is not nil, PostDay will call done on wg when finished
 // posting.
 // This typically takes about 10 minutes, whether single or parallel days.
-func (q Queuer) PostDay(wg *sync.WaitGroup, prefix string) {
+func (q Queuer) PostDay(wg *sync.WaitGroup, prefix string) error {
 	date, err := time.Parse("ndt/2006/01/02/", prefix)
 	if err != nil {
 		log.Println("Failed parsing date from ", prefix)
@@ -160,7 +204,7 @@ func (q Queuer) PostDay(wg *sync.WaitGroup, prefix string) {
 		if wg != nil {
 			wg.Done()
 		}
-		return
+		return err
 	}
 	queue := q.queueForDate(date)
 	log.Println("Adding ", prefix, " to ", queue)
@@ -171,10 +215,12 @@ func (q Queuer) PostDay(wg *sync.WaitGroup, prefix string) {
 	// TODO - can this error?  Or do errors only occur on iterator ops?
 	it := q.Bucket.Objects(context.Background(), &qry)
 	if wg != nil {
+		// TODO - this ignores errors.
 		go q.postOneDay(wg, queue, it)
 	} else {
-		q.postOneDay(nil, queue, it)
+		return q.postOneDay(nil, queue, it)
 	}
+	return nil
 }
 
 // PostMonth adds all of the files from dates within a specified month.
@@ -192,6 +238,11 @@ func (q Queuer) PostMonth(prefix string) {
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
 		if err != nil {
 			log.Println(err)
+			if strings.Contains(err.Error(),
+				"does not have storage.objects.list access") {
+				// Inadequate permissions
+				break
+			}
 		} else if o.Prefix != "" {
 			wg.Add(1)
 			q.PostDay(&wg, o.Prefix)
