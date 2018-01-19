@@ -78,10 +78,11 @@ type Queuer struct {
 // ErrNilClient is returned when client is not provided.
 var ErrNilClient = errors.New("nil http client not allowed")
 
-// NewQueuer creates a Queuer struct from provided parameters.
-//   altHTTP - allows injection of an http client to be used for queue_pusher calls.
-//   opts    - allows injection of credentials, e.g. for tests that need to access storage buckets.
-func NewQueuer(httpClient *http.Client, opts []option.ClientOption, queueBase string, numQueues int, project, bucketName string, dryRun bool) (Queuer, error) {
+// CreateQueuer creates a Queuer struct from provided parameters.  This does network ops.
+//   httpClient - client to be used for queue_pusher calls.  Allows injection of fake for testing.
+//                must be non-null.
+//   opts       - ClientOptions, e.g. credentials, for tests that need to access storage buckets.
+func CreateQueuer(httpClient *http.Client, opts []option.ClientOption, queueBase string, numQueues int, project, bucketName string, dryRun bool) (Queuer, error) {
 	if httpClient == nil {
 		return Queuer{}, ErrNilClient
 	}
@@ -224,7 +225,8 @@ func (q Queuer) PostDay(wg *sync.WaitGroup, prefix string) error {
 // PostMonth adds all of the files from dates within a specified month.
 // It is difficult to test without hitting GCS.  8-(
 // This typically takes about 10 minutes, processing all days concurrently.
-func (q Queuer) PostMonth(prefix string) {
+// May return an error, but some PostDay errors may not be detected or propagated.
+func (q Queuer) PostMonth(prefix string) error {
 	qry := storage.Query{
 		Delimiter: "/",
 		// TODO - validate.
@@ -233,6 +235,9 @@ func (q Queuer) PostMonth(prefix string) {
 	it := q.Bucket.Objects(context.Background(), &qry)
 
 	var wg sync.WaitGroup
+	errCount := 0
+	const maxErrors = 20
+	var err error
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
 		if err != nil {
 			log.Println(err)
@@ -241,12 +246,24 @@ func (q Queuer) PostMonth(prefix string) {
 				// Inadequate permissions
 				break
 			}
+			if errCount++; errCount > maxErrors {
+				log.Println("Too many errors.  Breaking loop.")
+				break
+			}
 		} else if o.Prefix != "" {
 			wg.Add(1)
-			q.PostDay(&wg, o.Prefix)
+			err := q.PostDay(&wg, o.Prefix)
+			if err != nil {
+				log.Println(err)
+				if errCount++; errCount > maxErrors {
+					log.Println("Too many errors.  Breaking loop.")
+					break
+				}
+			}
 		} else {
 			log.Println("Skipping: ", o.Name)
 		}
 	}
 	wg.Wait()
+	return err
 }

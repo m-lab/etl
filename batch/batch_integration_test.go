@@ -79,7 +79,7 @@ func Options() []option.ClientOption {
 
 func TestPostDay(t *testing.T) {
 	fake, tp := newCountingClient()
-	q, err := batch.NewQueuer(fake, Options(), "test-", 8, "fake-project", "archive-mlab-test", true)
+	q, err := batch.CreateQueuer(fake, Options(), "test-", 8, "fake-project", "archive-mlab-test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,11 +91,14 @@ func TestPostDay(t *testing.T) {
 
 func TestPostMonth(t *testing.T) {
 	fake, tp := newCountingClient()
-	q, err := batch.NewQueuer(fake, Options(), "test-", 8, "fake-project", "archive-mlab-test", true)
+	q, err := batch.CreateQueuer(fake, Options(), "test-", 8, "fake-project", "archive-mlab-test", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	q.PostMonth("ndt/2017/10/")
+	err = q.PostMonth("ndt/2017/10/")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if tp.count != 100 {
 		t.Errorf("Should have made 100 http requests: %d\n", tp.count)
 	}
@@ -108,8 +111,14 @@ func ExampleMonth() {
 
 	log.SetOutput(os.Stdout) // Redirect to stdout so test framework sees it.
 	fake, _ := newCountingClient()
-	q, _ := batch.NewQueuer(fake, Options(), "test-", 8, "fake-project", "archive-mlab-test", true)
-	q.PostMonth("ndt/2017/10/")
+	q, err := batch.CreateQueuer(fake, Options(), "test-", 8, "fake-project", "archive-mlab-test", true)
+	if err != nil {
+		log.Println(err)
+	}
+	err = q.PostMonth("ndt/2017/10/")
+	if err != nil {
+		log.Println(err)
+	}
 
 	log.SetOutput(os.Stderr) // restore
 	// Unordered output:
@@ -126,8 +135,14 @@ func ExampleDay() {
 
 	log.SetOutput(os.Stdout) // Redirect to stdout so test framework sees it.
 	fake, _ := newCountingClient()
-	q, _ := batch.NewQueuer(fake, Options(), "test-", 8, "fake-project", "archive-mlab-test", true)
-	q.PostDay(nil, "ndt/2017/09/24/")
+	q, err := batch.CreateQueuer(fake, Options(), "test-", 8, "fake-project", "archive-mlab-test", true)
+	if err != nil {
+		log.Println(err)
+	}
+	err = q.PostDay(nil, "ndt/2017/09/24/")
+	if err != nil {
+		log.Println(err)
+	}
 	log.SetOutput(os.Stderr) // restore
 	// Output:
 	// Adding  ndt/2017/09/24/  to  test-1

@@ -58,7 +58,7 @@ func main() {
 		return
 	}
 
-	q, err := batch.NewQueuer(nil, nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
+	q, err := batch.CreateQueuer(http.DefaultClient, nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
