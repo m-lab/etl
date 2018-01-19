@@ -43,7 +43,7 @@ func (t *okTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-func getOKClient() *http.Client {
+func DryRunQueuerClient() *http.Client {
 	client := &http.Client{}
 	client.Transport = &okTransport{}
 	return client
@@ -75,17 +75,15 @@ type Queuer struct {
 	HTTPClient *http.Client          // Client to be used for http requests to queue pusher.
 }
 
+// ErrNilClient is returned when client is not provided.
+var ErrNilClient = errors.New("nil http client not allowed")
+
 // NewQueuer creates a Queuer struct from provided parameters.
 //   altHTTP - allows injection of an http client to be used for queue_pusher calls.
 //   opts    - allows injection of credentials, e.g. for tests that need to access storage buckets.
-func NewQueuer(altHTTP *http.Client, opts []option.ClientOption, queueBase string, numQueues int, project, bucketName string, dryRun bool) (Queuer, error) {
-	var httpClient *http.Client
-	if altHTTP != nil {
-		httpClient = altHTTP
-	} else if dryRun {
-		httpClient = getOKClient()
-	} else {
-		httpClient = http.DefaultClient
+func NewQueuer(httpClient *http.Client, opts []option.ClientOption, queueBase string, numQueues int, project, bucketName string, dryRun bool) (Queuer, error) {
+	if httpClient == nil {
+		return Queuer{}, ErrNilClient
 	}
 
 	storageClient, err := storage.NewClient(context.Background(), opts...)
