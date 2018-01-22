@@ -42,7 +42,7 @@ func main() {
 
 	dest := strings.Split(*fDestinationTable, ".")
 	if len(dest) != 2 {
-		log.Println("template_prefix must have dataset.table_prefix")
+		log.Println("destination_table must have dataset.table_prefix")
 		os.Exit(1)
 	}
 	// TODO fix delay param.
