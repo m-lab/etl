@@ -138,11 +138,11 @@ func GetTableInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, err
 var underscoreDenseDate = regexp.MustCompile(`_(` + etl.YYYYMMDD + `)`)
 
 func getTableDate(srcInfo TableInfo) (string, error) {
-	date := underscoreDenseDate.FindString(srcInfo.Name)
-	if len(date) != 8 {
-		return "", errors.New("Invalid template suffix: " + srcInfo.Name)
+	date := underscoreDenseDate.FindStringSubmatch(srcInfo.Name)
+	if len(date) != 2 || len(date[1]) != 8 {
+		return "", errors.New("Invalid template suffix: " + srcInfo.Name + " " + date[1])
 	}
-	return date, nil
+	return date[1], nil
 }
 
 func destTable(bqClient *bigquery.Client, project, dataset, table, partition string) *bigquery.Table {
@@ -255,7 +255,7 @@ type Options struct {
 // destTable     - destination Table (possibly in another dataset)
 // minSrcAge     - minimum source age
 // ignoreDestAge - if true, will ignore destination age sanity check
-func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table, options Options) (bool, error) {
+func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, intermediateTable, destTable *bigquery.Table, options Options) (bool, error) {
 	// Check if the last update was at least minSrcAge in the past.
 	if time.Now().Sub(srcInfo.LastModifiedTime) < options.MinSrcAge {
 		return false, errors.New("Source is too recent")
@@ -288,9 +288,9 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.
 	//
 
 	if options.DryRun {
-		log.Println("Dedup dry run:", srcInfo.Name, "test_id", destTable)
+		log.Println("Dedup dry run:", srcInfo.Name, "test_id", intermediateTable)
 	} else {
-		status, err := dsExt.Dedup_Alpha(srcInfo.Name, "test_id", destTable)
+		status, err := dsExt.Dedup_Alpha(srcInfo.Name, "test_id", intermediateTable)
 		if err != nil {
 			log.Println(status)
 			log.Println(err)
@@ -307,6 +307,12 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.
 // any that are at least two days old, attempts to dedup and copy them to
 // partitions in the destination table.
 func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset, destBase string, options Options) error {
+	srcParts := strings.Split(srcPattern, "_")
+	if len(srcParts) != 2 {
+		return errors.New("Invalid source pattern: " + srcPattern)
+	}
+	srcBase := srcParts[0]
+
 	// These are sorted by LastModification, oldest first.
 	info, err := GetTableInfoMatching(dsExt, srcPattern)
 	if err != nil {
@@ -328,9 +334,14 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 		if err != nil {
 			return err
 		}
-		destTable := destTable(dsExt.BqClient, dsExt.ProjectID, destDataset, destBase, partition)
 
-		_, err = CheckAndDedup(dsExt, srcInfo, destTable, options)
+		intermediateTable := destTable(dsExt.BqClient, dsExt.ProjectID, dsExt.DatasetID, srcBase, partition)
+		destTable := destTable(dsExt.BqClient, dsExt.ProjectID, destDataset, destBase, partition)
+		if destTable.DatasetID == intermediateTable.DatasetID {
+			return errors.New("Intermediate and Destination should be in different datasets: " + intermediateTable.FullyQualifiedName())
+		}
+
+		_, err = CheckAndDedup(dsExt, srcInfo, intermediateTable, destTable, options)
 		if err != nil {
 			log.Println(err, "processing", srcInfo.Name)
 		}
