@@ -135,26 +135,33 @@ func GetTableInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, err
 	return result, nil
 }
 
-var underscoreDenseDate = regexp.MustCompile(`_(` + etl.YYYYMMDD + `)`)
+var denseDateSuffix = regexp.MustCompile(`(.*)([_$])(` + etl.YYYYMMDD + `)$`)
 
-func getTableDate(srcInfo TableInfo) (string, error) {
-	date := underscoreDenseDate.FindStringSubmatch(srcInfo.Name)
-	if len(date) != 2 || len(date[1]) != 8 {
-		return "", errors.New("Invalid template suffix: " + srcInfo.Name + " " + date[1])
+// Get the table prefix/base, separator, and partition/suffix
+func getTableParts(tableName string) ([]string, error) {
+	date := denseDateSuffix.FindStringSubmatch(tableName)
+	if len(date) != 4 || len(date[3]) != 8 {
+		return []string{}, errors.New("Invalid template suffix: " + tableName)
 	}
-	return date[1], nil
+	return date[1:4], nil
 }
 
-func destTable(bqClient *bigquery.Client, project, dataset, table, partition string) *bigquery.Table {
-	return bqClient.DatasetInProject(project, dataset).Table(table + "$" + partition)
+func getTable(bqClient *bigquery.Client, project, dataset, table, partition string) (*bigquery.Table, error) {
+	// This should fail
+	date := denseDateSuffix.FindStringSubmatch(table)
+	if len(date) > 0 {
+
+		return nil, errors.New("Invalid table base: " + table)
+	}
+	return bqClient.DatasetInProject(project, dataset).Table(table + "$" + partition), nil
 }
 
 // GetPartitionInfo provides basic information about a partition.
-// Unlike bqextGetPartitionInfo, this works directly on a bigquery.Table.
+// Unlike bqext.GetPartitionInfo, this works directly on a bigquery.Table.
 // table should include partition spec.
 // dsExt should have access to the table, but its project and dataset are not used.
 // TODO - possibly migrate this to go/bqext.
-func GetPartitionInfo(dsExt *bqext.Dataset, table *bigquery.Table) (bqext.PartitionInfo, error) {
+func GetPartitionInfo(ctx context.Context, dsExt *bqext.Dataset, table *bigquery.Table) (bqext.PartitionInfo, error) {
 	tableName := table.TableID
 	parts := strings.Split(tableName, "$")
 	if len(parts) != 2 {
@@ -185,40 +192,31 @@ func GetPartitionInfo(dsExt *bqext.Dataset, table *bigquery.Table) (bqext.Partit
 	return pi, nil
 }
 
-func checkTasksAndTests(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Table) error {
-	// Check if all task files in the old table are also present
-	// in the new table.
-	srcTable := dsExt.Table(srcInfo.Name)
-	srcDetail, err := GetTableDetail(dsExt, srcTable)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	destDetail, err := GetTableDetail(dsExt, dest)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
+func checkDetails(srcDetail, destDetail Detail) error {
 	log.Println("Details: src:", srcDetail, " dest:", destDetail)
 	// Check that new table contains at least 99% as many tasks as
 	// old table.
-	if destDetail.TaskFileCount > int(1.01*float32(srcDetail.TaskFileCount)) {
+	if destDetail.TaskFileCount > srcDetail.TaskFileCount {
+		log.Printf("Warning - fewer task files: %d < %d\n", srcDetail.TaskFileCount, destDetail.TaskFileCount)
+	} else if destDetail.TaskFileCount > int(1.01*float32(srcDetail.TaskFileCount)) {
 		return ErrorTooFewTasks
 	}
+
 	// Check that new table contains at least 95% as many tests as
 	// old table.  This may be fewer if the destination table still has dups.
-	if destDetail.TestCount > int(1.05*float32(srcDetail.TestCount)) {
+	if destDetail.TestCount > srcDetail.TestCount {
+		log.Printf("Warning - fewer tests: %d < %d\n", srcDetail.TestCount, destDetail.TestCount)
+	} else if destDetail.TestCount > int(1.05*float32(srcDetail.TestCount)) {
 		return ErrorTooFewTests
 	}
 	return nil
 }
 
 // TODO consider param to check whether source is older than dest.
-func checkDestOlder(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Table) error {
+func checkDestOlder(ctx context.Context, dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Table) error {
 	// Creation time of new table should be newer than last update
 	// of old table.
-	destPartitionInfo, err := GetPartitionInfo(dsExt, dest)
+	destPartitionInfo, err := GetPartitionInfo(ctx, dsExt, dest)
 	if err != nil {
 		return err
 	}
@@ -230,6 +228,63 @@ func checkDestOlder(dsExt *bqext.Dataset, srcInfo TableInfo, dest *bigquery.Tabl
 		return ErrorSrcOlderThanDest
 	}
 	return nil
+}
+
+func waitForJob(ctx context.Context, job *bigquery.Job) error {
+	previous := 0
+	backoff := 1
+	for {
+		status, err := job.Status(ctx)
+		if err != nil {
+			return err
+		}
+		if status.Done() {
+			if status.Err() != nil {
+				return status.Err()
+			}
+			break
+		}
+		if backoff < 10 {
+			tmp := previous
+			previous = backoff
+			backoff = backoff + tmp
+		}
+		time.Sleep(time.Duration(backoff))
+	}
+
+	return nil
+}
+
+// SafeCopyPartition uses several safety mechanisms to improve copy safety.
+// Caller should also have checked source and destination task/test counts.
+//  1. Source is required to be a partition.
+//  2. Destination partition is derived from source partition.
+//  3. Source and destination have the same partition date.
+//  4. Source table mod time later than destination table mod time.
+// TODO(gfr) Ideally this should be done by a separate process with
+// higher priviledge than the reprocessing and dedupping processes.
+func SafeCopyPartition(ctx context.Context, client *bigquery.Client, srcTable *bigquery.Table, destDataset, destTableName string) error {
+	parts, err := getTableParts(srcTable.TableID)
+	if err != nil {
+		return err
+	}
+
+	// TODO Copy table from intermediate to destination.
+	destTable, err := getTable(client, srcTable.ProjectID, destDataset, destTableName, parts[2])
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	copier := destTable.CopierFrom(srcTable)
+	log.Println("Copying...")
+	job, err := copier.Run(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = waitForJob(context.Background(), job)
+	return err
 }
 
 // Options provides processing options for Dedup_Alpha
@@ -255,50 +310,109 @@ type Options struct {
 // destTable     - destination Table (possibly in another dataset)
 // minSrcAge     - minimum source age
 // ignoreDestAge - if true, will ignore destination age sanity check
-func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, intermediateTable, destTable *bigquery.Table, options Options) (bool, error) {
+//
+// TODO(gfr) Should we check that intermediate table is NOT a production table?
+func CheckAndDedup(ctx context.Context, dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table, options Options) (bool, error) {
 	// Check if the last update was at least minSrcAge in the past.
 	if time.Now().Sub(srcInfo.LastModifiedTime) < options.MinSrcAge {
 		return false, errors.New("Source is too recent")
 	}
 
+	parts, err := getTableParts(srcInfo.Name)
+	if err != nil {
+		return false, err
+	}
+	intermediateTable, err := getTable(dsExt.BqClient, dsExt.ProjectID, dsExt.DatasetID, parts[0], parts[2])
+	if err != nil {
+		log.Println(err)
+		return false, err
+	}
+
+	if destTable.DatasetID == intermediateTable.DatasetID {
+		return false, errors.New("Intermediate and Destination should be in different datasets: " + intermediateTable.FullyQualifiedName())
+	}
+
 	t := dsExt.Table(srcInfo.Name)
-	ctx := context.Background()
 
 	// Just check that srcInfo table exists.
-	_, err := t.Metadata(ctx)
+	_, err = t.Metadata(ctx)
 	if err != nil {
 		log.Println(err)
 		return false, err
 	}
 
 	if !options.IgnoreDestAge {
-		err = checkDestOlder(dsExt, srcInfo, destTable)
+		err = checkDestOlder(ctx, dsExt, srcInfo, destTable)
 		if err != nil {
 			log.Println(err)
 			return false, err
 		}
 	}
-	err = checkTasksAndTests(dsExt, srcInfo, destTable)
+	srcTable := dsExt.Table(srcInfo.Name)
+
+	srcDetail, err := GetTableDetail(dsExt, srcTable)
+	if err != nil {
+		return false, err
+	}
+	destDetail, err := GetTableDetail(dsExt, destTable)
+	if err != nil {
+		return false, err
+	}
+
+	err = checkDetails(srcDetail, destDetail)
 	if err != nil {
 		log.Println(err)
 		return false, err
 	}
 
 	// Do the deduplication to intermediate table with same root name.
-	//
-
 	if options.DryRun {
 		log.Println("Dedup dry run:", srcInfo.Name, "test_id", intermediateTable)
-	} else {
-		status, err := dsExt.Dedup_Alpha(srcInfo.Name, "test_id", intermediateTable)
-		if err != nil {
-			log.Println(status)
-			log.Println(err)
-			return false, err
-		}
+		return false, nil
 	}
 
-	// If DeleteAfterDedup, then delete the source table.
+	status, err := dsExt.Dedup_Alpha(srcInfo.Name, "test_id", intermediateTable)
+	if err != nil {
+		log.Println(status)
+		log.Println(err)
+		return false, err
+	}
+
+	// Now compare number of rows and tasks in intermediate table to destination table.
+	intermediateDetail, err := GetTableDetail(dsExt, intermediateTable)
+	if err != nil {
+		return false, err
+	}
+	err = checkDetails(intermediateDetail, destDetail)
+	if err != nil {
+		return false, err
+	}
+
+	destParts, err := getTableParts(destTable.TableID)
+	if err != nil {
+		return false, err
+	}
+
+	err = SafeCopyPartition(ctx, dsExt.BqClient, intermediateTable, destTable.DatasetID, destParts[0])
+	if err != nil {
+		return false, err
+	}
+	log.Println("Done")
+
+	// TODO If DeleteAfterDedup, then delete the source table.
+
+	// TODO Update status table
+	// We should have a status table that has a row for each table dedup operation.
+	// It should record:
+	//    date, dedup version, requester, cmd params
+	//    source {table_date, mod date, task count, row count},
+	//    precheck outcome
+	//    dedup stats {elapsed time, bytes, rows, error}
+	//    intermediate {table$date, task count, row count, byte count}
+	//    destination {table$date, prev mod date, prev task count, prev row count, prev byte count}
+	//    copycheck outcome
+	//    final copy stats {elapsed time, bytes, rows, error}
+	//    outcome (succeed, precheck failed, dedup failed, copycheck failed, copy failed)
 
 	return true, nil
 }
@@ -311,7 +425,6 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 	if len(srcParts) != 2 {
 		return errors.New("Invalid source pattern: " + srcPattern)
 	}
-	srcBase := srcParts[0]
 
 	// These are sorted by LastModification, oldest first.
 	info, err := GetTableInfoMatching(dsExt, srcPattern)
@@ -329,19 +442,13 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 			continue
 		}
 
-		// TODO Should pull partition date, and use for both intermediate and final destination.
-		partition, err := getTableDate(srcInfo)
+		parts, err := getTableParts(srcInfo.Name)
 		if err != nil {
 			return err
 		}
 
-		intermediateTable := destTable(dsExt.BqClient, dsExt.ProjectID, dsExt.DatasetID, srcBase, partition)
-		destTable := destTable(dsExt.BqClient, dsExt.ProjectID, destDataset, destBase, partition)
-		if destTable.DatasetID == intermediateTable.DatasetID {
-			return errors.New("Intermediate and Destination should be in different datasets: " + intermediateTable.FullyQualifiedName())
-		}
-
-		_, err = CheckAndDedup(dsExt, srcInfo, intermediateTable, destTable, options)
+		destTable, _ := getTable(dsExt.BqClient, dsExt.ProjectID, destDataset, destBase, parts[2])
+		_, err = CheckAndDedup(context.Background(), dsExt, srcInfo, destTable, options)
 		if err != nil {
 			log.Println(err, "processing", srcInfo.Name)
 		}
