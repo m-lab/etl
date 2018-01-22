@@ -277,6 +277,7 @@ func SafeCopyPartition(ctx context.Context, client *bigquery.Client, srcTable *b
 	}
 
 	copier := destTable.CopierFrom(srcTable)
+	copier.WriteDisposition = bigquery.WriteTruncate
 	log.Println("Copying...")
 	job, err := copier.Run(ctx)
 	if err != nil {
@@ -284,6 +285,7 @@ func SafeCopyPartition(ctx context.Context, client *bigquery.Client, srcTable *b
 	}
 
 	err = waitForJob(context.Background(), job)
+	log.Println("Done")
 	return err
 }
 
@@ -371,9 +373,9 @@ func CheckAndDedup(ctx context.Context, dsExt *bqext.Dataset, srcInfo TableInfo,
 		return false, nil
 	}
 
-	status, err := dsExt.Dedup_Alpha(srcInfo.Name, "test_id", intermediateTable)
+	// TODO - are we checking for source newer than intermediate destination?  Should we?
+	_, err = dsExt.Dedup_Alpha(srcInfo.Name, "test_id", intermediateTable)
 	if err != nil {
-		log.Println(status)
 		log.Println(err)
 		return false, err
 	}
@@ -397,7 +399,6 @@ func CheckAndDedup(ctx context.Context, dsExt *bqext.Dataset, srcInfo TableInfo,
 	if err != nil {
 		return false, err
 	}
-	log.Println("Done")
 
 	// TODO If DeleteAfterDedup, then delete the source table.
 
@@ -450,7 +451,8 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 		destTable, _ := getTable(dsExt.BqClient, dsExt.ProjectID, destDataset, destBase, parts[2])
 		_, err = CheckAndDedup(context.Background(), dsExt, srcInfo, destTable, options)
 		if err != nil {
-			log.Println(err, "processing", srcInfo.Name)
+			log.Println(err, "dedupping", dsExt.DatasetID+"."+srcInfo.Name, "to", destDataset+"."+destBase)
+			return err
 		}
 	}
 	return nil

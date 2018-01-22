@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/dedup"
+	"golang.org/x/net/context"
 	"google.golang.org/api/option"
 	"gopkg.in/m-lab/go.v1/bqext"
 )
@@ -69,7 +70,7 @@ func TestGetTableDetail(t *testing.T) {
 }
 
 func TestCheckAndDedup(t *testing.T) {
-	dsExt, err := newTestingDataset("mlab-testing", "etl")
+	dsExt, err := newTestingDataset("mlab-testing", "src")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,18 +84,18 @@ func TestCheckAndDedup(t *testing.T) {
 	}
 
 	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, "etl").Table("TestDedupDest$19990101")
-	_, err = dedup.CheckAndDedup(&dsExt, info[0], destTable, dedup.Options{time.Hour, false, false})
+	_, err = dedup.CheckAndDedup(context.Background(), &dsExt, info[0], destTable, dedup.Options{time.Hour, false, false})
 	if err != nil {
 		log.Println(err)
 	}
-	_, err = dedup.CheckAndDedup(&dsExt, info[0], destTable, dedup.Options{time.Hour, true, false})
+	_, err = dedup.CheckAndDedup(context.Background(), &dsExt, info[0], destTable, dedup.Options{time.Hour, true, false})
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestProcess(t *testing.T) {
-	dsExt, err := newTestingDataset("mlab-testing", "etl")
+	dsExt, err := newTestingDataset("mlab-testing", "src")
 	if err != nil {
 		t.Fatal(err)
 	}
