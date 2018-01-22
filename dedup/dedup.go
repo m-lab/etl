@@ -12,11 +12,13 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/etl/etl"
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
 	"gopkg.in/m-lab/go.v1/bqext"
@@ -133,15 +135,18 @@ func GetTableInfoMatching(dsExt *bqext.Dataset, filter string) ([]TableInfo, err
 	return result, nil
 }
 
-// Extracts date suffix from src table name, and forms full destination table.
-func getDestTable(dsExt *bqext.Dataset, srcInfo TableInfo, destDataset, destBase string) (*bigquery.Table, error) {
-	parts := strings.Split(srcInfo.Name, "_")
-	if len(parts) != 2 {
-		log.Println(parts)
-		return nil, errors.New("Source doesn't have template suffix: " + srcInfo.Name)
+var underscoreDenseDate = regexp.MustCompile(`_(` + etl.YYYYMMDD + `)`)
+
+func getTableDate(srcInfo TableInfo) (string, error) {
+	date := underscoreDenseDate.FindString(srcInfo.Name)
+	if len(date) != 8 {
+		return "", errors.New("Invalid template suffix: " + srcInfo.Name)
 	}
-	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, destDataset).Table(destBase + "$" + parts[1])
-	return destTable, nil
+	return date, nil
+}
+
+func destTable(bqClient *bigquery.Client, project, dataset, table, partition string) *bigquery.Table {
+	return bqClient.DatasetInProject(project, dataset).Table(table + "$" + partition)
 }
 
 // GetPartitionInfo provides basic information about a partition.
@@ -238,6 +243,13 @@ type Options struct {
 // dedups the table.  Returns true if criteria pass, false if they fail.
 // Returns nil error on success, or non-nil error if there was an error
 // at any point.
+// Criteria:
+//   1.  Source table modification time is at least XXX in the past.
+//   2.  Source table mod time is later than destination table mod time.
+//   3.  Source reflects at least as many task files as destination.
+//   4.  Source has at least 98% as many tests as destination (including dups)
+//   5.  After deduplication, intermediate table has at least 98% as many tests as destination.
+//
 // dsExt         - bqext.Dataset for operations.
 // srcInfo       - TableInfo for the source
 // destTable     - destination Table (possibly in another dataset)
@@ -255,24 +267,35 @@ func CheckAndDedup(dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.
 	// Just check that srcInfo table exists.
 	_, err := t.Metadata(ctx)
 	if err != nil {
+		log.Println(err)
 		return false, err
 	}
 
 	if !options.IgnoreDestAge {
 		err = checkDestOlder(dsExt, srcInfo, destTable)
 		if err != nil {
+			log.Println(err)
 			return false, err
 		}
 	}
 	err = checkTasksAndTests(dsExt, srcInfo, destTable)
 	if err != nil {
+		log.Println(err)
 		return false, err
 	}
+
+	// Do the deduplication to intermediate table with same root name.
+	//
 
 	if options.DryRun {
 		log.Println("Dedup dry run:", srcInfo.Name, "test_id", destTable)
 	} else {
-		dsExt.Dedup_Alpha(srcInfo.Name, "test_id", destTable)
+		status, err := dsExt.Dedup_Alpha(srcInfo.Name, "test_id", destTable)
+		if err != nil {
+			log.Println(status)
+			log.Println(err)
+			return false, err
+		}
 	}
 
 	// If DeleteAfterDedup, then delete the source table.
@@ -300,10 +323,12 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 			continue
 		}
 
-		destTable, err := getDestTable(dsExt, srcInfo, destDataset, destBase)
+		// TODO Should pull partition date, and use for both intermediate and final destination.
+		partition, err := getTableDate(srcInfo)
 		if err != nil {
 			return err
 		}
+		destTable := destTable(dsExt.BqClient, dsExt.ProjectID, destDataset, destBase, partition)
 
 		_, err = CheckAndDedup(dsExt, srcInfo, destTable, options)
 		if err != nil {
