@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/dedup"
-	"gopkg.in/m-lab/go.v1/bqext"
+	"github.com/m-lab/go/bqext"
 )
 
 func init() {
@@ -23,6 +23,7 @@ var (
 	fDelay            = flag.Duration("delay", 7*24*time.Hour, "delay (hours) from last update")
 	fDestinationTable = flag.String("destination_table", "", "destination dataset.table")
 	fDeleteAfterCopy  = flag.Bool("delete", false, "Should delete table after copy")
+	fIgnoreDestAge    = flag.Bool("ignore_dest_age", false, "Ignore destination age in sanity check")
 	fDryRun           = flag.Bool("dry_run", false, "Print actions instead of executing")
 )
 
@@ -47,7 +48,7 @@ func main() {
 	}
 	// TODO fix delay param.
 	err = dedup.ProcessTablesMatching(&dsExt, src[1], dest[0], dest[1],
-		dedup.Options{MinSrcAge: *fDelay, IgnoreDestAge: false, DryRun: *fDryRun})
+		dedup.Options{MinSrcAge: *fDelay, IgnoreDestAge: *fIgnoreDestAge, DryRun: *fDryRun})
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
