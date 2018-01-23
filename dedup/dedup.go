@@ -19,9 +19,9 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/etl"
-	"github.com/m-lab/go/bqext"
 	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
+	"gopkg.in/m-lab/go.v1/bqext"
 )
 
 var (

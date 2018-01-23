@@ -101,7 +101,7 @@ func TestProcess(t *testing.T) {
 	}
 
 	err = dedup.ProcessTablesMatching(&dsExt, "TestDedupSrc_", "etl", "TestDedupDest", dedup.Options{1 * time.Minute, false, false})
-	if err != nil {
+	if err != nil && err != dedup.ErrorSrcOlderThanDest {
 		t.Error(err)
 	}
 	// TODO - actually check something interesting.
