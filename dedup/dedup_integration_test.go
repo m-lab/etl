@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/dedup"
+	"github.com/m-lab/go/bqext"
 	"golang.org/x/net/context"
 	"google.golang.org/api/option"
-	"gopkg.in/m-lab/go.v1/bqext"
 )
 
 func init() {
