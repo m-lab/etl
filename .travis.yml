@@ -58,6 +58,7 @@ script:
 - go test -coverpkg=$COVER_PKGS -coverprofile=batch.cov -v github.com/m-lab/etl/batch
 - go test -coverpkg=$COVER_PKGS -coverprofile=bq.cov -v github.com/m-lab/etl/bq
 - go test -coverpkg=$COVER_PKGS -coverprofile=dedup.cov -v github.com/m-lab/etl/dedup -tags=integration
+- go test -coverpkg=$COVER_PKGS -coverprofile=etl.cov -v github.com/m-lab/etl/etl
 - go test -coverpkg=$COVER_PKGS -coverprofile=parser.cov -v github.com/m-lab/etl/parser
 - go test -coverpkg=$COVER_PKGS -coverprofile=qp.cov -v github.com/m-lab/etl/appengine/queue_pusher
 - go test -coverpkg=$COVER_PKGS -coverprofile=task.cov -v github.com/m-lab/etl/task
