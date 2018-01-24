@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/m-lab/etl/dedup"
 	"github.com/m-lab/go/bqext"
@@ -114,4 +115,42 @@ func TestGetPartitionInfo(t *testing.T) {
 	if info.PartitionID != "19990101" {
 		t.Error("wrong partitionID: " + info.PartitionID)
 	}
+}
+
+func TestCheckAndDedup(t *testing.T) {
+	dsExt, err := newTestingDataset("mlab-testing", "src")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "TestDedupSrc_19990101")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(info) != 1 {
+		t.Fatal("No info for pattern.")
+	}
+
+	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, "etl").Table("TestDedupDest$19990101")
+	_, err = dedup.CheckAndDedup(context.Background(), &dsExt, info[0], destTable, dedup.Options{time.Hour, false, false})
+	if err != nil {
+		log.Println(err)
+	}
+	_, err = dedup.CheckAndDedup(context.Background(), &dsExt, info[0], destTable, dedup.Options{time.Hour, true, false})
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestProcess(t *testing.T) {
+	dsExt, err := newTestingDataset("mlab-testing", "src")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = dedup.ProcessTablesMatching(&dsExt, "TestDedupSrc_", "etl", "TestDedupDest", dedup.Options{1 * time.Minute, false, false})
+	if err != nil && err != dedup.ErrSrcOlderThanDest {
+		t.Error(err)
+	}
+	// TODO - actually check something interesting.
 }
