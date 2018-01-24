@@ -19,11 +19,11 @@ resources:
 
 automatic_scaling:
   # This is intended for batch jobs.  A single instance is required, and we allow
-  # it to scale up to 50 instances to get work done quickly.  However, note that
-  # more than 4 tasks/sec may result in bigquery stream quota problems, so this
+  # it to scale up to 40 instances to get work done quickly.  However, note that
+  # more than 3 tasks/sec may result in bigquery stream quota problems, so this
   # may require changes.
   min_num_instances: 1
-  max_num_instances: 50
+  max_num_instances: 40
   # Very long cool down period, to reduce the likelihood of tasks being truncated.
   cool_down_period_sec: 1800
   # We don't care much about latency, so a high utilization is desireable.
@@ -47,7 +47,7 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   NDT_BATCH: 'true'  # Allow instances to discover they are NDT_BATCH instances.
-  MAX_WORKERS: 20
+  MAX_WORKERS: 12
   BIGQUERY_PROJECT: 'measurement-lab'
   BIGQUERY_DATASET: 'batch'
   ANNOTATE_IP: 'true'
