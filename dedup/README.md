@@ -35,9 +35,9 @@ partition.
 GET https://www.googleapis.com/bigquery/v2/projects/projectId/datasets/datasetId/tables/tableId
 
  ```
-2. 
+2.
 
 ## Other considerations:
-1. Should run the tar file check.  Unfortunately, there may be tar
+1. Should run the task count check.  Unfortunately, there may be task
 files that don't result in any rows.  How to deal with that?
 

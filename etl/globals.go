@@ -10,6 +10,7 @@ import (
 
 // YYYYMMDD is a regexp string for identifying dense dates.
 const YYYYMMDD = `\d{4}[01]\d[0123]\d`
+// MlabDomain is the DNS domain for all mlab servers.
 const MlabDomain = `measurement-lab.org`
 
 const start = `^gs://(?P<prefix>.*)/(?P<exp>[^/]*)/`

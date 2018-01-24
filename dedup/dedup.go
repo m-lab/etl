@@ -93,7 +93,7 @@ func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (Detail, error)
 		SELECT SUM(tests) AS TestCount, COUNT(task)-1 AS TaskFileCount
 		FROM (
 			-- This avoids null counts when the partition doesn't exist or is empty.
-  		    SELECT 0 AS tests, "fake-task" AS Task 
+  		    SELECT 0 AS tests, "fake-task" AS Task
   		    UNION ALL
 		  	SELECT COUNT(test_id) AS tests, task_filename AS task
 		  	FROM `+"`%s.%s`"+`
@@ -137,8 +137,9 @@ var denseDateSuffix = regexp.MustCompile(`(.*)([_$])(` + etl.YYYYMMDD + `)$`)
 
 // tableNameParts is used to describe a templated table or table partition.
 type tableNameParts struct {
-	prefix, yyyymmdd string
-	isPartitioned    bool
+	prefix        string
+	isPartitioned bool
+	yyyymmdd      string
 }
 
 // getTableParts separates a table name into prefix/base, separator, and partition date.
@@ -147,17 +148,17 @@ func getTableParts(tableName string) (tableNameParts, error) {
 	if len(date) != 4 || len(date[3]) != 8 {
 		return tableNameParts{}, errors.New("Invalid template suffix: " + tableName)
 	}
-	return tableNameParts{date[1], date[3], date[2] == "$"}, nil
+	return tableNameParts{date[1], date[2] == "$", date[3]}, nil
 }
 
 // getTable constructs a bigquery Table object from project/dataset/table/partition.
 // The project/dataset/table/partition may or may not actually exist.
 // This does NOT do any network operations.
 func getTable(bqClient *bigquery.Client, project, dataset, table, partition string) (*bigquery.Table, error) {
-	// This should fail
+	// This checks that the table name is NOT a partitioned or templated table.
 	date := denseDateSuffix.FindStringSubmatch(table)
 	if len(date) > 0 {
-		return nil, errors.New("Invalid table base: " + table)
+		return nil, errors.New("Table base must not include partition or template suffix: " + table)
 	}
 	return bqClient.DatasetInProject(project, dataset).Table(table + "$" + partition), nil
 }
@@ -169,11 +170,11 @@ func getTable(bqClient *bigquery.Client, project, dataset, table, partition stri
 // TODO - possibly migrate this to go/bqext.
 func GetPartitionInfo(ctx context.Context, dsExt *bqext.Dataset, table *bigquery.Table) (bqext.PartitionInfo, error) {
 	tableName := table.TableID
-	parts := strings.Split(tableName, "$")
-	if len(parts) != 2 {
+	parts, err := getTableParts(tableName)
+	if err != nil || !parts.isPartitioned {
 		return bqext.PartitionInfo{}, errors.New("TableID missing partition: " + tableName)
 	}
-	fullTable := fmt.Sprintf("%s:%s.%s", table.ProjectID, table.DatasetID, parts[0])
+	fullTable := fmt.Sprintf("%s:%s.%s", table.ProjectID, table.DatasetID, parts.prefix)
 
 	// This uses legacy, because PARTITION_SUMMARY is not supported in standard.
 	queryString := fmt.Sprintf(
@@ -184,10 +185,10 @@ func GetPartitionInfo(ctx context.Context, dsExt *bqext.Dataset, table *bigquery
 		  MSEC_TO_TIMESTAMP(last_modified_time) AS LastModified
 		FROM
 		  [%s$__PARTITIONS_SUMMARY__]
-		WHERE partition_id = "%s" `, fullTable, parts[1])
+		WHERE partition_id = "%s" `, fullTable, parts.yyyymmdd)
 	pInfo := bqext.PartitionInfo{}
 
-	err := dsExt.QueryAndParse(queryString, &pInfo)
+	err = dsExt.QueryAndParse(queryString, &pInfo)
 	if err != nil {
 		// If the partition doesn't exist, just return empty Info, no error.
 		if err == iterator.Done {
