@@ -19,7 +19,7 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
-func clientOpts() []option.ClientOption {
+func testingAuth() []option.ClientOption {
 	opts := []option.ClientOption{}
 	if os.Getenv("TRAVIS") != "" {
 		// See m-lab/go#11
@@ -29,12 +29,8 @@ func clientOpts() []option.ClientOption {
 	return opts
 }
 
-func newTestingDataset(project, dataset string) (bqext.Dataset, error) {
-	return bqext.NewDataset(project, dataset, clientOpts()...)
-}
-
 func TestGetTableDetail(t *testing.T) {
-	dsExt, err := newTestingDataset("mlab-testing", "etl")
+	dsExt, err := bqext.NewDataset("mlab-testing", "etl", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +66,7 @@ func TestGetTableDetail(t *testing.T) {
 }
 
 func TestGetTableInfo(t *testing.T) {
-	dsExt, err := newTestingDataset("mlab-testing", "src")
+	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +84,7 @@ func TestGetTableInfo(t *testing.T) {
 }
 
 func TestGetTableInfoMatching(t *testing.T) {
-	dsExt, err := newTestingDataset("mlab-testing", "src")
+	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +99,7 @@ func TestGetTableInfoMatching(t *testing.T) {
 }
 
 func TestGetPartitionInfo(t *testing.T) {
-	dsExt, err := newTestingDataset("mlab-testing", "src")
+	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +114,7 @@ func TestGetPartitionInfo(t *testing.T) {
 }
 
 func TestCheckAndDedup(t *testing.T) {
-	dsExt, err := newTestingDataset("mlab-testing", "src")
+	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +139,7 @@ func TestCheckAndDedup(t *testing.T) {
 }
 
 func TestProcess(t *testing.T) {
-	dsExt, err := newTestingDataset("mlab-testing", "src")
+	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
