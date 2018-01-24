@@ -25,11 +25,11 @@ set -u
 #                            Bash Parameters                              #
 ###########################################################################
 
-USAGE="$0 <project> <public-dataset> <internal-dataset> <alias>"
+USAGE="$0 <project> <internal-dataset> <public-dataset> <alias,alias,...>"
 PROJECT=${1:?Please provide the google cloud project: $USAGE}
-PUBLIC=${PROJECT}:${2:?Please specify the public dataset: $USAGE}
-INTERNAL=${PROJECT}:${3:?Please specify the internal dataset: $USAGE}
-ALIAS=${PROJECT}:${4:?Please specify the alias dataset \{alpha|stable|none\}: $USAGE}
+INTERMEDIATE=${PROJECT}:${2:?Please specify the internal dataset e.g. intermediate_v3_1_1: $USAGE}
+PUBLIC=${PROJECT}:${3:?Please specify the public dataset e.g. rc_v3_1: $USAGE}
+ALIASES=${4:?Please specify the comma separated list of aliases \{rc|rc,release|none\}: $USAGE}
 
 # TODO - check that public and internal aren't swapped?
 # TODO - check that project is valid?
@@ -79,33 +79,38 @@ create_view() {
 # Create datasets, e.g. for new versions.
 # These lines may fail if they already exist, so we run them before set -e.
 bq mk ${PUBLIC}
-bq mk ${INTERNAL}
+bq mk ${INTERMEDIATE}
+for ALIAS in ($ALIASES); do
+  if [ "${ALIAS}" != "none" ]; then
+    bq mk ${PROJECT}:${ALIAS}
+  fi
+done
 
 # Terminate on error.
 set -e
 # If executing in travis, be verbose.
 if [[ -v TRAVIS ]];then set -x; fi
 
-create_view ${INTERNAL} common_etl \
+create_view ${INTERMEDIATE} common_etl \
   'ETL table projected into common schema, for union with PLX legacy data.
   This also adds "ndt.iupui." prefix to the connection_spec.hostname field.'
 
-create_view ${INTERNAL} ndt_exhaustive \
+create_view ${INTERMEDIATE} ndt_exhaustive \
   'Combined view of plx legacy fast table, up to May 10, and new ETL table, from May 11, 2017 onward.
   Includes blacklisted and EB tests, which should be removed before analysis.
   Note that at present, data from May 10 to mid September does NOT have geo annotations.'
 
-create_view ${INTERNAL} ndt_all \
+create_view ${INTERMEDIATE} ndt_all \
   'View across the all NDT data except EB and blacklisted'
 
-create_view ${INTERNAL} ndt_sensible \
+create_view ${INTERMEDIATE} ndt_sensible \
   'View across the all NDT data excluding EB, blacklisted,
   bad end state, short or very long duration'
 
-create_view ${INTERNAL} ndt_downloads \
+create_view ${INTERMEDIATE} ndt_downloads \
   'All good quality download tests'
 
-create_view ${INTERNAL} ndt_uploads \
+create_view ${INTERMEDIATE} ndt_uploads \
   'All good quality upload tests'
 
 ##################################################################################
@@ -116,20 +121,20 @@ create_view ${INTERNAL} ndt_uploads \
 create_view ${PUBLIC} ndt_all \
   'View across the all NDT data except EB and blacklisted' \
   '#legacySQL
-  SELECT * FROM ['${INTERNAL/:/.}'.ndt_all_legacysql]'
+  SELECT * FROM ['${INTERMEDIATE/:/.}'.ndt_all_legacysql]'
 
 create_view ${PUBLIC} ndt_downloads \
   'All good quality download tests' \
   '#legacySQL
-  SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads_legacysql]'
+  SELECT * FROM ['${INTERMEDIATE/:/.}'.ndt_downloads_legacysql]'
 
 create_view ${PUBLIC} ndt_uploads \
   'All good quality upload tests' \
   '#legacySQL
-  SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads_legacysql]'
+  SELECT * FROM ['${INTERMEDIATE/:/.}'.ndt_uploads_legacysql]'
 
 #############################################################################
-# Redirect stable, alpha, beta
+# Redirect release, rc, etc
 #############################################################################
 
 # If alias parameter is not "none", this will create the corresponding aliases.
@@ -138,21 +143,23 @@ create_view ${PUBLIC} ndt_uploads \
 # If last parameter is "none" then we skip this section.
 # TODO - should link alpha and rc when release is linked?
 
-if [ "${ALIAS}" != "${PROJECT}:none" ]; then
-  echo "Creating $ALIAS aliases"
+for ALIAS in ($ALIASES); do
+  if [ "${ALIAS}" != "none" ]; then
+    echo "Linking ${PROJECT}:${ALIAS} alias"
 
-  create_view ${ALIAS} ndt_all \
-    'View across the all NDT data except EB and blacklisted' \
-    '#legacySQL
-    SELECT * FROM ['${INTERNAL/:/.}'.ndt_all_legacysql]'
+    create_view ${PROJECT}:${ALIAS} ndt_all \
+      'View across the all NDT data except EB and blacklisted' \
+      '#legacySQL
+      SELECT * FROM ['${INTERMEDIATE/:/.}'.ndt_all_legacysql]'
 
-  create_view ${ALIAS} ndt_downloads \
-    'All good quality download tests' \
-    '#legacySQL
-    SELECT * FROM ['${INTERNAL/:/.}'.ndt_downloads_legacysql]'
+    create_view ${PROJECT}:${ALIAS} ndt_downloads \
+      'All good quality download tests' \
+      '#legacySQL
+      SELECT * FROM ['${INTERMEDIATE/:/.}'.ndt_downloads_legacysql]'
 
-  create_view ${ALIAS} ndt_uploads \
-    'All good quality upload tests' \
-    '#legacySQL
-    SELECT * FROM ['${INTERNAL/:/.}'.ndt_uploads_legacysql]'
-fi
+    create_view ${PROJECT}:${ALIAS} ndt_uploads \
+      'All good quality upload tests' \
+      '#legacySQL
+      SELECT * FROM ['${INTERMEDIATE/:/.}'.ndt_uploads_legacysql]'
+  fi
+done
