@@ -41,7 +41,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 		fmt.Println("cannot load test data")
 		return
 	}
-	hops, logTime, _, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", rawData, "pt-daily")
+	hops, logTime, _, lastLine, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -52,11 +52,15 @@ func TestParseLegacyFormatData(t *testing.T) {
 		fmt.Println(logTime)
 		t.Fatalf("Do not process log time correctly.")
 	}
+	if lastLine != "10  P(6, 6) txapp1.samknows.com (207.150.205.159)  24.900/24.972/25.055/0.045 ms " {
+		fmt.Println(lastLine)
+		t.Fatalf("Do not get last valid hop line correctly.")
+	}
 }
 
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData, "pt-daily")
+	hops, logTime, connSpec, lastLine, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -71,8 +75,13 @@ func TestPTParser(t *testing.T) {
 		Client_af:      2,
 		Data_direction: 0,
 	}
-	if !reflect.DeepEqual(*conn_spec, expected_cspec) {
+	if !reflect.DeepEqual(*connSpec, expected_cspec) {
 		t.Fatalf("Wrong results for connection spec!")
+	}
+
+	if lastLine != " 8  P(6, 6) 74.125.224.100 (74.125.224.100)  0.895 ms" {
+		fmt.Println("!!!"+lastLine+"!!!")
+		t.Fatalf("Do not get last valid hop line correctly.")
 	}
 
 	// TODO(dev): reformat these individual values to be more readable.
@@ -129,7 +138,7 @@ func TestPTParser(t *testing.T) {
 		}
 	}
 }
-
+/*
 func TestPTInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
 	n := parser.NewPTParser(ins)
@@ -173,4 +182,4 @@ func TestPTInserter(t *testing.T) {
 		fmt.Printf("Here is what is real: %v\n", ins.data[0])
 		t.Errorf("Not the expected values:")
 	}
-}
+}*/

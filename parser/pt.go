@@ -32,9 +32,19 @@ func (f *PTFileName) GetDate() (string, bool) {
 	return "", false
 }
 
+// The data that will be inserted intp BQ tables
+type ParsedPTData struct {
+	testID           string
+	hops             []*schema.ParisTracerouteHop
+	logTime          time.Time
+	connSpec         *schema.MLabConnectionSpecification
+	lastValidHopLine string
+}
+
 type PTParser struct {
 	inserter etl.Inserter
 	etl.RowStats
+	previousTests []ParsedPTData
 }
 
 type Node struct {
@@ -56,7 +66,7 @@ const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 
 func NewPTParser(ins etl.Inserter) *PTParser {
-	return &PTParser{ins, ins}
+	return &PTParser{ins, ins, []ParsedPTData{}}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
@@ -201,7 +211,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		testId = CreateTestId(meta["filename"].(string), filepath.Base(testName))
 	}
 
-	hops, logTime, connSpec, err := Parse(meta, testName, rawContent, pt.TableName())
+	hops, logTime, connSpec, lastValidHopLine, err := Parse(meta, testName, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
@@ -211,30 +221,56 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 
-	insertErr := false
-	for _, hop := range hops {
-		ptTest := schema.PT{
-			Test_id:              testId,
-			Log_time:             logTime.Unix(),
-			Connection_spec:      *connSpec,
-			Paris_traceroute_hop: *hop,
-			Type:                 int32(2),
-			Project:              int32(3),
-		}
-		err := pt.inserter.InsertRow(ptTest)
-		if err != nil {
-			metrics.ErrorCount.WithLabelValues(
-				pt.TableName(), "pt", "insert-err").Inc()
-			insertErr = true
-			log.Printf("insert-err: %v\n", err)
+	// Check Client_ip in connSpec to check all buffered PT tests.
+	// If pollution detected, then remove the test from buffer.
+	// If no pollution detected, insert the oldest test into BitQuery table.
+	destIP := connSpec.Client_ip
+	for index, PTTest := range pt.previousTests {
+		// array of hops was built reversely from list of nodes (in func ProcessAllNodes)
+		hop := PTTest.hops[0]
+		if PTTest.connSpec.Client_ip != destIP && (hop.Dest_ip == destIP || strings.Contains(PTTest.lastValidHopLine, destIP)) {
+			// remove pt.previousTest[index]
+			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
+			break
 		}
 	}
-	if insertErr {
-		// Inc TestCount only once per test.
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
-	} else {
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
+
+	if len(pt.previousTests) >= 5 {
+		// Insert the oldest test pt.previousTests[0] into BigQuery
+		insertErr := false
+		for _, hop := range pt.previousTests[0].hops {
+			ptTest := schema.PT{
+				Test_id:              pt.previousTests[0].testID,
+				Log_time:             pt.previousTests[0].logTime.Unix(),
+				Connection_spec:      *(pt.previousTests[0].connSpec),
+				Paris_traceroute_hop: *hop,
+				Type:                 int32(2),
+				Project:              int32(3),
+			}
+			err := pt.inserter.InsertRow(ptTest)
+			if err != nil {
+				metrics.ErrorCount.WithLabelValues(
+					pt.TableName(), "pt", "insert-err").Inc()
+				insertErr = true
+				log.Printf("insert-err: %v\n", err)
+			}
+		}
+		if insertErr {
+			// Inc TestCount only once per test.
+			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
+		} else {
+			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
+		}
+		pt.previousTests = pt.previousTests[1:]
 	}
+	// Insert current test into pt.previousTests
+	pt.previousTests = append(pt.previousTests, ParsedPTData{
+		testID:           testId,
+		hops:             hops,
+		logTime:          logTime,
+		connSpec:         connSpec,
+		lastValidHopLine: lastValidHopLine,
+	})
 	return nil
 }
 
@@ -259,7 +295,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 		if err == nil {
 			rtt = append(rtt, oneRtt)
 		} else {
-			log.Println("Failed to conver rtt to number with error %v", err)
+			fmt.Printf("Failed to conver rtt to number with error %v", err)
 			return err
 		}
 
@@ -351,7 +387,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, error) {
+func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, string, error) {
 	//log.Printf("%s", testName)
 
 	metrics.WorkerState.WithLabelValues("parse").Inc()
@@ -367,7 +403,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	// of test content as well.
 	t, err := GetLogtime(fn)
 	if err != nil {
-		return nil, time.Time{}, nil, err
+		return nil, time.Time{}, nil, "", err
 	}
 
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
@@ -398,7 +434,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				log.Println(oneLine)
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
-				return nil, time.Time{}, nil, err
+				return nil, time.Time{}, nil, "", err
 			}
 		} else {
 			// Handle each line of test file after the first line.
@@ -420,7 +456,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				err := ProcessOneTuple(tupleStr, protocol, currentLeaves, &allNodes, &newLeaves)
 				if err != nil {
 					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(float64(len(allNodes)))
-					return nil, time.Time{}, nil, err
+					return nil, time.Time{}, nil, "", err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
 				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i += 1 {
@@ -487,5 +523,5 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 		AddGeoDataPTConnSpec(connSpec, t)
 		AddGeoDataPTHopBatch(PTHops, t)
 	}
-	return PTHops, t, connSpec, nil
+	return PTHops, t, connSpec, lastValidHopLine, nil
 }
