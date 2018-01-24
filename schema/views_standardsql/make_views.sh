@@ -29,7 +29,7 @@ USAGE="$0 <project> <internal-dataset> <public-dataset> <alias,alias,...>"
 PROJECT=${1:?Please provide the google cloud project: $USAGE}
 INTERMEDIATE=${PROJECT}:${2:?Please specify the internal dataset e.g. intermediate_v3_1_1: $USAGE}
 PUBLIC=${PROJECT}:${3:?Please specify the public dataset e.g. rc_v3_1: $USAGE}
-ALIASES=${4:?Please specify the comma separated list of aliases \{rc|rc,release|none\}: $USAGE}
+ALIASES=${4:?Please specify a single alias, or quoted space separated list of aliases \{rc|\"rc release\"|none\}: $USAGE}
 
 # TODO - check that public and internal aren't swapped?
 # TODO - check that project is valid?
@@ -80,7 +80,7 @@ create_view() {
 # These lines may fail if they already exist, so we run them before set -e.
 bq mk ${PUBLIC}
 bq mk ${INTERMEDIATE}
-for ALIAS in ($ALIASES); do
+for ALIAS in $ALIASES; do
   if [ "${ALIAS}" != "none" ]; then
     bq mk ${PROJECT}:${ALIAS}
   fi
@@ -144,7 +144,7 @@ create_view ${PUBLIC} ndt_uploads \
 # If last parameter is "none" then we skip this section.
 # TODO - should link alpha and rc when release is linked?
 
-for ALIAS in ($ALIASES); do
+for ALIAS in $ALIASES; do
   if [ "${ALIAS}" != "none" ]; then
     echo "Linking ${PROJECT}:${ALIAS} alias"
 
