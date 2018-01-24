@@ -187,8 +187,46 @@ func (pt *PTParser) FullTableName() string {
 	return pt.inserter.FullTableName()
 }
 
+func (pt *PTParser) InsertOneTest(oneTest ParsedPTData) {
+	insertErr := false
+	for _, hop := range oneTest.hops {
+		ptTest := schema.PT{
+			Test_id:              oneTest.testID,
+			Log_time:             oneTest.logTime.Unix(),
+			Connection_spec:      *(oneTest.connSpec),
+			Paris_traceroute_hop: *hop,
+			Type:                 int32(2),
+			Project:              int32(3),
+		}
+		err := pt.inserter.InsertRow(ptTest)
+		if err != nil {
+			metrics.ErrorCount.WithLabelValues(
+				pt.TableName(), "pt", "insert-err").Inc()
+			insertErr = true
+			log.Printf("insert-err: %v\n", err)
+		}
+	}
+	if insertErr {
+		// Inc TestCount only once per test.
+		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
+	} else {
+		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
+	}
+}
+
+// Insert last several tests in previousTests
+func (pt *PTParser) ProcessLastTests() error {
+	for _, oneTest := range pt.previousTests {
+		pt.InsertOneTest(oneTest)
+	}
+	pt.previousTests = []ParsedPTData{}
+	return nil
+}
+
 func (pt *PTParser) Flush() error {
+	pt.ProcessLastTests()
 	return pt.inserter.Flush()
+
 }
 
 func CreateTestId(fn string, bn string) string {
@@ -237,30 +275,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 	if len(pt.previousTests) >= 5 {
 		// Insert the oldest test pt.previousTests[0] into BigQuery
-		insertErr := false
-		for _, hop := range pt.previousTests[0].hops {
-			ptTest := schema.PT{
-				Test_id:              pt.previousTests[0].testID,
-				Log_time:             pt.previousTests[0].logTime.Unix(),
-				Connection_spec:      *(pt.previousTests[0].connSpec),
-				Paris_traceroute_hop: *hop,
-				Type:                 int32(2),
-				Project:              int32(3),
-			}
-			err := pt.inserter.InsertRow(ptTest)
-			if err != nil {
-				metrics.ErrorCount.WithLabelValues(
-					pt.TableName(), "pt", "insert-err").Inc()
-				insertErr = true
-				log.Printf("insert-err: %v\n", err)
-			}
-		}
-		if insertErr {
-			// Inc TestCount only once per test.
-			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
-		} else {
-			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
-		}
+		pt.InsertOneTest(pt.previousTests[0])
 		pt.previousTests = pt.previousTests[1:]
 	}
 	// Insert current test into pt.previousTests

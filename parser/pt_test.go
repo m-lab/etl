@@ -80,7 +80,7 @@ func TestPTParser(t *testing.T) {
 	}
 
 	if lastLine != " 8  P(6, 6) 74.125.224.100 (74.125.224.100)  0.895 ms" {
-		fmt.Println("!!!"+lastLine+"!!!")
+		fmt.Println("!!!" + lastLine + "!!!")
 		t.Fatalf("Do not get last valid hop line correctly.")
 	}
 
@@ -138,19 +138,25 @@ func TestPTParser(t *testing.T) {
 		}
 	}
 }
-/*
+
 func TestPTInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
-	n := parser.NewPTParser(ins)
+	pt := parser.NewPTParser(ins)
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
 	}
-	err = n.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
+	err = pt.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
+	if ins.RowsInBuffer() != 0 {
+		t.Fatalf("Data processed prematurely.")
+	}
+
+	pt.ProcessLastTests()
 	if ins.RowsInBuffer() != 38 {
+		fmt.Println(ins.RowsInBuffer())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
 
@@ -182,4 +188,4 @@ func TestPTInserter(t *testing.T) {
 		fmt.Printf("Here is what is real: %v\n", ins.data[0])
 		t.Errorf("Not the expected values:")
 	}
-}*/
+}
