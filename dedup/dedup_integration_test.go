@@ -3,6 +3,7 @@
 package dedup_test
 
 import (
+	"context"
 	"log"
 	"os"
 	"testing"
@@ -64,5 +65,53 @@ func TestGetTableDetail(t *testing.T) {
 	}
 	if detail.TaskFileCount != 2 || detail.TestCount != 6 {
 		t.Error("Wrong number of tasks or tests")
+	}
+}
+
+func TestGetTableInfo(t *testing.T) {
+	dsExt, err := newTestingDataset("mlab-testing", "src")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := dedup.GetTableInfo(context.Background(), dsExt.Table("TestDedupSrc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.IsPartitioned {
+		t.Error("Should be partitioned")
+	}
+	if info.NumRows != 8 {
+		t.Errorf("Wrong number of rows: %d", info.NumRows)
+	}
+}
+
+func TestGetTableInfoMatching(t *testing.T) {
+	dsExt, err := newTestingDataset("mlab-testing", "src")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "Test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(info) != 3 {
+		t.Errorf("Wrong length: %d", len(info))
+	}
+}
+
+func TestGetPartitionInfo(t *testing.T) {
+	dsExt, err := newTestingDataset("mlab-testing", "src")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := dedup.GetPartitionInfo(context.Background(), &dsExt, dsExt.Table("TestDedupSrc$19990101"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.PartitionID != "19990101" {
+		t.Error("wrong partitionID: " + info.PartitionID)
 	}
 }
