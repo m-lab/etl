@@ -327,9 +327,9 @@ deploy:
   script:
     # Update these version numbers when making changes to the views.
     pushd $TRAVIS_BUILD_DIR/schema/views_legacysql &&
-    ./make_views.sh measurement-lab rc_v3_1 internal_v3_1_1 rc &&
+    ./make_views.sh measurement-lab intermediate_v3_1_1 rc_v3_1 rc,release &&
     cd $TRAVIS_BUILD_DIR/schema/views_standardsql &&
-    ./make_views.sh measurement-lab rc_v3_1 internal_v3_1_1 rc &&
+    ./make_views.sh measurement-lab intermediate_v3_1_1 rc_v3_1 rc,release &&
     popd
   skip_cleanup: true
   on:
