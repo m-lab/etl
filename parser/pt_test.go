@@ -52,7 +52,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 		fmt.Println(logTime)
 		t.Fatalf("Do not process log time correctly.")
 	}
-	if lastLine != "10  P(6, 6) txapp1.samknows.com (207.150.205.159)  24.900/24.972/25.055/0.045 ms " {
+	if lastLine != "ReachExpectedDestIP" {
 		fmt.Println(lastLine)
 		t.Fatalf("Do not get last valid hop line correctly.")
 	}
@@ -79,8 +79,8 @@ func TestPTParser(t *testing.T) {
 		t.Fatalf("Wrong results for connection spec!")
 	}
 
-	if lastLine != " 8  P(6, 6) 74.125.224.100 (74.125.224.100)  0.895 ms" {
-		fmt.Println("!!!" + lastLine + "!!!")
+	if lastLine != "ReachExpectedDestIP" {
+		fmt.Println(lastLine)
 		t.Fatalf("Do not get last valid hop line correctly.")
 	}
 
@@ -150,11 +150,7 @@ func TestPTInserter(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if ins.RowsInBuffer() != 0 {
-		t.Fatalf("Data processed prematurely.")
-	}
 
-	pt.ProcessLastTests()
 	if ins.RowsInBuffer() != 38 {
 		fmt.Println(ins.RowsInBuffer())
 		t.Fatalf("Number of rows in PT table is wrong.")
@@ -188,4 +184,44 @@ func TestPTInserter(t *testing.T) {
 		fmt.Printf("Here is what is real: %v\n", ins.data[0])
 		t.Errorf("Not the expected values:")
 	}
+}
+
+func TestPTPollutionCheck(t *testing.T) {
+	ins := &inMemoryInserter{}
+	pt := parser.NewPTParser(ins)
+
+	fileNameList := [6]string{
+		"testdata/PT/20171208T00:00:04Z-35.188.101.1-40784-173.205.3.38-9090.paris",
+		"testdata/PT/20171208T00:00:04Z-37.220.21.130-5667-173.205.3.43-42487.paris",
+		"testdata/PT/20171208T00:00:14Z-139.60.160.135-2023-173.205.3.44-1101.paris",
+		"testdata/PT/20171208T00:00:14Z-76.227.226.149-37156-173.205.3.37-52156.paris",
+		"testdata/PT/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris",
+		"testdata/PT/20171208T22:03:59Z-139.60.160.135-1519-163.22.28.44-1101.paris",
+	}
+	// expectedBufferedTest[2] == 0 means pollution detected and test removed.
+	expectedBufferedTest := [6]int{1, 1, 0, 1, 2, 1}
+	expectedNumRows := [6]int{0, 16, 29, 29, 29, 46}
+	// Process the tests
+	for index, filename := range fileNameList {
+		rawData, err := ioutil.ReadFile(filename)
+		if err != nil {
+			t.Fatalf("cannot read testdata.")
+		}
+		err = pt.ParseAndInsert(nil, filename, rawData)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		if pt.NumBufferedTests() != expectedBufferedTest[index] {
+			t.Fatalf("Data not buffered correctly")
+		}
+		if ins.RowsInBuffer() != expectedNumRows[index] {
+			t.Fatalf("Data not inserted into BigQuery correctly.")
+		}
+	}
+
+	pt.ProcessLastTests()
+	if ins.RowsInBuffer() != 56 {
+		t.Fatalf("Data not inserted into BigQuery correctly.")
+	}
+
 }

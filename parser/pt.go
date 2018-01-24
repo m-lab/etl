@@ -241,6 +241,10 @@ func CreateTestId(fn string, bn string) string {
 	return testId
 }
 
+func (pt *PTParser) NumBufferedTests() int {
+	return len(pt.previousTests)
+}
+
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues("pt").Inc()
 	defer metrics.WorkerState.WithLabelValues("pt").Dec()
@@ -271,6 +275,19 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
 			break
 		}
+	}
+
+	// if lastValidHopLine is "ReachExpectedDestIP", we need not buffer this test.
+	// We can insert it to BigQuery table directly.
+	if lastValidHopLine == "ReachExpectedDestIP" {
+		pt.InsertOneTest(ParsedPTData{
+			testID:           testId,
+			hops:             hops,
+			logTime:          logTime,
+			connSpec:         connSpec,
+			lastValidHopLine: "",
+		})
+		return nil
 	}
 
 	if len(pt.previousTests) >= 5 {
@@ -537,6 +554,9 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	} else {
 		AddGeoDataPTConnSpec(connSpec, t)
 		AddGeoDataPTHopBatch(PTHops, t)
+	}
+	if reachedDest {
+		return PTHops, t, connSpec, "ReachExpectedDestIP", nil
 	}
 	return PTHops, t, connSpec, lastValidHopLine, nil
 }
