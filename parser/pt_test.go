@@ -54,7 +54,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 	}
 	if lastLine != "ReachExpectedDestIP" {
 		fmt.Println(lastLine)
-		t.Fatalf("Do not get last valid hop line correctly.")
+		t.Fatalf("Did not reach expected destination.")
 	}
 }
 
@@ -81,7 +81,7 @@ func TestPTParser(t *testing.T) {
 
 	if lastLine != "ReachExpectedDestIP" {
 		fmt.Println(lastLine)
-		t.Fatalf("Do not get last valid hop line correctly.")
+		t.Fatalf("Did not reach expected destination.")
 	}
 
 	// TODO(dev): reformat these individual values to be more readable.

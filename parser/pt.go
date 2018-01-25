@@ -32,7 +32,8 @@ func (f *PTFileName) GetDate() (string, bool) {
 	return "", false
 }
 
-// The data that will be inserted intp BQ tables
+// The data structure is used to store the parsed results temporarily before it is verified
+// not polluted and can be inserted into BQ tables
 type ParsedPTData struct {
 	testID           string
 	hops             []*schema.ParisTracerouteHop
@@ -44,6 +45,8 @@ type ParsedPTData struct {
 type PTParser struct {
 	inserter etl.Inserter
 	etl.RowStats
+	// Care should be taken to ensure this does not accumulate many rows and
+	// lead to OOM problems.
 	previousTests []ParsedPTData
 }
 
