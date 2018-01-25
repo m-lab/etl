@@ -25,6 +25,7 @@ var (
 	fDeleteAfterCopy  = flag.Bool("delete", false, "Should delete table after copy")
 	fIgnoreDestAge    = flag.Bool("ignore_dest_age", false, "Ignore destination age in sanity check")
 	fDryRun           = flag.Bool("dry_run", false, "Print actions instead of executing")
+	fSkipDedup        = flag.Bool("skip_dedup", false, "Assume dedup has been done, and just copy.")
 )
 
 func main() {
@@ -48,7 +49,7 @@ func main() {
 	}
 	// TODO fix delay param.
 	err = dedup.ProcessTablesMatching(&dsExt, src[1], dest[0], dest[1],
-		dedup.Options{MinSrcAge: *fDelay, IgnoreDestAge: *fIgnoreDestAge, DryRun: *fDryRun})
+		dedup.Options{MinSrcAge: *fDelay, IgnoreDestAge: *fIgnoreDestAge, DryRun: *fDryRun, CopyOnly: *fSkipDedup})
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
