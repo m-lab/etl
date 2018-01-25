@@ -148,17 +148,17 @@ for ALIAS in $ALIASES; do
   if [ "${ALIAS}" != "none" ]; then
     echo "Linking ${PROJECT}:${ALIAS} alias"
 
-    create_view ${ALIAS} ndt_all \
+    create_view ${PROJECT}:${ALIAS} ndt_all \
       'View across the all NDT data except EB and blacklisted' \
       '#standardSQL
       SELECT * FROM `'${INTERMEDIATE/:/.}'.ndt_all`'
 
-    create_view ${ALIAS} ndt_downloads \
+    create_view ${PROJECT}:${ALIAS} ndt_downloads \
       'All good quality download tests' \
       '#standardSQL
       SELECT * FROM `'${INTERMEDIATE/:/.}'.ndt_downloads`'
 
-    create_view ${ALIAS} ndt_uploads \
+    create_view ${PROJECT}:${ALIAS} ndt_uploads \
       'All good quality upload tests' \
       '#standardSQL
       SELECT * FROM `'${INTERMEDIATE/:/.}'.ndt_uploads`'
