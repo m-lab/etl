@@ -302,6 +302,7 @@ type Options struct {
 	MinSrcAge     time.Duration
 	IgnoreDestAge bool
 	DryRun        bool
+	CopyOnly      bool // Skip the dedup step and copy from intermediate to destination
 }
 
 // CheckAndDedup checks various criteria, and if they all pass,
@@ -323,6 +324,7 @@ type Options struct {
 //
 // TODO(gfr) Should we check that intermediate table is NOT a production table?
 func CheckAndDedup(ctx context.Context, dsExt *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table, options Options) (bool, error) {
+
 	// Check if the last update was at least minSrcAge in the past.
 	if time.Now().Sub(srcInfo.LastModifiedTime) < options.MinSrcAge {
 		return false, errors.New("Source is too recent")
@@ -352,6 +354,7 @@ func CheckAndDedup(ctx context.Context, dsExt *bqext.Dataset, srcInfo TableInfo,
 	}
 
 	if !options.IgnoreDestAge {
+		// TODO - this fails if the destination partition does not exist.
 		err = checkDestOlder(ctx, dsExt, srcInfo, destTable)
 		if err != nil {
 			log.Println(err)
@@ -381,11 +384,13 @@ func CheckAndDedup(ctx context.Context, dsExt *bqext.Dataset, srcInfo TableInfo,
 		return false, nil
 	}
 
-	// TODO - are we checking for source newer than intermediate destination?  Should we?
-	_, err = dsExt.Dedup_Alpha(srcInfo.Name, "test_id", intermediateTable)
-	if err != nil {
-		log.Println(err)
-		return false, err
+	if !options.CopyOnly {
+		// TODO - are we checking for source newer than intermediate destination?  Should we?
+		_, err = dsExt.Dedup_Alpha(srcInfo.Name, "test_id", intermediateTable)
+		if err != nil {
+			log.Println(err)
+			return false, err
+		}
 	}
 
 	// Now compare number of rows and tasks in intermediate table to destination table.
