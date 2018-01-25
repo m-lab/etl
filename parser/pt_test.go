@@ -190,31 +190,58 @@ func TestPTPollutionCheck(t *testing.T) {
 	ins := &inMemoryInserter{}
 	pt := parser.NewPTParser(ins)
 
-	fileNameList := [6]string{
-		"testdata/PT/20171208T00:00:04Z-35.188.101.1-40784-173.205.3.38-9090.paris",
-		"testdata/PT/20171208T00:00:04Z-37.220.21.130-5667-173.205.3.43-42487.paris",
-		"testdata/PT/20171208T00:00:14Z-139.60.160.135-2023-173.205.3.44-1101.paris",
-		"testdata/PT/20171208T00:00:14Z-76.227.226.149-37156-173.205.3.37-52156.paris",
-		"testdata/PT/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris",
-		"testdata/PT/20171208T22:03:59Z-139.60.160.135-1519-163.22.28.44-1101.paris",
+	tests := []struct {
+		fileName             string
+		expectedBufferedTest int
+		expectedNumRows      int
+	}{
+		{
+			fileName:             "testdata/PT/20171208T00:00:04Z-35.188.101.1-40784-173.205.3.38-9090.paris",
+			expectedBufferedTest: 1,
+			expectedNumRows:      0,
+		},
+		{
+			fileName:             "testdata/PT/20171208T00:00:04Z-37.220.21.130-5667-173.205.3.43-42487.paris",
+			expectedBufferedTest: 1,
+			expectedNumRows:      16,
+		},
+		{
+			fileName: "testdata/PT/20171208T00:00:14Z-139.60.160.135-2023-173.205.3.44-1101.paris",
+			// expectedBufferedTest means pollution detected and test removed.
+			expectedBufferedTest: 0,
+			expectedNumRows:      29,
+		},
+		{
+			fileName:             "testdata/PT/20171208T00:00:14Z-76.227.226.149-37156-173.205.3.37-52156.paris",
+			expectedBufferedTest: 1,
+			expectedNumRows:      29,
+		},
+		{
+			fileName:             "testdata/PT/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris",
+			expectedBufferedTest: 2,
+			expectedNumRows:      29,
+		},
+		{
+			fileName:             "testdata/PT/20171208T22:03:59Z-139.60.160.135-1519-163.22.28.44-1101.paris",
+			expectedBufferedTest: 1,
+			expectedNumRows:      46,
+		},
 	}
-	// expectedBufferedTest[2] == 0 means pollution detected and test removed.
-	expectedBufferedTest := [6]int{1, 1, 0, 1, 2, 1}
-	expectedNumRows := [6]int{0, 16, 29, 29, 29, 46}
+
 	// Process the tests
-	for index, filename := range fileNameList {
-		rawData, err := ioutil.ReadFile(filename)
+	for _, test := range tests {
+		rawData, err := ioutil.ReadFile(test.fileName)
 		if err != nil {
 			t.Fatalf("cannot read testdata.")
 		}
-		err = pt.ParseAndInsert(nil, filename, rawData)
+		err = pt.ParseAndInsert(nil, test.fileName, rawData)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
-		if pt.NumBufferedTests() != expectedBufferedTest[index] {
+		if pt.NumBufferedTests() != test.expectedBufferedTest {
 			t.Fatalf("Data not buffered correctly")
 		}
-		if ins.RowsInBuffer() != expectedNumRows[index] {
+		if ins.RowsInBuffer() != test.expectedNumRows {
 			t.Fatalf("Data not inserted into BigQuery correctly.")
 		}
 	}
