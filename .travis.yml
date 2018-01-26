@@ -58,14 +58,16 @@ script:
 - for module in $MODULES; do
     COVER_PKGS=${COVER_PKGS}./$module/..., ;
   done
-  COVER_PKGS=${COVER_PKGS::-1}  # Trim the trailing comma
+- COVER_PKGS=${COVER_PKGS::-1}  # Trim the trailing comma
 
 - for module in $MODULES; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module ;
   done
 
 # Rerun modules with integration tests.  This means that some tests are repeated, but otherwise
-# we lose some coverage.
+# we lose some coverage.  The corresponding cov files are overwritten, but that is OK since
+# the non-integration tests are repeated.  If we change the unit tests to NOT run when integration
+# test tag is set, then we would need to have separate cov files.
 - for module in dedup ; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module -tags=integration ;
   done
