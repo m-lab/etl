@@ -41,26 +41,28 @@ func TestParseLegacyFormatData(t *testing.T) {
 		fmt.Println("cannot load test data")
 		return
 	}
-	hops, logTime, _, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", rawData, "pt-daily")
+	cashedTest, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if len(hops) != 9 {
+	if len(cashedTest.Hops) != 9 {
 		t.Fatalf("Do not process hops correctly.")
 	}
-	if logTime.Unix() != 1452559544 {
-		fmt.Println(logTime)
+	if cashedTest.LogTime.Unix() != 1452559544 {
 		t.Fatalf("Do not process log time correctly.")
+	}
+	if cashedTest.LastValidHopLine != "ExpectedDestIP" {
+		t.Fatalf("Did not reach expected destination.")
 	}
 }
 
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	hops, logTime, conn_spec, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData, "pt-daily")
+	cashedTest, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if logTime.Unix() != 1490053990 {
+	if cashedTest.LogTime.Unix() != 1490053990 {
 		t.Fatalf("Do not process log time correctly.")
 	}
 
@@ -71,8 +73,12 @@ func TestPTParser(t *testing.T) {
 		Client_af:      2,
 		Data_direction: 0,
 	}
-	if !reflect.DeepEqual(*conn_spec, expected_cspec) {
+	if !reflect.DeepEqual(*(cashedTest.ConnSpec), expected_cspec) {
 		t.Fatalf("Wrong results for connection spec!")
+	}
+
+	if cashedTest.LastValidHopLine != "ExpectedDestIP" {
+		t.Fatalf("Did not reach expected destination.")
 	}
 
 	// TODO(dev): reformat these individual values to be more readable.
@@ -116,15 +122,15 @@ func TestPTParser(t *testing.T) {
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.17.95.252", Src_af: 2, Dest_ip: "172.25.252.172", Dest_af: 2, Src_hostname: "172.17.95.252", Dest_hostname: "us-mtv-cl4-core1-gigabitethernet1-1.n.corp.google.com", Rtt: []float64{0.407}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.17.94.34", Src_af: 2, Dest_ip: "172.17.95.252", Dest_af: 2, Dest_hostname: "172.17.95.252", Rtt: []float64{0.376}},
 	}
-	if len(hops) != len(expected_hops) {
+	if len(cashedTest.Hops) != len(expected_hops) {
 		t.Fatalf("Wrong results for PT hops!")
 	}
 
-	for i := 0; i < len(hops); i++ {
-		if !reflect.DeepEqual(*hops[i], expected_hops[i]) {
+	for i := 0; i < len(cashedTest.Hops); i++ {
+		if !reflect.DeepEqual(*cashedTest.Hops[i], expected_hops[i]) {
 			fmt.Println(i)
 			fmt.Printf("Here is expected    : %v\n", expected_hops[i])
-			fmt.Printf("Here is what is real: %v\n", *hops[i])
+			fmt.Printf("Here is what is real: %v\n", *cashedTest.Hops[i])
 			t.Fatalf("Wrong results for PT hops!")
 		}
 	}
@@ -132,16 +138,18 @@ func TestPTParser(t *testing.T) {
 
 func TestPTInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
-	n := parser.NewPTParser(ins)
+	pt := parser.NewPTParser(ins)
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
 	}
-	err = n.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
+	err = pt.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
+
 	if ins.RowsInBuffer() != 38 {
+		fmt.Println(ins.RowsInBuffer())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
 
@@ -173,4 +181,71 @@ func TestPTInserter(t *testing.T) {
 		fmt.Printf("Here is what is real: %v\n", ins.data[0])
 		t.Errorf("Not the expected values:")
 	}
+}
+
+func TestPTPollutionCheck(t *testing.T) {
+	ins := &inMemoryInserter{}
+	pt := parser.NewPTParser(ins)
+
+	tests := []struct {
+		fileName             string
+		expectedBufferedTest int
+		expectedNumRows      int
+	}{
+		{
+			fileName:             "testdata/PT/20171208T00:00:04Z-35.188.101.1-40784-173.205.3.38-9090.paris",
+			expectedBufferedTest: 1,
+			expectedNumRows:      0,
+		},
+		{
+			fileName:             "testdata/PT/20171208T00:00:04Z-37.220.21.130-5667-173.205.3.43-42487.paris",
+			expectedBufferedTest: 1,
+			expectedNumRows:      16,
+		},
+		{
+			fileName: "testdata/PT/20171208T00:00:14Z-139.60.160.135-2023-173.205.3.44-1101.paris",
+			// expectedBufferedTest means pollution detected and test removed.
+			expectedBufferedTest: 0,
+			expectedNumRows:      29,
+		},
+		{
+			fileName:             "testdata/PT/20171208T00:00:14Z-76.227.226.149-37156-173.205.3.37-52156.paris",
+			expectedBufferedTest: 1,
+			expectedNumRows:      29,
+		},
+		{
+			fileName:             "testdata/PT/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris",
+			expectedBufferedTest: 2,
+			expectedNumRows:      29,
+		},
+		{
+			fileName:             "testdata/PT/20171208T22:03:59Z-139.60.160.135-1519-163.22.28.44-1101.paris",
+			expectedBufferedTest: 1,
+			expectedNumRows:      46,
+		},
+	}
+
+	// Process the tests
+	for _, test := range tests {
+		rawData, err := ioutil.ReadFile(test.fileName)
+		if err != nil {
+			t.Fatalf("cannot read testdata.")
+		}
+		err = pt.ParseAndInsert(nil, test.fileName, rawData)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		if pt.NumBufferedTests() != test.expectedBufferedTest {
+			t.Fatalf("Data not buffered correctly")
+		}
+		if ins.RowsInBuffer() != test.expectedNumRows {
+			t.Fatalf("Data not inserted into BigQuery correctly.")
+		}
+	}
+
+	pt.ProcessLastTests()
+	if ins.RowsInBuffer() != 56 {
+		t.Fatalf("Data not inserted into BigQuery correctly.")
+	}
+
 }

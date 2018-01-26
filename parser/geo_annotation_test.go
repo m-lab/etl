@@ -163,7 +163,7 @@ func TestAddGeoDataPTHopBatch(t *testing.T) {
 		annotation.BatchURL = ts.URL + test.url
 		p.AddGeoDataPTHopBatch(test.hops, test.timestamp)
 		if !reflect.DeepEqual(test.hops, test.res) {
-			t.Errorf("Expected %s, got %s from data %s", test.res, test.hops, test.url)
+			t.Errorf("Expected %v, got %v from data %s", test.res, test.hops, test.url)
 		}
 	}
 }
@@ -207,7 +207,7 @@ func TestAnnotatePTHops(t *testing.T) {
 	for _, test := range tests {
 		p.AnnotatePTHops(test.hops, test.annotationData, test.timestamp)
 		if !reflect.DeepEqual(test.hops, test.res) {
-			t.Errorf("Expected %s, got %s.", test.res, test.hops)
+			t.Errorf("Expected %v, got %v.", test.res, test.hops)
 		}
 	}
 
