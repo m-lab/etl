@@ -440,7 +440,8 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	}
 
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
-	// We can get the logtime, local IP, local port, server IP, server port from fileName directly
+	// By design, they are logtime, local IP, local port, the server IP and port which served the test
+	// that triggered this PT test (not the server IP & port that served THIS PT test.)
 	isFirstLine := true
 	protocol := "icmp"
 	// This var keep all current leaves
