@@ -8,17 +8,17 @@ import (
 	"strconv"
 )
 
-const (
-	// MlabDomain is the DNS domain for all mlab servers.
-	MlabDomain = `measurement-lab.org`
+// YYYYMMDD is a regexp string for identifying dense dates.
+const YYYYMMDD = `\d{4}[01]\d[0123]\d`
+// MlabDomain is the DNS domain for all mlab servers.
+const MlabDomain = `measurement-lab.org`
 
-	start       = `^gs://(?P<prefix>.*)/(?P<exp>[^/]*)/`
-	datePath    = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
-	dateTime    = `(\d{4}[01]\d[0123]\d)T\d{6}Z`
-	mlabN_podNN = `-(mlab\d)-([[:alpha:]]{3}\d[0-9t])-`
-	exp_NNNN    = `(.*)-(\d{4})`
-	suffix      = `(?:\.tar|\.tar.gz|\.tgz)$`
-)
+const start = `^gs://(?P<prefix>.*)/(?P<exp>[^/]*)/`
+const datePath = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
+const dateTime = `(\d{4}[01]\d[0123]\d)T\d{6}Z`
+const mlabN_podNN = `-(mlab\d)-([[:alpha:]]{3}\d[0-9t])-`
+const exp_NNNN = `(.*)-(\d{4})`
+const suffix = `(?:\.tar|\.tar.gz|\.tgz)$`
 
 // These are here to facilitate use across queue-pusher and parsing components.
 var (
