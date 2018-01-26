@@ -51,7 +51,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 	if cashedTest.LogTime.Unix() != 1452559544 {
 		t.Fatalf("Do not process log time correctly.")
 	}
-	if cashedTest.LastValidHopLine != "ReachExpectedDestIP" {
+	if cashedTest.LastValidHopLine != "ExpectedDestIP" {
 		t.Fatalf("Did not reach expected destination.")
 	}
 }
@@ -77,7 +77,7 @@ func TestPTParser(t *testing.T) {
 		t.Fatalf("Wrong results for connection spec!")
 	}
 
-	if cashedTest.LastValidHopLine != "ReachExpectedDestIP" {
+	if cashedTest.LastValidHopLine != "ExpectedDestIP" {
 		t.Fatalf("Did not reach expected destination.")
 	}
 

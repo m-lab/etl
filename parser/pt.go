@@ -67,6 +67,7 @@ type Node struct {
 
 const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
+const PTBufferSize int = 5
 
 func NewPTParser(ins etl.Inserter) *PTParser {
 	return &PTParser{ins, ins, []cachedPTData{}}
@@ -269,26 +270,29 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Check all buffered PT tests whether Client_ip in connSpec appear in the last
 	// hop of the buffered test.
 	// If pollution detected, then remove the test from buffer.
-	// If no pollution detected and buffer is full, insert the oldest test into BitQuery table.
+	// If no pollution detected and buffer is full, insert the oldest test into BigQuery table.
 	destIP := cashedTest.ConnSpec.Client_ip
 	for index, PTTest := range pt.previousTests {
-		// array of hops was built reversely from list of nodes (in func ProcessAllNodes)
+		// array of hops was built in reverse order from list of nodes (in func ProcessAllNodes())
 		hop := PTTest.Hops[0]
 		if PTTest.ConnSpec.Client_ip != destIP && (hop.Dest_ip == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
-			// remove pt.previousTest[index]
+			// Discard pt.previousTest[index]
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
 			break
 		}
 	}
 
-	// if lastValidHopLine is "ReachExpectedDestIP", we need not buffer this test.
-	// We can insert it to BigQuery table directly.
-	if cashedTest.LastValidHopLine == "ReachExpectedDestIP" {
+	// If a test that ends at the expected DestIP, it is not at risk of being polluted,
+	// so we don't have to wait to check against further tests - we can just go ahead and
+	// insert it to BigQuery table directly.
+	// Also we don't care about test LogTime order, since there are other workers inserting
+	// other blocks of hops concurrently.
+	if cashedTest.LastValidHopLine == "ExpectedDestIP" {
 		pt.InsertOneTest(cashedTest)
 		return nil
 	}
 
-	if len(pt.previousTests) >= 5 {
+	if len(pt.previousTests) >= PTBufferSize {
 		// Insert the oldest test pt.previousTests[0] into BigQuery
 		pt.InsertOneTest(pt.previousTests[0])
 		pt.previousTests = pt.previousTests[1:]
@@ -559,7 +563,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 			Hops:             PTHops,
 			LogTime:          t,
 			ConnSpec:         connSpec,
-			LastValidHopLine: "ReachExpectedDestIP",
+			LastValidHopLine: "ExpectedDestIP",
 		}, nil
 	}
 	return cachedPTData{
