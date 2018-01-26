@@ -10,6 +10,7 @@ import (
 
 // YYYYMMDD is a regexp string for identifying dense dates.
 const YYYYMMDD = `\d{4}[01]\d[0123]\d`
+
 // MlabDomain is the DNS domain for all mlab servers.
 const MlabDomain = `measurement-lab.org`
 
@@ -80,31 +81,38 @@ func (fn *DataPath) GetDataType() DataType {
 	return dt
 }
 
-// Extract metro name like "acc" from file name like
+// IsBatchService return true if this is a NDT batch service.
+// TODO - update this to BATCH_SERVICE, so it makes sense for other pipelines.
+func IsBatchService() bool {
+	isBatch, _ := strconv.ParseBool(os.Getenv("NDT_BATCH"))
+	return isBatch
+}
+
+// GetMetroName extracts metro name like "acc" from file name like
 // 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
-func GetMetroName(raw_fn string) string {
-	pod_name := podPattern.FindString(raw_fn)
-	if pod_name != "" {
-		return pod_name[7:10]
+func GetMetroName(rawFilename string) string {
+	podName := podPattern.FindString(rawFilename)
+	if podName != "" {
+		return podName[7:10]
 	}
 	return ""
 }
 
-// Convert an IPv4 address into uint32.
+// GetIntFromIPv4 converts an IPv4 address to equivalent uint32.
 func GetIntFromIPv4(p4 net.IP) uint {
 	return uint(p4[0])<<24 + uint(p4[1])<<16 + uint(p4[2])<<8 + uint(p4[3])
 }
 
-// Convert the upper 64 bits of an IPv6 address into uint64.
+// GetIntFromIPv6Upper converts the upper 64 bits of an IPv6 address into uint64.
 func GetIntFromIPv6Upper(p6 net.IP) uint64 {
 	return uint64(p6[0])<<56 + uint64(p6[1])<<48 + uint64(p6[2])<<40 + uint64(p6[3])<<32 + uint64(p6[4])<<24 + uint64(p6[5])<<16 + uint64(p6[6])<<8 + uint64(p6[7])
 }
 
-// Return how many bits that two IP address Different (from rightest)
+// NumberBitsDifferent computes how many trailing bits differ between two IP addresses.
 // The second returned number is 4 for IP_v4, 6 for IP_v6, and 0 for invalid input.
-func NumberBitsDifferent(first_ip string, second_ip string) (int, int) {
-	ip1 := net.ParseIP(first_ip)
-	ip2 := net.ParseIP(second_ip)
+func NumberBitsDifferent(first string, second string) (int, int) {
+	ip1 := net.ParseIP(first)
+	ip2 := net.ParseIP(second)
 	if ip1.To4() != nil && ip2.To4() != nil {
 		dist := uint(GetIntFromIPv4(ip1.To4()) ^ uint(GetIntFromIPv4(ip2.To4())))
 		n := 0

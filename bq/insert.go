@@ -29,20 +29,17 @@ import (
 	"github.com/m-lab/etl/metrics"
 )
 
-// TODO(dev) Use a more thoughtful setting for buffer size.
+// NewInserter creates a new BQInserter with appropriate characteristics.
 // TODO(P3) Include the project name in the parameters.
-// For now, 10K per row times 100 results is 1MB, which is an order of
-// magnitude below our 10MB max, so 100 might not be such a bad
-// default.
 func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 	suffix := ""
 	table := etl.DataTypeToTable[dt]
-	if time.Since(partition) < 30*24*time.Hour {
-		// If within past 30 days, we can stream directly to partition.
-		suffix = "$" + partition.Format("20060102")
-	} else {
-		// Otherwise, we use a templated table, and must merge it later.
+	if etl.IsBatchService() || time.Since(partition) > 30*24*time.Hour {
+		// If batch, or too far in the past, we use a templated table, and must merge it later.
 		suffix = "_" + partition.Format("20060102")
+	} else {
+		// Otherwise, we can stream directly to correct partition.
+		suffix = "$" + partition.Format("20060102")
 	}
 
 	return NewBQInserter(
@@ -51,8 +48,9 @@ func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inse
 		nil)
 }
 
-// TODO - improve the naming between here and NewInserter.
+// NewBQInserter initializes a new BQInserter
 // Pass in nil uploader for normal use, custom uploader for custom behavior
+// TODO - improve the naming between here and NewInserter.
 func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
 	if uploader == nil {
 		client := MustGetClient(params.Timeout)
@@ -82,7 +80,7 @@ var (
 	bqClient   *bigquery.Client
 )
 
-// Returns the Singleton bigquery client for this process.
+// MustGetClient returns the Singleton bigquery client for this process.
 // TODO - is there any advantage to using more than one client?
 func MustGetClient(timeout time.Duration) *bigquery.Client {
 	// We do this here, instead of in init(), because we only want to do it
@@ -107,7 +105,7 @@ func MustGetClient(timeout time.Duration) *bigquery.Client {
 
 //===============================================================================
 
-// Generic implementation of bq.ValueSaver, based on map.  This avoids extra
+// MapSaver is a generic implementation of bq.ValueSaver, based on maps.  This avoids extra
 // conversion steps in the bigquery library (except for the JSON conversion).
 // IMPLEMENTS: bigquery.ValueSaver
 type MapSaver struct {
