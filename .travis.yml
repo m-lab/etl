@@ -127,7 +127,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
-    && INJECTED_PROJECT=mlab-oti
+    && INJECTED_PROJECT=measurement-lab
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
@@ -216,7 +216,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
-    && INJECTED_PROJECT=mlab-oti
+    && INJECTED_PROJECT=measurement-lab
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
