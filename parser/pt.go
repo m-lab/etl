@@ -271,8 +271,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// the last hop of the buffered test.
 	// If it does appear, then the buffered test was polluted, and it will
 	// be discarded from buffer.
-	// If it does not appear, then no pollution detected. If buffer is full,
-	// we remove the oldest test and insert it into BigQuery table.
+	// If it does not appear, then no pollution detected.
 	destIP := cashedTest.ConnSpec.Client_ip
 	for index, PTTest := range pt.previousTests {
 		// array of hops was built in reverse order from list of nodes
@@ -298,6 +297,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return nil
 	}
 
+	// If buffer is full, remove the oldest test and insert it into BigQuery table.
 	if len(pt.previousTests) >= PTBufferSize {
 		// Insert the oldest test pt.previousTests[0] into BigQuery
 		pt.InsertOneTest(pt.previousTests[0])
@@ -528,6 +528,8 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 			metrics.PTMoreHopsAfterDest.WithLabelValues(metroName).Inc()
 			log.Printf("middle mess up test_id: " + fileName + " " + testName)
 		}
+	} else {
+		lastValidHopLine = "ExpectedDestIP"
 	}
 	// Calculate how close is the last hop with the real dest.
 	// The last node of allNodes contains the last hop IP.
@@ -557,15 +559,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 		AddGeoDataPTConnSpec(connSpec, logTime)
 		AddGeoDataPTHopBatch(PTHops, logTime)
 	}
-	if reachedDest {
-		return cachedPTData{
-			TestID:           testId,
-			Hops:             PTHops,
-			LogTime:          logTime,
-			ConnSpec:         connSpec,
-			LastValidHopLine: "ExpectedDestIP",
-		}, nil
-	}
+
 	return cachedPTData{
 		TestID:           testId,
 		Hops:             PTHops,
