@@ -103,6 +103,9 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
+    && INJECTED_PROJECT=mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
@@ -124,7 +127,8 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    && INJECTED_PROJECT=measurement-lab
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-prod.yaml
@@ -160,7 +164,8 @@ deploy:
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
 # PERSONAL SANDBOX: before code review for development code in a specific branch.
 - provider: script
-  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
+  script:
+    $TRAVIS_BUILD_DIR/.personalize_deploy.sh
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
   skip_cleanup: true
@@ -177,8 +182,12 @@ deploy:
 # INTEGRATION: Reviewed code, merged to integration branch, will trigger
 # deployment to "standard" mlab-sandbox.
 - provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+  script:
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
+    && INJECTED_PROJECT=mlab-sandbox
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -188,8 +197,12 @@ deploy:
 # when *ANY* branch is tagged with ndt-staging-*'  This allows pushing individual
 # pipeline components prior to committing to integration branch.
 - provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+  script:
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
+    && INJECTED_PROJECT=mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -203,7 +216,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    && INJECTED_PROJECT=measurement-lab
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:

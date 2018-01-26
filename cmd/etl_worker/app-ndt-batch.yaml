@@ -1,4 +1,5 @@
-# Use github release to trigger deployment.
+# Should be auto-deployed to sandbox and staging.
+# Use github release to trigger deployment to prod.
 
 runtime: custom
 env: flex
@@ -12,7 +13,8 @@ resources:
   cpu: 2
   # Instances support between [(cpu * 0.9) - 0.4, (cpu * 6.5) - 0.4]
   # Actual memory available is exposed via GAE_MEMORY_MB environment variable.
-  memory_gb: 6
+  # Recent observation with 20 workers per instance hovers around 1.5 GB.
+  memory_gb: 3
 
   # TODO - Adjust once we understand requirements.
   disk_size_gb: 10
@@ -48,7 +50,7 @@ env_variables:
 
   NDT_BATCH: 'true'  # Allow instances to discover they are NDT_BATCH instances.
   MAX_WORKERS: 12
-  BIGQUERY_PROJECT: 'measurement-lab'
+  BIGQUERY_PROJECT: ${INJECTED_PROJECT}
   BIGQUERY_DATASET: 'batch'
   ANNOTATE_IP: 'true'
   NDT_OMIT_DELTAS: 'true'
