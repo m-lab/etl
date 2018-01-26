@@ -50,29 +50,37 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 script:
+# To start, run all the non-integration tests.
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
-# TODO - add integration test tag.
-- COVER_PKGS=./annotation/...,./appengine/...,./bq/...,./dedup/...,./etl/...,./metrics/...,./parser/...,./schema/...,./storage/...,./task/...,./web100/...
-- go test -coverpkg=$COVER_PKGS -coverprofile=annotation.cov -v github.com/m-lab/etl/annotation
-- go test -coverpkg=$COVER_PKGS -coverprofile=batch.cov -v github.com/m-lab/etl/batch
-- go test -coverpkg=$COVER_PKGS -coverprofile=bq.cov -v github.com/m-lab/etl/bq
-- go test -coverpkg=$COVER_PKGS -coverprofile=dedup.cov -v github.com/m-lab/etl/dedup -tags=integration
-- go test -coverpkg=$COVER_PKGS -coverprofile=etl.cov -v github.com/m-lab/etl/etl
-- go test -coverpkg=$COVER_PKGS -coverprofile=parser.cov -v github.com/m-lab/etl/parser
-- go test -coverpkg=$COVER_PKGS -coverprofile=qp.cov -v github.com/m-lab/etl/appengine/queue_pusher
-- go test -coverpkg=$COVER_PKGS -coverprofile=task.cov -v github.com/m-lab/etl/task
-- go test -coverpkg=$COVER_PKGS -coverprofile=web100.cov -v github.com/m-lab/etl/web100
-# reproc tests are not ideal as they depend on GCS test-archive-mlab-sandbox.
-# They also require credentials, which aren't set up yet.
-# - go test -coverpkg=$COVER_PKGS -coverprofile=reproc.cov -v github.com/m-lab/etl/cmd/reproc
+# TODO - separate storage tests into integration and lightweight.
+- MODULES="annotation appengine bq dedup etl metrics parser schema storage task web100"
+- for module in $MODULES; do
+    COVER_PKGS=${COVER_PKGS}./$module/..., ;
+  done
+- COVER_PKGS=${COVER_PKGS::-1}  # Trim the trailing comma
+
+- for module in $MODULES; do
+    go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module ;
+  done
+
+# Rerun modules with integration tests.  This means that some tests are repeated, but otherwise
+# we lose some coverage.  The corresponding cov files are overwritten, but that is OK since
+# the non-integration tests are repeated.  If we change the unit tests to NOT run when integration
+# test tag is set, then we would need to have separate cov files.
+- for module in dedup ; do
+    go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module -tags=integration ;
+  done
 
 # Coveralls
 # TODO - figure out why batch.cov isn't being generated above.
-- $HOME/gopath/bin/gocovmerge annotation.cov bq.cov dedup.cov etl.cov parser.cov qp.cov task.cov web100.cov > merge.cov
+# Run "unit tests" with coverage.
+
+# Coveralls
+- $HOME/gopath/bin/gocovmerge *.cov > merge.cov
 - $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
 
-# Build and prepare for deployment
+# Clean build and prepare for deployment
 - cd $TRAVIS_BUILD_DIR/cmd/etl_worker && go build
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
 
