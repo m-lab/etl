@@ -267,26 +267,32 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 
-	// Check all buffered PT tests whether Client_ip in connSpec appear in the last
-	// hop of the buffered test.
-	// If pollution detected, then remove the test from buffer.
-	// If no pollution detected and buffer is full, insert the oldest test into BigQuery table.
+	// Check all buffered PT tests whether Client_ip in connSpec appear in
+	// the last hop of the buffered test.
+	// If it does appear, then the buffered test was polluted, and it will
+	// be discarded from buffer.
+	// If it does not appear, then no pollution detected. If buffer is full,
+	// we remove the oldest test and insert it into BigQuery table.
 	destIP := cashedTest.ConnSpec.Client_ip
 	for index, PTTest := range pt.previousTests {
-		// array of hops was built in reverse order from list of nodes (in func ProcessAllNodes())
-		hop := PTTest.Hops[0]
-		if PTTest.ConnSpec.Client_ip != destIP && (hop.Dest_ip == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
+		// array of hops was built in reverse order from list of nodes
+		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
+		finalHop := PTTest.Hops[0]
+		if PTTest.ConnSpec.Client_ip != destIP && (finalHop.Dest_ip == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
 			// Discard pt.previousTest[index]
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
 			break
 		}
 	}
 
-	// If a test that ends at the expected DestIP, it is not at risk of being polluted,
-	// so we don't have to wait to check against further tests - we can just go ahead and
-	// insert it to BigQuery table directly.
-	// Also we don't care about test LogTime order, since there are other workers inserting
-	// other blocks of hops concurrently.
+	// If a test ends at the expected DestIP, it is not at risk of being
+	// polluted,so we don't have to wait to check against further tests.
+	// We can just go ahead and insert it to BigQuery table directly. This
+	// optimization makes the pollution check more effective by saving the
+	// unnecessary check between those tests (reached expected DestIP) and
+	// the new test.
+	// Also we don't care about test LogTime order, since there are other
+	// workers inserting other blocks of hops concurrently.
 	if cashedTest.LastValidHopLine == "ExpectedDestIP" {
 		pt.InsertOneTest(cashedTest)
 		return nil
@@ -417,13 +423,6 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte, tableName string) (cachedPTData, error) {
 	//log.Printf("%s", testName)
-	emptyTest := cachedPTData{
-		TestID:           "",
-		Hops:             nil,
-		LogTime:          time.Time{},
-		ConnSpec:         nil,
-		LastValidHopLine: "",
-	}
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 
@@ -435,9 +434,9 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	serverIP := ""
 	// We do not need to get destIP and serverIP from file name, since they are at the first line
 	// of test content as well.
-	t, err := GetLogtime(fn)
+	logTime, err := GetLogtime(fn)
 	if err != nil {
-		return emptyTest, err
+		return cachedPTData{}, err
 	}
 
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
@@ -468,7 +467,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 				log.Println(oneLine)
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
-				return emptyTest, err
+				return cachedPTData{}, err
 			}
 		} else {
 			// Handle each line of test file after the first line.
@@ -490,7 +489,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 				err := ProcessOneTuple(tupleStr, protocol, currentLeaves, &allNodes, &newLeaves)
 				if err != nil {
 					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(float64(len(allNodes)))
-					return emptyTest, err
+					return cachedPTData{}, err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
 				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i += 1 {
@@ -554,14 +553,14 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 		metrics.AnnotationErrorCount.With(prometheus.Labels{
 			"source": "IP Annotation Disabled."}).Inc()
 	} else {
-		AddGeoDataPTConnSpec(connSpec, t)
-		AddGeoDataPTHopBatch(PTHops, t)
+		AddGeoDataPTConnSpec(connSpec, logTime)
+		AddGeoDataPTHopBatch(PTHops, logTime)
 	}
 	if reachedDest {
 		return cachedPTData{
 			TestID:           testId,
 			Hops:             PTHops,
-			LogTime:          t,
+			LogTime:          logTime,
 			ConnSpec:         connSpec,
 			LastValidHopLine: "ExpectedDestIP",
 		}, nil
@@ -569,7 +568,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	return cachedPTData{
 		TestID:           testId,
 		Hops:             PTHops,
-		LogTime:          t,
+		LogTime:          logTime,
 		ConnSpec:         connSpec,
 		LastValidHopLine: lastValidHopLine,
 	}, nil
