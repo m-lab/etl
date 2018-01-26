@@ -82,6 +82,7 @@ func (fn *DataPath) GetDataType() DataType {
 }
 
 // IsBatchService return true if this is a NDT batch service.
+// TODO - update this to BATCH_SERVICE, so it makes sense for other pipelines.
 func IsBatchService() bool {
 	isBatch, _ := strconv.ParseBool(os.Getenv("NDT_BATCH"))
 	return isBatch
