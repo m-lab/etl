@@ -34,12 +34,12 @@ func (f *PTFileName) GetDate() (string, bool) {
 
 // The data structure is used to store the parsed results temporarily before it is verified
 // not polluted and can be inserted into BQ tables
-type ParsedPTData struct {
-	testID           string
-	hops             []*schema.ParisTracerouteHop
-	logTime          time.Time
-	connSpec         *schema.MLabConnectionSpecification
-	lastValidHopLine string
+type cachedPTData struct {
+	TestID           string
+	Hops             []*schema.ParisTracerouteHop
+	LogTime          time.Time
+	ConnSpec         *schema.MLabConnectionSpecification
+	LastValidHopLine string
 }
 
 type PTParser struct {
@@ -47,7 +47,7 @@ type PTParser struct {
 	etl.RowStats
 	// Care should be taken to ensure this does not accumulate many rows and
 	// lead to OOM problems.
-	previousTests []ParsedPTData
+	previousTests []cachedPTData
 }
 
 type Node struct {
@@ -69,7 +69,7 @@ const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 
 func NewPTParser(ins etl.Inserter) *PTParser {
-	return &PTParser{ins, ins, []ParsedPTData{}}
+	return &PTParser{ins, ins, []cachedPTData{}}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
@@ -190,13 +190,13 @@ func (pt *PTParser) FullTableName() string {
 	return pt.inserter.FullTableName()
 }
 
-func (pt *PTParser) InsertOneTest(oneTest ParsedPTData) {
+func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 	insertErr := false
-	for _, hop := range oneTest.hops {
+	for _, hop := range oneTest.Hops {
 		ptTest := schema.PT{
-			Test_id:              oneTest.testID,
-			Log_time:             oneTest.logTime.Unix(),
-			Connection_spec:      *(oneTest.connSpec),
+			Test_id:              oneTest.TestID,
+			Log_time:             oneTest.LogTime.Unix(),
+			Connection_spec:      *(oneTest.ConnSpec),
 			Paris_traceroute_hop: *hop,
 			Type:                 int32(2),
 			Project:              int32(3),
@@ -222,7 +222,7 @@ func (pt *PTParser) ProcessLastTests() error {
 	for _, oneTest := range pt.previousTests {
 		pt.InsertOneTest(oneTest)
 	}
-	pt.previousTests = []ParsedPTData{}
+	pt.previousTests = []cachedPTData{}
 	return nil
 }
 
@@ -256,7 +256,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		testId = CreateTestId(meta["filename"].(string), filepath.Base(testName))
 	}
 
-	hops, logTime, connSpec, lastValidHopLine, err := Parse(meta, testName, rawContent, pt.TableName())
+	cashedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
@@ -266,14 +266,15 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 
-	// Check Client_ip in connSpec to check all buffered PT tests.
+	// Check all buffered PT tests whether Client_ip in connSpec appear in the last
+	// hop of the buffered test.
 	// If pollution detected, then remove the test from buffer.
-	// If no pollution detected, insert the oldest test into BitQuery table.
-	destIP := connSpec.Client_ip
+	// If no pollution detected and buffer is full, insert the oldest test into BitQuery table.
+	destIP := cashedTest.ConnSpec.Client_ip
 	for index, PTTest := range pt.previousTests {
 		// array of hops was built reversely from list of nodes (in func ProcessAllNodes)
-		hop := PTTest.hops[0]
-		if PTTest.connSpec.Client_ip != destIP && (hop.Dest_ip == destIP || strings.Contains(PTTest.lastValidHopLine, destIP)) {
+		hop := PTTest.Hops[0]
+		if PTTest.ConnSpec.Client_ip != destIP && (hop.Dest_ip == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
 			// remove pt.previousTest[index]
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
 			break
@@ -282,14 +283,8 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 	// if lastValidHopLine is "ReachExpectedDestIP", we need not buffer this test.
 	// We can insert it to BigQuery table directly.
-	if lastValidHopLine == "ReachExpectedDestIP" {
-		pt.InsertOneTest(ParsedPTData{
-			testID:           testId,
-			hops:             hops,
-			logTime:          logTime,
-			connSpec:         connSpec,
-			lastValidHopLine: "",
-		})
+	if cashedTest.LastValidHopLine == "ReachExpectedDestIP" {
+		pt.InsertOneTest(cashedTest)
 		return nil
 	}
 
@@ -299,13 +294,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		pt.previousTests = pt.previousTests[1:]
 	}
 	// Insert current test into pt.previousTests
-	pt.previousTests = append(pt.previousTests, ParsedPTData{
-		testID:           testId,
-		hops:             hops,
-		logTime:          logTime,
-		connSpec:         connSpec,
-		lastValidHopLine: lastValidHopLine,
-	})
+	pt.previousTests = append(pt.previousTests, cashedTest)
 	return nil
 }
 
@@ -422,9 +411,15 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, tableName string) ([]*schema.ParisTracerouteHop, time.Time, *schema.MLabConnectionSpecification, string, error) {
+func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte, tableName string) (cachedPTData, error) {
 	//log.Printf("%s", testName)
-
+	emptyTest := cachedPTData{
+		TestID:           "",
+		Hops:             nil,
+		LogTime:          time.Time{},
+		ConnSpec:         nil,
+		LastValidHopLine: "",
+	}
 	metrics.WorkerState.WithLabelValues("parse").Inc()
 	defer metrics.WorkerState.WithLabelValues("parse").Dec()
 
@@ -438,7 +433,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 	// of test content as well.
 	t, err := GetLogtime(fn)
 	if err != nil {
-		return nil, time.Time{}, nil, "", err
+		return emptyTest, err
 	}
 
 	// The filename contains 5-tuple like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
@@ -469,7 +464,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				log.Println(oneLine)
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
-				return nil, time.Time{}, nil, "", err
+				return emptyTest, err
 			}
 		} else {
 			// Handle each line of test file after the first line.
@@ -491,7 +486,7 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 				err := ProcessOneTuple(tupleStr, protocol, currentLeaves, &allNodes, &newLeaves)
 				if err != nil {
 					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(float64(len(allNodes)))
-					return nil, time.Time{}, nil, "", err
+					return emptyTest, err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
 				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i += 1 {
@@ -559,7 +554,19 @@ func Parse(meta map[string]bigquery.Value, testName string, rawContent []byte, t
 		AddGeoDataPTHopBatch(PTHops, t)
 	}
 	if reachedDest {
-		return PTHops, t, connSpec, "ReachExpectedDestIP", nil
+		return cachedPTData{
+			TestID:           testId,
+			Hops:             PTHops,
+			LogTime:          t,
+			ConnSpec:         connSpec,
+			LastValidHopLine: "ReachExpectedDestIP",
+		}, nil
 	}
-	return PTHops, t, connSpec, lastValidHopLine, nil
+	return cachedPTData{
+		TestID:           testId,
+		Hops:             PTHops,
+		LogTime:          t,
+		ConnSpec:         connSpec,
+		LastValidHopLine: lastValidHopLine,
+	}, nil
 }

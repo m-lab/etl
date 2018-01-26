@@ -41,30 +41,28 @@ func TestParseLegacyFormatData(t *testing.T) {
 		fmt.Println("cannot load test data")
 		return
 	}
-	hops, logTime, _, lastLine, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", rawData, "pt-daily")
+	cashedTest, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if len(hops) != 9 {
+	if len(cashedTest.Hops) != 9 {
 		t.Fatalf("Do not process hops correctly.")
 	}
-	if logTime.Unix() != 1452559544 {
-		fmt.Println(logTime)
+	if cashedTest.LogTime.Unix() != 1452559544 {
 		t.Fatalf("Do not process log time correctly.")
 	}
-	if lastLine != "ReachExpectedDestIP" {
-		fmt.Println(lastLine)
+	if cashedTest.LastValidHopLine != "ReachExpectedDestIP" {
 		t.Fatalf("Did not reach expected destination.")
 	}
 }
 
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	hops, logTime, connSpec, lastLine, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData, "pt-daily")
+	cashedTest, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if logTime.Unix() != 1490053990 {
+	if cashedTest.LogTime.Unix() != 1490053990 {
 		t.Fatalf("Do not process log time correctly.")
 	}
 
@@ -75,12 +73,11 @@ func TestPTParser(t *testing.T) {
 		Client_af:      2,
 		Data_direction: 0,
 	}
-	if !reflect.DeepEqual(*connSpec, expected_cspec) {
+	if !reflect.DeepEqual(*(cashedTest.ConnSpec), expected_cspec) {
 		t.Fatalf("Wrong results for connection spec!")
 	}
 
-	if lastLine != "ReachExpectedDestIP" {
-		fmt.Println(lastLine)
+	if cashedTest.LastValidHopLine != "ReachExpectedDestIP" {
 		t.Fatalf("Did not reach expected destination.")
 	}
 
@@ -125,15 +122,15 @@ func TestPTParser(t *testing.T) {
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.17.95.252", Src_af: 2, Dest_ip: "172.25.252.172", Dest_af: 2, Src_hostname: "172.17.95.252", Dest_hostname: "us-mtv-cl4-core1-gigabitethernet1-1.n.corp.google.com", Rtt: []float64{0.407}},
 		schema.ParisTracerouteHop{Protocol: "tcp", Src_ip: "172.17.94.34", Src_af: 2, Dest_ip: "172.17.95.252", Dest_af: 2, Dest_hostname: "172.17.95.252", Rtt: []float64{0.376}},
 	}
-	if len(hops) != len(expected_hops) {
+	if len(cashedTest.Hops) != len(expected_hops) {
 		t.Fatalf("Wrong results for PT hops!")
 	}
 
-	for i := 0; i < len(hops); i++ {
-		if !reflect.DeepEqual(*hops[i], expected_hops[i]) {
+	for i := 0; i < len(cashedTest.Hops); i++ {
+		if !reflect.DeepEqual(*cashedTest.Hops[i], expected_hops[i]) {
 			fmt.Println(i)
 			fmt.Printf("Here is expected    : %v\n", expected_hops[i])
-			fmt.Printf("Here is what is real: %v\n", *hops[i])
+			fmt.Printf("Here is what is real: %v\n", *cashedTest.Hops[i])
 			t.Fatalf("Wrong results for PT hops!")
 		}
 	}
