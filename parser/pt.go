@@ -40,6 +40,7 @@ type cachedPTData struct {
 	LogTime          time.Time
 	ConnSpec         *schema.MLabConnectionSpecification
 	LastValidHopLine string
+	MetroName        string
 }
 
 type PTParser struct {
@@ -278,7 +279,8 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
 		finalHop := PTTest.Hops[0]
 		if PTTest.ConnSpec.Client_ip != destIP && (finalHop.Dest_ip == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
-			// Discard pt.previousTest[index]
+			// Discard pt.previousTests[index]
+			metrics.PTPollutedCount.WithLabelValues(pt.previousTests[index].MetroName).Inc()
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
 			break
 		}
@@ -566,5 +568,6 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 		LogTime:          logTime,
 		ConnSpec:         connSpec,
 		LastValidHopLine: lastValidHopLine,
+		MetroName:        metroName,
 	}, nil
 }
