@@ -1,3 +1,9 @@
+# The queues are deployed in multiple projects:
+#   gcloud beta app deploy --project=mlab-staging appengine/queue.yaml
+#   gcloud beta app deploy --project=mlab-sandbox appengine/queue.yaml
+#
+# TODO - should implement auto-deploy.
+
 total_storage_limit: 2000M
 
 queue:
