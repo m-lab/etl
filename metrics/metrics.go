@@ -270,12 +270,12 @@ var (
 	// Counts the PT polluted tests per metro.
 	//
 	// Provides metrics:
-	//   etl_pt_polluted_count{metro}
+	//   etl_pt_polluted_total{metro}
 	// Example usage:
 	//   metrics.PTPollutedCount.WithLabelValues("sea").Inc()
 	PTPollutedCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "etl_pt_polluted_count",
+			Name: "etl_pt_polluted_total",
 			Help: "Count how many PT tests polluted per metro.",
 		},
 		// sea
