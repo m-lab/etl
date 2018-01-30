@@ -159,11 +159,24 @@ func getTableParts(tableName string) (tableNameParts, error) {
 // TODO(gfr) Probably should move this to go/bqext
 func getTable(bqClient *bigquery.Client, project, dataset, table, partition string) (*bigquery.Table, error) {
 	// This checks that the table name is NOT a partitioned or templated table.
+	if strings.Contains(table, "$") || strings.Contains(table, "_") {
+		return nil, errors.New("Table base must not include _ or $: " + table)
+	}
 	date := denseDateSuffix.FindStringSubmatch(table)
 	if len(date) > 0 {
 		return nil, errors.New("Table base must not include partition or template suffix: " + table)
 	}
-	return bqClient.DatasetInProject(project, dataset).Table(table + "$" + partition), nil
+
+	full := table + "$" + partition
+	_, err := getTableParts(full)
+	if err != nil {
+		return nil, err
+	}
+
+	// Oddly, a nil client is just fine here.
+    // A nil client works here, but may lead to failures later, e.g.
+    // if you create a copier.
+	return bqClient.DatasetInProject(project, dataset).Table(full), nil
 }
 
 // GetPartitionInfo provides basic information about a partition.

@@ -3,8 +3,6 @@ package dedup
 import (
 	"log"
 	"testing"
-
-	"cloud.google.com/go/bigquery"
 )
 
 func init() {
@@ -16,16 +14,38 @@ func init() {
 func Test_getTableParts(t *testing.T) {
 	parts, err := getTableParts("table$20160102")
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+	} else {
+		if !parts.isPartitioned {
+			t.Error("Should be partitioned")
+		}
+		if parts.prefix != "table" {
+			t.Error("incorrect prefix: " + parts.prefix)
+		}
+		if parts.yyyymmdd != "20160102" {
+			t.Error("incorrect partition: " + parts.yyyymmdd)
+		}
 	}
-	if !parts.isPartitioned {
-		t.Error("Should be partitioned")
+
+	parts, err = getTableParts("table_20160102")
+	if err != nil {
+		t.Error(err)
+	} else {
+		if parts.isPartitioned {
+			t.Error("Should not be partitioned")
+		}
 	}
-	if parts.prefix != "table" {
-		t.Error("incorrect prefix: " + parts.prefix)
+	parts, err = getTableParts("table$2016010")
+	if err == nil {
+		t.Error("Should error when partition is incomplete")
 	}
-	if parts.yyyymmdd != "20160102" {
-		t.Error("incorrect partition: " + parts.yyyymmdd)
+	parts, err = getTableParts("table$201601022")
+	if err == nil {
+		t.Error("Should error when partition is too long")
+	}
+	parts, err = getTableParts("table$20162102")
+	if err == nil {
+		t.Error("Should error when partition is invalid")
 	}
 }
 
@@ -33,14 +53,23 @@ func Test_getTableParts(t *testing.T) {
 // The project/dataset/table/partition may or may not actually exist.
 // This does NOT do any network operations.
 func Test_getTable(t *testing.T) {
-	//bqClient *bigquery.Client, project, dataset, table, partition string) (*bigquery.Table, error) {
-	foo, err := getTable(&bigquery.Client{}, "project", "dataset", "table", "20160102")
+	// We won't do anything with the tables, so we can use a nil client.
+	table, err := getTable(nil, "project", "dataset", "table", "20160102")
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+	} else {
+		if table.DatasetID != "dataset" {
+			t.Error("Bad parsing")
+		}
 	}
 
-	if foo.DatasetID != "dataset" {
-		t.Error("Bad parsing")
+	table, err = getTable(nil, "project", "dataset", "table$124", "20160102")
+	if err == nil {
+		t.Error("Bad table name not detected")
 	}
-	// TODO check for invalid table base.
+
+	table, err = getTable(nil, "project", "dataset", "table", "201601020")
+	if err == nil {
+		t.Error("Bad suffix not detected")
+	}
 }

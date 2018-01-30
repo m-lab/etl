@@ -111,8 +111,18 @@ func TestGetPartitionInfo(t *testing.T) {
 	if info.PartitionID != "19990101" {
 		t.Error("wrong partitionID: " + info.PartitionID)
 	}
+
+	// Check behavior for missing partition
+	info, err = dedup.GetPartitionInfo(context.Background(), &dsExt, dsExt.Table("TestDedupSrc$17760101"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.PartitionID != "" {
+		t.Error("Non-existent partition should return empty PartitionID")
+	}
 }
 
+// TODO - should check some failure cases.
 func TestCheckAndDedup(t *testing.T) {
 	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
