@@ -138,11 +138,11 @@ func TestCheckAndDedup(t *testing.T) {
 	}
 
 	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, "etl").Table("TestDedupDest$19990101")
-	_, err = dedup.CheckAndDedup(context.Background(), &dsExt, info[0], destTable, dedup.Options{time.Minute, false, false, false})
+	err = dedup.CheckAndDedup(context.Background(), &dsExt, info[0], destTable, dedup.Options{time.Minute, false, false, false})
 	if err != nil {
 		log.Println(err)
 	}
-	_, err = dedup.CheckAndDedup(context.Background(), &dsExt, info[0], destTable, dedup.Options{time.Minute, true, false, false})
+	err = dedup.CheckAndDedup(context.Background(), &dsExt, info[0], destTable, dedup.Options{time.Minute, true, false, false})
 	if err != nil {
 		t.Error(err)
 	}
