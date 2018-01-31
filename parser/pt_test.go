@@ -226,9 +226,9 @@ func TestPTPollutionCheck(t *testing.T) {
 		},
 		{
 			fileName:             "testdata/PT/20171208T22:03:59Z-139.60.160.135-1519-163.22.28.44-1101.paris",
-			// The 4th test was detected that was polluted by the 6th test.
+			// The 5th test was detected that was polluted by the 6th test.
 			// It was removed from buffer (expectedBufferedTest drop from 2 to 1). 
-			// Buffer contains the 5th test now. 
+			// Buffer contains the 4th test now. 
 			expectedBufferedTest: 1,
 			// The 6th test reached its destIP and was inserted into BigQuery.
 			expectedNumRows:      46,
@@ -256,7 +256,7 @@ func TestPTPollutionCheck(t *testing.T) {
 		}
 	}
 
-	// Insert the 5th test in the buffer to BigQuery.
+	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
 	if ins.RowsInBuffer() != 56 {
 		t.Fatalf("Data not inserted into BigQuery correctly.")
