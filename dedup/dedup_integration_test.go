@@ -85,13 +85,14 @@ func TestGetTableInfo(t *testing.T) {
 }
 */
 func TestAnnotationTableMeta(t *testing.T) {
+	// TODO - Make NewDataSet return a pointer, for consistency with bigquery.
 	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	tbl := dsExt.Table("TestDedupSrc")
-	at := dedup.NewAnnotatedTable(*tbl, &dsExt)
+	at := dedup.NewAnnotatedTable(tbl, &dsExt)
 	meta, err := at.CachedMeta(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +105,7 @@ func TestAnnotationTableMeta(t *testing.T) {
 	}
 
 	tbl = dsExt.Table("XYZ")
-	at = dedup.NewAnnotatedTable(*tbl, &dsExt)
+	at = dedup.NewAnnotatedTable(tbl, &dsExt)
 	meta, err = at.CachedMeta(nil)
 	if err != dedup.ErrNilContext {
 		t.Fatal("Should be an error when no context provided")
@@ -122,20 +123,20 @@ func TestAnnotationDetail(t *testing.T) {
 	}
 
 	tbl := dsExt.Table("TestDedupSrc")
-	at := dedup.NewAnnotatedTable(*tbl, &dsExt)
+	at := dedup.NewAnnotatedTable(tbl, &dsExt)
 	_, err = at.CachedDetail(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestGetTableInfoMatching(t *testing.T) {
+func TestGetTablesMatching(t *testing.T) {
 	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	atList, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "Test")
+	atList, err := dedup.GetTablesMatching(context.Background(), &dsExt, "Test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +176,7 @@ func TestCheckAndDedup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	atList, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "TestDedupSrc_19990101")
+	atList, err := dedup.GetTablesMatching(context.Background(), &dsExt, "TestDedupSrc_19990101")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +186,7 @@ func TestCheckAndDedup(t *testing.T) {
 
 	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, "etl").Table("TestDedupDest$19990101")
 	// TODO - clean up pointer vs non-pointer args everywhere.
-	job := dedup.NewJob(&dsExt, &atList[0], dedup.NewAnnotatedTable(*destTable, &dsExt))
+	job := dedup.NewJob(&dsExt, &atList[0], dedup.NewAnnotatedTable(destTable, &dsExt))
 	err = job.CheckAndDedup(context.Background(), dedup.Options{time.Minute, false, false, false})
 	if err != nil {
 		log.Println(err)
