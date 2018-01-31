@@ -186,7 +186,7 @@ func (pt *PTParser) TaskError() error {
 
 func (pt *PTParser) GetFirstBufferHops() int {
 	if len(pt.previousTests) > 0 {
-		return len(pt.previousTests[0].hops)
+		return len(pt.previousTests[0].Hops)
 	}
 	return 0
 }
