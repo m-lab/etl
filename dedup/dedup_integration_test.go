@@ -145,13 +145,15 @@ func TestGetTablesMatching(t *testing.T) {
 	}
 }
 
-func TestGetPartitionInfo(t *testing.T) {
+func TestAnnotatedTableGetPartitionInfo(t *testing.T) {
 	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	info, err := dedup.GetPartitionInfo(context.Background(), &dsExt, dsExt.Table("TestDedupSrc$19990101"))
+	tbl := dsExt.Table("TestDedupSrc$19990101")
+	at := dedup.NewAnnotatedTable(tbl, &dsExt)
+	info, err := at.GetPartitionInfo(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +162,9 @@ func TestGetPartitionInfo(t *testing.T) {
 	}
 
 	// Check behavior for missing partition
-	info, err = dedup.GetPartitionInfo(context.Background(), &dsExt, dsExt.Table("TestDedupSrc$17760101"))
+	tbl = dsExt.Table("TestDedupSrc$17760101")
+	at = dedup.NewAnnotatedTable(tbl, &dsExt)
+	info, err = at.GetPartitionInfo(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

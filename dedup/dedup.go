@@ -128,7 +128,7 @@ func (at *AnnotatedTable) CachedPartitionInfo(ctx context.Context) (*bqext.Parti
 	}
 	// TODO - use context
 	// TODO - maybe just embed code here.
-	at.pInfo, at.err = GetPartitionInfo(ctx, at.dataset, at.Table)
+	at.pInfo, at.err = at.GetPartitionInfo(ctx)
 	return at.pInfo, at.err
 }
 
@@ -253,17 +253,18 @@ func getTable(bqClient *bigquery.Client, project, dataset, table, partition stri
 }
 
 // GetPartitionInfo provides basic information about a partition.
-// Unlike bqext.GetPartitionInfo, this works directly on a bigquery.Table.
-// table should include partition spec.
-// dsExt should have access to the table, but its project and dataset are not used.
+// Unlike bqext.GetPartitionInfo, this gets project and dataset from the
+// table, which should include partition spec.
+// at.dataset should have access to the table, but its project and dataset are not used.
 // TODO - possibly migrate this to go/bqext.
-func GetPartitionInfo(ctx context.Context, dsExt *bqext.Dataset, table *bigquery.Table) (*bqext.PartitionInfo, error) {
-	tableName := table.TableID
+func (at *AnnotatedTable) GetPartitionInfo(ctx context.Context) (*bqext.PartitionInfo, error) {
+	tableName := at.Table.TableID
 	parts, err := getTableParts(tableName)
 	if err != nil || !parts.isPartitioned {
 		return nil, errors.New("TableID missing partition: " + tableName)
 	}
-	fullTable := fmt.Sprintf("%s:%s.%s", table.ProjectID, table.DatasetID, parts.prefix)
+	// Assemble the FQ table name, without the partition suffix.
+	fullTable := fmt.Sprintf("%s:%s.%s", at.ProjectID, at.DatasetID, parts.prefix)
 
 	// This uses legacy, because PARTITION_SUMMARY is not supported in standard.
 	queryString := fmt.Sprintf(
@@ -277,7 +278,7 @@ func GetPartitionInfo(ctx context.Context, dsExt *bqext.Dataset, table *bigquery
 		WHERE partition_id = "%s" `, fullTable, parts.yyyymmdd)
 	pInfo := bqext.PartitionInfo{}
 
-	err = dsExt.QueryAndParse(queryString, &pInfo)
+	err = at.dataset.QueryAndParse(queryString, &pInfo)
 	if err != nil {
 		// If the partition doesn't exist, just return empty Info, no error.
 		if err == iterator.Done {
@@ -288,6 +289,7 @@ func GetPartitionInfo(ctx context.Context, dsExt *bqext.Dataset, table *bigquery
 	return &pInfo, nil
 }
 
+// TODO - move these up with other methods after review.
 func (at *AnnotatedTable) checkDetails(ctx context.Context, other *AnnotatedTable) error {
 	thisDetail, err := at.CachedDetail(ctx)
 	if err != nil {
