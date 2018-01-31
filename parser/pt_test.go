@@ -230,7 +230,7 @@ func TestPTPollutionCheck(t *testing.T) {
 			// It was removed from buffer (expectedBufferedTest drop from 2 to 1). 
 			// Buffer contains the 5th test now. 
 			expectedBufferedTest: 1,
-			// THe 6th test reached its destIP and was inserted into BigQuery.
+			// The 6th test reached its destIP and was inserted into BigQuery.
 			expectedNumRows:      46,
 		},
 	}
@@ -251,8 +251,8 @@ func TestPTPollutionCheck(t *testing.T) {
 		if ins.RowsInBuffer() != test.expectedNumRows {
 			t.Fatalf("Data not inserted into BigQuery correctly.")
 		}
-		if index == 1 {
-			fmt.Printf("First row: %v\n", ins.data[0])
+		if pt.NumBufferedTests() == 1 {
+			fmt.Printf("index:%d, %d\n", index, pt.GetFirstBufferHops())
 		}
 	}
 
