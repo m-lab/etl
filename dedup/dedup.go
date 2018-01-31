@@ -25,8 +25,13 @@ import (
 )
 
 var (
+	// ErrNilContext is returned when a request could not be completed with
+	// a nil context.
+	ErrNilContext = errors.New("Could not be completed without context")
 	// ErrNotRegularTable is returned when a table is not a regular table (e.g. views)
 	ErrNotRegularTable = errors.New("Not a regular table")
+	// ErrNoDataset is returned when a operation requires a dataset, but none is provided/available.
+	ErrNoDataset = errors.New("No dataset available")
 	// ErrSrcOlderThanDest is returned if a source table is older than the destination partition.
 	ErrSrcOlderThanDest = errors.New("Source older than destination partition")
 	// ErrTooFewTasks is returned when the source table has fewer task files than the destination.
@@ -35,6 +40,78 @@ var (
 	ErrTooFewTests = errors.New("Too few tests")
 )
 
+// Detail provides more detailed information about a partition or table.
+type Detail struct {
+	PartitionID   string // May be empty.  Used for slices of partitions.
+	TaskFileCount int
+	TestCount     int
+}
+
+// AnnotatedTable binds a bigquery.Table with associated additional info.
+type AnnotatedTable struct {
+	bigquery.Table
+	dataset *bqext.Dataset // A dataset that can query the table.  May be nil.
+	meta    *bigquery.TableMetadata
+	detail  *Detail
+	err     error // first error (if any) when attempting to fetch annotation
+}
+
+// CachedMeta returns metadata if available.
+// If ctx is non-nil, will attempt to fetch metadata if it is not already cached.
+// Returns error if meta not available.
+func (at *AnnotatedTable) CachedMeta(ctx context.Context) (*bigquery.TableMetadata, error) {
+	if at.meta != nil {
+		return at.meta, nil
+	}
+	if at.err != nil {
+		return nil, at.err
+	}
+	if ctx == nil {
+		return nil, ErrNilContext
+	}
+	at.meta, at.err = at.Metadata(ctx)
+	return at.meta, at.err
+}
+
+// CachedDetail returns the cached detail, or fetches it if possible.
+func (at *AnnotatedTable) CachedDetail(ctx context.Context) (*Detail, error) {
+	if at.detail != nil {
+		return at.detail, nil
+	}
+	if at.err != nil {
+		return nil, at.err
+	}
+	if at.dataset == nil {
+		return nil, ErrNoDataset
+	}
+	if ctx == nil {
+		return nil, ErrNilContext
+	}
+	// TODO - use context
+	// TODO - GetTableDetail should return pointer
+	var detail Detail
+	detail, at.err = GetTableDetail(at.dataset, &at.Table)
+	if at.err == nil {
+		at.detail = &detail
+	}
+	return at.detail, at.err
+}
+
+// CheckIsRegular returns nil if table exists and is a regular table.
+// Otherwise returns an error, indicating
+// If metadata is not available, returns false and associated error.
+func (at *AnnotatedTable) CheckIsRegular(ctx context.Context) error {
+	meta, err := at.CachedMeta(ctx)
+	if err != nil {
+		return err
+	}
+	if meta.Type != bigquery.RegularTable {
+		return ErrNotRegularTable
+	}
+	return nil
+}
+
+// /*
 // TableInfo contains the basic stats for a specific table or partition.
 type TableInfo struct {
 	Name             string
@@ -66,12 +143,7 @@ func GetTableInfo(ctx context.Context, t *bigquery.Table) (TableInfo, error) {
 	return ts, nil
 }
 
-// Detail provides more detailed information about a partition or table.
-type Detail struct {
-	PartitionID   string // May be empty.  Used for slices of partitions.
-	TaskFileCount int
-	TestCount     int
-}
+//*/
 
 // GetTableDetail fetches more detailed info about a partition or table.
 // Expects table to have test_id, and task_filename fields.
@@ -111,7 +183,8 @@ func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (Detail, error)
 // and collects the basic stats about each of them.
 // It performs many network operations, possibly two per table.
 // Returns slice ordered by decreasing age.
-func GetTableInfoMatching(ctx context.Context, dsExt *bqext.Dataset, filter string) ([]TableInfo, error) {
+func GetTableInfoMatching(ctx context.Context, dsExt *bqext.Dataset, filter string) ([]TableInfo, []AnnotatedTable, error) {
+	alt := make([]AnnotatedTable, 0) // TODO should this be (..., 31, 0)
 	result := make([]TableInfo, 0)
 	ti := dsExt.Tables(ctx)
 	for t, err := ti.Next(); err == nil; t, err = ti.Next() {
@@ -123,15 +196,16 @@ func GetTableInfoMatching(ctx context.Context, dsExt *bqext.Dataset, filter stri
 				continue
 			}
 			if err != nil {
-				return []TableInfo{}, err
+				return []TableInfo{}, nil, err
 			}
 			result = append(result, ts)
+			alt = append(alt, AnnotatedTable{Table: *t})
 		}
 	}
 	sort.Slice(result[:], func(i, j int) bool {
 		return result[i].LastModifiedTime.Before(result[j].LastModifiedTime)
 	})
-	return result, nil
+	return result, alt, nil
 }
 
 var denseDateSuffix = regexp.MustCompile(`(.*)([_$])(` + etl.YYYYMMDD + `)$`)
@@ -321,8 +395,8 @@ type Options struct {
 // Job keeps track of a number of resources involved in dedupping.
 type Job struct {
 	// Initialization objects
-	*bqext.Dataset                 // Dataset extension associated with source
-	srcInfo        TableInfo       // earliest available info about source.
+	*bqext.Dataset // Dataset extension associated with source
+	srcInfo        TableInfo
 	destTable      *bigquery.Table // destination table that result will be committed to.
 
 	// Additional information generated during processing.
@@ -504,7 +578,7 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 	}
 
 	// These are sorted by LastModification, oldest first.
-	info, err := GetTableInfoMatching(context.Background(), dsExt, srcPattern)
+	info, _, err := GetTableInfoMatching(context.Background(), dsExt, srcPattern)
 	if err != nil {
 		return err
 	}

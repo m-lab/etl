@@ -89,7 +89,7 @@ func TestGetTableInfoMatching(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "Test")
+	info, _, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "Test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestCheckAndDedup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "TestDedupSrc_19990101")
+	info, _, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "TestDedupSrc_19990101")
 	if err != nil {
 		t.Fatal(err)
 	}
