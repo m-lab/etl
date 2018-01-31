@@ -65,6 +65,7 @@ func TestGetTableDetail(t *testing.T) {
 	}
 }
 
+/*
 func TestGetTableInfo(t *testing.T) {
 	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
 	if err != nil {
@@ -82,6 +83,51 @@ func TestGetTableInfo(t *testing.T) {
 		t.Errorf("Wrong number of rows: %d", info.NumRows)
 	}
 }
+*/
+func TestAnnotationTableMeta(t *testing.T) {
+	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tbl := dsExt.Table("TestDedupSrc")
+	at := dedup.NewAnnotatedTable(*tbl, &dsExt)
+	meta, err := at.CachedMeta(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.NumRows != 8 {
+		t.Errorf("Wrong number of rows: %d", meta.NumRows)
+	}
+	if meta.TimePartitioning == nil {
+		t.Error("Should be partitioned")
+	}
+
+	tbl = dsExt.Table("XYZ")
+	at = dedup.NewAnnotatedTable(*tbl, &dsExt)
+	meta, err = at.CachedMeta(nil)
+	if err != dedup.ErrNilContext {
+		t.Fatal("Should be an error when no context provided")
+	}
+	meta, err = at.CachedMeta(context.Background())
+	if err == nil {
+		t.Fatal("Should be an error when fetching bad table meta")
+	}
+}
+
+func TestAnnotationDetail(t *testing.T) {
+	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tbl := dsExt.Table("TestDedupSrc")
+	at := dedup.NewAnnotatedTable(*tbl, &dsExt)
+	_, err = at.CachedDetail(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestGetTableInfoMatching(t *testing.T) {
 	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
@@ -89,12 +135,12 @@ func TestGetTableInfoMatching(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, _, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "Test")
+	atList, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "Test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(info) != 3 {
-		t.Errorf("Wrong length: %d", len(info))
+	if len(atList) != 3 {
+		t.Errorf("Wrong length: %d", len(atList))
 	}
 }
 
@@ -129,16 +175,17 @@ func TestCheckAndDedup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, _, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "TestDedupSrc_19990101")
+	atList, err := dedup.GetTableInfoMatching(context.Background(), &dsExt, "TestDedupSrc_19990101")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(info) != 1 {
+	if len(atList) != 1 {
 		t.Fatal("No info for pattern.")
 	}
 
 	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, "etl").Table("TestDedupDest$19990101")
-	job := dedup.NewJob(&dsExt, info[0], destTable)
+	// TODO - clean up pointer vs non-pointer args everywhere.
+	job := dedup.NewJob(&dsExt, &atList[0], dedup.NewAnnotatedTable(*destTable, &dsExt))
 	err = job.CheckAndDedup(context.Background(), dedup.Options{time.Minute, false, false, false})
 	if err != nil {
 		log.Println(err)
