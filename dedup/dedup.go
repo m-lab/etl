@@ -318,6 +318,59 @@ type Options struct {
 	CopyOnly      bool          // Skip the dedup step and copy from intermediate to destination
 }
 
+// Job keeps track of a number of resources involved in dedupping.
+type Job struct {
+	// Initialization objects
+	*bqext.Dataset                 // Dataset extension associated with source
+	srcInfo        TableInfo       // earliest available info about source.
+	destTable      *bigquery.Table // destination table that result will be committed to.
+
+	// Additional information generated during processing.
+	srcTable   *bigquery.Table // Source table to be deduplicated
+	dedupTable *bigquery.Table // dedup table that will receive deduped result before commit
+}
+
+// NewJob creates a DedupJob struct
+func NewJob(ds *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table) *Job {
+	return &Job{Dataset: ds, srcInfo: srcInfo, destTable: destTable}
+}
+
+// This should be called after doing various sanity checks.
+func (job *Job) dedupAndCopy(ctx context.Context, options Options) error {
+	if !options.CopyOnly {
+		// Do the deduplication to intermediate "dedup" table with same root name.
+		// TODO - are we checking for source newer than intermediate destination?  Should we?
+		_, err := job.Dedup_Alpha(job.srcTable.TableID, "test_id", job.dedupTable)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+	}
+
+	// Now compare number of rows and tasks in dedup table to destination table.
+	dedupDetail, err := GetTableDetail(job.Dataset, job.dedupTable)
+	if err != nil {
+		return err
+	}
+	destDetail, err := GetTableDetail(job.Dataset, job.destTable)
+	err = checkDetails(dedupDetail, destDetail)
+	if err != nil {
+		return err
+	}
+
+	destParts, err := getTableParts(job.destTable.TableID)
+	if err != nil {
+		return err
+	}
+
+	err = SanityCheckAndCopy(ctx, job.Dataset.BqClient, job.dedupTable, job.destTable.DatasetID, destParts.prefix)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // CheckAndDedup checks various criteria, and if they all pass, dedups the table.
 // The destination table must exist, must be in a separate dataset, and may or may not
 // have a corresponding partition.  If the partition already exists, then additional
@@ -343,23 +396,23 @@ type Options struct {
 // options       - dedup options, MinSrcAge, IgnoreDestAge, DryRun, CopyOnly.
 //
 // TODO(gfr) Should we check that intermediate table is NOT a production table?
-func CheckAndDedup(ctx context.Context, srcDS *bqext.Dataset, srcInfo TableInfo, destTable *bigquery.Table, options Options) error {
+func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 
-	srcParts, err := getTableParts(srcInfo.Name)
+	srcParts, err := getTableParts(job.srcInfo.Name)
 	if err != nil {
 		return err
 	}
 
 	// Check if the last update was at least minSrcAge in the past.
-	if time.Now().Sub(srcInfo.LastModifiedTime) < options.MinSrcAge {
+	if time.Now().Sub(job.srcInfo.LastModifiedTime) < options.MinSrcAge {
 		return errors.New("Source is too recent")
 	}
 
-	if destTable.DatasetID == srcDS.DatasetID {
+	if job.destTable.DatasetID == job.Dataset.DatasetID {
 		return errors.New("Source and Destination should be in different datasets: ")
 	}
 
-	destParts, err := getTableParts(destTable.TableID)
+	destParts, err := getTableParts(job.destTable.TableID)
 	if err != nil {
 		return err
 	}
@@ -370,39 +423,38 @@ func CheckAndDedup(ctx context.Context, srcDS *bqext.Dataset, srcInfo TableInfo,
 
 	// We do the deduplication into the corresponding partition, derived from the source table template.
 	// We will eventually use dedupTable to create a copier, so it must use a valid bigquery.Client.
-	dedupTable, err := getTable(srcDS.BqClient, srcDS.ProjectID, srcDS.DatasetID, srcParts.prefix, srcParts.yyyymmdd)
+	job.dedupTable, err = getTable(job.BqClient, job.ProjectID, job.DatasetID, srcParts.prefix, srcParts.yyyymmdd)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	if destTable.DatasetID == dedupTable.DatasetID {
-		return errors.New("Dedup and Destination should be in different datasets: " + dedupTable.FullyQualifiedName())
-	}
-
-	srcTable := srcDS.Table(srcInfo.Name)
-
+	job.srcTable = job.Table(job.srcInfo.Name)
 	// Just check that table exists.
-	_, err = srcTable.Metadata(ctx)
+	_, err = job.srcTable.Metadata(ctx)
 	if err != nil {
 		log.Println(err)
 		return err
+	}
+
+	if job.destTable.DatasetID == job.dedupTable.DatasetID {
+		return errors.New("Dedup and Destination should be in different datasets: " + job.dedupTable.FullyQualifiedName())
 	}
 
 	if !options.IgnoreDestAge {
 		// TODO - this fails if the destination partition does not exist.
-		err = checkDestOlder(ctx, srcDS, srcInfo, destTable)
+		err = checkDestOlder(ctx, job.Dataset, job.srcInfo, job.destTable)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
 	}
 
-	srcDetail, err := GetTableDetail(srcDS, srcTable)
+	srcDetail, err := GetTableDetail(job.Dataset, job.srcTable)
 	if err != nil {
 		return err
 	}
-	destDetail, err := GetTableDetail(srcDS, destTable)
+	destDetail, err := GetTableDetail(job.Dataset, job.destTable)
 	if err != nil {
 		return err
 	}
@@ -415,34 +467,11 @@ func CheckAndDedup(ctx context.Context, srcDS *bqext.Dataset, srcInfo TableInfo,
 	}
 
 	if options.DryRun {
-		log.Println("Dedup dry run:", srcInfo.Name, "test_id", dedupTable)
+		log.Println("Dedup dry run:", job.srcInfo.Name, "test_id", job.dedupTable)
 		return nil
 	}
 
-	if !options.CopyOnly {
-		// Do the deduplication to intermediate "dedup" table with same root name.
-		// TODO - are we checking for source newer than intermediate destination?  Should we?
-		_, err = srcDS.Dedup_Alpha(srcInfo.Name, "test_id", dedupTable)
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-	}
-
-	// Now compare number of rows and tasks in dedup table to destination table.
-	dedupDetail, err := GetTableDetail(srcDS, dedupTable)
-	if err != nil {
-		return err
-	}
-	err = checkDetails(dedupDetail, destDetail)
-	if err != nil {
-		return err
-	}
-
-	err = SanityCheckAndCopy(ctx, srcDS.BqClient, dedupTable, destTable.DatasetID, destParts.prefix)
-	if err != nil {
-		return err
-	}
+	err = job.dedupAndCopy(ctx, options)
 
 	// TODO Update status table
 	// We should have a status table that has a row for each table dedup operation.
@@ -501,7 +530,8 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 		}
 
 		destTable, _ := getTable(dsExt.BqClient, dsExt.ProjectID, destDataset, destBase, parts.yyyymmdd)
-		err = CheckAndDedup(context.Background(), dsExt, srcInfo, destTable, options)
+		job := NewJob(dsExt, srcInfo, destTable)
+		err = job.CheckAndDedup(context.Background(), options)
 		if err != nil {
 			log.Println(err, "dedupping", dsExt.DatasetID+"."+srcInfo.Name, "to", destDataset+"."+destBase)
 			return err
