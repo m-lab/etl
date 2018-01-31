@@ -48,16 +48,19 @@ type Detail struct {
 }
 
 // AnnotatedTable binds a bigquery.Table with associated additional info.
+// It keeps track of all the info we have so far, automatically fetches
+// more data as needed, and thus avoids possibly fetching multiple times.
 type AnnotatedTable struct {
-	bigquery.Table
+	*bigquery.Table
 	dataset *bqext.Dataset // A dataset that can query the table.  May be nil.
 	meta    *bigquery.TableMetadata
 	detail  *Detail
+	pInfo   *bqext.PartitionInfo
 	err     error // first error (if any) when attempting to fetch annotation
 }
 
 // NewAnnotatedTable creates an AnnotatedTable
-func NewAnnotatedTable(t bigquery.Table, ds *bqext.Dataset) *AnnotatedTable {
+func NewAnnotatedTable(t *bigquery.Table, ds *bqext.Dataset) *AnnotatedTable {
 	return &AnnotatedTable{Table: t, dataset: ds}
 }
 
@@ -78,6 +81,9 @@ func (at *AnnotatedTable) CachedMeta(ctx context.Context) (*bigquery.TableMetada
 	return at.meta, at.err
 }
 
+// LastModifiedTime returns the LMT field from the metadata.  If not
+// available, returns time.Now().  This is a bit hacky, so take care
+// if the missing metadata might be a problem.
 func (at *AnnotatedTable) LastModifiedTime(ctx context.Context) time.Time {
 	meta, err := at.CachedMeta(ctx)
 	if err != nil {
@@ -101,13 +107,29 @@ func (at *AnnotatedTable) CachedDetail(ctx context.Context) (*Detail, error) {
 		return nil, ErrNilContext
 	}
 	// TODO - use context
-	// TODO - GetTableDetail should return pointer
-	var detail Detail
-	detail, at.err = GetTableDetail(at.dataset, &at.Table)
-	if at.err == nil {
-		at.detail = &detail
-	}
+	// TODO - maybe just embed code here.
+	at.detail, at.err = GetTableDetail(at.dataset, at.Table)
 	return at.detail, at.err
+}
+
+// CachedPartitionInfo returns the cached PInfo, possibly fetching it if possible.
+func (at *AnnotatedTable) CachedPartitionInfo(ctx context.Context) (*bqext.PartitionInfo, error) {
+	if at.pInfo != nil {
+		return at.pInfo, nil
+	}
+	if at.err != nil {
+		return nil, at.err
+	}
+	if at.dataset == nil {
+		return nil, ErrNoDataset
+	}
+	if ctx == nil {
+		return nil, ErrNilContext
+	}
+	// TODO - use context
+	// TODO - maybe just embed code here.
+	at.pInfo, at.err = GetPartitionInfo(ctx, at.dataset, at.Table)
+	return at.pInfo, at.err
 }
 
 // CheckIsRegular returns nil if table exists and is a regular table.
@@ -124,43 +146,9 @@ func (at *AnnotatedTable) CheckIsRegular(ctx context.Context) error {
 	return nil
 }
 
-/*
-// TableInfo contains the basic stats for a specific table or partition.
-type TableInfo struct {
-	Name             string
-	IsPartitioned    bool
-	NumBytes         int64
-	NumRows          uint64
-	CreationTime     time.Time
-	LastModifiedTime time.Time
-}
-
-// GetTableInfo returns the basic info for a single table.
-// It executes a single network request.
-func GetTableInfo(ctx context.Context, t *bigquery.Table) (TableInfo, error) {
-	meta, err := t.Metadata(ctx)
-	if err != nil {
-		return TableInfo{}, err
-	}
-	if meta.Type != bigquery.RegularTable {
-		return TableInfo{}, ErrNotRegularTable
-	}
-	ts := TableInfo{
-		Name:             t.TableID,
-		IsPartitioned:    meta.TimePartitioning != nil,
-		NumBytes:         meta.NumBytes,
-		NumRows:          meta.NumRows,
-		CreationTime:     meta.CreationTime,
-		LastModifiedTime: meta.LastModifiedTime,
-	}
-	return ts, nil
-}
-
-// */
-
 // GetTableDetail fetches more detailed info about a partition or table.
 // Expects table to have test_id, and task_filename fields.
-func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (Detail, error) {
+func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (*Detail, error) {
 	// If table is a partition, then we have to separate out the partition part for the query.
 	parts := strings.Split(table.TableID, "$")
 	dataset := table.DatasetID
@@ -170,7 +158,7 @@ func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (Detail, error)
 		if len(parts[1]) == 8 {
 			where = "where _PARTITIONTIME = PARSE_TIMESTAMP(\"%Y%m%d\",\"" + parts[1] + "\")"
 		} else {
-			return Detail{}, errors.New("Invalid partition string: " + parts[1])
+			return nil, errors.New("Invalid partition string: " + parts[1])
 		}
 	}
 	detail := Detail{}
@@ -189,22 +177,21 @@ func GetTableDetail(dsExt *bqext.Dataset, table *bigquery.Table) (Detail, error)
 
 	// TODO - this should take a context?
 	err := dsExt.QueryAndParse(queryString, &detail)
-	return detail, err
+	return &detail, err
 }
 
-// GetTableInfoMatching finds all tables matching table filter
+// GetTablesMatching finds all tables matching table filter
 // and collects the basic stats about each of them.
 // It performs many network operations, possibly two per table.
 // Returns slice ordered by decreasing age.
-func GetTableInfoMatching(ctx context.Context, dsExt *bqext.Dataset, filter string) ([]AnnotatedTable, error) {
-	alt := make([]AnnotatedTable, 0) // TODO should this be (..., 31, 0)
-	//	result := make([]TableInfo, 0)
+func GetTablesMatching(ctx context.Context, dsExt *bqext.Dataset, filter string) ([]AnnotatedTable, error) {
+	alt := make([]AnnotatedTable, 0)
 	ti := dsExt.Tables(ctx)
 	for t, err := ti.Next(); err == nil; t, err = ti.Next() {
 		// TODO should this be starts with?  Or a regex?
 		if strings.Contains(t.TableID, filter) {
 			// TODO - make this run in parallel
-			at := AnnotatedTable{Table: *t, dataset: dsExt}
+			at := AnnotatedTable{Table: t, dataset: dsExt}
 			_, err := at.CachedMeta(ctx)
 			if err == ErrNotRegularTable {
 				continue
@@ -212,7 +199,6 @@ func GetTableInfoMatching(ctx context.Context, dsExt *bqext.Dataset, filter stri
 			if err != nil {
 				return nil, err
 			}
-			//	result = append(result, ts)
 			alt = append(alt, at)
 		}
 	}
@@ -271,11 +257,11 @@ func getTable(bqClient *bigquery.Client, project, dataset, table, partition stri
 // table should include partition spec.
 // dsExt should have access to the table, but its project and dataset are not used.
 // TODO - possibly migrate this to go/bqext.
-func GetPartitionInfo(ctx context.Context, dsExt *bqext.Dataset, table *bigquery.Table) (bqext.PartitionInfo, error) {
+func GetPartitionInfo(ctx context.Context, dsExt *bqext.Dataset, table *bigquery.Table) (*bqext.PartitionInfo, error) {
 	tableName := table.TableID
 	parts, err := getTableParts(tableName)
 	if err != nil || !parts.isPartitioned {
-		return bqext.PartitionInfo{}, errors.New("TableID missing partition: " + tableName)
+		return nil, errors.New("TableID missing partition: " + tableName)
 	}
 	fullTable := fmt.Sprintf("%s:%s.%s", table.ProjectID, table.DatasetID, parts.prefix)
 
@@ -295,47 +281,50 @@ func GetPartitionInfo(ctx context.Context, dsExt *bqext.Dataset, table *bigquery
 	if err != nil {
 		// If the partition doesn't exist, just return empty Info, no error.
 		if err == iterator.Done {
-			return bqext.PartitionInfo{}, nil
+			return &bqext.PartitionInfo{}, nil
 		}
-		return bqext.PartitionInfo{}, err
+		return nil, err
 	}
-	return pInfo, nil
+	return &pInfo, nil
 }
 
-func checkDetails(srcDetail, destDetail Detail) error {
-	// Check that new table contains at least 99% as many tasks as
-	// old table.
-	if float32(srcDetail.TaskFileCount) < 0.99*float32(destDetail.TaskFileCount) {
-		return ErrTooFewTasks
-	} else if srcDetail.TaskFileCount < destDetail.TaskFileCount {
-		log.Printf("Warning - fewer task files: %d < %d\n", srcDetail.TaskFileCount, destDetail.TaskFileCount)
+func (at *AnnotatedTable) checkDetails(ctx context.Context, other *AnnotatedTable) error {
+	thisDetail, err := at.CachedDetail(ctx)
+	if err != nil {
+		return err
+	}
+	otherDetail, err := other.CachedDetail(ctx)
+	if err != nil {
+		return err
 	}
 
-	// Check that new table contains at least 95% as many tests as
-	// old table.  This may be fewer if the destination table still has dups.
-	if float32(srcDetail.TestCount) < 0.95*float32(destDetail.TestCount) {
+	// Check that receiver table contains at least 99% as many tasks as
+	// other table.
+	if float32(thisDetail.TaskFileCount) < 0.99*float32(otherDetail.TaskFileCount) {
+		return ErrTooFewTasks
+	} else if thisDetail.TaskFileCount < otherDetail.TaskFileCount {
+		log.Printf("Warning - fewer task files: %d < %d\n", thisDetail.TaskFileCount, otherDetail.TaskFileCount)
+	}
+
+	// Check that receiver table contains at least 95% as many tests as
+	// other table.  This may be fewer if the destination table still has dups.
+	if float32(thisDetail.TestCount) < 0.95*float32(otherDetail.TestCount) {
 		return ErrTooFewTests
-	} else if srcDetail.TestCount < destDetail.TestCount {
-		log.Printf("Warning - fewer tests: %d < %d\n", srcDetail.TestCount, destDetail.TestCount)
+	} else if thisDetail.TestCount < otherDetail.TestCount {
+		log.Printf("Warning - fewer tests: %d < %d\n", thisDetail.TestCount, otherDetail.TestCount)
 	}
 	return nil
 }
 
-// Fetches info about destination table, and checks that it's mtime is older than the source table's.
-func checkDestOlder(ctx context.Context, dsExt *bqext.Dataset, src, dest *AnnotatedTable) error {
-	// TODO - save and use existing info.
-	destPartitionInfo, err := GetPartitionInfo(ctx, dsExt, &dest.Table)
-	if err != nil {
-		return err
-	}
-
+// TODO - should we use the metadata, or the PI?  Are they the same?
+func (at *AnnotatedTable) checkAges(ctx context.Context, other *AnnotatedTable) error {
 	// If the source table is older than the destination table, then
 	// don't overwrite it.
-	srcMeta, err := src.CachedMeta(ctx)
+	thisMeta, err := at.CachedMeta(ctx)
 	if err != nil {
 		return err
 	}
-	if srcMeta.LastModifiedTime.Before(destPartitionInfo.LastModified) {
+	if thisMeta.LastModifiedTime.Before(other.LastModifiedTime(ctx)) {
 		// TODO should perhaps delete the source table?
 		return ErrSrcOlderThanDest
 	}
@@ -418,7 +407,7 @@ type Job struct {
 	destTable      *AnnotatedTable // destination table that result will be committed to.
 
 	// Additional information generated during processing.
-	dedupTable *bigquery.Table // dedup table that will receive deduped result before commit
+	dedupTable *AnnotatedTable // dedup table that will receive deduped result before commit
 }
 
 // NewJob creates a DedupJob struct
@@ -431,7 +420,7 @@ func (job *Job) dedupAndCopy(ctx context.Context, options Options) error {
 	if !options.CopyOnly {
 		// Do the deduplication to intermediate "dedup" table with same root name.
 		// TODO - are we checking for source newer than intermediate destination?  Should we?
-		_, err := job.Dedup_Alpha(job.srcTable.TableID, "test_id", job.dedupTable)
+		_, err := job.Dedup_Alpha(job.srcTable.TableID, "test_id", job.dedupTable.Table)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -439,12 +428,7 @@ func (job *Job) dedupAndCopy(ctx context.Context, options Options) error {
 	}
 
 	// Now compare number of rows and tasks in dedup table to destination table.
-	dedupDetail, err := GetTableDetail(job.Dataset, job.dedupTable)
-	if err != nil {
-		return err
-	}
-	destDetail, err := job.destTable.CachedDetail(ctx)
-	err = checkDetails(dedupDetail, *destDetail)
+	err := job.dedupTable.checkDetails(ctx, job.destTable)
 	if err != nil {
 		return err
 	}
@@ -454,7 +438,7 @@ func (job *Job) dedupAndCopy(ctx context.Context, options Options) error {
 		return err
 	}
 
-	err = SanityCheckAndCopy(ctx, job.Dataset.BqClient, job.dedupTable, job.destTable.DatasetID, destParts.prefix)
+	err = SanityCheckAndCopy(ctx, job.Dataset.BqClient, job.dedupTable.Table, job.destTable.DatasetID, destParts.prefix)
 	if err != nil {
 		return err
 	}
@@ -489,9 +473,18 @@ func (job *Job) dedupAndCopy(ctx context.Context, options Options) error {
 // TODO(gfr) Should we check that intermediate table is NOT a production table?
 func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 
+	// Check that source and destination are both templated or partitioned.
 	srcParts, err := getTableParts(job.srcTable.TableID)
 	if err != nil {
 		return err
+	}
+	destParts, err := getTableParts(job.destTable.TableID)
+	if err != nil {
+		return err
+	}
+	// Check that date suffixes match.
+	if destParts.yyyymmdd != srcParts.yyyymmdd {
+		return errors.New("Source and Destination should have same partition/template date: ")
 	}
 
 	// Check if the last update was at least minSrcAge in the past.
@@ -503,26 +496,17 @@ func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 		return errors.New("Source and Destination should be in different datasets: ")
 	}
 
-	destParts, err := getTableParts(job.destTable.TableID)
-	if err != nil {
-		return err
-	}
-
-	if destParts.yyyymmdd != srcParts.yyyymmdd {
-		return errors.New("Source and Destination should have same partition/template date: ")
-	}
-
 	// We do the deduplication into the corresponding partition, derived from the source table template.
 	// We will eventually use dedupTable to create a copier, so it must use a valid bigquery.Client.
-	job.dedupTable, err = getTable(job.BqClient, job.ProjectID, job.DatasetID, srcParts.prefix, srcParts.yyyymmdd)
+	tmpTable, err := getTable(job.BqClient, job.ProjectID, job.DatasetID, srcParts.prefix, srcParts.yyyymmdd)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
+	job.dedupTable = NewAnnotatedTable(tmpTable, job.Dataset)
 
-	//	job.srcTable = NewAnnotatedTable(job.srcT, job.ds)
 	// Just check that table exists.
-	_, err = job.srcTable.Metadata(ctx)
+	_, err = job.srcTable.CachedMeta(ctx)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -533,25 +517,14 @@ func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 	}
 
 	if !options.IgnoreDestAge {
-		// TODO - this fails if the destination partition does not exist.
-		err = checkDestOlder(ctx, job.Dataset, job.srcTable, job.destTable)
+		err = job.srcTable.checkAges(ctx, job.destTable)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
 	}
 
-	srcDetail, err := job.srcTable.CachedDetail(ctx)
-	if err != nil {
-		return err
-	}
-	destDetail, err := job.destTable.CachedDetail(ctx)
-	if err != nil {
-		return err
-	}
-
-	// If dest partition exists, sanity check that we have reasonable numbers in source.
-	err = checkDetails(*srcDetail, *destDetail)
+	err = job.srcTable.checkDetails(ctx, job.destTable)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -595,7 +568,7 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 	}
 
 	// These are sorted by LastModification, oldest first.
-	atList, err := GetTableInfoMatching(context.Background(), dsExt, srcPattern)
+	atList, err := GetTablesMatching(context.Background(), dsExt, srcPattern)
 	if err != nil {
 		return err
 	}
@@ -621,7 +594,7 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 		}
 
 		destTable, _ := getTable(dsExt.BqClient, dsExt.ProjectID, destDataset, destBase, parts.yyyymmdd)
-		job := NewJob(dsExt, &srcTable, NewAnnotatedTable(*destTable, dsExt))
+		job := NewJob(dsExt, &srcTable, NewAnnotatedTable(destTable, dsExt))
 		err = job.CheckAndDedup(context.Background(), options)
 		if err != nil {
 			log.Println(err, "dedupping", dsExt.DatasetID+"."+srcTable.TableID, "to", destDataset+"."+destBase)
