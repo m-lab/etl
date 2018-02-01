@@ -38,6 +38,8 @@ var (
 	ErrTooFewTasks = errors.New("Too few tasks")
 	// ErrTooFewTests is returned when the source table has fewer tests than the destination.
 	ErrTooFewTests = errors.New("Too few tests")
+	// ErrMismatchedPartitions is returned when partition dates should match but don't.
+	ErrMismatchedPartitions = errors.New("Partition dates don't match")
 )
 
 // Detail provides more detailed information about a partition or table.
@@ -87,7 +89,7 @@ func (at *AnnotatedTable) CachedMeta(ctx context.Context) (*bigquery.TableMetada
 func (at *AnnotatedTable) LastModifiedTime(ctx context.Context) time.Time {
 	meta, err := at.CachedMeta(ctx)
 	if err != nil {
-		return time.Now() // Hack - not sure what to do instead.
+		return time.Time{} // Default time.  Caller might need to check for this.
 	}
 	return meta.LastModifiedTime
 }
@@ -290,7 +292,7 @@ func (at *AnnotatedTable) GetPartitionInfo(ctx context.Context) (*bqext.Partitio
 }
 
 // TODO - move these up with other methods after review.
-func (at *AnnotatedTable) checkDetails(ctx context.Context, other *AnnotatedTable) error {
+func (at *AnnotatedTable) checkAlmostAsBig(ctx context.Context, other *AnnotatedTable) error {
 	thisDetail, err := at.CachedDetail(ctx)
 	if err != nil {
 		return err
@@ -319,13 +321,15 @@ func (at *AnnotatedTable) checkDetails(ctx context.Context, other *AnnotatedTabl
 }
 
 // TODO - should we use the metadata, or the PI?  Are they the same?
-func (at *AnnotatedTable) checkAges(ctx context.Context, other *AnnotatedTable) error {
+func (at *AnnotatedTable) checkModifiedAfter(ctx context.Context, other *AnnotatedTable) error {
 	// If the source table is older than the destination table, then
 	// don't overwrite it.
 	thisMeta, err := at.CachedMeta(ctx)
 	if err != nil {
 		return err
 	}
+	// Note that if other doesn't actually exist, its LastModifiedTime will be the time zero value,
+	// so this will generally work as intended.
 	if thisMeta.LastModifiedTime.Before(other.LastModifiedTime(ctx)) {
 		// TODO should perhaps delete the source table?
 		return ErrSrcOlderThanDest
@@ -363,26 +367,28 @@ func WaitForJob(ctx context.Context, job *bigquery.Job, maxBackoff time.Duration
 // SanityCheckAndCopy uses several sanity checks to improve copy safety.
 // Caller should also have checked source and destination ages, and task/test counts.
 //  1. Source is required to be a single partition or templated table with yyyymmdd suffix.
-//  2. Destination partition is derived from source partition.
+//  2. Destination partition matches source partition/suffix
 // TODO(gfr) Ideally this should be done by a separate process with
 // higher priviledge than the reprocessing and dedupping processes.
 // TODO(gfr) Also support copying from a template instead of partition?
-func SanityCheckAndCopy(ctx context.Context, client *bigquery.Client, srcTable *bigquery.Table, destDataset, destTableName string) error {
+func SanityCheckAndCopy(ctx context.Context, client *bigquery.Client, srcTable, destTable *bigquery.Table) error {
 	// Extract the
-	parts, err := getTableParts(srcTable.TableID)
+	srcParts, err := getTableParts(srcTable.TableID)
 	if err != nil {
 		return err
 	}
 
-	destTable, err := getTable(client, srcTable.ProjectID, destDataset, destTableName, parts.yyyymmdd)
+	destParts, err := getTableParts(destTable.TableID)
 	if err != nil {
-		log.Println(err)
 		return err
+	}
+	if destParts.yyyymmdd != srcParts.yyyymmdd {
+		return ErrMismatchedPartitions
 	}
 
 	copier := destTable.CopierFrom(srcTable)
 	copier.WriteDisposition = bigquery.WriteTruncate
-	log.Println("Copying...")
+	log.Println("Copying...", srcTable.TableID)
 	job, err := copier.Run(ctx)
 	if err != nil {
 		return err
@@ -412,7 +418,7 @@ type Job struct {
 	dedupTable *AnnotatedTable // dedup table that will receive deduped result before commit
 }
 
-// NewJob creates a DedupJob struct
+// NewJob creates a Job struct
 func NewJob(ds *bqext.Dataset, srcTable, destTable *AnnotatedTable) *Job {
 	return &Job{Dataset: ds, srcTable: srcTable, destTable: destTable}
 }
@@ -430,17 +436,12 @@ func (job *Job) dedupAndCopy(ctx context.Context, options Options) error {
 	}
 
 	// Now compare number of rows and tasks in dedup table to destination table.
-	err := job.dedupTable.checkDetails(ctx, job.destTable)
+	err := job.dedupTable.checkAlmostAsBig(ctx, job.destTable)
 	if err != nil {
 		return err
 	}
 
-	destParts, err := getTableParts(job.destTable.TableID)
-	if err != nil {
-		return err
-	}
-
-	err = SanityCheckAndCopy(ctx, job.Dataset.BqClient, job.dedupTable.Table, job.destTable.DatasetID, destParts.prefix)
+	err = SanityCheckAndCopy(ctx, job.Dataset.BqClient, job.dedupTable.Table, job.destTable.Table)
 	if err != nil {
 		return err
 	}
@@ -462,19 +463,15 @@ func (job *Job) dedupAndCopy(ctx context.Context, options Options) error {
 // Criteria:
 //   1. Source table modification time is at least as old as options.MinSrcAge
 //   2. Source table mod time is later than destination table mod time, unless options.IgnoreDestAge.
-//   3. If destination partition exists then
-//       3a. Source reflects at least as many task files as destination (if dest)
-//       3b. Source has at least 98% as many tests as destination (including dups)
-//       3c. After deduplication, intermediate table has at least 98% as many tests as destination.
+//   3. Source and destination are in different datasets, and source dataset is NOT "base_tables"
+//   4. If destination partition exists then
+//       4a. Source reflects at least 99% as many task files as final destination
+//       4b. Source has at least 95% as many tests as destination (including dups)
+//       4c. After deduplication, intermediate table has at least 95% as many tests as destination.
 //
-// srcExt         - bqext.Dataset for operations.
-// srcInfo       - TableInfo for the source
-// destTable     - destination Table (possibly in another dataset)
-// options       - dedup options, MinSrcAge, IgnoreDestAge, DryRun, CopyOnly.
+// options - dedup options, MinSrcAge, IgnoreDestAge, DryRun, CopyOnly.
 //
-// TODO(gfr) Should we check that intermediate table is NOT a production table?
 func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
-
 	// Check that source and destination are both templated or partitioned.
 	srcParts, err := getTableParts(job.srcTable.TableID)
 	if err != nil {
@@ -490,7 +487,7 @@ func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 	}
 
 	// Check if the last update was at least minSrcAge in the past.
-	if time.Now().Sub(job.srcTable.LastModifiedTime(ctx)) < options.MinSrcAge {
+	if time.Since(job.srcTable.LastModifiedTime(ctx)) < options.MinSrcAge {
 		return errors.New("Source is too recent")
 	}
 
@@ -498,8 +495,10 @@ func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 		return errors.New("Source and Destination should be in different datasets: ")
 	}
 
-	// We do the deduplication into the corresponding partition, derived from the source table template.
-	// We will eventually use dedupTable to create a copier, so it must use a valid bigquery.Client.
+	// For the dedup destination, we use the partitioned table with the same dataset/prefix
+	// as the source table.
+	// We do the deduplication into the partition with the same date.
+	// dedupTable will later be used to create a copier, so it must use a valid bigquery.Client.
 	tmpTable, err := getTable(job.BqClient, job.ProjectID, job.DatasetID, srcParts.prefix, srcParts.yyyymmdd)
 	if err != nil {
 		log.Println(err)
@@ -514,19 +513,20 @@ func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 		return err
 	}
 
-	if job.destTable.DatasetID == job.dedupTable.DatasetID {
+	// Check that temporary dedup target is neither final destination, nor "base_tables" dataset.
+	if job.dedupTable.DatasetID == job.destTable.DatasetID || job.dedupTable.DatasetID == "base_tables" {
 		return errors.New("Dedup and Destination should be in different datasets: " + job.dedupTable.FullyQualifiedName())
 	}
 
 	if !options.IgnoreDestAge {
-		err = job.srcTable.checkAges(ctx, job.destTable)
+		err = job.srcTable.checkModifiedAfter(ctx, job.destTable)
 		if err != nil {
 			log.Println(err)
 			return err
 		}
 	}
 
-	err = job.srcTable.checkDetails(ctx, job.destTable)
+	err = job.srcTable.checkAlmostAsBig(ctx, job.destTable)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -562,7 +562,7 @@ func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 // ProcessTablesMatching lists all tables matching a template pattern, and for
 // any that are at least the age specified in options, dedups and copies them to
 // corresponding partitions in the destination table.
-func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset, destBase string, options Options) error {
+func ProcessTablesMatching(srcDS *bqext.Dataset, srcPattern string, destDataset string, options Options) error {
 	// This may not have full suffix, so we can't use getTableParts.
 	srcParts := strings.Split(srcPattern, "_")
 	if len(srcParts) != 2 {
@@ -570,7 +570,7 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 	}
 
 	// These are sorted by LastModification, oldest first.
-	atList, err := GetTablesMatching(context.Background(), dsExt, srcPattern)
+	atList, err := GetTablesMatching(context.Background(), srcDS, srcPattern)
 	if err != nil {
 		return err
 	}
@@ -590,16 +590,20 @@ func ProcessTablesMatching(dsExt *bqext.Dataset, srcPattern string, destDataset,
 			continue
 		}
 
-		parts, err := getTableParts(srcTable.TableID)
+		srcParts, err := getTableParts(srcTable.TableID)
 		if err != nil {
 			return err
 		}
 
-		destTable, _ := getTable(dsExt.BqClient, dsExt.ProjectID, destDataset, destBase, parts.yyyymmdd)
-		job := NewJob(dsExt, &srcTable, NewAnnotatedTable(destTable, dsExt))
+		// destination should be in a different dataset, but same project and same table name and
+		// date suffix as source.
+		destTable, _ := getTable(srcDS.BqClient, srcDS.ProjectID,
+			destDataset, srcParts.prefix, srcParts.yyyymmdd)
+		job := NewJob(srcDS, &srcTable, NewAnnotatedTable(destTable, srcDS))
 		err = job.CheckAndDedup(context.Background(), options)
 		if err != nil {
-			log.Println(err, "dedupping", dsExt.DatasetID+"."+srcTable.TableID, "to", destDataset+"."+destBase)
+			log.Println(err, "dedupping", srcDS.DatasetID+"."+srcTable.TableID,
+				"to", destTable.DatasetID+"."+destTable.TableID)
 			return err
 		}
 	}

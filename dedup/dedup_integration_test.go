@@ -30,13 +30,13 @@ func testingAuth() []option.ClientOption {
 }
 
 func TestGetTableDetail(t *testing.T) {
-	dsExt, err := bqext.NewDataset("mlab-testing", "etl", testingAuth()...)
+	destDS, err := bqext.NewDataset("mlab-testing", "etl", testingAuth()...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Check that it handles empty partitions
-	detail, err := dedup.GetTableDetail(&dsExt, dsExt.Table("TestDedupDest$20001229"))
+	detail, err := dedup.GetTableDetail(&destDS, destDS.Table("DedupTest$20001229"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestGetTableDetail(t *testing.T) {
 
 	// Check that it handles single partitions.
 	// TODO - update to create its own test table.
-	detail, err = dedup.GetTableDetail(&dsExt, dsExt.Table("TestDedupDest$19990101"))
+	detail, err = dedup.GetTableDetail(&destDS, destDS.Table("DedupTest$19990101"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,9 +54,14 @@ func TestGetTableDetail(t *testing.T) {
 		t.Error("Wrong number of tasks or tests")
 	}
 
+	srcDS, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Check that it handles full table.
 	// TODO - update to create its own test table.
-	detail, err = dedup.GetTableDetail(&dsExt, dsExt.Table("TestDedupSrc_19990101"))
+	detail, err = dedup.GetTableDetail(&srcDS, srcDS.Table("DedupTest_19990101"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,25 +70,6 @@ func TestGetTableDetail(t *testing.T) {
 	}
 }
 
-/*
-func TestGetTableInfo(t *testing.T) {
-	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	info, err := dedup.GetTableInfo(context.Background(), dsExt.Table("TestDedupSrc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !info.IsPartitioned {
-		t.Error("Should be partitioned")
-	}
-	if info.NumRows != 8 {
-		t.Errorf("Wrong number of rows: %d", info.NumRows)
-	}
-}
-*/
 func TestAnnotationTableMeta(t *testing.T) {
 	// TODO - Make NewDataSet return a pointer, for consistency with bigquery.
 	dsExt, err := bqext.NewDataset("mlab-testing", "src", testingAuth()...)
@@ -91,7 +77,7 @@ func TestAnnotationTableMeta(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tbl := dsExt.Table("TestDedupSrc")
+	tbl := dsExt.Table("DedupTest")
 	at := dedup.NewAnnotatedTable(tbl, &dsExt)
 	meta, err := at.CachedMeta(context.Background())
 	if err != nil {
@@ -122,7 +108,7 @@ func TestAnnotationDetail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tbl := dsExt.Table("TestDedupSrc")
+	tbl := dsExt.Table("DedupTest")
 	at := dedup.NewAnnotatedTable(tbl, &dsExt)
 	_, err = at.CachedDetail(context.Background())
 	if err != nil {
@@ -151,7 +137,7 @@ func TestAnnotatedTableGetPartitionInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tbl := dsExt.Table("TestDedupSrc$19990101")
+	tbl := dsExt.Table("DedupTest$19990101")
 	at := dedup.NewAnnotatedTable(tbl, &dsExt)
 	info, err := at.GetPartitionInfo(context.Background())
 	if err != nil {
@@ -162,7 +148,7 @@ func TestAnnotatedTableGetPartitionInfo(t *testing.T) {
 	}
 
 	// Check behavior for missing partition
-	tbl = dsExt.Table("TestDedupSrc$17760101")
+	tbl = dsExt.Table("DedupTest$17760101")
 	at = dedup.NewAnnotatedTable(tbl, &dsExt)
 	info, err = at.GetPartitionInfo(context.Background())
 	if err != nil {
@@ -180,7 +166,7 @@ func TestCheckAndDedup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	atList, err := dedup.GetTablesMatching(context.Background(), &dsExt, "TestDedupSrc_19990101")
+	atList, err := dedup.GetTablesMatching(context.Background(), &dsExt, "DedupTest_19990101")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +174,7 @@ func TestCheckAndDedup(t *testing.T) {
 		t.Fatal("No info for pattern.")
 	}
 
-	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, "etl").Table("TestDedupDest$19990101")
+	destTable := dsExt.BqClient.DatasetInProject(dsExt.ProjectID, "etl").Table("DedupTest$19990101")
 	// TODO - clean up pointer vs non-pointer args everywhere.
 	job := dedup.NewJob(&dsExt, &atList[0], dedup.NewAnnotatedTable(destTable, &dsExt))
 	err = job.CheckAndDedup(context.Background(), dedup.Options{time.Minute, false, false, false})
@@ -207,7 +193,7 @@ func TestProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = dedup.ProcessTablesMatching(&dsExt, "TestDedupSrc_", "etl", "TestDedupDest", dedup.Options{1 * time.Minute, false, false, false})
+	err = dedup.ProcessTablesMatching(&dsExt, "DedupTest_", "etl", dedup.Options{1 * time.Minute, false, false, false})
 	if err != nil && err != dedup.ErrSrcOlderThanDest {
 		t.Error(err)
 	}
