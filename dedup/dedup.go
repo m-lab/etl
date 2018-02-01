@@ -84,8 +84,8 @@ func (at *AnnotatedTable) CachedMeta(ctx context.Context) (*bigquery.TableMetada
 }
 
 // LastModifiedTime returns the LMT field from the metadata.  If not
-// available, returns time.Now().  This is a bit hacky, so take care
-// if the missing metadata might be a problem.
+// available, returns time.Time{} which is the zero time.
+// Caller should take care if missing metadata might be a problem.
 func (at *AnnotatedTable) LastModifiedTime(ctx context.Context) time.Time {
 	meta, err := at.CachedMeta(ctx)
 	if err != nil {
