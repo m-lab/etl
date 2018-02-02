@@ -33,26 +33,27 @@ func main() {
 
 	src := strings.Split(*fTemplatePrefix, ".")
 	if len(src) != 2 {
-		log.Println("template_prefix must have dataset.table_prefix")
-		os.Exit(1)
+		log.Fatal("template_prefix must have dataset.table_prefix")
 	}
+	srcTableParts := strings.Split(src[1], "_")
+	if len(srcTableParts) != 2 {
+		log.Fatal("pattern must have _", src[1])
+	}
+
 	dsExt, err := bqext.NewDataset(*fProject, src[0])
 	if err != nil {
-		log.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	dest := strings.Split(*fDestinationTable, ".")
 	if len(dest) != 2 {
-		log.Println("destination_table must have dataset.table_prefix")
-		os.Exit(1)
+		log.Fatal("destination_table must have dataset.table_prefix")
 	}
 
 	// TODO fix delay param.
-	srcParts, _ := dedup.GetTableNameParts(src[1])
 
-	if srcParts.Prefix != dest[1] {
-		log.Fatal("Source and destination table bases should be same")
+	if srcTableParts[0] != dest[1] {
+		log.Fatal("Source and destination table bases should be same", srcTableParts, dest)
 	}
 	err = dedup.ProcessTablesMatching(&dsExt, src[1], dest[0],
 		dedup.Options{MinSrcAge: *fDelay, IgnoreDestAge: *fIgnoreDestAge, DryRun: *fDryRun, CopyOnly: *fSkipDedup})
