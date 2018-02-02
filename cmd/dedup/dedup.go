@@ -47,8 +47,14 @@ func main() {
 		log.Println("destination_table must have dataset.table_prefix")
 		os.Exit(1)
 	}
+
 	// TODO fix delay param.
-	err = dedup.ProcessTablesMatching(&dsExt, src[1], dest[0], dest[1],
+	srcParts, _ := dedup.GetTableNameParts(src[1])
+
+	if srcParts.Prefix != dest[1] {
+		log.Fatal("Source and destination table bases should be same")
+	}
+	err = dedup.ProcessTablesMatching(&dsExt, src[1], dest[0],
 		dedup.Options{MinSrcAge: *fDelay, IgnoreDestAge: *fIgnoreDestAge, DryRun: *fDryRun, CopyOnly: *fSkipDedup})
 	if err != nil {
 		log.Println(err)
