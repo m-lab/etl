@@ -75,5 +75,5 @@ SELECT
       web100_log_entry.snap.X_rcv_ssthresh, web100_log_entry.snap.X_wnd_clamp)
     AS snap)
   AS web100_log_entry
-FROM `measurement-lab.public.ndt`
+FROM `measurement-lab.base_tables.ndt`
 WHERE _PARTITIONTIME >= TIMESTAMP("2017-05-11 00:00:00")

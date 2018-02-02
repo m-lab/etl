@@ -3,8 +3,8 @@
 # Also creates internal views that the public views are built on.
 # This should generally be run from a travis deployment, and the
 # arguments should be derived from the deployment tag.
-# The following legacySQL views are created in the public dataset:
-#    ndt_all​ - all (lightly filtered) tests, excluding EB,
+# The following legacySQL views are created in the rc/release datasets:
+#      ndt_all​ - all (lightly filtered) tests, excluding EB,
 #              blacklisted, short and very long tests.
 #    Separate views for download and upload NDT tests:
 # ​​​     ndt_downloads
@@ -25,13 +25,13 @@ set -u
 #                            Bash Parameters                              #
 ###########################################################################
 
-USAGE="$0 <project> <internal-dataset> <public-dataset> <alias,alias,...>"
+USAGE="$0 <project> <intermediate-dataset> <rc-dataset> <alias,alias,...>"
 PROJECT=${1:?Please provide the google cloud project: $USAGE}
 INTERMEDIATE=${PROJECT}:${2:?Please specify the internal dataset e.g. intermediate_v3_1_1: $USAGE}
-PUBLIC=${PROJECT}:${3:?Please specify the public dataset e.g. rc_v3_1: $USAGE}
+PUBLIC=${PROJECT}:${3:?Please specify the release candidate dataset e.g. rc_v3_1: $USAGE}
 ALIASES=${4:?Please specify a single alias, or quoted space separated list of aliases \{rc|\"rc release\"|none\}: $USAGE}
 
-# TODO - check that public and internal aren't swapped?
+# TODO - check that public and intermediate aren't swapped?
 # TODO - check that project is valid?
 
 
