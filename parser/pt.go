@@ -68,7 +68,7 @@ type Node struct {
 
 const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
-const PTBufferSize int = 5
+const PTBufferSize int = 2
 
 func NewPTParser(ins etl.Inserter) *PTParser {
 	return &PTParser{ins, ins, []cachedPTData{}}
