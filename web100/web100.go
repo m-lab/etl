@@ -585,20 +585,6 @@ func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 	return nil
 }
 
-// Check whether a single field differs between two snapshots.
-// For example, CongSignal
-// TODO - optimize by passing in a?
-func (snap *Snapshot) diff(other *Snapshot, field Variable) bool {
-	a := other.raw[field.Offset : field.Offset+field.Size]
-	b := snap.raw[field.Offset : field.Offset+field.Size]
-	return bytes.Compare(a, b) != 0
-}
-
-func (snap *Snapshot) extract(field Variable, values Saver) {
-	data := snap.raw[field.Offset : field.Offset+field.Size]
-	field.Save(data, values)
-}
-
 // About 70 usec (for SmoothedRTT or CongestionSignals)
 func (sl *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
 	result := make([]int, 0, 100)
@@ -648,10 +634,6 @@ func (sl *SnapLog) SliceIntField(fieldName string, indices []int) []int64 {
 	for i := 0; i < len(indices); i++ {
 		// Safe to skip the validation, because it was done when getting the indices.
 		offset := sl.bodyOffset + indices[i]*sl.read.Length
-		begin := string(sl.raw[offset : offset+len(BEGIN_SNAP_DATA)])
-		if begin != BEGIN_SNAP_DATA {
-			return nil
-		}
 		s.reset(sl.raw[offset+len(BEGIN_SNAP_DATA):offset+sl.read.Length], &sl.read)
 
 		field.Save(s.raw[field.Offset:field.Offset+field.Size], &result)
