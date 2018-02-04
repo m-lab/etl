@@ -213,6 +213,7 @@ func IPFromBytes(data []byte) (net.IP, error) {
 
 // Save interprets data according to the receiver type, and saves the result to snapValues.
 // Most of the types are unused, but included here for completeness.
+// This does a single alloc per int64 save???
 // TODO URGENT - unit tests for this!!
 func (v *Variable) Save(data []byte, snapValues Saver) error {
 	// Ignore deprecated fields.
@@ -285,7 +286,7 @@ type fieldSet struct {
 	Length int
 }
 
-// find returns the variable of a given name, or nil.
+// find returns the variable spec of a given name, or nil.
 func (fs *fieldSet) find(name string) *Variable {
 	index, ok := fs.FieldMap[name]
 	if !ok {
@@ -545,6 +546,11 @@ func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
 		fields: &sl.read}, nil
 }
 
+func (snap *Snapshot) reset(data []byte, fields *fieldSet) {
+	snap.fields = fields
+	snap.raw = data
+}
+
 // SnapshotValues writes all values into the provided Saver.
 func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 	if snap.raw == nil {
@@ -569,12 +575,110 @@ func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 	}
 	var field Variable
 	for _, field = range snap.fields.Fields {
-		// Interpret and save the web100 field value.
 		a := other.raw[field.Offset : field.Offset+field.Size]
 		b := snap.raw[field.Offset : field.Offset+field.Size]
 		if bytes.Compare(a, b) != 0 {
+			// Interpret and save the web100 field value.
 			field.Save(b, snapValues)
 		}
 	}
 	return nil
 }
+
+// Check whether a single field differs between two snapshots.
+// For example, CongSignal
+// TODO - optimize by passing in a?
+func (snap *Snapshot) diff(other *Snapshot, field Variable) bool {
+	a := other.raw[field.Offset : field.Offset+field.Size]
+	b := snap.raw[field.Offset : field.Offset+field.Size]
+	return bytes.Compare(a, b) != 0
+}
+
+func (snap *Snapshot) extract(field Variable, values Saver) {
+	data := snap.raw[field.Offset : field.Offset+field.Size]
+	field.Save(data, values)
+}
+
+// About 100 usec (for CongestionSignals)
+func (snaplog *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
+	result := make([]int, 0, 100)
+	field := snaplog.read.find(fieldName)
+	if field == nil {
+		return nil, errors.New("Field not found")
+	}
+	last := make([]byte, field.Size)
+	for i := 0; i < snaplog.SnapCount(); i++ {
+		s, err := snaplog.Snapshot(i)
+		if err != nil {
+			return result, err
+		}
+		data := s.raw[field.Offset : field.Offset+field.Size]
+		if bytes.Compare(data, last) != 0 {
+			result = append(result, i)
+		}
+		last = data
+	}
+	return result, nil
+}
+
+type ArraySaver struct {
+	Integers []int64
+	Strings  []string
+	Bools    []bool
+}
+
+func NewArraySaver(n int) ArraySaver {
+	return ArraySaver{make([]int64, 0, n),
+		make([]string, 0, n), make([]bool, 0, n)}
+}
+
+func (s ArraySaver) SetInt64(name string, val int64) {
+	s.Integers = append(s.Integers, val)
+}
+func (s ArraySaver) SetBool(name string, val bool) {
+	s.Bools = append(s.Bools, val)
+}
+func (s ArraySaver) SetString(name string, val string) {
+	s.Strings = append(s.Strings, val)
+}
+
+type NullSaver struct {
+	Integers []int64
+}
+
+func (s NullSaver) SetString(name string, val string) {}
+func (s NullSaver) SetInt64(name string, val int64)   {}
+func (s NullSaver) SetBool(name string, val bool)     {}
+
+// about 100 nsec per field.
+func (sl *SnapLog) SliceIntField(fieldName string, at []int) []int64 {
+	var s Snapshot
+	field := sl.read.find(fieldName)
+	//result := NullSaver{}
+	//data := []byte{1, 2, 3, 4, 5, 6}
+	result := NewArraySaver(len(at))
+	for i := 0; i < len(at); i++ {
+		offset := sl.bodyOffset + at[i]*sl.read.Length
+		//begin := string(sl.raw[offset : offset+len(BEGIN_SNAP_DATA)])
+		//if begin != BEGIN_SNAP_DATA {
+		//	return nil
+		//}
+
+		// We use the "/read" field group, as that is what is always used for NDT snapshots.
+		// This may be incorrect for use in other settings.
+		// This saves about 70 usec.
+		s.reset(sl.raw[offset+len(BEGIN_SNAP_DATA):offset+sl.read.Length], &sl.read)
+		//s, err := sl.Snapshot(at[i]) // This is doing an alloc
+		//if err != nil {
+		//	return nil
+		//}
+		// Alloc seems to be here, even using NullSaver
+		// also even using simple data.
+		field.Save(s.raw[field.Offset:field.Offset+field.Size], result)
+		//field.Save(data, result)
+	}
+	return result.Integers
+}
+
+// For each increment in CongSignal, we want to add values of snapCount, SRTT
+// the corresponding repeated fields.

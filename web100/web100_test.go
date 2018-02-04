@@ -1,9 +1,5 @@
 package web100_test
 
-// TODO - consider adding selected tests from
-// gs://m-lab/ndt/2016/11/01/20161101T000000Z-mlab1-syd01-ndt-0002.tgz
-// to test some of the anomaly cases.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -200,4 +196,88 @@ func TestNewVar(t *testing.T) {
 	//	4 /*INTEGER*/, 4 /*INTEGER32*/, 4 /*IPV4*/, 4 /*COUNTER32*/, 4, /*GAUGE32*/
 	//	4 /*UNSIGNED32*/, 4, /*TIME_TICKS*/
 	//	8 /*COUNTER64*/, 2 /*PORT_NUM*/, 17, 17, 32 /*STR32*/, 1 /*OCTET*/, 0}
+}
+
+func TestChangeIndices(t *testing.T) {
+	c2sName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:48716.c2s_snaplog`
+	c2sData, err := ioutil.ReadFile(`testdata/` + c2sName)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	slog, err := web100.NewSnapLog(c2sData)
+
+	_, err = slog.ChangeIndices("CongestionSignals")
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+}
+
+func BenchmarkChangeIndices(b *testing.B) {
+	b.StopTimer()
+	s2cName := `20090601T22:19:19.325928000Z-75.133.69.98:60631.s2c_snaplog`
+	data, err := ioutil.ReadFile(`testdata/` + s2cName)
+	if err != nil {
+		b.Fatalf(err.Error())
+	}
+
+	slog, err := web100.NewSnapLog(data)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := slog.ChangeIndices("SmoothedRTT")
+		if err != nil {
+			b.Fatalf(err.Error())
+		}
+	}
+}
+
+// About 150 nsec per element.
+// 1 alloc per item.
+func BenchmarkSliceInt(b *testing.B) {
+	b.StopTimer()
+	//s2cName := `20090401T09:01:09.490730000Z_131.169.137.246:14881.c2s_snaplog`
+	//s2cName := `20170430T11:54:26.658288000Z_p508486E9.dip0.t-ipconnect.de:53088.s2c_snaplog`
+	s2cName := `20090601T22:19:19.325928000Z-75.133.69.98:60631.s2c_snaplog`
+	data, err := ioutil.ReadFile(`testdata/` + s2cName)
+	if err != nil {
+		b.Fatalf(err.Error())
+	}
+	slog, err := web100.NewSnapLog(data)
+	if err != nil {
+		b.Fatalf(err.Error())
+	}
+	indices, err := slog.ChangeIndices("SmoothedRTT")
+	if err != nil {
+		b.Fatalf(err.Error())
+	}
+	log.Println(len(indices))
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		slog.SliceIntField("SmoothedRTT", indices)
+		if err != nil {
+			b.Fatalf(err.Error())
+		}
+	}
+}
+
+type NullSaver struct{}
+
+func (s NullSaver) SetString(name string, val string) {}
+func (s NullSaver) SetInt64(name string, val int64)   {}
+func (s NullSaver) SetBool(name string, val bool)     {}
+
+// 30 nsec/op, 0 allocs/op
+func BenchmarkSaver(b *testing.B) {
+	ns := NullSaver{}
+	v, _ := web100.NewVariable("SmoothedRTT 0 4 4")
+	data := []byte{0, 1, 2, 3, 4, 5, 6}
+	for i := 0; i < b.N; i++ {
+		v.Save(data, ns)
+	}
+}
+
+func main() {
+
 }
