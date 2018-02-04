@@ -51,8 +51,8 @@ type SimpleSaver struct {
 }
 
 func NewSimpleSaver() SimpleSaver {
-	return SimpleSaver{make(map[string]int64),
-		make(map[string]string), make(map[string]bool)}
+	return SimpleSaver{make(map[string]int64, 10),
+		make(map[string]string, 10), make(map[string]bool, 10)}
 }
 
 func (s SimpleSaver) SetString(name string, val string) {
@@ -207,10 +207,11 @@ func TestChangeIndices(t *testing.T) {
 
 	slog, err := web100.NewSnapLog(c2sData)
 
-	_, err = slog.ChangeIndices("CongestionSignals")
+	x, err := slog.ChangeIndices("CongestionSignals")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
+	log.Printf("count: %d\n", len(x))
 }
 
 func BenchmarkChangeIndices(b *testing.B) {
@@ -232,8 +233,8 @@ func BenchmarkChangeIndices(b *testing.B) {
 	}
 }
 
-// About 150 nsec per element.
-// 1 alloc per item.
+// 3 usec for 78 items
+// 100 nsec for zero items, and about 40 nsec per item.
 func BenchmarkSliceInt(b *testing.B) {
 	b.StopTimer()
 	//s2cName := `20090401T09:01:09.490730000Z_131.169.137.246:14881.c2s_snaplog`
@@ -264,9 +265,13 @@ func BenchmarkSliceInt(b *testing.B) {
 
 type NullSaver struct{}
 
-func (s NullSaver) SetString(name string, val string) {}
-func (s NullSaver) SetInt64(name string, val int64)   {}
-func (s NullSaver) SetBool(name string, val bool)     {}
+func (s *NullSaver) SetString(name string, val string) {}
+func (s *NullSaver) SetInt64(name string, val int64) {
+	if name == "" {
+		panic("panic")
+	}
+}
+func (s *NullSaver) SetBool(name string, val bool) {}
 
 // 30 nsec/op, 0 allocs/op
 func BenchmarkSaver(b *testing.B) {
@@ -274,10 +279,6 @@ func BenchmarkSaver(b *testing.B) {
 	v, _ := web100.NewVariable("SmoothedRTT 0 4 4")
 	data := []byte{0, 1, 2, 3, 4, 5, 6}
 	for i := 0; i < b.N; i++ {
-		v.Save(data, ns)
+		v.Save(data, &ns)
 	}
-}
-
-func main() {
-
 }

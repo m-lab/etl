@@ -599,19 +599,24 @@ func (snap *Snapshot) extract(field Variable, values Saver) {
 	field.Save(data, values)
 }
 
-// About 100 usec (for CongestionSignals)
-func (snaplog *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
+// About 70 usec (for SmoothedRTT or CongestionSignals)
+func (sl *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
 	result := make([]int, 0, 100)
-	field := snaplog.read.find(fieldName)
+	field := sl.read.find(fieldName)
 	if field == nil {
 		return nil, errors.New("Field not found")
 	}
 	last := make([]byte, field.Size)
-	for i := 0; i < snaplog.SnapCount(); i++ {
-		s, err := snaplog.Snapshot(i)
-		if err != nil {
-			return result, err
+	var s Snapshot // This saves about 2 usec, compared with creating new Snapshot for each row.
+	for i := 0; i < sl.SnapCount(); i++ {
+		// This saves about 30 usec
+		offset := sl.bodyOffset + i*sl.read.Length
+		begin := string(sl.raw[offset : offset+len(BEGIN_SNAP_DATA)])
+		if begin != BEGIN_SNAP_DATA {
+			return nil, nil
 		}
+		s.reset(sl.raw[offset+len(BEGIN_SNAP_DATA):offset+sl.read.Length], &sl.read)
+
 		data := s.raw[field.Offset : field.Offset+field.Size]
 		if bytes.Compare(data, last) != 0 {
 			result = append(result, i)
@@ -621,61 +626,35 @@ func (snaplog *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
 	return result, nil
 }
 
-type ArraySaver struct {
+type IntArraySaver struct {
 	Integers []int64
-	Strings  []string
-	Bools    []bool
 }
 
-func NewArraySaver(n int) ArraySaver {
-	return ArraySaver{make([]int64, 0, n),
-		make([]string, 0, n), make([]bool, 0, n)}
+func NewIntArraySaver(n int) IntArraySaver {
+	return IntArraySaver{make([]int64, 0, n)}
 }
 
-func (s ArraySaver) SetInt64(name string, val int64) {
+func (s *IntArraySaver) SetInt64(name string, val int64) {
 	s.Integers = append(s.Integers, val)
 }
-func (s ArraySaver) SetBool(name string, val bool) {
-	s.Bools = append(s.Bools, val)
-}
-func (s ArraySaver) SetString(name string, val string) {
-	s.Strings = append(s.Strings, val)
-}
+func (s *IntArraySaver) SetBool(name string, val bool)     {}
+func (s *IntArraySaver) SetString(name string, val string) {}
 
-type NullSaver struct {
-	Integers []int64
-}
-
-func (s NullSaver) SetString(name string, val string) {}
-func (s NullSaver) SetInt64(name string, val int64)   {}
-func (s NullSaver) SetBool(name string, val bool)     {}
-
-// about 100 nsec per field.
-func (sl *SnapLog) SliceIntField(fieldName string, at []int) []int64 {
-	var s Snapshot
+// about 40 nsec per field.
+func (sl *SnapLog) SliceIntField(fieldName string, indices []int) []int64 {
+	var s Snapshot // This saves about 2 usec, compared with creating new Snapshot for each row.
 	field := sl.read.find(fieldName)
-	//result := NullSaver{}
-	//data := []byte{1, 2, 3, 4, 5, 6}
-	result := NewArraySaver(len(at))
-	for i := 0; i < len(at); i++ {
-		offset := sl.bodyOffset + at[i]*sl.read.Length
-		//begin := string(sl.raw[offset : offset+len(BEGIN_SNAP_DATA)])
-		//if begin != BEGIN_SNAP_DATA {
-		//	return nil
-		//}
-
-		// We use the "/read" field group, as that is what is always used for NDT snapshots.
-		// This may be incorrect for use in other settings.
-		// This saves about 70 usec.
+	result := NewIntArraySaver(len(indices))
+	for i := 0; i < len(indices); i++ {
+		// Safe to skip the validation, because it was done when getting the indices.
+		offset := sl.bodyOffset + indices[i]*sl.read.Length
+		begin := string(sl.raw[offset : offset+len(BEGIN_SNAP_DATA)])
+		if begin != BEGIN_SNAP_DATA {
+			return nil
+		}
 		s.reset(sl.raw[offset+len(BEGIN_SNAP_DATA):offset+sl.read.Length], &sl.read)
-		//s, err := sl.Snapshot(at[i]) // This is doing an alloc
-		//if err != nil {
-		//	return nil
-		//}
-		// Alloc seems to be here, even using NullSaver
-		// also even using simple data.
-		field.Save(s.raw[field.Offset:field.Offset+field.Size], result)
-		//field.Save(data, result)
+
+		field.Save(s.raw[field.Offset:field.Offset+field.Size], &result)
 	}
 	return result.Integers
 }
