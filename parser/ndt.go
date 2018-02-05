@@ -23,6 +23,9 @@ import (
 var (
 	// NDTOmitDeltas flag indicates if deltas should be suppressed.
 	NDTOmitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
+	// NDTEstimateBW flag indicates if we should run BW estimation code
+	// and annotate rows.
+	NDTEstimateBW, _ = strconv.ParseBool(os.Getenv("NDT_ESTIMATE_BW"))
 )
 
 const (
@@ -491,15 +494,17 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		results["anomalies"].(schema.Web100ValueMap)["snaplog_error"] = true
 	}
 
-	congEvents := make(schema.Web100ValueMap, 10)
-	snapNums, err := snaplog.ChangeIndices("SmoothedRTT")
-	if err != nil {
-		log.Println(err)
-	} else {
-		congEvents["indices"] = snapNums
-		congEvents["smoothedRTT"] = snaplog.SliceIntField("SmoothedRTT", snapNums)
-		congEvents["thruOctetsAcked"] = snaplog.SliceIntField("HCThruOctetsAcked", snapNums)
-		results["slices"] = congEvents
+	if NDTEstimateBW {
+		congEvents := make(schema.Web100ValueMap, 10)
+		snapNums, err := snaplog.ChangeIndices("SmoothedRTT")
+		if err != nil {
+			log.Println(err)
+		} else {
+			congEvents["indices"] = snapNums
+			congEvents["smoothedRTT"] = snaplog.SliceIntField("SmoothedRTT", snapNums)
+			congEvents["thruOctetsAcked"] = snaplog.SliceIntField("HCThruOctetsAcked", snapNums)
+			results["slices"] = congEvents
+		}
 	}
 
 	// This is the timestamp parsed from the filename.

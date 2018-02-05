@@ -214,6 +214,7 @@ func TestChangeIndices(t *testing.T) {
 	log.Printf("count: %d\n", len(x))
 }
 
+// About 70 usec per test, independent of which field is used.
 func BenchmarkChangeIndices(b *testing.B) {
 	b.StopTimer()
 	s2cName := `20090601T22:19:19.325928000Z-75.133.69.98:60631.s2c_snaplog`
@@ -234,7 +235,7 @@ func BenchmarkChangeIndices(b *testing.B) {
 }
 
 // 3 usec for 78 items
-// 100 nsec for zero items, and about 40 nsec per item.
+// 100 nsec for zero items, and about 40 nsec per index.
 func BenchmarkSliceInt(b *testing.B) {
 	b.StopTimer()
 	//s2cName := `20090401T09:01:09.490730000Z_131.169.137.246:14881.c2s_snaplog`
@@ -266,12 +267,8 @@ func BenchmarkSliceInt(b *testing.B) {
 type NullSaver struct{}
 
 func (s *NullSaver) SetString(name string, val string) {}
-func (s *NullSaver) SetInt64(name string, val int64) {
-	if name == "" {
-		panic("panic")
-	}
-}
-func (s *NullSaver) SetBool(name string, val bool) {}
+func (s *NullSaver) SetInt64(name string, val int64)   {}
+func (s *NullSaver) SetBool(name string, val bool)     {}
 
 // 30 nsec/op, 0 allocs/op
 func BenchmarkSaver(b *testing.B) {

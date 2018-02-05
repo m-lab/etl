@@ -587,7 +587,8 @@ func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 	return nil
 }
 
-// About 70 usec (for SmoothedRTT or CongestionSignals)
+// ChangeIndices finds all snapshot indices where the specified field
+// changes value.
 func (sl *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
 	result := make([]int, 0, 100)
 	field := sl.read.find(fieldName)
