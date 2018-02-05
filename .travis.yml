@@ -348,11 +348,10 @@ deploy:
   script:
     # Update these version numbers when making changes to the views.
     # TODO - add feature to allow making aliases from existing intermediate.
-    pushd $TRAVIS_BUILD_DIR/schema/views_legacysql
-    &&./make_views.sh measurement-lab intermediate_v3_1_1 rc_v3_1 "rc release"
+    cd $TRAVIS_BUILD_DIR/schema/views_legacysql
+    && ./make_views.sh measurement-lab intermediate_v3_1_1 rc_v3_1 "rc release"
     && cd $TRAVIS_BUILD_DIR/schema/views_standardsql
     && ./make_views.sh measurement-lab intermediate_v3_1_1 rc_v3_1 "rc release"
-    && popd
   skip_cleanup: true
   on:
     repo: m-lab/etl
