@@ -67,6 +67,8 @@ func (dp *DiscoParser) TaskError() error {
 //
 // TODO - optimize this to use the JSON directly, if possible.
 func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+	metrics.WorkerState.WithLabelValues(dp.TableName(), "switch").Inc()
+	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "switch").Dec()
 	meta["testname"] = testName
 	ms := struct {
 		FileName  string `json:"filename, string"`
