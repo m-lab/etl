@@ -184,13 +184,6 @@ func (pt *PTParser) TaskError() error {
 	return nil
 }
 
-func (pt *PTParser) GetFirstBufferHops() int {
-	if len(pt.previousTests) > 0 {
-		return len(pt.previousTests[0].Hops)
-	}
-	return 0
-}
-
 func (pt *PTParser) TableName() string {
 	return pt.inserter.TableBase()
 }

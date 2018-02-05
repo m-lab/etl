@@ -236,7 +236,7 @@ func TestPTPollutionCheck(t *testing.T) {
 	}
 
 	// Process the tests
-	for index, test := range tests {
+	for _, test := range tests {
 		rawData, err := ioutil.ReadFile(test.fileName)
 		if err != nil {
 			t.Fatalf("cannot read testdata.")
@@ -250,9 +250,6 @@ func TestPTPollutionCheck(t *testing.T) {
 		}
 		if ins.RowsInBuffer() != test.expectedNumRows {
 			t.Fatalf("Data not inserted into BigQuery correctly.")
-		}
-		if pt.NumBufferedTests() == 1 {
-			fmt.Printf("index:%d, %d\n", index, pt.GetFirstBufferHops())
 		}
 	}
 
