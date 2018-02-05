@@ -68,7 +68,7 @@ type Node struct {
 
 const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
-const PTBufferSize int = 5
+const PTBufferSize int = 2
 
 func NewPTParser(ins etl.Inserter) *PTParser {
 	return &PTParser{ins, ins, []cachedPTData{}}
@@ -521,6 +521,10 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
 	// reach destIP at the last hop.
 	lastHop := destIP
+	if len(allNodes) == 0 {
+		// Empty test, stop here.
+		return cachedPTData{}, errors.New("Empty Test.")
+	}
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
 		lastHop = allNodes[len(allNodes)-1].ip

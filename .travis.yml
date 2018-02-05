@@ -294,7 +294,7 @@ deploy:
     condition: $TRAVIS_TAG == pt-staging-*
 
 # PROD: Should be used AFTER code review and commit to master branch.  Triggers
-# when *ANY* branch is tagged with p-prod-*'
+# when *ANY* branch is tagged with pt-prod-*'
 - provider: script
   script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-prod.yaml
@@ -302,7 +302,7 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_TAG == pt-prod*
+    condition: $TRAVIS_TAG == pt-prod-*
 
 ######################################################################
 ## Service: queue-pusher -- AppEngine Standard Environment.
