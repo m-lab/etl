@@ -344,8 +344,8 @@ func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 			n.TableName(), testType, "4KB").Inc()
 	}
 
-	metrics.WorkerState.WithLabelValues("ndt").Inc()
-	defer metrics.WorkerState.WithLabelValues("ndt").Dec()
+	metrics.WorkerState.WithLabelValues(n.TableName(), "ndt").Inc()
+	defer metrics.WorkerState.WithLabelValues(n.TableName(), "ndt").Dec()
 
 	n.getAndInsertValues(test, testType)
 }
@@ -415,8 +415,8 @@ func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schem
 
 func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	// Extract the values from the last snapshot.
-	metrics.WorkerState.WithLabelValues("parse").Inc()
-	defer metrics.WorkerState.WithLabelValues("parse").Dec()
+	metrics.WorkerState.WithLabelValues(n.TableName(), "parse").Inc()
+	defer metrics.WorkerState.WithLabelValues(n.TableName(), "parse").Dec()
 
 	if !strings.HasSuffix(test.fn, ".gz") {
 		metrics.WarningCount.WithLabelValues(
