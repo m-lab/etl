@@ -492,12 +492,13 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	}
 
 	congEvents := make(schema.Web100ValueMap, 10)
-	snapNums, err := snaplog.ChangeIndices("CongestionSignals")
+	snapNums, err := snaplog.ChangeIndices("SmoothedRTT")
 	if err != nil {
 		log.Println(err)
 	} else {
 		congEvents["indices"] = snapNums
 		congEvents["smoothedRTT"] = snaplog.SliceIntField("SmoothedRTT", snapNums)
+		congEvents["thruOctetsAcked"] = snaplog.SliceIntField("HCThruOctetsAcked", snapNums)
 		results["slices"] = congEvents
 	}
 
