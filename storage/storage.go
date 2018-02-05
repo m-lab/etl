@@ -19,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 
 	"golang.org/x/net/context"
@@ -41,7 +40,7 @@ type ETLSource struct {
 	TarReader                   // TarReader interface provided by an embedded struct.
 	io.Closer                   // Closer interface to be provided by an embedded struct.
 	RetryBaseTime time.Duration // The base time for backoff and retry.
-	Data          *etl.DataPath
+	TableBase     string        // TableBase is BQ table associated with this source, or "invalid".
 }
 
 // Retrieve next file header.
@@ -53,14 +52,14 @@ func (rr *ETLSource) nextHeader(trial int) (*tar.Header, bool, error) {
 			return nil, false, err
 		} else if strings.Contains(err.Error(), "unexpected EOF") {
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.Data.TableBase(), "next", strconv.Itoa(trial), "unexpected EOF").Inc()
+				rr.TableBase, "next", strconv.Itoa(trial), "unexpected EOF").Inc()
 			// TODO: These are likely unrecoverable, so we should
 			// just return.
 		} else {
 			// Quite a few of these now, and they seem to be
 			// unrecoverable.
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.Data.TableBase(), "next", strconv.Itoa(trial), "other").Inc()
+				rr.TableBase, "next", strconv.Itoa(trial), "other").Inc()
 		}
 		log.Printf("nextHeader: %v\n", err)
 	}
@@ -83,7 +82,7 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 				return nil, false, err
 			}
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.Data.TableBase(), "open zip", strconv.Itoa(trial), "zipReaderError").Inc()
+				rr.TableBase, "open zip", strconv.Itoa(trial), "zipReaderError").Inc()
 			log.Printf("zipReaderError(%d): %v in file %s\n", trial, err, h.Name)
 			return nil, true, err
 		}
@@ -100,11 +99,11 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			// We are seeing these very rarely, maybe 1 per hour.
 			// They are non-deterministic, so probably related to GCS problems.
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.Data.TableBase(), phase, strconv.Itoa(trial), "stream error").Inc()
+				rr.TableBase, phase, strconv.Itoa(trial), "stream error").Inc()
 		} else {
 			// We haven't seen any of these so far (as of May 9)
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.Data.TableBase(), phase, strconv.Itoa(trial), "other error").Inc()
+				rr.TableBase, phase, strconv.Itoa(trial), "other error").Inc()
 		}
 		log.Printf("nextData(%d): %v\n", trial, err)
 		return nil, true, err
@@ -118,8 +117,8 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 // and storage.ErrOversizeFile.
 // Returns io.EOF when there are no more tests.
 func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
-	metrics.WorkerState.WithLabelValues(rr.Data.TableBase(), "read").Inc()
-	defer metrics.WorkerState.WithLabelValues(rr.Data.TableBase(), "read").Dec()
+	metrics.WorkerState.WithLabelValues(rr.TableBase, "read").Inc()
+	defer metrics.WorkerState.WithLabelValues(rr.TableBase, "read").Dec()
 
 	// Try to get the next file.  We retry multiple times, because sometimes
 	// GCS stalls and produces stream errors.
@@ -203,14 +202,25 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	if client == nil {
 		return nil, errNoClient
 	}
-	// ValidateTestPath automatically checks number of fields and file extension.
-	data, err := etl.ValidateTestPath(uri)
-	if err != nil {
-		return nil, err
+	// For now only handle gcs paths.
+	if !strings.HasPrefix(uri, "gs://") {
+		return nil, errors.New("invalid file path: " + uri)
+	}
+	parts := strings.SplitN(uri, "/", 4)
+	if len(parts) != 4 {
+		return nil, errors.New("invalid file path: " + uri)
+	}
+	bucket := parts[2]
+	fn := parts[3]
+
+	// TODO - consider just always testing for valid gzip file.
+	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
+		strings.HasSuffix(fn, ".tar.gz")) {
+		return nil, errors.New("not tar or tgz: " + uri)
 	}
 
 	// TODO(prod) Evaluate whether this is long enough.
-	obj, err := getObject(client, data.Bucket, data.Filename(), 30*time.Minute)
+	obj, err := getObject(client, bucket, fn, 30*time.Minute)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +228,7 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	rdr := obj.Body
 	var closer io.Closer = obj.Body
 	// Handle .tar.gz, .tgz files.
-	if strings.HasSuffix(strings.ToLower(data.Filename()), "gz") {
+	if strings.HasSuffix(strings.ToLower(fn), "gz") {
 		// TODO add unit test
 		// NB: This must not be :=, or it creates local rdr.
 		// TODO - add retries with backoff.
@@ -233,7 +243,7 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	tarReader := tar.NewReader(rdr)
 
 	timeout := 16 * time.Millisecond
-	return &ETLSource{tarReader, closer, timeout, data}, nil
+	return &ETLSource{tarReader, closer, timeout, "invalid"}, nil
 }
 
 // GetStorageClient provides a storage reader client.
