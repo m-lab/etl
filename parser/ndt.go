@@ -495,6 +495,8 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	}
 
 	if NDTEstimateBW {
+		// This is not terribly useful as is.  Intended as a place holder for code
+		// we are working on in parallel.
 		congEvents := make(schema.Web100ValueMap, 10)
 		snapNums, err := snaplog.ChangeIndices("SmoothedRTT")
 		if err != nil {
