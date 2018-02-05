@@ -442,6 +442,8 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 		return nil, err
 	}
 
+	// Lots of allocation here.
+	// TODO - could improve alloc efficiency here.
 	read, err := parseFields(buf, "/read\n", "\n")
 	if err != nil {
 		return nil, err

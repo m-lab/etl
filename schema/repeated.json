@@ -4,6 +4,11 @@
       { "name": "parse_time", "type": "TIMESTAMP"},
       { "name": "log_time", "type": "TIMESTAMP"},
       { "name": "blacklist_flags", "type": "INTEGER", "description": "Deprecated.  Use flag in anomalies record instead."},
+      { "fields":[
+            {"name": "indices", "type": "INTEGER", "mode": "REPEATED"},
+            {"name": "packets", "type": "INTEGER", "mode": "REPEATED"},
+            {"name": "smoothedRTT", "type": "INTEGER", "mode": "REPEATED"} 
+            ], "name": "slices", "type": "RECORD"},
       {
         "fields": [
           { "name": "no_meta", "type": "BOOLEAN"},
