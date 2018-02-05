@@ -55,8 +55,8 @@ func (tt *Task) SetMaxFileSize(max int64) {
 // injected parser to parse them, and inserts them into bigquery. Returns the
 // number of files processed.
 func (tt *Task) ProcessAllTests() (int, error) {
-	metrics.WorkerState.WithLabelValues("task").Inc()
-	defer metrics.WorkerState.WithLabelValues("task").Dec()
+	metrics.WorkerState.WithLabelValues(tt.TableName(), "task").Inc()
+	defer metrics.WorkerState.WithLabelValues(tt.TableName(), "task").Dec()
 	files := 0
 	nilData := 0
 	var testname string
@@ -111,7 +111,7 @@ OUTER:
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if err != nil {
 			metrics.TaskCount.WithLabelValues(
-				"Task", "ParseAndInsertError").Inc()
+				tt.TableName(), "Task", "ParseAndInsertError").Inc()
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
 			continue
