@@ -521,7 +521,11 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
 	// reach destIP at the last hop.
 	lastHop := destIP
-	if len(allNodes) > 1 && allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
+	if len(allNodes) == 0 {
+		// Empty test, stop here.
+		return cachedPTData{}, errors.New("Empty Test.")
+	}
+	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
 		lastHop = allNodes[len(allNodes)-1].ip
 		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
