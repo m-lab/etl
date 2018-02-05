@@ -197,6 +197,8 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 		// TODO - anything better we could do here?
 	}
 	defer tr.Close()
+	// Label storage metrics with the expected table name.
+	tr.TableBase = data.TableBase()
 
 	dateFormat := "20060102"
 	date, err := time.Parse(dateFormat, data.PackedDate)
