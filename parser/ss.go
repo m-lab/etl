@@ -189,8 +189,8 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 }
 
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	metrics.WorkerState.WithLabelValues("ss").Inc()
-	defer metrics.WorkerState.WithLabelValues("ss").Dec()
+	metrics.WorkerState.WithLabelValues(ss.TableName(), "ss").Inc()
+	defer metrics.WorkerState.WithLabelValues(ss.TableName(), "ss").Dec()
 	if strings.Contains(testName, ".tra") {
 		// Ignore the trace file for sidestream test.
 		return nil
