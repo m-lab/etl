@@ -251,8 +251,8 @@ func (pt *PTParser) NumBufferedTests() int {
 }
 
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	metrics.WorkerState.WithLabelValues("pt").Inc()
-	defer metrics.WorkerState.WithLabelValues("pt").Dec()
+	metrics.WorkerState.WithLabelValues(pt.TableName(), "pt").Inc()
+	defer metrics.WorkerState.WithLabelValues(pt.TableName(), "pt").Dec()
 	testId := filepath.Base(testName)
 	if meta["filename"] != nil {
 		testId = CreateTestId(meta["filename"].(string), filepath.Base(testName))
@@ -425,8 +425,8 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte, tableName string) (cachedPTData, error) {
 	//log.Printf("%s", testName)
-	metrics.WorkerState.WithLabelValues("parse").Inc()
-	defer metrics.WorkerState.WithLabelValues("parse").Dec()
+	metrics.WorkerState.WithLabelValues(tableName, "parse").Inc()
+	defer metrics.WorkerState.WithLabelValues(tableName, "parse").Dec()
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
