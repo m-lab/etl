@@ -2,49 +2,83 @@ package etl_test
 
 import (
 	"fmt"
+	"path"
+	"reflect"
 	"testing"
 
 	"github.com/m-lab/etl/etl"
 )
 
-func TestValidation(t *testing.T) {
-	// These should fail:
-	// Leading character before gs://
-	_, err := etl.ValidateTestPath(
-		`xgs://m-lab-sandbox/ndt/2016/01/26/20160126T123456Z-mlab1-prg01-ndt-0007.tgz`)
-	if err == nil {
-		t.Error("Should be invalid: ")
+func TestValidateTestPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		want    *etl.DataPath
+		wantErr bool
+	}{
+		{
+			name:    "error-bad-uri-prefix",
+			path:    `xgs://m-lab-sandbox/ndt/2016/01/26/20160126T123456Z-mlab1-prg01-ndt-0007.tgz`,
+			wantErr: true,
+		},
+		{
+			name:    "error-bad-extension",
+			path:    `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.gz.baz`,
+			wantErr: true,
+		},
+		{
+			name:    "error-bad-pod-name",
+			path:    `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg1-ndt-0007.tar.gz`,
+			wantErr: true,
+		},
+		{
+			name:    "error-bad-date-path",
+			path:    `gs://m-lab-sandbox/ndt/2016/0126/20160126T000000Z-mlab1-prg1-ndt-0007.tar.gz`,
+			wantErr: true,
+		},
+		{
+			name: "success-tgz",
+			path: `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz`,
+			want: &etl.DataPath{
+				"m-lab-sandbox", "ndt", "2016/01/26", "20160126", "000000", "mlab1", "prg01", "ndt", "0007", ".tgz",
+			},
+		},
+		{
+			name: "success-tar",
+			path: `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar`,
+			want: &etl.DataPath{
+				"m-lab-sandbox", "ndt", "2016/07/14", "20160714", "123456", "mlab1", "lax04", "ndt", "0001", ".tar",
+			},
+		},
+		{
+			name: "success-tar-gz",
+			path: `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar.gz`,
+			want: &etl.DataPath{
+				"m-lab-sandbox", "ndt", "2016/07/14", "20160714", "123456", "mlab1", "lax04", "ndt", "0001", ".tar.gz",
+			},
+		},
 	}
-	// Wrong trailing characters
-	_, err = etl.ValidateTestPath(
-		`gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.gz.baz`)
-	if err == nil {
-		t.Error("Should be invalid: ")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := etl.ValidateTestPath(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateTestPath() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ValidateTestPath() = %v, want %v", got, tt.want)
+			}
+			if tt.want == nil {
+				return
+			}
+			if tt.want.String() != tt.path {
+				t.Errorf("DataPath.String() = %v, want %v", tt.want.String(), tt.path)
+			}
+			if tt.want.Filename() != path.Base(tt.path) {
+				t.Errorf("DataPath.Filename() = %v, want %v", tt.want.Filename(), path.Base(tt.path))
+			}
+		})
 	}
-	// Missing mlabN-podNN
-	_, err = etl.ValidateTestPath(
-		`gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg1-ndt-0007.tar.gz`)
-	if err == nil {
-		t.Error("Should be invalid: ")
-	}
-
-	// These should succeed
-	data, err := etl.ValidateTestPath(
-		`gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz`)
-	if err != nil {
-		t.Error(err)
-	}
-	data, err = etl.ValidateTestPath(
-		`gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar`)
-	if err != nil {
-		t.Error(err)
-	}
-	data, err = etl.ValidateTestPath(
-		`gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar.gz`)
-	if err != nil {
-		t.Error(err)
-	}
-	fmt.Printf("%v\n", data)
 }
 
 func TestGetMetroName(t *testing.T) {
@@ -66,5 +100,75 @@ func TestCalculateIPDistance(t *testing.T) {
 	if diff2 != 0 || ip_type != 6 {
 		t.Errorf("Error in calculating IPv6 distance!\n")
 		return
+	}
+}
+
+func TestDataPath_GetDataType(t *testing.T) {
+	tests := []struct {
+		name string
+		exp1 string
+		want etl.DataType
+	}{
+		{
+			name: "okay",
+			exp1: "ndt",
+			want: etl.NDT,
+		},
+		{
+			name: "invalid",
+			exp1: "foobargum",
+			want: etl.INVALID,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fn := &etl.DataPath{
+				Exp1: tt.exp1,
+			}
+			if got := fn.GetDataType(); got != tt.want {
+				t.Errorf("DataPath.GetDataType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataPath_String(t *testing.T) {
+	type fields struct {
+		Bucket     string
+		Exp1       string
+		DatePath   string
+		PackedDate string
+		PackedTime string
+		Host       string
+		Pod        string
+		Experiment string
+		FileNumber string
+		Suffix     string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fn := &etl.DataPath{
+				Bucket:     tt.fields.Bucket,
+				Exp1:       tt.fields.Exp1,
+				DatePath:   tt.fields.DatePath,
+				PackedDate: tt.fields.PackedDate,
+				PackedTime: tt.fields.PackedTime,
+				Host:       tt.fields.Host,
+				Pod:        tt.fields.Pod,
+				Experiment: tt.fields.Experiment,
+				FileNumber: tt.fields.FileNumber,
+				Suffix:     tt.fields.Suffix,
+			}
+			if got := fn.String(); got != tt.want {
+				t.Errorf("DataPath.String() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
