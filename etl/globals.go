@@ -102,23 +102,6 @@ func (fn *DataPath) TableBase() string {
 	return DataTypeToTable[fn.GetDataType()]
 }
 
-// String reconstructs the DataPath URI.
-func (fn *DataPath) String() string {
-	fields := []string{
-		"gs:/",
-		fn.Bucket,
-		fn.Exp1,
-		fn.DatePath,
-		fn.Filename(),
-	}
-	return strings.Join(fields, "/")
-}
-
-func (fn *DataPath) Filename() string {
-	// TODO: parse the full date to perfectly reconstruct time.
-	return fn.PackedDate + "T" + fn.PackedTime + "Z-" + fn.Host + "-" + fn.Pod + "-" + fn.Experiment + "-" + fn.FileNumber + fn.Suffix
-}
-
 // IsBatchService return true if this is a NDT batch service.
 // TODO - update this to BATCH_SERVICE, so it makes sense for other pipelines.
 func IsBatchService() bool {

@@ -68,15 +68,6 @@ func TestValidateTestPath(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ValidateTestPath() = %v, want %v", got, tt.want)
 			}
-			if tt.want == nil {
-				return
-			}
-			if tt.want.String() != tt.path {
-				t.Errorf("DataPath.String() = %v, want %v", tt.want.String(), tt.path)
-			}
-			if tt.want.Filename() != path.Base(tt.path) {
-				t.Errorf("DataPath.Filename() = %v, want %v", tt.want.Filename(), path.Base(tt.path))
-			}
 		})
 	}
 }
@@ -127,47 +118,6 @@ func TestDataPath_GetDataType(t *testing.T) {
 			}
 			if got := fn.GetDataType(); got != tt.want {
 				t.Errorf("DataPath.GetDataType() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestDataPath_String(t *testing.T) {
-	type fields struct {
-		Bucket     string
-		Exp1       string
-		DatePath   string
-		PackedDate string
-		PackedTime string
-		Host       string
-		Pod        string
-		Experiment string
-		FileNumber string
-		Suffix     string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fn := &etl.DataPath{
-				Bucket:     tt.fields.Bucket,
-				Exp1:       tt.fields.Exp1,
-				DatePath:   tt.fields.DatePath,
-				PackedDate: tt.fields.PackedDate,
-				PackedTime: tt.fields.PackedTime,
-				Host:       tt.fields.Host,
-				Pod:        tt.fields.Pod,
-				Experiment: tt.fields.Experiment,
-				FileNumber: tt.fields.FileNumber,
-				Suffix:     tt.fields.Suffix,
-			}
-			if got := fn.String(); got != tt.want {
-				t.Errorf("DataPath.String() = %v, want %v", got, tt.want)
 			}
 		})
 	}
