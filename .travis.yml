@@ -152,7 +152,7 @@ deploy:
     # These injected params specify the project and bucket used by the service.
     INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/gardener.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -167,7 +167,7 @@ deploy:
     # These injected params specify the project and bucket used by the service.
     INJECTED_PROJECT=mlab-staging INJECTED_BUCKET=archive-mlab-staging
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/gardener.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
