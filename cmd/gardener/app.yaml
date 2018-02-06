@@ -3,7 +3,7 @@
 
 runtime: go
 env: flex
-service: etl-cron
+service: etl-gardener
 
 # Security Notes
 #  It looks like Google Sign-In requires webpage support.  Credentials are not
