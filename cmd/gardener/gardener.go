@@ -102,14 +102,13 @@ func Month(rwr http.ResponseWriter, rq *http.Request) {
 	fields := monthRegex.FindStringSubmatch(rawPrefix)
 	log.Printf("%+v\n", fields)
 	if fields == nil {
+		log.Printf("Invalid prefix %s\n", rawPrefix)
 		fmt.Fprintf(rwr, "Invalid prefix %s\n", rawPrefix)
 		return
 	}
 
-	batchQueuer.PostMonth(rawPrefix)
-	// rwr.WriteHeader("ok")
-	fmt.Fprintf(rwr, "Processed %s\n", rawPrefix)
-	log.Println("Done")
+	// batchQueuer.PostMonth(rawPrefix)
+	fmt.Fprintf(rwr, "Disabled... Would have processed %s\n", rawPrefix)
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +166,7 @@ func init() {
 
 func main() {
 	// Check if invoked as a service.
-	cron, _ := strconv.ParseBool(os.Getenv("CRON_SERVICE"))
+	cron, _ := strconv.ParseBool(os.Getenv("GARDENER_SERVICE"))
 	if cron {
 		runService()
 		return
