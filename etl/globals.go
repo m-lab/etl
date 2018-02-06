@@ -6,7 +6,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
 // YYYYMMDD is a regexp string for identifying dense dates.
