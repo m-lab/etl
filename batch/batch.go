@@ -143,6 +143,7 @@ func (q Queuer) postOneTask(queue, fn string) error {
 }
 
 // postOneDay posts all items in an ObjectIterator into the appropriate queue.
+// TODO - should this delete the data from the target partition before posting tasks?
 func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) error {
 	qpErrCount := 0
 	gcsErrCount := 0
@@ -150,36 +151,40 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 	if wg != nil {
 		defer wg.Done()
 	}
+	var err error
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
 		if err != nil {
 			// TODO - should this retry?
 			log.Println(err, "on it.Next")
 			gcsErrCount++
-			if gcsErrCount > 3 {
+			if gcsErrCount > 5 {
 				log.Printf("Failed after %d files to %s.\n", fileCount, queue)
-				return err
+				break
 			}
 			continue
 		}
 
 		err = q.postOneTask(queue, o.Name)
 		if err != nil {
-			// TODO - should this retry?
+			log.Println(err)
 			if strings.Contains(err.Error(), "UNKNOWN_QUEUE") {
-				log.Println(err)
-				return err
+				break
+			}
+			if strings.Contains(err.Error(), "invalid filename") {
+				// Invalid filename is never going to get better.
+				continue
 			}
 			log.Println(err, o.Name, "Retrying")
-			// Retry
+			// Retry once
 			time.Sleep(10 * time.Second)
 			err = q.postOneTask(queue, o.Name)
 
 			if err != nil {
 				log.Println(err, o.Name, "FAILED")
 				qpErrCount++
-				if qpErrCount > 3 {
+				if qpErrCount > 5 {
 					log.Printf("Failed after %d files to %s (on %s).\n", fileCount, queue, o.Name)
-					return err
+					break
 				}
 			}
 		} else {
@@ -187,7 +192,7 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 		}
 	}
 	log.Println("Added ", fileCount, " tasks to ", queue)
-	return nil
+	return err
 }
 
 // PostDay fetches an iterator over the objects with ndt/YYYY/MM/DD prefix,

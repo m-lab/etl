@@ -54,7 +54,7 @@ script:
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
 # TODO - separate storage tests into integration and lightweight.
-- MODULES="annotation appengine bq dedup etl metrics parser schema storage task web100"
+- MODULES="annotation appengine batch bq dedup etl metrics parser schema storage task web100"
 - for module in $MODULES; do
     COVER_PKGS=${COVER_PKGS}./$module/..., ;
   done
@@ -68,7 +68,7 @@ script:
 # we lose some coverage.  The corresponding cov files are overwritten, but that is OK since
 # the non-integration tests are repeated.  If we change the unit tests to NOT run when integration
 # test tag is set, then we would need to have separate cov files.
-- for module in dedup ; do
+- for module in batch dedup ; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module -tags=integration ;
   done
 
@@ -93,8 +93,8 @@ deploy:
 # STAGING: Automatically deploys all pipeline services on new merge to
 # integration branch.
 # Deploys all staging services: NDT, PT, SS, QUEUE_PUSHER
-# (Currently this does not include NDT_BATCH or CRON, as CRON is in
-# development, and batch is driven by CRON.  Prod include the batch
+# (Currently this does not include NDT_BATCH or GARDENER, as GARDENER is in
+# development, and batch is driven by GARDENER.  Prod include the batch
 # pipeline because we have been using it manually.)
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
@@ -141,6 +141,37 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_TAG == prod-*
+
+######################################################################
+## Service: etl-gardener -- Service that runs various batch jobs, such as
+#                           reprocessing and dedupping.
+#
+# SANDBOX: before code review for development code in a specific branch.
+- provider: script
+  script:
+    # These injected params specify the project and bucket used by the service.
+    INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/gardener.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == gardener-sandbox-*
+
+#
+# INTEGRATION: Reviewed code, merged to integration branch, will trigger
+# deployment to mlab-staging.
+- provider: script
+  script:
+    # These injected params specify the project and bucket used by the service.
+    INJECTED_PROJECT=mlab-staging INJECTED_BUCKET=archive-mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/gardener.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    branch: integration
 
 ######################################################################
 ## Service: etl-disco-parser -- AppEngine Flexible Environment.
@@ -305,18 +336,30 @@ deploy:
 
 ######################################################################
 ## Service: queue-pusher -- AppEngine Standard Environment.
-# SANDBOX: before code review for development code in a specific branch.
+# PERSONAL SANDBOX: before code review for development code in a specific branch.
 - provider: script
   script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher app.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
-    condition: $TRAVIS_BRANCH == qp-sandbox-*
+    condition: $TRAVIS_BRANCH == qp-personal-*
+
+# SANDBOX: After code review and commits to master branch. Triggers when *ANY*
+# branch is tagged with qp-sandbox-*
+- provider: script
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    tag: true
+    condition: $TRAVIS_TAG == qp-sandbox-* || $TRAVIS_BRANCH == integration
 
 # STAGING: After code review and commits to master branch. Triggers when *ANY*
 # branch is tagged with qp-staging-*
