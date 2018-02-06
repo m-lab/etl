@@ -1,18 +1,8 @@
-// Package main defines a service for submitting date ranges for
-// reprocessing.  This will generally be triggered by an internal
-// timer, but specific ranges can also be reprocessed by submitting
-// URL requests from authorized sources.
-
+// Package main defines a service for handling various post-processing
+// and house-keeping tasks associated with the pipelines.
+// Most tasks will be run periodically, but some may be triggered
+// by URL requests from authorized sources.
 package main
-
-/*
-Strategies...
-  1. Work from a month prefix, but explicitly iterate over days.
-      maybe use a separate goroutine for each date? (DONE)
-  2. Work from a prefix, or range of prefixes.
-  3. Work from a date range
-
-*/
 
 import (
 	"errors"
@@ -71,6 +61,9 @@ func QueuerFromEnv() (batch.Queuer, error) {
 	return batch.CreateQueuer(http.DefaultClient, nil, queueBase, numQueues, project, bucketName, false)
 }
 
+// Status provides basic information about the service.  For now, it is just
+// configuration and version info.  In future it will likely include more
+// dynamic information.
 // TODO(gfr) Add either a black list or a white list for the environment
 // variables, so we can hide sensitive vars. https://github.com/m-lab/etl/issues/384
 func Status(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +88,7 @@ var (
 	monthRegex = regexp.MustCompile(`(?P<exp>[^/]*)/(?P<yyyymm>\d{4}[/-][01]\d/)`)
 )
 
-// Month handles month format requests.
+// Month initiates reprocessing of an entire month of archive data.
 // example http://localhost:8080/reproc/month?prefix=ndt/2017/09/
 // TODO - use flusher, ok := w.(http.Flusher) to send partial result updates.
 func Month(rwr http.ResponseWriter, rq *http.Request) {
@@ -113,7 +106,7 @@ func Month(rwr http.ResponseWriter, rq *http.Request) {
 		return
 	}
 
-	cronQueuer.PostMonth(rawPrefix)
+	batchQueuer.PostMonth(rawPrefix)
 	// rwr.WriteHeader("ok")
 	fmt.Fprintf(rwr, "Processed %s\n", rawPrefix)
 	log.Println("Done")
@@ -124,10 +117,11 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "ok")
 }
 
-// Persistent Queuer for use in handlers.
-var cronQueuer batch.Queuer
+// Persistent Queuer for use in handlers and gardener tasks.
+var batchQueuer batch.Queuer
 
-// For service, the configuration info comes from environment variables.
+// runService starts a service handler and runs forever.
+// The configuration info comes from environment variables.
 func runService() {
 	// Enable block profiling
 	runtime.SetBlockProfileRate(1000000) // One event per msec.
@@ -135,7 +129,7 @@ func runService() {
 	setupPrometheus()
 
 	var err error
-	cronQueuer, err = QueuerFromEnv()
+	batchQueuer, err = QueuerFromEnv()
 	if err != nil {
 		log.Println(err)
 		log.Fatal("Required environment variables are missing or invalid.")
