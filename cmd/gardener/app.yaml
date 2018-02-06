@@ -41,7 +41,7 @@ manual_scaling:
 # Note: add a public port for GCE auto discovery by prometheus.
 # TODO(dev): are any values redundant or irrelevant?
 network:
-  instance_tag: etl-cron
+  instance_tag: etl-gardener
   name: default
   # Forward port 9090 on the GCE instance address to the same port in the
   # container address. Only forward TCP traffic.
@@ -52,7 +52,7 @@ network:
 env_variables:
   RELEASE_TAG: ${TRAVIS_TAG}
   COMMIT_HASH: ${TRAVIS_COMMIT}
-  CRON_SERVICE: true
+  GARDENER_SERVICE: true
   TASKFILE_BUCKET: ${INJECTED_BUCKET}
   PROJECT: ${INJECTED_PROJECT}
   EXPERIMENT: NDT
