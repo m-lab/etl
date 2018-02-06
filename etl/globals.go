@@ -41,16 +41,16 @@ type DataPath struct {
 	// TODO(dev) Delete unused fields.
 	// They are comprehensive now in anticipation of using them to populate
 	// new fields in the BQ tables.
-	Bucket     string // #1
-	Exp1       string // #2
-	DatePath   string // #3
-	PackedDate string // #4
-	PackedTime string // #5
-	Host       string // #6
-	Pod        string // #7
-	Experiment string // #8
-	FileNumber string // #9
-	Suffix     string // #10
+	Bucket     string // #1 -- the GCS bucket name.
+	Exp1       string // #2 -- the experiment directory.
+	DatePath   string // #3 -- the YYYY/MM/DD date path.
+	PackedDate string // #4 -- the YYYYMMDD date.
+	PackedTime string // #5 -- the HHMMSS time.
+	Host       string // #6 -- the short server name, e.g. mlab1.
+	Pod        string // #7 -- the pod/site name, e.g. ams02.
+	Experiment string // #8 -- the experiment name, e.g. ndt
+	FileNumber string // #9 -- the file number, e.g. 0001
+	Suffix     string // #10 -- the archive suffix, e.g. .tgz
 }
 
 // ValidateTestPath validates a task filename.
