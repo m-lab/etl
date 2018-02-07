@@ -114,7 +114,7 @@ func worker(rwr http.ResponseWriter, rq *http.Request) {
 
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
-		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "worker", "TooManyRequests").Inc()
 		rwr.WriteHeader(http.StatusTooManyRequests)
 		fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
 		return

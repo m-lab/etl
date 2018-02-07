@@ -1,4 +1,4 @@
-// Package metrics defines prometheus metric types and provides
+// The metrics package defines prometheus metric types and provides
 // convenience methods to add accounting to various parts of the pipeline.
 //
 // When defining new operations or metrics, these are helpful values to track:
@@ -367,23 +367,8 @@ var (
 			Name: "etl_gcs_retry_count",
 			Help: "Number of retries on GCS reads.",
 		},
-		// open/read/zip, num_retries, ok/error/
-		[]string{"phase", "retries", "status"},
-	)
-
-	// BigQueryInsert counts the number of into BigQuery insert operations.
-	//
-	// Provides metrics:
-	//   etl_worker_bigquery_insert_total{table, status}
-	// Usage example:
-	//   metrics.BigQueryInsert.WithLabelValues("ndt", "200").Inc()
-	BigQueryInsert = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "etl_worker_bigquery_insert_total",
-			Help: "Number of BigQuery insert operations.",
-		},
-		// Worker type, e.g. ndt, sidestream, ptr, etc.
-		[]string{"table", "status"},
+		// ndt/traceroute, open/read/zip, num_retries, ok/error/
+		[]string{"table", "phase", "retries", "status"},
 	)
 
 	// RowSizeHistogram provides a histogram of bq row json sizes.  It is intended primarily for
