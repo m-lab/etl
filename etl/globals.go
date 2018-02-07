@@ -2,10 +2,14 @@ package etl
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"net"
 	"os"
 	"regexp"
 	"strconv"
+
+	"github.com/m-lab/etl/metrics"
 )
 
 // YYYYMMDD is a regexp string for identifying dense dates.
@@ -212,3 +216,22 @@ var (
 	// There is also a mapping of data types to queue names in
 	// queue_pusher.go
 )
+
+// RunSafely executes f in a wrapper that will catch any panic
+// and return an error.
+func RunSafely(f func()) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				log.Println("bad recovery conversion")
+				err = fmt.Errorf("pkg: %v", r)
+			}
+			log.Println("Recovered from panic:", err)
+			metrics.PanicCount.WithLabelValues("worker").Inc()
+		}
+	}()
+	f()
+	return err
+}
