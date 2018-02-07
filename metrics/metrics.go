@@ -17,15 +17,14 @@ import (
 
 func init() {
 	// Register the metrics defined with Prometheus's default registry.
+
+	// Annotator
 	prometheus.MustRegister(AnnotationTimeSummary)
 	prometheus.MustRegister(AnnotationRequestCount)
 	prometheus.MustRegister(AnnotationErrorCount)
 	prometheus.MustRegister(AnnotationWarningCount)
-	prometheus.MustRegister(WorkerCount)
-	prometheus.MustRegister(WorkerState)
-	prometheus.MustRegister(FileCount)
-	prometheus.MustRegister(TaskCount)
-	prometheus.MustRegister(TestCount)
+
+	// PT
 	prometheus.MustRegister(PTHopCount)
 	prometheus.MustRegister(PTTestCount)
 	prometheus.MustRegister(PTNotReachDestCount)
@@ -33,17 +32,24 @@ func init() {
 	prometheus.MustRegister(PTBitsAwayFromDestV4)
 	prometheus.MustRegister(PTBitsAwayFromDestV6)
 	prometheus.MustRegister(PTPollutedCount)
+
+	// NDT
+	prometheus.MustRegister(DeltaNumFieldsHistogram)
+	prometheus.MustRegister(EntryFieldCountHistogram)
+	prometheus.MustRegister(FileSizeHistogram)
+	prometheus.MustRegister(RowSizeHistogram)
+
+	// Common metrics
+	prometheus.MustRegister(WorkerCount)
+	prometheus.MustRegister(WorkerState)
+	prometheus.MustRegister(TaskCount)
+	prometheus.MustRegister(TestCount)
 	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(WarningCount)
 	prometheus.MustRegister(BackendFailureCount)
 	prometheus.MustRegister(GCSRetryCount)
-	prometheus.MustRegister(BigQueryInsert)
-	prometheus.MustRegister(RowSizeHistogram)
-	prometheus.MustRegister(DeltaNumFieldsHistogram)
-	prometheus.MustRegister(EntryFieldCountHistogram)
 	prometheus.MustRegister(DurationHistogram)
-	prometheus.MustRegister(InsertionHistogram)
-	prometheus.MustRegister(FileSizeHistogram)
+
 }
 
 // TODO
@@ -101,24 +107,29 @@ var (
 	// Provides metrics:
 	//   etl_worker_count
 	// Example usage:
-	//   metrics.WorkerCount.Inc() / .Dec()
-	WorkerCount = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "etl_worker_count",
-		Help: "Number of active workers.",
-	})
+	//   metrics.WorkerCount.WithLabelValues("ndt").Inc()
+	WorkerCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "etl_worker_count",
+			Help: "Number of active workers.",
+		},
+		// Output bigquery base table name, e.g. "ndt".
+		[]string{"table"})
 
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_worker_count{state}
+	//   etl_worker_count{table="ndt", state="insert"}
 	// Example usage:
-	//   metrics.WorkerState.WithLabelValues("flush").Inc() / .Dec()
-	WorkerState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "etl_worker_state",
-		Help: "Number of workers in different states.",
-	},
+	//   metrics.WorkerState.WithLabelValues("ndt", "flush").Inc() / .Dec()
+	WorkerState = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "etl_worker_state",
+			Help: "Number of workers in different states.",
+		},
+		// Output bigquery base table name, e.g. "ndt".
 		// Worker state, e.g. create task, read, parse, insert
-		[]string{"state"},
+		[]string{"table", "state"},
 	)
 
 	// Counts the number of files processed by machine, rsync module, and day.
@@ -138,16 +149,16 @@ var (
 	// Counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_task_count{package, status}
+	//   etl_task_count{table, package, status}
 	// Example usage:
-	//   metrics.TaskCount.WithLabelValues("Task", "ok").Inc()
+	//   metrics.TaskCount.WithLabelValues("ndt", "Task", "ok").Inc()
 	TaskCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_task_count",
 			Help: "Number of tasks/archive files processed.",
 		},
 		// Go package or filename, and Status
-		[]string{"package", "status"},
+		[]string{"table", "package", "status"},
 	)
 
 	// Counts the number of tests successfully processed by the parsers.
@@ -331,32 +342,17 @@ var (
 	// Counts the number of retries on GCS read operations.
 	//
 	// Provides metrics:
-	//   etl_gcs_retry_count{type}
+	//   etl_gcs_retry_count{table, phase, retries, status}
 	// Example usage:
 	// metrics.GCSRetryCount.WithLabelValues(
-	//	TableName(), retries, "ok").Inc()
+	//	TableName(), "open", retries, "ok").Inc()
 	GCSRetryCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_gcs_retry_count",
 			Help: "Number of retries on GCS reads.",
 		},
-		// open/read/zip, num_retries, ok/error/
-		[]string{"phase", "retries", "status"},
-	)
-
-	// Counts the number of into BigQuery insert operations.
-	//
-	// Provides metrics:
-	//   etl_worker_bigquery_insert_total{table, status}
-	// Usage example:
-	//   metrics.BigQueryInsert.WithLabelValues("ndt", "200").Inc()
-	BigQueryInsert = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "etl_worker_bigquery_insert_total",
-			Help: "Number of BigQuery insert operations.",
-		},
-		// Worker type, e.g. ndt, sidestream, ptr, etc.
-		[]string{"table", "status"},
+		// ndt/traceroute, open/read/zip, num_retries, ok/error/
+		[]string{"table", "phase", "retries", "status"},
 	)
 
 	// A histogram of bq row json sizes.  It is intended primarily for

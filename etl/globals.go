@@ -14,12 +14,12 @@ const YYYYMMDD = `\d{4}[01]\d[0123]\d`
 // MlabDomain is the DNS domain for all mlab servers.
 const MlabDomain = `measurement-lab.org`
 
-const start = `^gs://(?P<prefix>.*)/(?P<exp>[^/]*)/`
+const start = `^gs://(?P<bucket>.*)/(?P<exp>[^/]*)/`
 const datePath = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
-const dateTime = `(\d{4}[01]\d[0123]\d)T\d{6}Z`
-const mlabN_podNN = `-(mlab\d)-([[:alpha:]]{3}\d[0-9t])-`
-const exp_NNNN = `(.*)-(\d{4})`
-const suffix = `(?:\.tar|\.tar.gz|\.tgz)$`
+const dateTime = `(?P<packeddate>\d{4}[01]\d[0123]\d)T(?P<packedtime>\d{6})Z`
+const mlabN_podNN = `-(?P<host>mlab\d)-(?P<pod>[[:alpha:]]{3}\d[0-9t])-`
+const exp_NNNN = `(?P<experiment>.*)-(?P<filenumber>\d{4})`
+const suffix = `(?P<suffix>\.tar|\.tar.gz|\.tgz)$`
 
 // These are here to facilitate use across queue-pusher and parsing components.
 var (
@@ -41,13 +41,16 @@ type DataPath struct {
 	// TODO(dev) Delete unused fields.
 	// They are comprehensive now in anticipation of using them to populate
 	// new fields in the BQ tables.
-	Exp1       string // #2
-	DatePath   string // #3
-	PackedDate string // #4
-	Host       string // #5
-	Pod        string // #6
-	Experiment string // #7
-	FileNumber string // #8
+	Bucket     string // #1 -- the GCS bucket name.
+	Exp1       string // #2 -- the experiment directory.
+	DatePath   string // #3 -- the YYYY/MM/DD date path.
+	PackedDate string // #4 -- the YYYYMMDD date.
+	PackedTime string // #5 -- the HHMMSS time.
+	Host       string // #6 -- the short server name, e.g. mlab1.
+	Pod        string // #7 -- the pod/site name, e.g. ams02.
+	Experiment string // #8 -- the experiment name, e.g. ndt
+	FileNumber string // #9 -- the file number, e.g. 0001
+	Suffix     string // #10 -- the archive suffix, e.g. .tgz
 }
 
 // ValidateTestPath validates a task filename.
@@ -66,10 +69,22 @@ func ValidateTestPath(path string) (*DataPath, error) {
 		}
 		return nil, errors.New("Invalid test path: " + path)
 	}
-	return &DataPath{
-			fields[2], fields[3], fields[4], fields[5],
-			fields[6], fields[7], fields[8]},
-		nil
+	if len(fields) < 11 {
+		return nil, errors.New("Path does not include all fields: " + path)
+	}
+	dp := &DataPath{
+		Bucket:     fields[1],
+		Exp1:       fields[2],
+		DatePath:   fields[3],
+		PackedDate: fields[4],
+		PackedTime: fields[5],
+		Host:       fields[6],
+		Pod:        fields[7],
+		Experiment: fields[8],
+		FileNumber: fields[9],
+		Suffix:     fields[10],
+	}
+	return dp, nil
 }
 
 // GetDataType finds the type of data stored in a file from its complete filename
@@ -79,6 +94,11 @@ func (fn *DataPath) GetDataType() DataType {
 		return INVALID
 	}
 	return dt
+}
+
+// TableBase returns the base bigquery table name associated with the DataPath data type.
+func (fn *DataPath) TableBase() string {
+	return DataTypeToTable[fn.GetDataType()]
 }
 
 // IsBatchService return true if this is a NDT batch service.
