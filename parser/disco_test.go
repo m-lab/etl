@@ -36,7 +36,7 @@ func TestJSONParsing(t *testing.T) {
 
 	var parser etl.Parser = parser.NewDiscoParser(ins)
 
-	meta := map[string]bigquery.Value{"filename": "filename", "parsetime": time.Now()}
+	meta := map[string]bigquery.Value{"filename": "filename", "parse_time": time.Now()}
 	// Should result in two tests sent to inserter, but no call to uploader.
 	err = parser.ParseAndInsert(meta, "testName", test_data)
 	if ins.Accepted() != 2 {
@@ -77,7 +77,7 @@ func xTestRealBackend(t *testing.T) {
 	ins, err := bq.NewInserter("mlab_sandbox", etl.SW, time.Now())
 	var parser etl.Parser = parser.NewDiscoParser(ins)
 
-	meta := map[string]bigquery.Value{"filename": "filename", "parsetime": time.Now()}
+	meta := map[string]bigquery.Value{"filename": "filename", "parse_time": time.Now()}
 	for i := 0; i < 3; i++ {
 		// Iterations:
 		// Add two rows, no upload.
