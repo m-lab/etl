@@ -2,6 +2,7 @@ package etl_test
 
 import (
 	"fmt"
+	"log"
 	"testing"
 
 	"github.com/m-lab/etl/etl"
@@ -66,5 +67,19 @@ func TestCalculateIPDistance(t *testing.T) {
 	if diff2 != 0 || ip_type != 6 {
 		t.Errorf("Error in calculating IPv6 distance!\n")
 		return
+	}
+}
+
+func indexError() {
+	a := []int{1, 2, 3}
+	log.Println(a[4])
+}
+
+func TestRunSafely(t *testing.T) {
+	log.SetFlags(0)
+
+	err := etl.RunSafely(indexError)
+	if err == nil {
+		t.Fatal("Should have returned an error.")
 	}
 }
