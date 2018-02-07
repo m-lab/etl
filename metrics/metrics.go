@@ -17,6 +17,7 @@ import (
 
 func init() {
 	// Register the metrics defined with Prometheus's default registry.
+	prometheus.MustRegister(PanicCount)
 	prometheus.MustRegister(AnnotationTimeSummary)
 	prometheus.MustRegister(AnnotationRequestCount)
 	prometheus.MustRegister(AnnotationErrorCount)
