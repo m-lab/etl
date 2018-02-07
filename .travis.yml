@@ -40,8 +40,10 @@ before_install:
 # Install test credentials.
 # Note that anyone with github ACLs to push to a branch can hack .travis.yml
 # and discover these credentials in the travis logs.
-- echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key
-- gcloud auth activate-service-account --key-file=travis-testing.key
+- if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
+  echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key
+  gcloud auth activate-service-account --key-file=travis-testing.key
+  fi
 
 # These directories will be cached on successful "script" builds, and restored,
 # if available, to save time on future builds.
@@ -68,9 +70,12 @@ script:
 # we lose some coverage.  The corresponding cov files are overwritten, but that is OK since
 # the non-integration tests are repeated.  If we change the unit tests to NOT run when integration
 # test tag is set, then we would need to have separate cov files.
-- for module in dedup ; do
+# Note: we do not run integration tests from forked PRs b/c the SA is unavailable.
+- if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
+  for module in dedup ; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module -tags=integration ;
-  done
+  done ;
+  fi
 
 # Coveralls
 # TODO - figure out why batch.cov isn't being generated above.
