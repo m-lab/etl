@@ -217,21 +217,36 @@ var (
 	// queue_pusher.go
 )
 
-// RunSafely executes f in a wrapper that will catch any panic
-// and return an error.
-func RunSafely(f func()) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			var ok bool
-			err, ok = r.(error)
-			if !ok {
-				log.Println("bad recovery conversion")
-				err = fmt.Errorf("pkg: %v", r)
-			}
-			log.Println("Recovered from panic:", err)
-			metrics.PanicCount.WithLabelValues("worker").Inc()
+// CatchPanic should be wrapped in a defer to capture
+// panics and return an error.
+// Examples:
+//  For function that returns an error:
+//    func foobar() (err error) {
+//        defer func() {
+//		      err = etl.CatchPanic(recover(), "foobar")
+// 	      }()
+//        ...
+//        ...
+//    }
+//
+//  For function that does not return error:
+//    func foobar() {
+//        defer func() {
+//		      etl.CatchPanic(recover(), "foobar")
+// 	      }()
+//        ...
+//        ...
+//    }
+func CatchPanic(r interface{}, tag string) (err error) {
+	if r != nil {
+		var ok bool
+		err, ok = r.(error)
+		if !ok {
+			log.Println("bad recovery conversion")
+			err = fmt.Errorf("pkg: %v", r)
 		}
-	}()
-	f()
+		log.Println("Recovered from panic:", err)
+		metrics.PanicCount.WithLabelValues(tag).Inc()
+	}
 	return err
 }
