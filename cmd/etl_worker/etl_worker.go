@@ -102,57 +102,47 @@ func decrementInFlight() {
 
 // TODO(gfr) unify counting for http and pubsub paths?
 func worker(rwr http.ResponseWriter, rq *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered from panic", r)
-			err, ok := r.(error)
-			if !ok {
-				err = fmt.Errorf("pkg: %v", r)
+	etl.RunSafely(func() {
+		// Throttle by grabbing a semaphore from channel.
+		if shouldThrottle() {
+			metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
+			rwr.WriteHeader(http.StatusTooManyRequests)
+			fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
+			return
+		}
+
+		// Decrement counter when worker finishes.
+		defer decrementInFlight()
+
+		var err error
+		retryCountStr := rq.Header.Get("X-AppEngine-TaskRetryCount")
+		retryCount := 0
+		if retryCountStr != "" {
+			retryCount, err = strconv.Atoi(retryCountStr)
+			if err != nil {
+				log.Printf("Invalid retries string: %s\n", retryCountStr)
 			}
-			log.Println("Recovered from panic:", err)
-			metrics.PanicCount.WithLabelValues("worker").Inc()
 		}
-	}()
-
-	// Throttle by grabbing a semaphore from channel.
-	if shouldThrottle() {
-		metrics.TaskCount.WithLabelValues("unknown", "worker", "TooManyRequests").Inc()
-		rwr.WriteHeader(http.StatusTooManyRequests)
-		fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
-		return
-	}
-
-	// Decrement counter when worker finishes.
-	defer decrementInFlight()
-
-	var err error
-	retryCountStr := rq.Header.Get("X-AppEngine-TaskRetryCount")
-	retryCount := 0
-	if retryCountStr != "" {
-		retryCount, err = strconv.Atoi(retryCountStr)
-		if err != nil {
-			log.Printf("Invalid retries string: %s\n", retryCountStr)
+		executionCountStr := rq.Header.Get("X-AppEngine-TaskExecutionCount")
+		executionCount := 0
+		if executionCountStr != "" {
+			executionCount, err = strconv.Atoi(executionCountStr)
+			if err != nil {
+				log.Printf("Invalid execution count string: %s\n", executionCountStr)
+			}
 		}
-	}
-	executionCountStr := rq.Header.Get("X-AppEngine-TaskExecutionCount")
-	executionCount := 0
-	if executionCountStr != "" {
-		executionCount, err = strconv.Atoi(executionCountStr)
-		if err != nil {
-			log.Printf("Invalid execution count string: %s\n", executionCountStr)
+
+		rq.ParseForm()
+		// Log request data.
+		for key, value := range rq.Form {
+			log.Printf("Form:   %q == %q\n", key, value)
 		}
-	}
 
-	rq.ParseForm()
-	// Log request data.
-	for key, value := range rq.Form {
-		log.Printf("Form:   %q == %q\n", key, value)
-	}
-
-	rawFileName := rq.FormValue("filename")
-	status, msg := subworker(rawFileName, executionCount, retryCount)
-	rwr.WriteHeader(status)
-	fmt.Fprintf(rwr, msg)
+		rawFileName := rq.FormValue("filename")
+		status, msg := subworker(rawFileName, executionCount, retryCount)
+		rwr.WriteHeader(status)
+		fmt.Fprintf(rwr, msg)
+	})
 }
 
 func subworker(rawFileName string, executionCount, retryCount int) (status int, msg string) {
