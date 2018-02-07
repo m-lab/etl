@@ -189,6 +189,7 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 }
 
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
+	// TODO: for common metric states with constant labels, define global constants.
 	metrics.WorkerState.WithLabelValues(ss.TableName(), "ss").Inc()
 	defer metrics.WorkerState.WithLabelValues(ss.TableName(), "ss").Dec()
 	if strings.Contains(testName, ".tra") {
