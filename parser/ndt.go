@@ -170,12 +170,7 @@ func (n *NDTParser) FullTableName() string {
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
-func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName string, content []byte) (err error) {
-	// This will recover from any panics and return an error.
-	defer func() {
-		err = etl.CatchPanic(err, recover(), "ndt.ParseAndInsert")
-	}()
-
+func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName string, content []byte) error {
 	// Scraper adds files to tar file in lexical order.  This groups together all
 	// files in a single test, but the order of the files varies because of port number.
 	// If c2s or s2c files precede the .meta file, we must cache them, and process
@@ -183,8 +178,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	// If we detect a new prefix before getting all three, we should log appropriate
 	// information about that, and possibly place error rows in the BQ table.
 	// TODO(prod) Ensure that archive files are also date sorted.
-	var info *TestInfo
-	info, err = ParseNDTFileName(testName)
+	info, err := ParseNDTFileName(testName)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(
 			n.TableName(), "unknown", "bad filename").Inc()
@@ -277,8 +271,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		return errors.New("Unknown test suffix: " + info.Suffix)
 	}
 
-	// Must return err (explicitly or implicitly) in order to capture err from panic.
-	return
+	return nil
 }
 
 func (n *NDTParser) reportAnomalies() {
