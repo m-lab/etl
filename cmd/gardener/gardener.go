@@ -111,8 +111,27 @@ func Month(rwr http.ResponseWriter, rq *http.Request) {
 	fmt.Fprintf(rwr, "Disabled... Would have processed %q\n", rawPrefix)
 }
 
+// TODO - remove?
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "ok")
+}
+
+func ready(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "ok")
+}
+
+func alive(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "ok")
+}
+
+func starting(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusServiceUnavailable)
+	fmt.Fprintf(w, `{"message": "Internal server error."}`)
+}
+
+func dead(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusInternalServerError)
+	fmt.Fprintf(w, `{"message": "Internal server error."}`)
 }
 
 // Persistent Queuer for use in handlers and gardener tasks.
@@ -125,24 +144,31 @@ func runService() {
 	runtime.SetBlockProfileRate(1000000) // One event per msec.
 
 	setupPrometheus()
-
-	var err error
-	batchQueuer, err = QueuerFromEnv()
-	if err != nil {
-		log.Println(err)
-		log.Fatal("Required environment variables are missing or invalid.")
-	}
-	log.Println("Running as a service.")
-	http.HandleFunc("/_ah/health", healthCheckHandler)
-	http.HandleFunc("/", Status)
-	http.HandleFunc("/status", Status)
-	http.HandleFunc("/reproc/month", Month)
-
 	// We also setup another prometheus handler on a non-standard path. This
 	// path name will be accessible through the AppEngine service address,
 	// however it will be served by a random instance.
 	http.Handle("/random-metrics", promhttp.Handler())
-	http.ListenAndServe(":8080", nil)
+
+	http.HandleFunc("/_ah/health", healthCheckHandler)
+	http.HandleFunc("/", Status)
+	http.HandleFunc("/status", Status)
+
+	var err error
+	batchQueuer, err = QueuerFromEnv()
+	if err == nil {
+		http.HandleFunc("/alive", alive)
+		http.HandleFunc("/ready", ready)
+		http.HandleFunc("/reproc/month", Month)
+		log.Println("Running as a service.")
+	} else {
+		http.HandleFunc("/alive", dead)
+		http.HandleFunc("/ready", dead)
+		log.Println(err)
+		log.Println("Required environment variables are missing or invalid.")
+	}
+
+	// ListenAndServe, and terminate when it returns.
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 // These are used only for command line.  For service, environment variables are used
@@ -186,6 +212,7 @@ func main() {
 
 	q, err := batch.CreateQueuer(http.DefaultClient, nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
 	if err != nil {
+		// In command line mode, good to just fast fail.
 		log.Fatal(err)
 	}
 	if *fMonth != "" {

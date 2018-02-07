@@ -51,6 +51,21 @@ network:
   forwarded_ports:
     - 9090/tcp
 
+ liveness_check:
+   path: "/alive"
+   check_interval_sec: 30
+   timeout_sec: 4
+   failure_threshold: 2
+   success_threshold: 1
+
+readiness_check:
+  path: "/ready"
+  check_interval_sec: 5
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 1
+  app_start_timeout_sec: 120
+
 env_variables:
   RELEASE_TAG: ${TRAVIS_TAG}
   COMMIT_HASH: ${TRAVIS_COMMIT}
