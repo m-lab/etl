@@ -54,14 +54,17 @@ func (tt *Task) SetMaxFileSize(max int64) {
 // ProcessAllTests loops through all the tests in a tar file, calls the
 // injected parser to parse them, and inserts them into bigquery. Returns the
 // number of files processed.
-func (tt *Task) ProcessAllTests() (int, error) {
+func (tt *Task) ProcessAllTests() (files int, err error) {
+	// This will recover from any panics.
+	defer func() {
+		err = etl.CatchPanic(recover(), "task.ProcessAllTests")
+	}()
+
 	metrics.WorkerState.WithLabelValues(tt.TableName(), "task").Inc()
 	defer metrics.WorkerState.WithLabelValues(tt.TableName(), "task").Dec()
-	files := 0
 	nilData := 0
 	var testname string
 	var data []byte
-	var err error
 	// Read each file from the tar
 
 OUTER:

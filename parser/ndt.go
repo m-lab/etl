@@ -68,8 +68,8 @@ var (
 	endPattern  = regexp.MustCompile(suffix + `$`)
 )
 
-// testInfo contains all the fields from a valid NDT test file name.
-type testInfo struct {
+// TestInfo contains all the fields from a valid NDT test file name.
+type TestInfo struct {
 	DateDir   string    // Optional leading date yyyy/mm/dd/
 	Date      string    // The date field from the test file name
 	Time      string    // The time field
@@ -78,7 +78,8 @@ type testInfo struct {
 	Timestamp time.Time // The parsed timestamp, with microsecond resolution
 }
 
-func ParseNDTFileName(path string) (*testInfo, error) {
+// ParseNDTFileName parses the name of a tar or tgz file containing NDT test data.
+func ParseNDTFileName(path string) (*TestInfo, error) {
 	fields := gzTestFilePattern.FindStringSubmatch(path)
 
 	if fields == nil {
@@ -100,7 +101,7 @@ func ParseNDTFileName(path string) (*testInfo, error) {
 		log.Println(fields[2] + "T" + fields[3] + "   " + err.Error())
 		return nil, errors.New("Invalid test path: " + path)
 	}
-	return &testInfo{fields[1], fields[2], fields[3], fields[4], fields[5], timestamp}, nil
+	return &TestInfo{fields[1], fields[2], fields[3], fields[4], fields[5], timestamp}, nil
 }
 
 //=========================================================================
@@ -109,10 +110,11 @@ func ParseNDTFileName(path string) (*testInfo, error) {
 
 type fileInfoAndData struct {
 	fn   string
-	info testInfo
+	info TestInfo
 	data []byte
 }
 
+// NDTParser implements the Parser interface for NDT.
 type NDTParser struct {
 	inserter     etl.Inserter
 	etl.RowStats // Implement RowStats through an embedded struct.
@@ -128,6 +130,7 @@ type NDTParser struct {
 	metaFile *MetaFileData
 }
 
+// NewNDTParser returns a new NDT parser.
 func NewNDTParser(ins etl.Inserter) *NDTParser {
 	return &NDTParser{
 		inserter: ins,
@@ -135,15 +138,19 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 }
 
 // These functions are also required to complete the etl.Parser interface.
+
+// TaskError returns non-nil if more than 10% of row inserts failed.
 func (n *NDTParser) TaskError() error {
 	if n.inserter.Committed() < 10*n.inserter.Failed() {
 		log.Printf("Warning: high row insert errors: %d / %d\n",
 			n.inserter.Accepted(), n.inserter.Failed())
-		return errors.New("Too many insertion failures.")
+		return errors.New("too many insertion failures")
 	}
 	return nil
 }
 
+// Flush completes processing of final task group, if any, and flushes
+// buffer to BigQuery.
 func (n *NDTParser) Flush() error {
 	// Process the last group (if it exists) before flushing the inserter.
 	if n.timestamp != "" {
@@ -152,16 +159,22 @@ func (n *NDTParser) Flush() error {
 	return n.inserter.Flush()
 }
 
+// TableName returns the base of the bq table inserter target.
 func (n *NDTParser) TableName() string {
 	return n.inserter.TableBase()
 }
 
+// FullTableName returns the full bq table name inserter target, including date suffix.
 func (n *NDTParser) FullTableName() string {
 	return n.inserter.FullTableName()
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
-func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName string, content []byte) error {
+func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName string, content []byte) (err error) {
+	// This will recover from any panics.
+	defer func() {
+		err = etl.CatchPanic(recover(), "task.ProcessAllTests")
+	}()
 	// Scraper adds files to tar file in lexical order.  This groups together all
 	// files in a single test, but the order of the files varies because of port number.
 	// If c2s or s2c files precede the .meta file, we must cache them, and process
