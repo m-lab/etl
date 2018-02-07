@@ -223,7 +223,7 @@ var (
 //  For function that returns an error:
 //    func foobar() (err error) {
 //        defer func() {
-//		      err = etl.CatchPanic(recover(), "foobar")
+//		      err = etl.CatchPanic(err, recover(), "foobar")
 // 	      }()
 //        ...
 //        ...
@@ -232,12 +232,12 @@ var (
 //  For function that does not return error:
 //    func foobar() {
 //        defer func() {
-//		      etl.CatchPanic(recover(), "foobar")
+//		      etl.CatchPanic(nil, recover(), "foobar")
 // 	      }()
 //        ...
 //        ...
 //    }
-func CatchPanic(r interface{}, tag string) (err error) {
+func CatchPanic(err error, r interface{}, tag string) error {
 	if r != nil {
 		var ok bool
 		err, ok = r.(error)
