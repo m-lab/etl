@@ -92,7 +92,7 @@ deploy:
 ######################################################################
 # STAGING: Automatically deploys all pipeline services on new merge to
 # integration branch.
-# Deploys all staging services: NDT, PT, SS, QUEUE_PUSHER
+# Deploys all staging services: NDT, PT, SS, DISCO, QUEUE_PUSHER
 # (Currently this does not include NDT_BATCH or CRON, as CRON is in
 # development, and batch is driven by CRON.  Prod include the batch
 # pipeline because we have been using it manually.)
@@ -110,6 +110,8 @@ deploy:
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-staging.yaml
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco-staging.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
