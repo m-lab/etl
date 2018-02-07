@@ -2,11 +2,17 @@ package etl_test
 
 import (
 	"fmt"
+    "log"
 	"reflect"
 	"testing"
 
 	"github.com/m-lab/etl/etl"
 )
+
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 func TestValidateTestPath(t *testing.T) {
 	tests := []struct {
@@ -119,5 +125,26 @@ func TestCalculateIPDistance(t *testing.T) {
 	if diff2 != 0 || ip_type != 6 {
 		t.Errorf("Error in calculating IPv6 distance!\n")
 		return
+	}
+}
+
+func indexError() {
+	a := []int{1, 2, 3}
+	log.Println(a[4])
+}
+
+func PanicAndRecover() (err error) {
+	defer func() {
+		err = etl.CatchPanic(recover(), "foobar")
+	}()
+	indexError()
+	return err
+}
+
+func TestHandlePanic(t *testing.T) {
+	err := PanicAndRecover()
+	log.Println("Actually did recover")
+	if err == nil {
+		t.Fatal("Should have errored")
 	}
 }
