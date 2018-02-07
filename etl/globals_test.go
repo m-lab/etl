@@ -1,8 +1,9 @@
 package etl_test
 
 import (
+	"errors"
 	"fmt"
-    "log"
+	"log"
 	"reflect"
 	"testing"
 
@@ -128,17 +129,22 @@ func TestCalculateIPDistance(t *testing.T) {
 	}
 }
 
-func indexError() {
-	a := []int{1, 2, 3}
-	log.Println(a[4])
-}
-
 func PanicAndRecover() (err error) {
 	defer func() {
-		err = etl.CatchPanic(recover(), "foobar")
+		err = etl.CatchPanic(nil, recover(), "foobar")
 	}()
-	indexError()
-	return err
+	a := []int{1, 2, 3}
+	log.Println(a[4])
+	// This is never reached.
+	return
+}
+
+func ErrorWithoutPanic(prior error) (err error) {
+	err = prior
+	defer func() {
+		err = etl.CatchPanic(err, recover(), "foobar")
+	}()
+	return
 }
 
 func TestHandlePanic(t *testing.T) {
@@ -146,5 +152,17 @@ func TestHandlePanic(t *testing.T) {
 	log.Println("Actually did recover")
 	if err == nil {
 		t.Fatal("Should have errored")
+	}
+}
+
+func TestNoPanic(t *testing.T) {
+	err := ErrorWithoutPanic(nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = ErrorWithoutPanic(errors.New("prior"))
+	if err == nil {
+		t.Error("Should have returned prior error.")
 	}
 }
