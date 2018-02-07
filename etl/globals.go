@@ -175,7 +175,7 @@ const (
 	NDT_OMIT_DELTAS = DataType("ndt_nodelta") // to support larger buffer size.
 	SS              = DataType("sidestream")
 	PT              = DataType("traceroute")
-	SW              = DataType("disco")
+	SW              = DataType("switch")
 	INVALID         = DataType("invalid")
 )
 
@@ -195,7 +195,7 @@ var (
 		NDT:     "ndt",
 		SS:      "sidestream",
 		PT:      "traceroute",
-		SW:      "disco_test",
+		SW:      "switch",
 		INVALID: "invalid",
 	}
 
