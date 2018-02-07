@@ -102,17 +102,16 @@ func Month(rwr http.ResponseWriter, rq *http.Request) {
 	fields := monthRegex.FindStringSubmatch(rawPrefix)
 	log.Printf("%+v\n", fields)
 	if fields == nil {
-		log.Printf("Invalid prefix %s\n", rawPrefix)
-		fmt.Fprintf(rwr, "Invalid prefix %s\n", rawPrefix)
+		log.Printf("Invalid prefix %q\n", rawPrefix)
+		fmt.Fprintf(rwr, "Invalid prefix %q\n", rawPrefix)
 		return
 	}
 
 	// batchQueuer.PostMonth(rawPrefix)
-	fmt.Fprintf(rwr, "Disabled... Would have processed %s\n", rawPrefix)
+	fmt.Fprintf(rwr, "Disabled... Would have processed %q\n", rawPrefix)
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO(soltesz): provide a real health check.
 	fmt.Fprint(w, "ok")
 }
 
@@ -152,11 +151,12 @@ var (
 	fQueue   = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
 	// TODO implement listing queues to determine number of queue, and change this to 0
 	fNumQueues = flag.Int("num_queues", 8, "Number of queues.  Normally determined by listing queues.")
-	fBucket    = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
-	fExper     = flag.String("experiment", "ndt", "Experiment prefix, without trailing slash.")
-	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
-	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
-	fDryRun    = flag.Bool("dry_run", false, "Prevents all output to queue_pusher.")
+	// Gardener will only read from this bucket, so its ok to use production bucket as default.
+	fBucket = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
+	fExper  = flag.String("experiment", "ndt", "Experiment prefix, without trailing slash.")
+	fMonth  = flag.String("month", "", "Single month spec, as YYYY/MM")
+	fDay    = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
+	fDryRun = flag.Bool("dry_run", false, "Prevents all output to queue_pusher.")
 )
 
 func init() {
@@ -166,8 +166,8 @@ func init() {
 
 func main() {
 	// Check if invoked as a service.
-	cron, _ := strconv.ParseBool(os.Getenv("GARDENER_SERVICE"))
-	if cron {
+	isService, _ := strconv.ParseBool(os.Getenv("GARDENER_SERVICE"))
+	if isService {
 		runService()
 		return
 	}

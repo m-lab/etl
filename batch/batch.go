@@ -145,13 +145,17 @@ func (q Queuer) postOneTask(queue, fn string) error {
 // postOneDay posts all items in an ObjectIterator into the appropriate queue.
 // TODO - should this delete the data from the target partition before posting tasks?
 func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectIterator) error {
-	qpErrCount := 0
-	gcsErrCount := 0
-	fileCount := 0
 	if wg != nil {
 		defer wg.Done()
 	}
-	var err error
+
+	fileCount := 0
+	defer func() {
+		log.Println("Added ", fileCount, " tasks to ", queue)
+	}()
+
+	qpErrCount := 0
+	gcsErrCount := 0
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
 		if err != nil {
 			// TODO - should this retry?
@@ -159,7 +163,7 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 			gcsErrCount++
 			if gcsErrCount > 5 {
 				log.Printf("Failed after %d files to %s.\n", fileCount, queue)
-				break
+				return err
 			}
 			continue
 		}
@@ -168,7 +172,7 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 		if err != nil {
 			log.Println(err)
 			if strings.Contains(err.Error(), "UNKNOWN_QUEUE") {
-				break
+				return err
 			}
 			if strings.Contains(err.Error(), "invalid filename") {
 				// Invalid filename is never going to get better.
@@ -184,15 +188,14 @@ func (q Queuer) postOneDay(wg *sync.WaitGroup, queue string, it *storage.ObjectI
 				qpErrCount++
 				if qpErrCount > 5 {
 					log.Printf("Failed after %d files to %s (on %s).\n", fileCount, queue, o.Name)
-					break
+					return err
 				}
 			}
 		} else {
 			fileCount++
 		}
 	}
-	log.Println("Added ", fileCount, " tasks to ", queue)
-	return err
+	return nil
 }
 
 // PostDay fetches an iterator over the objects with ndt/YYYY/MM/DD prefix,
@@ -240,20 +243,23 @@ func (q Queuer) PostMonth(prefix string) error {
 	it := q.Bucket.Objects(context.Background(), &qry)
 
 	var wg sync.WaitGroup
+	defer func() {
+		wg.Wait()
+	}()
+
 	errCount := 0
 	const maxErrors = 20
-	var err error
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
 		if err != nil {
 			log.Println(err)
 			if strings.Contains(err.Error(),
 				"does not have storage.objects.list access") {
 				// Inadequate permissions
-				break
+				return err
 			}
 			if errCount++; errCount > maxErrors {
 				log.Println("Too many errors.  Breaking loop.")
-				break
+				return err
 			}
 		} else if o.Prefix != "" {
 			wg.Add(1)
@@ -262,13 +268,12 @@ func (q Queuer) PostMonth(prefix string) error {
 				log.Println(err)
 				if errCount++; errCount > maxErrors {
 					log.Println("Too many errors.  Breaking loop.")
-					break
+					return err
 				}
 			}
 		} else {
 			log.Println("Skipping: ", o.Name)
 		}
 	}
-	wg.Wait()
-	return err
+	return nil
 }
