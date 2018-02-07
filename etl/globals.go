@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 
 	"github.com/m-lab/etl/metrics"
@@ -247,6 +248,8 @@ func CatchPanic(err error, r interface{}, tag string) error {
 		}
 		log.Println("Recovered from panic:", err)
 		metrics.PanicCount.WithLabelValues(tag).Inc()
+		// This prints the full panic stack.  Cool!
+		fmt.Printf("%s\n", debug.Stack())
 	}
 	return err
 }
