@@ -15,5 +15,8 @@ intended to contain snapshot deltas.  To create a new table:
 pt.json contains the schema for paris traceroute tables.  To create a new table:
     bq mk --time_partitioning_type=DAY --schema schema/pt.json -t mlab_sandbox.pt_test
 
+switch.json contains the schema for DISCO tables. To create a new table:
+    bq mk --time_partitioning_type=DAY --schema schema/switch.json -t mlab_sandbox.switch
+
 As of May 2017, there are (still) differences between the legacy and NDT schema that may
 need to be addressed.
