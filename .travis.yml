@@ -110,8 +110,9 @@ deploy:
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-staging.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco-staging.yaml
+    && INJECTED_PROJECT=mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
@@ -149,6 +150,7 @@ deploy:
 # SANDBOX: before code review for development code in a specific branch.
 - provider: script
   script:
+    INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
   skip_cleanup: true
