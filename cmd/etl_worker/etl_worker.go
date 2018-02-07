@@ -102,6 +102,18 @@ func decrementInFlight() {
 
 // TODO(gfr) unify counting for http and pubsub paths?
 func worker(rwr http.ResponseWriter, rq *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered from panic", r)
+			err, ok := r.(error)
+			if !ok {
+				err = fmt.Errorf("pkg: %v", r)
+			}
+			log.Println("Recovered from panic:", err)
+			metrics.PanicCount.WithLabelValues("worker").Inc()
+		}
+	}()
+
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
 		metrics.TaskCount.WithLabelValues("unknown", "worker", "TooManyRequests").Inc()
