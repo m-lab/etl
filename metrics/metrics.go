@@ -57,12 +57,12 @@ var (
 	// PanicCount counts the number of panics encountered in the pipeline.
 	//
 	// Provides metrics:
-	//   etl_panic_count{source}
+	//   etl_panic_total{source}
 	// Example usage:
 	//   metrics.PanicCount.WithLabelValues("worker").Inc()
 	PanicCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "etl_panic_count",
+			Name: "etl_panic_total",
 			Help: "Number of panics encountered.",
 		},
 		// Tag indicating where the panic was recovered.
