@@ -8,6 +8,11 @@ import (
 	"github.com/m-lab/etl/etl"
 )
 
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 func TestValidation(t *testing.T) {
 	// These should fail:
 	// Leading character before gs://
@@ -75,11 +80,18 @@ func indexError() {
 	log.Println(a[4])
 }
 
-func TestRunSafely(t *testing.T) {
-	log.SetFlags(0)
+func PanicAndRecover() (err error) {
+	defer func() {
+		err = etl.CatchPanic(recover(), "foobar")
+	}()
+	indexError()
+	return err
+}
 
-	err := etl.RunSafely(indexError)
+func TestHandlePanic(t *testing.T) {
+	err := PanicAndRecover()
+	log.Println("Actually did recover")
 	if err == nil {
-		t.Fatal("Should have returned an error.")
+		t.Fatal("Should have errored")
 	}
 }
