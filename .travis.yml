@@ -41,8 +41,8 @@ before_install:
 # Note that anyone with github ACLs to push to a branch can hack .travis.yml
 # and discover these credentials in the travis logs.
 - if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
-  echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key
-  gcloud auth activate-service-account --key-file=travis-testing.key
+  echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key ;
+  gcloud auth activate-service-account --key-file=travis-testing.key ;
   fi
 
 # These directories will be cached on successful "script" builds, and restored,
