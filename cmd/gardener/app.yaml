@@ -6,6 +6,8 @@ env: flex
 service: etl-gardener
 
 # Security Notes
+# Also see https://docs.google.com/document/d/1x46aDgatVRp0XB7vAgq2VufOa6hfHG_IICsHGUcHfs0
+#
 #  It looks like Google Sign-In requires webpage support.  Credentials are not
 #  handled transparently by chrome.  For interactive use, we would need to
 #  serve a page that has the sign-in code in it, and from there, support the
