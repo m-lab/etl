@@ -1,7 +1,7 @@
 [
     { "name": "meta", "type": "RECORD", "fields": [
-            { "name": "filename", "type": "STRING" },
-            { "name": "testname", "type": "STRING" },
+            { "name": "task_filename", "type": "STRING" },
+            { "name": "test_id", "type": "STRING" },
             { "name": "parse_time", "type": "TIMESTAMP" }
         ]
     },

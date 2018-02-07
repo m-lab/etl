@@ -4,8 +4,8 @@ package schema
 
 // Meta contains the archive and parse metadata.
 type Meta struct {
-	FileName  string `json:"filename, string" bigquery:"filename"`
-	TestName  string `json:"testname, string" bigquery:"testname"`
+	FileName  string `json:"task_filename, string" bigquery:"task_filename"`
+	TestName  string `json:"test_id, string" bigquery:"test_id"`
 	ParseTime int64  `json:"parse_time, int64" bigquery:"parse_time"`
 }
 
