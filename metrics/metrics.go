@@ -1,4 +1,4 @@
-// The metrics package defines prometheus metric types and provides
+// Package metrics defines prometheus metric types and provides
 // convenience methods to add accounting to various parts of the pipeline.
 //
 // When defining new operations or metrics, these are helpful values to track:
@@ -54,7 +54,22 @@ func init() {
 //
 
 var (
-	// Measures the latencies of requests to the Annotation Service as measured by the pipeline
+	// PanicCount counts the number of panics encountered in the pipeline.
+	//
+	// Provides metrics:
+	//   etl_panic_count{source}
+	// Example usage:
+	//   metrics.PanicCount.WithLabelValues("worker").Inc()
+	PanicCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_panic_count",
+			Help: "Number of panics encountered.",
+		},
+		// Tag indicating where the panic was recovered.
+		[]string{"source"},
+	)
+
+	// AnnotationTimeSummary measures the latencies of requests to the Annotation Service as measured by the pipeline
 	// Provides metrics:
 	//    etl_annotator_Annotation_Time_Summary
 	// Example usage:
@@ -64,7 +79,7 @@ var (
 		Help: "The total time to annotate, in nanoseconds.",
 	}, []string{"test_type"})
 
-	// Measures the number of annotation requests
+	// AnnotationRequestCount measures the number of annotation requests
 	// Provides metrics:
 	//    etl_annotator_Request_Count
 	// Example usage:
@@ -74,7 +89,7 @@ var (
 		Help: "The current number of annotation requests",
 	})
 
-	// Measures the number of annotation errors
+	// AnnotationErrorCount measures the number of annotation errors
 	// Provides metrics:
 	//    etl_annotator_Error_Count
 	// Example usage:
@@ -85,7 +100,7 @@ var (
 			Help: "The current number of errors encountered while attempting to add geo data.",
 		}, []string{"source"})
 
-	// Measures the number of annotation warnings
+	// AnnotationWarningCount measures the number of annotation warnings
 	// Provides metrics:
 	//    etl_annotator_Warning_Count
 	// Example usage:
@@ -96,7 +111,7 @@ var (
 			Help: "The current number of Warnings encountered while attempting to add geo data.",
 		}, []string{"source"})
 
-	// Counts the number of tasks processed by the pipeline.
+	// WorkerCount counts the number of workers currently active.
 	//
 	// Provides metrics:
 	//   etl_worker_count
@@ -107,7 +122,7 @@ var (
 		Help: "Number of active workers.",
 	})
 
-	// Counts the number of tasks processed by the pipeline.
+	// WorkerState counts the number of workers in each worker state..
 	//
 	// Provides metrics:
 	//   etl_worker_count{state}
@@ -121,7 +136,7 @@ var (
 		[]string{"state"},
 	)
 
-	// Counts the number of files processed by machine, rsync module, and day.
+	// FileCount counts the number of files processed by machine, rsync module, and day.
 	//
 	// Provides metrics:
 	//   etl_files_processed{rsync_host_module, day_of_week}
@@ -135,7 +150,7 @@ var (
 		[]string{"rsync_host_module", "day_of_week"},
 	)
 
-	// Counts the number of tasks processed by the pipeline.
+	// TaskCount counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
 	//   etl_task_count{package, status}
@@ -150,7 +165,7 @@ var (
 		[]string{"package", "status"},
 	)
 
-	// Counts the number of tests successfully processed by the parsers.
+	// TestCount counts the number of tests successfully processed by the parsers.
 	//
 	// Provides metrics:
 	//   etl_test_count{table, filetype, status}
@@ -166,7 +181,7 @@ var (
 		[]string{"table", "filetype", "status"},
 	)
 
-	// Counts the number of hops in PT tests successfully processed by the parsers.
+	// PTHopCount counts the number of hops in PT tests successfully processed by the parsers.
 	//
 	// Provides metrics:
 	//   etl_pthop_count{table, filetype, status}
@@ -182,7 +197,7 @@ var (
 		[]string{"table", "filetype", "status"},
 	)
 
-	// Counts the PT tests per metro.
+	// PTTestCount counts the PT tests per metro.
 	//
 	// Provides metrics:
 	//   etl_pt_test_count_per_metro{metro}
@@ -197,7 +212,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// Counts the PT tests that did not reach the expected destination IP
+	// PTNotReachDestCount counts the PT tests that did not reach the expected destination IP
 	// at the last hop per metro.
 	//
 	// Provides metrics:
@@ -213,7 +228,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// Counts the PT tests that reach the expected destination IP
+	// PTMoreHopsAfterDest counts the PT tests that reach the expected destination IP
 	// in the middle of a test per metro, but do more hops afterwards instead of ending there.
 	//
 	// Provides metrics:
@@ -229,8 +244,8 @@ var (
 		[]string{"metro"},
 	)
 
-	// A histogram of number of bits difference between last hop and expected destination IP
-	// for the PT tests that did not reach the expected destination IP.
+	// PTBitsAwayFromDestV4 provides a histogram of number of bits difference between
+	// last hop and expected destination IP for the PT tests that did not reach the expected destination IP.
 	// This metric is only for IPv4.
 	//
 	// Provides metrics:
@@ -248,7 +263,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// A histogram of number of bits difference between last hop and expected destination IP
+	// PTBitsAwayFromDestV6 provides a histogram of number of bits difference between last hop and expected destination IP
 	// for the PT tests that did not reach the expected destination IP.
 	// This metric is only for IPv6.
 	//
@@ -267,7 +282,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// Counts the PT polluted tests per metro.
+	// PTPollutedCount counts the PT polluted tests per metro.
 	//
 	// Provides metrics:
 	//   etl_pt_polluted_total{metro}
@@ -282,7 +297,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// Counts the all warnings that do NOT result in test loss.
+	// WarningCount counts the all warnings that do NOT result in test loss.
 	//
 	// Provides metrics:
 	//   etl_warning_count{table, filetype, kind}
@@ -297,7 +312,7 @@ var (
 		[]string{"table", "filetype", "kind"},
 	)
 
-	// Counts the all errors that result in test loss.
+	// ErrorCount counts the all errors that result in test loss.
 	//
 	// Provides metrics:
 	//   etl_error_count{table, filetype, kind}
@@ -312,7 +327,7 @@ var (
 		[]string{"table", "filetype", "kind"},
 	)
 
-	// Counts the all bulk backend failures.  This does not count, e.g.
+	// BackendFailureCount counts the all bulk backend failures.  This does not count, e.g.
 	// single row errors.
 	//
 	// Provides metrics:
@@ -328,7 +343,7 @@ var (
 		[]string{"table", "kind"},
 	)
 
-	// Counts the number of retries on GCS read operations.
+	// GCSRetryCount counts the number of retries on GCS read operations.
 	//
 	// Provides metrics:
 	//   etl_gcs_retry_count{type}
@@ -344,7 +359,7 @@ var (
 		[]string{"phase", "retries", "status"},
 	)
 
-	// Counts the number of into BigQuery insert operations.
+	// BigQueryInsert counts the number of into BigQuery insert operations.
 	//
 	// Provides metrics:
 	//   etl_worker_bigquery_insert_total{table, status}
@@ -359,7 +374,7 @@ var (
 		[]string{"table", "status"},
 	)
 
-	// A histogram of bq row json sizes.  It is intended primarily for
+	// RowSizeHistogram provides a histogram of bq row json sizes.  It is intended primarily for
 	// NDT, so the bins are fairly large.  NDT average json is around 200K
 	//
 	// Provides metrics:
@@ -383,7 +398,7 @@ var (
 		[]string{"table"},
 	)
 
-	// A histogram of snapshot delta field counts.  It is intended primarily for
+	// DeltaNumFieldsHistogram provides a histogram of snapshot delta field counts.  It is intended primarily for
 	// NDT.  Typical is about 13, but max might be up to 120 or so.
 	//
 	// Provides metrics:
@@ -406,7 +421,7 @@ var (
 		[]string{"table"},
 	)
 
-	// A histogram of (approximate) row field counts.  It is intended primarily for
+	// EntryFieldCountHistogram provides a histogram of (approximate) row field counts.  It is intended primarily for
 	// NDT, so the bins are fairly large.  NDT snapshots typically total about 10k
 	// fields, 99th percentile around 35k fields, and occasionally as many as 50k.
 	// Smaller field count bins included so that it is possibly useful for other
@@ -433,7 +448,7 @@ var (
 		[]string{"table"},
 	)
 
-	// A histogram of bigquery insertion times. The buckets should use
+	// InsertionHistogram provides a histogram of bigquery insertion times. The buckets should use
 	// periods that are intuitive for people.
 	//
 	// Provides metrics:
@@ -459,7 +474,7 @@ var (
 		[]string{"table", "status"},
 	)
 
-	// A histogram of worker processing times. The buckets should use
+	// DurationHistogram provides a histogram of worker processing times. The buckets should use
 	// periods that are intuitive for people.
 	//
 	// Provides metrics:
