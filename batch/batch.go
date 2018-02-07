@@ -243,9 +243,7 @@ func (q Queuer) PostMonth(prefix string) error {
 	it := q.Bucket.Objects(context.Background(), &qry)
 
 	var wg sync.WaitGroup
-	defer func() {
-		wg.Wait()
-	}()
+	defer wg.Wait()
 
 	errCount := 0
 	const maxErrors = 20

@@ -145,7 +145,8 @@ func runService() {
 	http.ListenAndServe(":8080", nil)
 }
 
-// These are used for command line.
+// These are used only for command line.  For service, environment variables are used
+// for general parameters, and request parameter for month.
 var (
 	fProject = flag.String("project", "", "Project containing queues.")
 	fQueue   = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
