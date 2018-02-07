@@ -336,30 +336,18 @@ deploy:
 
 ######################################################################
 ## Service: queue-pusher -- AppEngine Standard Environment.
-# PERSONAL SANDBOX: before code review for development code in a specific branch.
+# SANDBOX: before code review for development code in a specific branch.
 - provider: script
   script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher app.yaml
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
   on:
     repo: m-lab/etl
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
-    condition: $TRAVIS_BRANCH == qp-personal-*
-
-# SANDBOX: After code review and commits to master branch. Triggers when *ANY*
-# branch is tagged with qp-sandbox-*
-- provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    tag: true
-    condition: $TRAVIS_TAG == qp-sandbox-* || $TRAVIS_BRANCH == integration
+    condition: $TRAVIS_BRANCH == qp-sandbox-*
 
 # STAGING: After code review and commits to master branch. Triggers when *ANY*
 # branch is tagged with qp-staging-*
