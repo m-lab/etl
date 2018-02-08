@@ -49,7 +49,7 @@ func init() {
 	prometheus.MustRegister(BackendFailureCount)
 	prometheus.MustRegister(GCSRetryCount)
 	prometheus.MustRegister(DurationHistogram)
-
+	prometheus.MustRegister(InsertionHistogram)
 }
 
 // TODO
