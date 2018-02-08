@@ -230,7 +230,8 @@ var (
 //        ...
 //        ...
 //    }
-func AddPanicMetric(r interface{}, tag string) {
+// TODO - possibly move this to metrics.go
+func CountPanics(r interface{}, tag string) {
 	if r != nil {
 		err, ok := r.(error)
 		if !ok {
@@ -244,8 +245,9 @@ func AddPanicMetric(r interface{}, tag string) {
 }
 
 // PanicToErr captures panics and converts them to
-// errors.  Use with care, as panic may mean that state
-// is corrupted.
+// errors.  Use with extreme care, as panic may mean that
+// state is corrupted, and continuing to execut may result
+// in undefined behavior.
 // It must be wrapped in a defer.
 // Example:
 //    // err must be a named return value to be captured.
@@ -262,6 +264,8 @@ func PanicToErr(err error, r interface{}, tag string) error {
 	if r != nil {
 		var ok bool
 		err, ok = r.(error)
+		// TODO - Check if err == runtime.Error, and treat
+		// differently ?
 		if !ok {
 			log.Println("bad recovery conversion")
 			err = fmt.Errorf("pkg: %v", r)

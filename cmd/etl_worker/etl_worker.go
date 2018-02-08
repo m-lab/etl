@@ -105,7 +105,7 @@ func worker(rwr http.ResponseWriter, rq *http.Request) {
 	// This will add metric count and log message from any panic.
 	// The panic will still propagate, and http will report it.
 	defer func() {
-		etl.AddPanicMetric(recover(), "worker")
+		etl.CountPanics(recover(), "worker")
 	}()
 
 	// Throttle by grabbing a semaphore from channel.

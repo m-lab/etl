@@ -130,7 +130,7 @@ func TestCalculateIPDistance(t *testing.T) {
 	}
 }
 
-func PanicAndRecover() (err error) {
+func panicAndRecover() (err error) {
 	defer func() {
 		err = etl.PanicToErr(nil, recover(), "foobar")
 	}()
@@ -140,7 +140,7 @@ func PanicAndRecover() (err error) {
 	return
 }
 
-func ErrorWithoutPanic(prior error) (err error) {
+func errorWithoutPanic(prior error) (err error) {
 	err = prior
 	defer func() {
 		err = etl.PanicToErr(err, recover(), "foobar")
@@ -149,7 +149,7 @@ func ErrorWithoutPanic(prior error) (err error) {
 }
 
 func TestHandlePanic(t *testing.T) {
-	err := PanicAndRecover()
+	err := panicAndRecover()
 	log.Println("Actually did recover")
 	if err == nil {
 		t.Fatal("Should have errored")
@@ -157,20 +157,20 @@ func TestHandlePanic(t *testing.T) {
 }
 
 func TestNoPanic(t *testing.T) {
-	err := ErrorWithoutPanic(nil)
+	err := errorWithoutPanic(nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = ErrorWithoutPanic(errors.New("prior"))
-	if err == nil {
+	err = errorWithoutPanic(errors.New("prior"))
+	if err.Error() != "prior" {
 		t.Error("Should have returned prior error.")
 	}
 }
 
-func RePanic() {
+func rePanic() {
 	defer func() {
-		etl.AddPanicMetric(recover(), "foobar")
+		etl.CountPanics(recover(), "foobar")
 	}()
 	a := []int{1, 2, 3}
 	log.Println(a[4])
@@ -178,7 +178,7 @@ func RePanic() {
 	return
 }
 
-func TestAddPanicMetric(t *testing.T) {
+func TestCountPanics(t *testing.T) {
 	// When we call RePanic, the panic should cause a log and a metric
 	// increment, but should still panic.  This intercepts the panic,
 	// and errors if the panic doesn't happen.
@@ -189,5 +189,5 @@ func TestAddPanicMetric(t *testing.T) {
 		fmt.Printf("%s\n", debug.Stack())
 	}()
 
-	RePanic()
+	rePanic()
 }
