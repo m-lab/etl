@@ -131,8 +131,8 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
     && INJECTED_PROJECT=mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh ${INJECTED_PROJECT}
+    /tmp/${INJECTED_PROJECT}.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
@@ -154,17 +154,13 @@ deploy:
 # PROD: Should be used AFTER code review, commit to integration, and staging soak.
 # Triggers when *ANY* branch is tagged with prod-*'
 # Deploys all production services: NDT, NDT_BATCH, PT, SS, QUEUE_PUSHER
-# NOTE:
-#  Failure in one of the deployments will terminate the deployment sequence, leaving
-#  the system in a mixed state.  This should be manually addresses ASAP.
+# NOTE: See later target for ndt-prod-*, which also triggers on prod-*, and
+#       deploys the NDT daily and batch pipelines.
+# NOTE: Failure in one of the deployments will terminate the deployment sequence,
+#       leaving the system in a mixed state.  This should be manually addresses ASAP.
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
-    && INJECTED_PROJECT=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-prod.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-prod.yaml
@@ -214,11 +210,14 @@ deploy:
 
 ######################################################################
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
-# PERSONAL SANDBOX: before code review for development code in a specific branch.
+# SANDBOX: before code review for development code in a specific branch.
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
+    && INJECTED_PROJECT=mlab-sandbox
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh ${INJECTED_PROJECT}
+    /tmp/${INJECTED_PROJECT}.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -233,17 +232,19 @@ deploy:
 # PROD: Should be used AFTER code review and commit to master branch.
 # Triggers when *ANY* branch is tagged with ndt-prod-*'
 # Deploys BOTH STREAMING AND BATCH services.
+# TODO - group all of the *-prod-* triggers together, same for sandbox, staging.
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
     && INJECTED_PROJECT=measurement-lab
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_TAG == ndt-prod-*
+    condition: $TRAVIS_TAG == ndt-prod-* || $TRAVIS_TAG == prod-*
 
 ######################################################################
 ## Service: etl-sidestream-parser -- AppEngine Flexible Environment.
@@ -265,6 +266,7 @@ deploy:
 
 # PROD: Should be used AFTER code review and commit to master branch.  Triggers
 # when *ANY* branch is tagged with ss-prod-*'
+# TODO - collect all of the *-prod-* triggers together.
 - provider: script
   script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-prod.yaml
