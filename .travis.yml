@@ -72,7 +72,8 @@ script:
 - if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
   for module in batch dedup ; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module -tags=integration ;
-  done
+  done ;
+  fi
 
 # Coveralls
 # TODO - figure out why batch.cov isn't being generated above.
