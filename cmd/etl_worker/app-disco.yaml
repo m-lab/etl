@@ -9,7 +9,7 @@ resources:
   cpu: 2
   # Instances support between [(cpu * 0.9) - 0.4, (cpu * 6.5) - 0.4]
   # Actual memory available is exposed via GAE_MEMORY_MB environment variable.
-  memory_gb: 2
+  memory_gb: 2.5
 
 automatic_scaling:
   # We expect fairly small load, so a low minimum should reduce costs.
