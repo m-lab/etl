@@ -102,14 +102,10 @@ func decrementInFlight() {
 
 // TODO(gfr) unify counting for http and pubsub paths?
 func worker(rwr http.ResponseWriter, rq *http.Request) {
-	// This will recover from any panics.
+	// This will add metric count and log message from any panic.
+	// The panic will still propagate, and http will report it.
 	defer func() {
-		err := etl.CatchPanic(recover(), "worker")
-		if err != nil {
-			metrics.TaskCount.WithLabelValues("unknown", "InternalServerError").Inc()
-			rwr.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(rwr, `{"message": "Internal Server Error"}`)
-		}
+		etl.AddPanicMetric(recover(), "worker")
 	}()
 
 	// Throttle by grabbing a semaphore from channel.
