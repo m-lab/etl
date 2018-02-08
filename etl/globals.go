@@ -218,27 +218,47 @@ var (
 	// queue_pusher.go
 )
 
-// CatchPanic should be wrapped in a defer to capture
-// panics and return an error.
+// AddPanicMetric captures panics, increments the
+// panic metric, and then repanics.
+// It must be wrapped in a defer.
 // Examples:
 //  For function that returns an error:
+//    func foobar() () {
+//        defer func() {
+//		      etl.AddPanicMetric(recover(), "foobar")
+// 	      }()
+//        ...
+//        ...
+//    }
+func AddPanicMetric(r interface{}, tag string) {
+	if r != nil {
+		err, ok := r.(error)
+		if !ok {
+			log.Println("bad recovery conversion")
+			err = fmt.Errorf("pkg: %v", r)
+		}
+		log.Println("Adding metrics for panic:", err)
+		metrics.PanicCount.WithLabelValues(tag).Inc()
+		panic(r)
+	}
+}
+
+// PanicToErr captures panics and converts them to
+// errors.  Use with care, as panic may mean that state
+// is corrupted.
+// It must be wrapped in a defer.
+// Example:
+//    // err must be a named return value to be captured.
 //    func foobar() (err error) {
 //        defer func() {
-//		      err = etl.CatchPanic(err, recover(), "foobar")
+//			  // Possibly do something with existing error
+//            // before calling PanicToErr
+//		      err = etl.PanicToErr(err, recover(), "foobar")
 // 	      }()
 //        ...
 //        ...
 //    }
-//
-//  For function that does not return error:
-//    func foobar() {
-//        defer func() {
-//		      etl.CatchPanic(nil, recover(), "foobar")
-// 	      }()
-//        ...
-//        ...
-//    }
-func CatchPanic(err error, r interface{}, tag string) error {
+func PanicToErr(err error, r interface{}, tag string) error {
 	if r != nil {
 		var ok bool
 		err, ok = r.(error)
@@ -248,7 +268,6 @@ func CatchPanic(err error, r interface{}, tag string) error {
 		}
 		log.Println("Recovered from panic:", err)
 		metrics.PanicCount.WithLabelValues(tag).Inc()
-		// This prints the full panic stack.  Cool!
 		fmt.Printf("%s\n", debug.Stack())
 	}
 	return err

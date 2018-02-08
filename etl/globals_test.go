@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"runtime/debug"
 	"testing"
 
 	"github.com/m-lab/etl/etl"
@@ -131,7 +132,7 @@ func TestCalculateIPDistance(t *testing.T) {
 
 func PanicAndRecover() (err error) {
 	defer func() {
-		err = etl.CatchPanic(nil, recover(), "foobar")
+		err = etl.PanicToErr(nil, recover(), "foobar")
 	}()
 	a := []int{1, 2, 3}
 	log.Println(a[4])
@@ -142,7 +143,7 @@ func PanicAndRecover() (err error) {
 func ErrorWithoutPanic(prior error) (err error) {
 	err = prior
 	defer func() {
-		err = etl.CatchPanic(err, recover(), "foobar")
+		err = etl.PanicToErr(err, recover(), "foobar")
 	}()
 	return
 }
@@ -165,4 +166,28 @@ func TestNoPanic(t *testing.T) {
 	if err == nil {
 		t.Error("Should have returned prior error.")
 	}
+}
+
+func RePanic() {
+	defer func() {
+		etl.AddPanicMetric(recover(), "foobar")
+	}()
+	a := []int{1, 2, 3}
+	log.Println(a[4])
+	// This is never reached.
+	return
+}
+
+func TestAddPanicMetric(t *testing.T) {
+	// When we call RePanic, the panic should cause a log and a metric
+	// increment, but should still panic.  This intercepts the panic,
+	// and errors if the panic doesn't happen.
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		}
+		fmt.Printf("%s\n", debug.Stack())
+	}()
+
+	RePanic()
 }
