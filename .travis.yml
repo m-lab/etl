@@ -97,10 +97,7 @@ deploy:
 ######################################################################
 # STAGING: Automatically deploys all pipeline services on new merge to
 # integration branch.
-# Deploys all staging services: NDT, PT, SS, DISCO, QUEUE_PUSHER
-# (Currently this does not include NDT_BATCH or GARDENER, as GARDENER is in
-# development, and batch is driven by GARDENER.  Prod includes the batch
-# pipeline because we have been using it manually.)
+# Deploys all staging services: NDT, NDT_BATCH, PT, SS, DISCO, QUEUE_PUSHER, GARDENER
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
 #  the system in a mixed state.  This should be manually addresses ASAP.
@@ -118,8 +115,12 @@ deploy:
     && INJECTED_PROJECT=mlab-staging
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
+    && INJECTED_PROJECT=mlab-staging INJECTED_BUCKET=archive-mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -165,21 +166,7 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == gardener-sandbox-*
-
-#
-# INTEGRATION: Reviewed code, merged to integration branch, will trigger
-# deployment to mlab-staging.
-- provider: script
-  script:
-    # These injected params specify the project and bucket used by the service.
-    INJECTED_PROJECT=mlab-staging INJECTED_BUCKET=archive-mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    branch: integration
+    condition: $TRAVIS_BRANCH == gardener-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
 ######################################################################
 ## Service: etl-disco-parser -- AppEngine Flexible Environment.
@@ -218,36 +205,6 @@ deploy:
     # Integration branch will not use decorated service names.
     condition: $TRAVIS_BRANCH == ndt-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
-# INTEGRATION: Reviewed code, merged to integration branch, will trigger
-# deployment to "standard" mlab-sandbox.
-- provider: script
-  script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
-    && INJECTED_PROJECT=mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    branch: integration
-
-# STAGING: Should be used AFTER code review and commit to dev branch.  Triggers
-# when *ANY* branch is tagged with ndt-staging-*'  This allows pushing individual
-# pipeline components prior to committing to integration branch.
-- provider: script
-  script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
-    && INJECTED_PROJECT=mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_TAG == ndt-staging-*
-
 # PROD: Should be used AFTER code review and commit to master branch.
 # Triggers when *ANY* branch is tagged with ndt-prod-*'
 # Deploys BOTH STREAMING AND BATCH services.
@@ -281,17 +238,6 @@ deploy:
     # Integration branch will not use decorated service names.
     condition: $TRAVIS_BRANCH == ss-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
-# STAGING: Should be used AFTER code review and commit to dev branch.  Triggers
-# when *ANY* branch is tagged with ss-staging*'
-- provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-staging.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_TAG == ss-staging*
-
 # PROD: Should be used AFTER code review and commit to master branch.  Triggers
 # when *ANY* branch is tagged with ss-prod-*'
 - provider: script
@@ -321,17 +267,6 @@ deploy:
     # Integration branch will not use decorated service names.
     condition: $TRAVIS_BRANCH == pt-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
-# STAGING: Should be used AFTER code review and commit to dev branch.  Triggers
-# when *ANY* branch is tagged with pt-staging-*'
-- provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_TAG == pt-staging-*
-
 # PROD: Should be used AFTER code review and commit to master branch.  Triggers
 # when *ANY* branch is tagged with pt-prod-*'
 - provider: script
@@ -356,19 +291,7 @@ deploy:
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
-    condition: $TRAVIS_BRANCH == qp-sandbox-*
-
-# STAGING: After code review and commits to master branch. Triggers when *ANY*
-# branch is tagged with qp-staging-*
-- provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    tag: true
-    condition: $TRAVIS_TAG == qp-staging-*
+    condition: $TRAVIS_BRANCH == qp-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
 # PROD: After code review and commits to master branch. Triggers when *ANY*
 # branch is tagged with qp-prod-*
@@ -383,6 +306,20 @@ deploy:
     condition: $TRAVIS_TAG == qp-prod-*
 
 ## BigQuery Views:
+- provider: script
+  script:
+    # Update these version numbers when making changes to the views.
+    # TODO - add feature to allow making aliases from existing intermediate.
+    cd $TRAVIS_BUILD_DIR/schema/views_legacysql
+    && ./make_views.sh mlab-staging intermediate_v3_1_1 rc_v3_1 "rc release"
+    && cd $TRAVIS_BUILD_DIR/schema/views_standardsql
+    && ./make_views.sh mlab-staging intermediate_v3_1_1 rc_v3_1 "rc release"
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_TAG == views-staging-*
+
 - provider: script
   script:
     # Update these version numbers when making changes to the views.
