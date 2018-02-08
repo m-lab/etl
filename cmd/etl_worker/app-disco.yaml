@@ -6,7 +6,7 @@ service: etl-disco-parser
 #   https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml
 
 resources:
-  cpu: 1
+  cpu: 2
   # Instances support between [(cpu * 0.9) - 0.4, (cpu * 6.5) - 0.4]
   # Actual memory available is exposed via GAE_MEMORY_MB environment variable.
   memory_gb: 2
@@ -36,7 +36,7 @@ env_variables:
   RELEASE_TAG: ${TRAVIS_TAG}
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
-  MAX_WORKERS: 20
+  MAX_WORKERS: 50
   BIGQUERY_PROJECT: ${INJECTED_PROJECT}
   BIGQUERY_DATASET: 'base_tables'
   ANNOTATE_IP: 'false'
