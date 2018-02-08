@@ -40,8 +40,10 @@ before_install:
 # Install test credentials.
 # Note that anyone with github ACLs to push to a branch can hack .travis.yml
 # and discover these credentials in the travis logs.
-- echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key
-- gcloud auth activate-service-account --key-file=travis-testing.key
+- if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
+  echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key ;
+  gcloud auth activate-service-account --key-file=travis-testing.key ;
+  fi
 
 # These directories will be cached on successful "script" builds, and restored,
 # if available, to save time on future builds.
@@ -72,7 +74,8 @@ script:
 - if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
   for module in batch dedup ; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module -tags=integration ;
-  done
+  done ;
+  fi
 
 # Coveralls
 # TODO - figure out why batch.cov isn't being generated above.
@@ -94,9 +97,9 @@ deploy:
 ######################################################################
 # STAGING: Automatically deploys all pipeline services on new merge to
 # integration branch.
-# Deploys all staging services: NDT, PT, SS, QUEUE_PUSHER
+# Deploys all staging services: NDT, PT, SS, DISCO, QUEUE_PUSHER
 # (Currently this does not include NDT_BATCH or GARDENER, as GARDENER is in
-# development, and batch is driven by GARDENER.  Prod include the batch
+# development, and batch is driven by GARDENER.  Prod includes the batch
 # pipeline because we have been using it manually.)
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
@@ -112,6 +115,9 @@ deploy:
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-staging.yaml
+    && INJECTED_PROJECT=mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
@@ -180,6 +186,7 @@ deploy:
 # SANDBOX: before code review for development code in a specific branch.
 - provider: script
   script:
+    INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
   skip_cleanup: true
