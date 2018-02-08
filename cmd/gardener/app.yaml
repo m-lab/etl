@@ -51,19 +51,29 @@ network:
   forwarded_ports:
     - 9090/tcp
 
- liveness_check:
+// Liveness and Readiness
+// https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml
+// Instances that fail the liveness check will be restarted by appengine.
+liveness_check:
    path: "/alive"
    check_interval_sec: 30
    timeout_sec: 4
    failure_threshold: 2
    success_threshold: 1
+   // The default is 300, but gardener should come up fast.  But if readiness is a problem
+   // we want to ensure that readiness failure triggers first, so setting this to same
+   // as app_start_timeout_sec.  Combined with 2 x 30 check interval, this should give
+   // plenty of time for the readiness check to trigger.
+   initial_delay_sec: 120
 
+// Instances are only added to load balancer after passing the readiness check.
 readiness_check:
   path: "/ready"
   check_interval_sec: 5
   timeout_sec: 4
   failure_threshold: 2
   success_threshold: 1
+  // After this period, the deployment fails and is rolled back.
   app_start_timeout_sec: 120
 
 env_variables:
