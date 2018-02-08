@@ -1,0 +1,87 @@
+# Non-scaling instances for running cron jobs and other lightweight requests that should
+# always run to completion.
+
+runtime: go
+env: flex
+service: etl-gardener
+
+# Security Notes
+# Also see https://docs.google.com/document/d/1x46aDgatVRp0XB7vAgq2VufOa6hfHG_IICsHGUcHfs0
+#
+#  It looks like Google Sign-In requires webpage support.  Credentials are not
+#  handled transparently by chrome.  For interactive use, we would need to
+#  serve a page that has the sign-in code in it, and from there, support the
+#  requests that need credentials.  Search for "integrating google sign-in".
+#
+# For now we probably should just live with a security hole (for testing),
+# and plan to drive everything from a background process.
+handlers:
+- url: /reproc/.*
+  script: _go_app
+  #login: admin
+  #auth_fail_action: redirect
+  #secure: always
+- url: /status
+  script: _go_app
+- url: /.*
+  script: _go_app
+
+
+# Resource and scaling options. For more background, see:
+#   https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml
+
+# TODO(dev): adjust CPU and memory based on actual requirements.
+resources:
+  cpu: 2
+  # Instances support between [(cpu * 0.9) - 0.4, (cpu * 6.5) - 0.4]
+  # Actual memory available is exposed via GAE_MEMORY_MB environment variable.
+  memory_gb: 4
+
+manual_scaling:
+  instances: 1
+
+# Note: add a public port for GCE auto discovery by prometheus.
+# TODO(dev): are any values redundant or irrelevant?
+network:
+  instance_tag: etl-gardener
+  name: default
+  # Forward port 9090 on the GCE instance address to the same port in the
+  # container address. Only forward TCP traffic.
+  # Note: the default AppEngine container port 8080 cannot be forwarded.
+  forwarded_ports:
+    - 9090/tcp
+
+// Liveness and Readiness
+// https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml
+// Instances that fail the liveness check will be restarted by appengine.
+liveness_check:
+   path: "/alive"
+   check_interval_sec: 30
+   timeout_sec: 4
+   failure_threshold: 2
+   success_threshold: 1
+   // The default is 300, but gardener should come up fast.  But if readiness is a problem
+   // we want to ensure that readiness failure triggers first, so setting this to same
+   // as app_start_timeout_sec.  Combined with 2 x 30 check interval, this should give
+   // plenty of time for the readiness check to trigger.
+   initial_delay_sec: 120
+
+// Instances are only added to load balancer after passing the readiness check.
+readiness_check:
+  path: "/ready"
+  check_interval_sec: 5
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 1
+  // After this period, the deployment fails and is rolled back.
+  app_start_timeout_sec: 120
+
+env_variables:
+  RELEASE_TAG: ${TRAVIS_TAG}
+  COMMIT_HASH: ${TRAVIS_COMMIT}
+  GARDENER_SERVICE: true
+  TASKFILE_BUCKET: ${INJECTED_BUCKET}
+  PROJECT: ${INJECTED_PROJECT}
+  EXPERIMENT: NDT
+  QUEUE_BASE: etl-ndt-batch-
+  NUM_QUEUES: 8
