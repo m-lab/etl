@@ -1,12 +1,20 @@
-// Package main defines a command line tool for submitting date
-// ranges for reprocessing
+// Package main defines a service for handling various post-processing
+// and house-keeping tasks associated with the pipelines.
+// Most tasks will be run periodically, but some may be triggered
+// by URL requests from authorized sources.
 package main
 
 import (
+	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/pprof"
+	"os"
+	"regexp"
+	"runtime"
+	"strconv"
 
 	"github.com/m-lab/etl/batch"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -29,17 +37,153 @@ func setupPrometheus() {
 	go http.ListenAndServe(":9090", mux)
 }
 
-// These are used for command line.
+// QueuerFromEnv creates a Queuer struct initialized from environment variables.
+// It uses TASKFILE_BUCKET, PROJECT, QUEUE_BASE, and NUM_QUEUES.
+func QueuerFromEnv() (batch.Queuer, error) {
+	bucketName, ok := os.LookupEnv("TASKFILE_BUCKET")
+	if !ok {
+		return batch.Queuer{}, errors.New("TASKFILE_BUCKET not set")
+	}
+	project, ok := os.LookupEnv("PROJECT")
+	if !ok {
+		return batch.Queuer{}, errors.New("PROJECT not set")
+	}
+	queueBase, ok := os.LookupEnv("QUEUE_BASE")
+	if !ok {
+		return batch.Queuer{}, errors.New("QUEUE_BASE not set")
+	}
+	numQueues, err := strconv.Atoi(os.Getenv("NUM_QUEUES"))
+	if err != nil {
+		log.Println(err)
+		return batch.Queuer{}, errors.New("Parse error on NUM_QUEUES")
+	}
+
+	return batch.CreateQueuer(http.DefaultClient, nil, queueBase, numQueues, project, bucketName, false)
+}
+
+// Status provides basic information about the service.  For now, it is just
+// configuration and version info.  In future it will likely include more
+// dynamic information.
+// TODO(gfr) Add either a black list or a white list for the environment
+// variables, so we can hide sensitive vars. https://github.com/m-lab/etl/issues/384
+func Status(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "<html><body>\n")
+	fmt.Fprintf(w, "<p>NOTE: This is just one of potentially many instances.</p>\n")
+	commit := os.Getenv("COMMIT_HASH")
+	if len(commit) >= 8 {
+		fmt.Fprintf(w, "Release: %s <br>  Commit: <a href=\"https://github.com/m-lab/etl/tree/%s\">%s</a><br>\n",
+			os.Getenv("RELEASE_TAG"), os.Getenv("COMMIT_HASH"), os.Getenv("COMMIT_HASH")[0:7])
+	} else {
+		fmt.Fprintf(w, "Release: %s   Commit: unknown\n", os.Getenv("RELEASE_TAG"))
+	}
+
+	env := os.Environ()
+	for i := range env {
+		fmt.Fprintf(w, "%s</br>\n", env[i])
+	}
+	fmt.Fprintf(w, "</body></html>\n")
+}
+
+var (
+	monthRegex = regexp.MustCompile(`(?P<exp>[^/]*)/(?P<yyyymm>\d{4}[/-][01]\d/)`)
+)
+
+// Month initiates reprocessing of an entire month of archive data.
+// example http://localhost:8080/reproc/month?prefix=ndt/2017/09/
+// TODO - use flusher, ok := w.(http.Flusher) to send partial result updates.
+func Month(rwr http.ResponseWriter, rq *http.Request) {
+	rq.ParseForm()
+	// Log request data.
+	for key, value := range rq.Form {
+		log.Printf("Form:   %q == %q\n", key, value)
+	}
+
+	rawPrefix := rq.FormValue("prefix")
+	fields := monthRegex.FindStringSubmatch(rawPrefix)
+	log.Printf("%+v\n", fields)
+	if fields == nil {
+		log.Printf("Invalid prefix %q\n", rawPrefix)
+		fmt.Fprintf(rwr, "Invalid prefix %q\n", rawPrefix)
+		return
+	}
+
+	// batchQueuer.PostMonth(rawPrefix)
+	fmt.Fprintf(rwr, "Disabled... Would have processed %q\n", rawPrefix)
+}
+
+// TODO - remove?
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "ok")
+}
+
+func ready(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "ok")
+}
+
+func alive(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "ok")
+}
+
+func starting(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusServiceUnavailable)
+	fmt.Fprintf(w, `{"message": "Internal server error."}`)
+}
+
+func dead(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusInternalServerError)
+	fmt.Fprintf(w, `{"message": "Internal server error."}`)
+}
+
+// Persistent Queuer for use in handlers and gardener tasks.
+var batchQueuer batch.Queuer
+
+// runService starts a service handler and runs forever.
+// The configuration info comes from environment variables.
+func runService() {
+	// Enable block profiling
+	runtime.SetBlockProfileRate(1000000) // One event per msec.
+
+	setupPrometheus()
+	// We also setup another prometheus handler on a non-standard path. This
+	// path name will be accessible through the AppEngine service address,
+	// however it will be served by a random instance.
+	http.Handle("/random-metrics", promhttp.Handler())
+
+	http.HandleFunc("/_ah/health", healthCheckHandler)
+	http.HandleFunc("/", Status)
+	http.HandleFunc("/status", Status)
+
+	var err error
+	batchQueuer, err = QueuerFromEnv()
+	if err == nil {
+		http.HandleFunc("/alive", alive)
+		http.HandleFunc("/ready", ready)
+		http.HandleFunc("/reproc/month", Month)
+		log.Println("Running as a service.")
+	} else {
+		http.HandleFunc("/alive", dead)
+		http.HandleFunc("/ready", dead)
+		log.Println(err)
+		log.Println("Required environment variables are missing or invalid.")
+	}
+
+	// ListenAndServe, and terminate when it returns.
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+// These are used only for command line.  For service, environment variables are used
+// for general parameters, and request parameter for month.
 var (
 	fProject = flag.String("project", "", "Project containing queues.")
 	fQueue   = flag.String("queue", "etl-ndt-batch-", "Base of queue name.")
 	// TODO implement listing queues to determine number of queue, and change this to 0
 	fNumQueues = flag.Int("num_queues", 8, "Number of queues.  Normally determined by listing queues.")
-	fBucket    = flag.String("bucket", "", "Source bucket.")
-	fExper     = flag.String("experiment", "ndt", "Experiment prefix, without trailing slash.")
-	fMonth     = flag.String("month", "", "Single month spec, as YYYY/MM")
-	fDay       = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
-	fDryRun    = flag.Bool("dry_run", false, "Prevents all output to queue_pusher.")
+	// Gardener will only read from this bucket, so its ok to use production bucket as default.
+	fBucket = flag.String("bucket", "archive-mlab-oti", "Source bucket.")
+	fExper  = flag.String("experiment", "ndt", "Experiment prefix, without trailing slash.")
+	fMonth  = flag.String("month", "", "Single month spec, as YYYY/MM")
+	fDay    = flag.String("day", "", "Single day spec, as YYYY/MM/DD")
+	fDryRun = flag.Bool("dry_run", false, "Prevents all output to queue_pusher.")
 )
 
 func init() {
@@ -48,6 +192,14 @@ func init() {
 }
 
 func main() {
+	// Check if invoked as a service.
+	isService, _ := strconv.ParseBool(os.Getenv("GARDENER_SERVICE"))
+	if isService {
+		runService()
+		return
+	}
+
+	// Otherwise this is a command line invocation...
 	flag.Parse()
 	// Check that either project or dry-run is set.
 	// If dry-run, it is ok for the project to be unset, as the URLs
@@ -60,6 +212,7 @@ func main() {
 
 	q, err := batch.CreateQueuer(http.DefaultClient, nil, *fQueue, *fNumQueues, *fProject, *fBucket, *fDryRun)
 	if err != nil {
+		// In command line mode, good to just fast fail.
 		log.Fatal(err)
 	}
 	if *fMonth != "" {
