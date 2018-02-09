@@ -104,6 +104,19 @@ func TestPostMonth(t *testing.T) {
 	}
 }
 
+func TestGetTaskqueueStats(t *testing.T) {
+	// TODO - use mlab-testing instead of mlab-sandbox??
+	q, err := batch.CreateQueuer(http.DefaultClient, Options(), "test-", 8, "mlab-sandbox", "archive-mlab-test", true)
+	stats, err := q.GetTaskqueueStats()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stats) != 8 {
+		t.Fatal("Too few stats")
+	}
+	log.Println(stats)
+}
+
 // NOTE: This test depends on the contents of the test-archive-mlab-sandbox
 // bucket.  If it fails, check whether that bucket has been modified.
 func ExampleMonth() {
