@@ -14,7 +14,7 @@ resources:
 automatic_scaling:
   # We expect fairly small load, so a low minimum should reduce costs.
   min_num_instances: 1
-  max_num_instances: 4
+  max_num_instances: 3
   cool_down_period_sec: 900
   # We don't care much about latency, so a high utilization is desireable.
   cpu_utilization:
@@ -36,7 +36,7 @@ env_variables:
   RELEASE_TAG: ${TRAVIS_TAG}
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
-  MAX_WORKERS: 50
+  MAX_WORKERS: 60
   BIGQUERY_PROJECT: ${INJECTED_PROJECT}
   BIGQUERY_DATASET: 'base_tables'
   ANNOTATE_IP: 'false'
