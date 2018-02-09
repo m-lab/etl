@@ -109,6 +109,11 @@ func CreateQueuer(httpClient *http.Client, opts []option.ClientOption, queueBase
 }
 
 // GetTaskqueueStats returns the stats for a list of queues.
+// It should return a taskqueue.QueueStatistics for each queue.
+// If any errors occur, the last error will be returned.
+//  On request error, it will return a partial map (usually empty) and the error.
+// If there are missing queues or parse errors, it will add an empty QueueStatistics
+// object to the map, and continue, saving the error for later return.
 // TODO update queue_pusher to process multiple queue names in one request.
 // TODO add unit test.
 func (q *Queuer) GetTaskqueueStats() (map[string][]taskqueue.QueueStatistics, error) {
@@ -116,19 +121,19 @@ func (q *Queuer) GetTaskqueueStats() (map[string][]taskqueue.QueueStatistics, er
 	for i := range queueNames {
 		queueNames[i] = fmt.Sprintf("%s%d", q.QueueBase, i)
 	}
-	// This does not work from flex![]
-	//stats, err := taskqueue.QueueStats(context.Background(), queueNames)
 	allStats := make(map[string][]taskqueue.QueueStatistics, len(queueNames))
-	var err error
+	var finalErr error
 	for i := range queueNames {
-		var resp *http.Response
-		resp, err = http.Get(fmt.Sprintf(`https://queue-pusher-dot-%s.appspot.com/stats?queuename=%s`, q.Project, queueNames[i]))
+		// Would prefer to use this, but it does not work from flex![]
+		// stats, err := taskqueue.QueueStats(context.Background(), queueNames)
+		resp, err := http.Get(fmt.Sprintf(`https://queue-pusher-dot-%s.appspot.com/stats?queuename=%s`, q.Project, queueNames[i]))
 		if err != nil {
+			finalErr = err
 			log.Println(err)
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			err = errors.New("Bad status on http request")
+			finalErr = errors.New("Bad status on http request")
 			break
 		}
 		data := make([]byte, 10000)
@@ -136,19 +141,21 @@ func (q *Queuer) GetTaskqueueStats() (map[string][]taskqueue.QueueStatistics, er
 		n, err = io.ReadFull(resp.Body, data)
 		resp.Body.Close()
 		if err != io.ErrUnexpectedEOF {
+			finalErr = err
 			log.Println(err)
 			continue
 		}
 		var stats []taskqueue.QueueStatistics
 		err = json.Unmarshal(data[:n], &stats)
 		if err != nil {
+			finalErr = err
 			log.Println(err)
 			log.Printf(`https://queue-pusher-dot-%s.appspot.com/stats?queuename=%s`, q.Project, queueNames[i])
 			continue
 		}
 		allStats[queueNames[i]] = stats
 	}
-	return allStats, err
+	return allStats, finalErr
 }
 
 // Initially this used a hash, but using day ordinal is better
