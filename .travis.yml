@@ -131,7 +131,7 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
     && INJECTED_PROJECT=mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh ${INJECTED_PROJECT}
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml
@@ -216,7 +216,7 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
     && INJECTED_PROJECT=mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh ${INJECTED_PROJECT}
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
