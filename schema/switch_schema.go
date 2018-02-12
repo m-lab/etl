@@ -23,3 +23,9 @@ type SwitchStats struct {
 	Hostname   string   `json:"hostname" bigquery:"hostname"`
 	Experiment string   `json:"experiment" bigquery:"experiment"`
 }
+
+// Size estimates the number of bytes in the SwitchStats object.
+func (s *SwitchStats) Size() int {
+	return (len(s.Meta.FileName) + len(s.Meta.TestName) + 8 +
+		12*len(s.Sample) + len(s.Metric) + len(s.Hostname) + len(s.Experiment))
+}
