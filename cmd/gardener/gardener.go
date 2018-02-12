@@ -26,8 +26,8 @@ import (
 // All DataStore related code and variables
 // ###############################################################################
 const (
-	// dayStateKind categorizes the Datastore records.
-	datastoreKind = "gardener"
+	dsNamespace   = "gardener"
+	dsKind        = "gardener"
 	batchStateKey = "batch-state"
 )
 
@@ -56,8 +56,9 @@ func Load(name string, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	key := datastore.NameKey(datastoreKind, name, nil)
-	return client.Get(context.Background(), key, obj)
+	k := datastore.NameKey(dsKind, name, nil)
+	k.Namespace = dsNamespace
+	return client.Get(context.Background(), k, obj)
 }
 
 // Save stores an arbitrary object to kind/key in the default namespace.
@@ -69,7 +70,8 @@ func Save(key string, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	k := datastore.NameKey(datastoreKind, key, nil)
+	k := datastore.NameKey(dsKind, key, nil)
+	k.Namespace = dsNamespace
 	_, err = client.Put(context.Background(), k, obj)
 	return err
 }
@@ -197,6 +199,7 @@ func periodic() {
 
 		MaybeScheduleMoreTasks(&batchQueuer)
 
+		// There is no need for randomness, since this is a singleton handler.
 		time.Sleep(300 * time.Second)
 	}
 }
