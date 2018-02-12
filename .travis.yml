@@ -118,40 +118,22 @@ script:
 
 deploy:
 ######################################################################
-## Service: etl-gardener -- Service that runs various batch jobs, such as
-#                           reprocessing and dedupping.
-#
-# SANDBOX: before code review for development code in a specific branch.
-- provider: script
-  script:
-    # These injected params specify the project and bucket used by the service.
-    INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_BRANCH == gardener-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
 ######################################################################
-## Service: etl-disco-parser -- AppEngine Flexible Environment.
+######################################################################
+## Service: queue-pusher -- AppEngine Standard Environment.
 # SANDBOX: before code review for development code in a specific branch.
 - provider: script
-  script:
-    INJECTED_PROJECT=mlab-sandbox
+  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
   on:
     repo: m-lab/etl
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
-    # A bash-style 'if' condition, matching branches with a "sandbox-" prefix.
-    # Sandbox branches will be deployed to personalized service names.
-    # Integration branch will not use decorated service names.
-    condition: $TRAVIS_BRANCH == disco-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+    condition: $TRAVIS_BRANCH == qp-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
 ######################################################################
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
@@ -210,26 +192,45 @@ deploy:
     # Integration branch will not use decorated service names.
     condition: $TRAVIS_BRANCH == pt-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
-######################################################################
-## Service: queue-pusher -- AppEngine Standard Environment.
+## Service: etl-disco-parser -- AppEngine Flexible Environment.
 # SANDBOX: before code review for development code in a specific branch.
 - provider: script
-  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
+  script:
+    INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
     # Consider all branches and match using the condition. By default
     # "all_branches" is false, and the condition is ignored.
     all_branches: true
-    condition: $TRAVIS_BRANCH == qp-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+    # A bash-style 'if' condition, matching branches with a "sandbox-" prefix.
+    # Sandbox branches will be deployed to personalized service names.
+    # Integration branch will not use decorated service names.
+    condition: $TRAVIS_BRANCH == disco-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
-######################################################################
-## ALL ETL SERVICES
+## Service: etl-gardener -- Service that runs various batch jobs, such as
+#                           reprocessing and dedupping.
+#
+# SANDBOX: before code review for development code in a specific branch.
+- provider: script
+  script:
+    # These injected params specify the project and bucket used by the service.
+    INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == gardener-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+
 ######################################################################
 # STAGING: Automatically deploys all pipeline services on new merge to
 # integration branch.
+######################################################################
+## ALL ETL SERVICES
 # Deploys all staging services: NDT, NDT_BATCH, PT, SS, DISCO, QUEUE_PUSHER, GARDENER
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
@@ -297,41 +298,6 @@ deploy:
     all_branches: true
     condition: $TRAVIS_TAG == prod-*
 
-# PROD: Should be used AFTER code review and commit to master branch.  Triggers
-# when *ANY* branch is tagged with ss-prod-*'
-# TODO - collect all of the *-prod-* triggers together.
-- provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-prod.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_TAG == ss-prod-*
-
-# PROD: Should be used AFTER code review and commit to master branch.  Triggers
-# when *ANY* branch is tagged with pt-prod-*'
-- provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-prod.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_TAG == pt-prod-*
-
-# PROD: After code review and commits to master branch. Triggers when *ANY*
-# branch is tagged with qp-prod-*
-- provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    tag: true
-    condition: $TRAVIS_TAG == qp-prod-* || $TRAVIS_BRANCH == prod-*
-
 # PROD: Should be used AFTER code review and commit to master branch.
 # Triggers when *ANY* branch is tagged with ndt-prod-*'
 # Deploys BOTH STREAMING AND BATCH services.
@@ -348,6 +314,19 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_TAG == ndt-prod-* || $TRAVIS_TAG == prod-*
+
+
+# PROD: After code review and commits to master branch. Triggers when *ANY*
+# branch is tagged with qp-prod-*
+- provider: script
+  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    tag: true
+    condition: $TRAVIS_TAG == qp-prod-* || $TRAVIS_BRANCH == prod-*
 
 
 #############################################################################
