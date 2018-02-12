@@ -126,6 +126,8 @@ deploy:
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
 #  the system in a mixed state.  This should be manually addresses ASAP.
+# TODO - should have a bash script to do this deployment, with possible parallelism
+# and better error handling.
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
@@ -330,8 +332,10 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     tag: true
-    condition: $TRAVIS_TAG == qp-prod-*
+    condition: $TRAVIS_TAG == qp-prod-* || $TRAVIS_BRANCH == prod-*
 
+
+#############################################################################
 ## BigQuery Views:
 - provider: script
   script:
