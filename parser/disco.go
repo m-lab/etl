@@ -57,14 +57,8 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 		ParseTime: meta["parse_time"].(time.Time).Unix(),
 	}
 
-	// Measure the distribution of disco file sizes. (bytes / file)
-	// TODO: add table label, add extension label.
-	metrics.FileSizeHistogram.WithLabelValues("normal").Observe(float64(len(test)))
-
 	rdr := bytes.NewReader(test)
 	dec := json.NewDecoder(rdr)
-	rowCount := 0
-
 	for dec.More() {
 		var stats schema.SwitchStats
 		stats.Meta = ms
@@ -75,16 +69,6 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 			// TODO(dev) Should accumulate errors, instead of aborting?
 			return err
 		}
-		rowCount++
-
-		// Count the number of samples per record.
-		metrics.DeltaNumFieldsHistogram.WithLabelValues(
-			dp.TableName()).Observe(float64(len(stats.Sample)))
-
-		// TODO: measure metrics.RowSizeHistogram every so often with json size.
-		metrics.RowSizeHistogram.WithLabelValues(
-			dp.TableName()).Observe(float64(stats.Size()))
-
 		err = dp.inserter.InsertRow(stats)
 		if err != nil {
 			switch t := err.(type) {
@@ -101,11 +85,6 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 			return err
 		}
 	}
-
-	// Measure the distribution of records per file.
-	metrics.EntryFieldCountHistogram.WithLabelValues(
-		dp.TableName()).Observe(float64(rowCount))
-
 	metrics.TestCount.WithLabelValues(dp.TableName(), "disco", "ok").Inc()
 
 	return nil

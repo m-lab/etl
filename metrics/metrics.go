@@ -371,8 +371,6 @@ var (
 		[]string{"table", "phase", "retries", "status"},
 	)
 
-	// TODO(dev): bytes/row - generalize this metric for any file type.
-	//
 	// RowSizeHistogram provides a histogram of bq row json sizes.  It is intended primarily for
 	// NDT, so the bins are fairly large.  NDT average json is around 200K
 	//
@@ -397,8 +395,6 @@ var (
 		[]string{"table"},
 	)
 
-	// TODO(dev): fields/row - generalize this metric for any file type.
-	//
 	// DeltaNumFieldsHistogram provides a histogram of snapshot delta field counts.  It is intended primarily for
 	// NDT.  Typical is about 13, but max might be up to 120 or so.
 	//
@@ -422,8 +418,6 @@ var (
 		[]string{"table"},
 	)
 
-	// TODO(dev): rows/test - generalize this metric for any file type.
-	//
 	// EntryFieldCountHistogram provides a histogram of (approximate) row field counts.  It is intended primarily for
 	// NDT, so the bins are fairly large.  NDT snapshots typically total about 10k
 	// fields, 99th percentile around 35k fields, and occasionally as many as 50k.
@@ -442,10 +436,7 @@ var (
 		prometheus.HistogramOpts{
 			Name: "etl_entry_field_count",
 			Help: "total snapshot field count distributions.",
-			Buckets: []float64{
-				1, 2, 3, 4, 6, 8,
-				10, 12, 15, 20, 24, 30, 40, 48, 60, 80,
-				100, 120, 150, 200, 240, 300, 400, 480, 600, 800,
+			Buckets: []float64{100, 120, 150, 200, 240, 300, 400, 480, 600, 800,
 				1000, 1200, 1500, 2000, 2400, 3000, 4000, 4800, 6000, 8000,
 				10000, 12000, 15000, 20000, 24000, 30000, 40000, 48000, 60000, 80000,
 				100000, 120000, 150000, 200000, 240000, 300000, 400000, 480000,
@@ -473,7 +464,7 @@ var (
 			Help: "Insertion time distributions.",
 			Buckets: []float64{
 				0.001, 0.003, 0.01, 0.03, 0.1, 0.2, 0.5, 1.0, 2.0,
-				5.0, 10.0, 20.0, 50.0, 100.0, 200.0, math.Inf(+1),
+				5.0, 10.0, 20.0, 50.0, 100.0, math.Inf(+1),
 			},
 		},
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
@@ -504,25 +495,16 @@ var (
 		},
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
 		// TODO(soltesz): support a status field based on HTTP status.
-		[]string{"worker", "status"},
+		[]string{"worker"},
 	)
 
-	// TODO(dev): bytes/test - generalize this metric for size of any file type.
+	// TODO(dev): generalize this metric for size of any file type.
 	FileSizeHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_web100_snaplog_file_size_bytes",
 			Help: "Size of individual snaplog files.",
 			Buckets: []float64{
 				0,
-				1000,       // 1k
-				5000,       // 5k
-				10000,      // 10k
-				25000,      // 25k
-				50000,      // 50k
-				75000,      // 75k
-				100000,     // 100k
-				200000,     // 200k
-				300000,     // 300k
 				400000,     // 400k
 				500000,     // 500k
 				600000,     // 600k
@@ -559,28 +541,12 @@ var (
 	)
 )
 
-// catchStatus wraps the native http.ResponseWriter and captures any written HTTP
-// status codes.
-type catchStatus struct {
-	http.ResponseWriter
-	status int
-}
-
-// WriteHeader wraps the http.ResponseWriter.WriteHeader method, and preserves the
-// status code.
-func (cw *catchStatus) WriteHeader(code int) {
-	cw.ResponseWriter.WriteHeader(code)
-	cw.status = code
-}
-
 // DurationHandler wraps the call of an inner http.HandlerFunc and records the runtime.
 func DurationHandler(name string, inner http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()
-		cw := &catchStatus{w, http.StatusOK} // Default status is OK.
-		inner.ServeHTTP(cw, r)
-		// TODO(soltesz): change 'name' to 'table' label based on request parameter.
-		DurationHistogram.WithLabelValues(name, http.StatusText(cw.status)).Observe(
-			time.Since(t).Seconds())
+		inner.ServeHTTP(w, r)
+		// TODO(soltesz): collect success or failure status.
+		DurationHistogram.WithLabelValues(name).Observe(time.Since(t).Seconds())
 	}
 }
