@@ -13,6 +13,9 @@ queue:
   # Maximum number of concurrent requests.
   max_concurrent_requests: 360
 
+# Notes on performance tuning:
+# https://docs.google.com/document/d/114sbHx4wNK3eWpM1OnVD_Qhlwp2Hdh-XlBI5zTuNQP8/edit#
+#
 # BigQuery has a streaming insert quota per table.  The published quota is
 # 100MB/sec per table, but we have been hitting the quota at seemingly
 # lower rates - around 200 rows/second for NDT with deltas, which is about
