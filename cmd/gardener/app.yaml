@@ -67,6 +67,8 @@ liveness_check:
    initial_delay_sec: 120
 
 # Instances are only added to load balancer after passing the readiness check.
+# NOTE: Looking at the logs, the path and the interval don't seem to be respected.
+# TODO: would be good to sort out how this actually works.
 readiness_check:
   path: "/ready"
   check_interval_sec: 5

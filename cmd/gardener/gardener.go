@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,13 +13,169 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
-	"regexp"
 	"runtime"
 	"strconv"
+	"time"
 
+	"cloud.google.com/go/datastore"
 	"github.com/m-lab/etl/batch"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+// ###############################################################################
+// All DataStore related code and variables
+// ###############################################################################
+const (
+	// dayStateKind categorizes the Datastore records.
+	datastoreKind = "gardener"
+	batchStateKey = "batch-state"
+)
+
+var dsClient *datastore.Client
+
+func getDSClient() (*datastore.Client, error) {
+	var err error
+	var client *datastore.Client
+	if dsClient == nil {
+		project, ok := os.LookupEnv("PROJECT")
+		if !ok {
+			return dsClient, errors.New("PROJECT env var not set")
+		}
+		client, err = datastore.NewClient(context.Background(), project)
+		if err == nil {
+			dsClient = client
+		}
+	}
+	return dsClient, err
+}
+
+// Load retrieves an arbitrary record from datastore.
+func Load(name string, obj interface{}) error {
+	var client *datastore.Client
+	client, err := getDSClient()
+	if err != nil {
+		return err
+	}
+	key := datastore.NameKey(datastoreKind, name, nil)
+	return client.Get(context.Background(), key, obj)
+}
+
+// Save stores an arbitrary object to kind/key in the default namespace.
+// If a record already exists, then it is overwritten.
+// TODO(gfr) Make an upsert version of this:
+// https://cloud.google.com/datastore/docs/concepts/entities
+func Save(key string, obj interface{}) error {
+	client, err := getDSClient()
+	if err != nil {
+		return err
+	}
+	k := datastore.NameKey(datastoreKind, key, nil)
+	_, err = client.Put(context.Background(), k, obj)
+	return err
+}
+
+// ###############################################################################
+// Batch processing task scheduling
+// ###############################################################################
+
+// Persistent Queuer for use in handlers and gardener tasks.
+var batchQueuer batch.Queuer
+
+// QueueState holds the state information for each batch queue.
+type QueueState struct {
+	// Per queue, indicate which day is being processed in
+	// that queue.  No need to process more than one day at a time.
+	// The other queues will take up the slack while we add more
+	// tasks when one queue is emptied.
+
+	QueueName        string // Name of the batch queue.
+	NextTask         string // Name of task file currently being enqueued.
+	PendingPartition string // FQ Name of next table partition to be added.
+}
+
+// BatchState holds the entire batch processing state.
+// It holds the state locally, and also is stored in DataStore for
+// recovery when the instance is restarted, e.g. for weekly platform
+// updates.
+// At any given time, we restrict ourselves to a 14 day reprocessing window,
+// and finish the beginning of that window before reprocessing any dates beyond it.
+// When we determine that the first date in the window has been submitted for
+// processing, we advance the window up to the next pending date.
+type BatchState struct {
+	Hostname       string       // Hostname of the gardener that saved this.
+	InstanceID     string       // instance ID of the gardener that saved this.
+	WindowStart    time.Time    // Start of two week window we are working on.
+	QueueBase      string       // base name for queues.
+	QStates        []QueueState // States for each queue.
+	LastUpdateTime time.Time    // Time of last update.  (Is this in DS metadata?)
+}
+
+// MaybeScheduleMoreTasks will look for an empty task queue, and if it finds one, will look
+// for corresponding days to add to the queue.
+// Alternatively, it may look first for the N oldest days to be reprocessed, and will then
+// check whether any of the task queues for those oldest days is empty, and conditionally add tasks.
+func MaybeScheduleMoreTasks(queuer *batch.Queuer) {
+	// GetTaskQueueDepth returns the number of pending items in a task queue.
+	stats, err := queuer.GetTaskqueueStats()
+	if err != nil {
+		log.Println(err)
+	} else {
+		for k, v := range stats {
+			if len(v) > 0 && v[0].Tasks == 0 && v[0].InFlight == 0 {
+				log.Printf("Ready: %s: %v\n", k, v[0])
+				// Should add more tasks now.
+			}
+		}
+	}
+}
+
+// ###############################################################################
+//  Top level service control code.
+// ###############################################################################
+
+// StartDateRFC3339 is the date at which reprocessing will start when it catches
+// up to present.  For now, we are making this the beginning of the ETL timeframe,
+// until we get annotation fixed to use the actual data date instead of NOW.
+const StartDateRFC3339 = "2017-05-01T00:00:00Z00:00"
+
+// StartupBatch determines whether some other instance has control, and
+// assumes control if not.
+func StartupBatch(base string, numQueues int) (BatchState, error) {
+	hostname := os.Getenv("HOSTNAME")
+	instance := os.Getenv("GAE_INSTANCE")
+	queues := make([]QueueState, numQueues)
+	var bs BatchState
+	err := Load(batchStateKey, &bs)
+	if err != nil {
+		startDate, err := time.Parse(time.RFC3339, StartDateRFC3339)
+		if err != nil {
+			log.Println("Could not parse start time.  Not starting batch.")
+			return bs, err
+		}
+		bs = BatchState{hostname, instance, startDate, base, queues, time.Now()}
+
+	} else {
+		// TODO - should check whether we should take over, or leave alone.
+	}
+
+	err = Save(batchStateKey, &bs)
+	return bs, err
+}
+
+// Periodic will run approximately every 5 minutes.
+func Periodic() {
+	_, err := StartupBatch(batchQueuer.QueueBase, batchQueuer.NumQueues)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		log.Println("Periodic is running")
+
+		MaybeScheduleMoreTasks(&batchQueuer)
+
+		time.Sleep(300 * time.Second)
+	}
+}
 
 func setupPrometheus() {
 	// Define a custom serve mux for prometheus to listen on a separate port.
@@ -84,33 +241,6 @@ func Status(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "</body></html>\n")
 }
 
-var (
-	monthRegex = regexp.MustCompile(`(?P<exp>[^/]*)/(?P<yyyymm>\d{4}[/-][01]\d/)`)
-)
-
-// Month initiates reprocessing of an entire month of archive data.
-// example http://localhost:8080/reproc/month?prefix=ndt/2017/09/
-// TODO - use flusher, ok := w.(http.Flusher) to send partial result updates.
-func Month(rwr http.ResponseWriter, rq *http.Request) {
-	rq.ParseForm()
-	// Log request data.
-	for key, value := range rq.Form {
-		log.Printf("Form:   %q == %q\n", key, value)
-	}
-
-	rawPrefix := rq.FormValue("prefix")
-	fields := monthRegex.FindStringSubmatch(rawPrefix)
-	log.Printf("%+v\n", fields)
-	if fields == nil {
-		log.Printf("Invalid prefix %q\n", rawPrefix)
-		fmt.Fprintf(rwr, "Invalid prefix %q\n", rawPrefix)
-		return
-	}
-
-	// batchQueuer.PostMonth(rawPrefix)
-	fmt.Fprintf(rwr, "Disabled... Would have processed %q\n", rawPrefix)
-}
-
 // TODO - remove?
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "ok")
@@ -124,18 +254,10 @@ func alive(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "ok")
 }
 
-func starting(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusServiceUnavailable)
-	fmt.Fprintf(w, `{"message": "Internal server error."}`)
-}
-
 func dead(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(w, `{"message": "Internal server error."}`)
 }
-
-// Persistent Queuer for use in handlers and gardener tasks.
-var batchQueuer batch.Queuer
 
 // runService starts a service handler and runs forever.
 // The configuration info comes from environment variables.
@@ -158,9 +280,11 @@ func runService() {
 	if err == nil {
 		http.HandleFunc("/alive", alive)
 		http.HandleFunc("/ready", ready)
-		http.HandleFunc("/reproc/month", Month)
 		log.Println("Running as a service.")
+
+		go Periodic()
 	} else {
+		// This will cause app-engine to roll back.
 		http.HandleFunc("/alive", dead)
 		http.HandleFunc("/ready", dead)
 		log.Println(err)
@@ -170,6 +294,10 @@ func runService() {
 	// ListenAndServe, and terminate when it returns.
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
+
+// ###############################################################################
+//  Top level command line code.
+// ###############################################################################
 
 // These are used only for command line.  For service, environment variables are used
 // for general parameters, and request parameter for month.
