@@ -124,7 +124,7 @@ deploy:
 
 ## Service: queue-pusher -- AppEngine Standard Environment.
 - provider: script
-  script: $TRAVIS_BUILD_DIR/.personalize_deploy.sh
+  script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
@@ -139,8 +139,8 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
     && INJECTED_PROJECT=mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh ${INJECTED_PROJECT}
-    /tmp/${INJECTED_PROJECT}.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -222,8 +222,8 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
     && INJECTED_PROJECT=mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh ${INJECTED_PROJECT}
-    /tmp/${INJECTED_PROJECT}.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
@@ -265,6 +265,8 @@ deploy:
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-prod.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-prod.yaml
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
     # TODO - add disco here
   skip_cleanup: true
   on:
@@ -287,19 +289,6 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_TAG == ndt-prod-* || $TRAVIS_TAG == prod-*
-
-
-###################### JUST QUEUE-PUSHER ###############################
-# Triggers when *ANY* branch is tagged with qp-prod-* OR prod-*
-- provider: script
-  script: $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    tag: true
-    condition: $TRAVIS_TAG == qp-prod-* || $TRAVIS_BRANCH == prod-*
 
 
 ##########################  JUST VIEWS #################################
