@@ -75,7 +75,7 @@ func Save(key string, obj interface{}) error {
 }
 
 // ###############################################################################
-// Batch processing task scheduling
+//  Batch processing task scheduling and support code
 // ###############################################################################
 
 // Persistent Queuer for use in handlers and gardener tasks.
@@ -129,18 +129,38 @@ func MaybeScheduleMoreTasks(queuer *batch.Queuer) {
 	}
 }
 
-// ###############################################################################
-//  Top level service control code.
-// ###############################################################################
+// queuerFromEnv creates a Queuer struct initialized from environment variables.
+// It uses TASKFILE_BUCKET, PROJECT, QUEUE_BASE, and NUM_QUEUES.
+func queuerFromEnv() (batch.Queuer, error) {
+	bucketName, ok := os.LookupEnv("TASKFILE_BUCKET")
+	if !ok {
+		return batch.Queuer{}, errors.New("TASKFILE_BUCKET not set")
+	}
+	project, ok := os.LookupEnv("PROJECT")
+	if !ok {
+		return batch.Queuer{}, errors.New("PROJECT not set")
+	}
+	queueBase, ok := os.LookupEnv("QUEUE_BASE")
+	if !ok {
+		return batch.Queuer{}, errors.New("QUEUE_BASE not set")
+	}
+	numQueues, err := strconv.Atoi(os.Getenv("NUM_QUEUES"))
+	if err != nil {
+		log.Println(err)
+		return batch.Queuer{}, errors.New("Parse error on NUM_QUEUES")
+	}
+
+	return batch.CreateQueuer(http.DefaultClient, nil, queueBase, numQueues, project, bucketName, false)
+}
 
 // StartDateRFC3339 is the date at which reprocessing will start when it catches
 // up to present.  For now, we are making this the beginning of the ETL timeframe,
 // until we get annotation fixed to use the actual data date instead of NOW.
 const StartDateRFC3339 = "2017-05-01T00:00:00Z00:00"
 
-// StartupBatch determines whether some other instance has control, and
+// startupBatch determines whether some other instance has control, and
 // assumes control if not.
-func StartupBatch(base string, numQueues int) (BatchState, error) {
+func startupBatch(base string, numQueues int) (BatchState, error) {
 	hostname := os.Getenv("HOSTNAME")
 	instance := os.Getenv("GAE_INSTANCE")
 	queues := make([]QueueState, numQueues)
@@ -162,9 +182,13 @@ func StartupBatch(base string, numQueues int) (BatchState, error) {
 	return bs, err
 }
 
-// Periodic will run approximately every 5 minutes.
-func Periodic() {
-	_, err := StartupBatch(batchQueuer.QueueBase, batchQueuer.NumQueues)
+// ###############################################################################
+//  Top level service control code.
+// ###############################################################################
+
+// periodic will run approximately every 5 minutes.
+func periodic() {
+	_, err := startupBatch(batchQueuer.QueueBase, batchQueuer.NumQueues)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -194,30 +218,6 @@ func setupPrometheus() {
 	go http.ListenAndServe(":9090", mux)
 }
 
-// QueuerFromEnv creates a Queuer struct initialized from environment variables.
-// It uses TASKFILE_BUCKET, PROJECT, QUEUE_BASE, and NUM_QUEUES.
-func QueuerFromEnv() (batch.Queuer, error) {
-	bucketName, ok := os.LookupEnv("TASKFILE_BUCKET")
-	if !ok {
-		return batch.Queuer{}, errors.New("TASKFILE_BUCKET not set")
-	}
-	project, ok := os.LookupEnv("PROJECT")
-	if !ok {
-		return batch.Queuer{}, errors.New("PROJECT not set")
-	}
-	queueBase, ok := os.LookupEnv("QUEUE_BASE")
-	if !ok {
-		return batch.Queuer{}, errors.New("QUEUE_BASE not set")
-	}
-	numQueues, err := strconv.Atoi(os.Getenv("NUM_QUEUES"))
-	if err != nil {
-		log.Println(err)
-		return batch.Queuer{}, errors.New("Parse error on NUM_QUEUES")
-	}
-
-	return batch.CreateQueuer(http.DefaultClient, nil, queueBase, numQueues, project, bucketName, false)
-}
-
 // Status provides basic information about the service.  For now, it is just
 // configuration and version info.  In future it will likely include more
 // dynamic information.
@@ -241,22 +241,15 @@ func Status(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "</body></html>\n")
 }
 
-// TODO - remove?
-func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "ok")
-}
+var healthy = false
 
-func ready(w http.ResponseWriter, r *http.Request) {
+// healthCheck, for now, used for both /ready and /alive.
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	if !healthy {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `{"message": "Internal server error."}`)
+	}
 	fmt.Fprint(w, "ok")
-}
-
-func alive(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "ok")
-}
-
-func dead(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, `{"message": "Internal server error."}`)
 }
 
 // runService starts a service handler and runs forever.
@@ -270,23 +263,23 @@ func runService() {
 	// path name will be accessible through the AppEngine service address,
 	// however it will be served by a random instance.
 	http.Handle("/random-metrics", promhttp.Handler())
-
-	http.HandleFunc("/_ah/health", healthCheckHandler)
 	http.HandleFunc("/", Status)
 	http.HandleFunc("/status", Status)
 
+	http.HandleFunc("/alive", healthCheck)
+	http.HandleFunc("/ready", healthCheck)
+
 	var err error
-	batchQueuer, err = QueuerFromEnv()
+	batchQueuer, err = queuerFromEnv()
 	if err == nil {
-		http.HandleFunc("/alive", alive)
-		http.HandleFunc("/ready", ready)
+		healthy = true
 		log.Println("Running as a service.")
 
-		go Periodic()
+		// Run the background "periodic" function.
+		go periodic()
 	} else {
+		// Leaving healthy == false
 		// This will cause app-engine to roll back.
-		http.HandleFunc("/alive", dead)
-		http.HandleFunc("/ready", dead)
 		log.Println(err)
 		log.Println("Required environment variables are missing or invalid.")
 	}
