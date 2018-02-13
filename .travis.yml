@@ -265,9 +265,11 @@ deploy:
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-prod.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-prod.yaml
+    && INJECTED_PROJECT=mlab-oti
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
-    # TODO - add disco here
   skip_cleanup: true
   on:
     repo: m-lab/etl
