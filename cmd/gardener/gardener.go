@@ -158,7 +158,7 @@ func queuerFromEnv() (batch.Queuer, error) {
 // StartDateRFC3339 is the date at which reprocessing will start when it catches
 // up to present.  For now, we are making this the beginning of the ETL timeframe,
 // until we get annotation fixed to use the actual data date instead of NOW.
-const StartDateRFC3339 = "2017-05-01T00:00:00Z00:00"
+const StartDateRFC3339 = "2017-05-01T00:00:00Z"
 
 // startupBatch determines whether some other instance has control, and
 // assumes control if not.
