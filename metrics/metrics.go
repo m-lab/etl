@@ -516,7 +516,7 @@ var (
 	FileSizeHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_test_file_size_bytes",
-			Help: "Size of individual archive files.",
+			Help: "Size of individual test files.",
 			Buckets: []float64{
 				0,
 				1000,       // 1k
