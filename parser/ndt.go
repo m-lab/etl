@@ -351,6 +351,7 @@ func (n *NDTParser) processGroup() {
 // However, we often get s2c and c2s without corresponding meta files.  When this happens,
 // we proceed with an empty metaFile.
 func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
+	// TODO: handle this logic earlier in ParseAndInsert or in IsParsable.
 	if len(test.data) > 10*1024*1024 {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, ">10MB").Inc()
