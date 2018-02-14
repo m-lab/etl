@@ -107,6 +107,16 @@ OUTER:
 			// If verbose, log the filename that is skipped.
 			continue
 		}
+		kind, parsable := tt.Parser.IsParsable(testname, data)
+		if !parsable {
+			metrics.FileSizeHistogram.WithLabelValues(
+				tt.Parser.TableName(), kind, "ignored").Observe(float64(len(data)))
+			// Don't bother calling ParseAndInsert since this is unparsable.
+			continue
+		} else {
+			metrics.FileSizeHistogram.WithLabelValues(
+				tt.Parser.TableName(), kind, "parsed").Observe(float64(len(data)))
+		}
 		err := tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if err != nil {
