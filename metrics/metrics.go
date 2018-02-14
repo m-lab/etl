@@ -507,11 +507,16 @@ var (
 		[]string{"worker", "status"},
 	)
 
-	// TODO(dev): bytes/test - generalize this metric for size of any file type.
+	// FileSizeHistogram provides a histogram of source file sizes. The bucket
+	// sizes should cover a wide range of input file sizes.
+	//
+	// Example usage:
+	//   metrics.FileSizeHistogram.WithLabelValues(
+	//       "ndt", "c2s_snaplog", "parsed").Observe(size)
 	FileSizeHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "etl_web100_snaplog_file_size_bytes",
-			Help: "Size of individual snaplog files.",
+			Name: "etl_test_file_size_bytes",
+			Help: "Size of individual test files.",
 			Buckets: []float64{
 				0,
 				1000,       // 1k
@@ -555,7 +560,7 @@ var (
 				math.Inf(+1),
 			},
 		},
-		[]string{"range"},
+		[]string{"table", "kind", "group"},
 	)
 )
 

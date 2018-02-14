@@ -188,14 +188,24 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 	return *snap, nil
 }
 
+// IsParsable returns the canonical test type and whether to parse data.
+func (ss *SSParser) IsParsable(testName string, data []byte) (string, bool) {
+	if strings.HasSuffix(testName, ".web100") {
+		return "web100", true
+	}
+	if strings.HasSuffix(testName, ".tra") {
+		// Ignore the trace file for sidestream test.
+		return "trace", false
+	}
+	return "unknown", false
+}
+
+// ParseAndInsert extracts each sidestream record from the rawContent and inserts each into a separate row.
 func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	// TODO: for common metric states with constant labels, define global constants.
 	metrics.WorkerState.WithLabelValues(ss.TableName(), "ss").Inc()
 	defer metrics.WorkerState.WithLabelValues(ss.TableName(), "ss").Dec()
-	if strings.Contains(testName, ".tra") {
-		// Ignore the trace file for sidestream test.
-		return nil
-	}
+
 	log_time, err := ExtractLogtimeFromFilename(testName)
 	if err != nil {
 		return err

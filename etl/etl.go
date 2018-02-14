@@ -47,7 +47,7 @@ type Inserter interface {
 	RowStats // Inserter must implement RowStats
 }
 
-// Params for NewInserter
+// InserterParams for NewInserter
 type InserterParams struct {
 	// The project comes from os.GetEnv("GCLOUD_PROJECT")
 	// These specify the google cloud dataset/table to write to.
@@ -60,7 +60,14 @@ type InserterParams struct {
 	RetryDelay time.Duration // Time to sleep between retries on Quota exceeded failures.
 }
 
+// Parser is the generic interface implemented by each experiment parser.
 type Parser interface {
+	// IsParsable reports a canonical file "kind" and whether the file appears to
+	// be parsable based on the name and content size. A true result does not
+	// guarantee that ParseAndInsert will succeed, but a false result means that
+	// ParseAndInsert can be skipped.
+	IsParsable(testName string, test []byte) (string, bool)
+
 	// meta - metadata, e.g. from the original tar file name.
 	// testName - Name of test file (typically extracted from a tar file)
 	// test - binary test data
