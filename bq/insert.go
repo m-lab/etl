@@ -31,7 +31,21 @@ import (
 	"github.com/m-lab/etl/metrics"
 )
 
-const insertsBeforeRowJSONCount = 1000
+// insertsBeforeRowJSONCount controls how often we perform a wasted JSON marshal
+// on a row before inserting it into BQ. The smaller the number the more wasted
+// CPU time.
+const insertsBeforeRowJSONCount = 5000
+
+// tableInsertCounts tracks the number of inserts to each table. Keys are table
+// names and values are *int32.
+var tableInsertCounts = sync.Map{}
+
+func init() {
+	// For every table name, add a counter to the tableInsertCounts map.
+	for _, table := range etl.DataTypeToTable {
+		tableInsertCounts.Store(table, new(int32))
+	}
+}
 
 // NewInserter creates a new BQInserter with appropriate characteristics.
 // TODO(P3) Include the project name in the parameters.
@@ -141,9 +155,14 @@ func (in *BQInserter) InsertRow(data interface{}) error {
 
 // maybeCountRowSize periodically converts a row to JSON to measure its size.
 func (in *BQInserter) maybeCountRowSize(data interface{}) {
-	atomic.AddInt32(&insertCount, 1)
+	counter, ok := tableInsertCounts.Load(in.TableBase())
+	if !ok {
+		// The inserter is writing to a table not known to etl.DataTypeToTable.
+		return
+	}
+	count := atomic.AddInt32(counter.(*int32), 1)
 	// Do this just once in a while, so it doesn't take much resource.
-	if insertCount%insertsBeforeRowJSONCount != 0 {
+	if count%insertsBeforeRowJSONCount != 0 {
 		return
 	}
 	jsonRow, _ := json.Marshal(data)
