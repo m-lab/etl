@@ -190,7 +190,7 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 
 // IsParsable returns the canonical test type and whether to parse data.
 func (ss *SSParser) IsParsable(testName string, data []byte) (string, bool) {
-	if strings.HasSuffix(testName, "web100") {
+	if strings.HasSuffix(testName, ".web100") {
 		return "web100", true
 	}
 	if strings.HasSuffix(testName, ".tra") {
