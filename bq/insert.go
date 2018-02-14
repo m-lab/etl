@@ -94,9 +94,8 @@ func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Insert
 
 //===============================================================================
 var (
-	clientOnce  sync.Once // This avoids a race on setting bqClient.
-	bqClient    *bigquery.Client
-	insertCount int32 // number of inserts performed globally.
+	clientOnce sync.Once // This avoids a race on setting bqClient.
+	bqClient   *bigquery.Client
 )
 
 // MustGetClient returns the Singleton bigquery client for this process.
