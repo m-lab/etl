@@ -169,6 +169,34 @@ func (n *NDTParser) FullTableName() string {
 	return n.inserter.FullTableName()
 }
 
+// IsParsable returns the canonical test type and whether to parse data.
+func (n *NDTParser) IsParsable(testName string, data []byte) (string, bool) {
+	info, err := ParseNDTFileName(testName)
+	if err != nil {
+		return "unknown", false
+	}
+	switch info.Suffix {
+	// Parsable types:
+	case "c2s_snaplog":
+		fallthrough // b/c this is parsable
+	case "s2c_snaplog":
+		fallthrough // b/c this is parsable
+	case "meta":
+		return info.Suffix, true
+	// Unparsable types:
+	case "c2s_ndttrace":
+		fallthrough // b/c this is unparsable
+	case "s2c_ndttrace":
+		fallthrough // b/c this is unparsable
+	case "cputime":
+		return info.Suffix, false
+	}
+	// All other cases.
+	metrics.TestCount.WithLabelValues(
+		n.TableName(), "unknown", "unknown suffix").Inc()
+	return "unknown", false
+}
+
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
 func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName string, content []byte) error {
 	// Scraper adds files to tar file in lexical order.  This groups together all
@@ -262,12 +290,9 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		}
 		n.metaFile = ProcessMetaFile(
 			n.TableName(), n.inserter.TableSuffix(), testName, content)
-	case "c2s_ndttrace":
-	case "s2c_ndttrace":
-	case "cputime":
 	default:
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), "unknown", "unknown suffix").Inc()
+			n.TableName(), "unknown", "unparsable file").Inc()
 		return errors.New("Unknown test suffix: " + info.Suffix)
 	}
 
@@ -326,21 +351,13 @@ func (n *NDTParser) processGroup() {
 // However, we often get s2c and c2s without corresponding meta files.  When this happens,
 // we proceed with an empty metaFile.
 func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
-	// NOTE: this file size threshold and the number of simultaneous workers
-	// defined in etl_worker.go must guarantee that all files written to
-	// /mnt/tmpfs will fit.
 	if len(test.data) > 10*1024*1024 {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, ">10MB").Inc()
 		log.Printf("Ignoring oversize snaplog: %d, %s\n",
 			len(test.data), test.fn)
-		metrics.FileSizeHistogram.WithLabelValues(
-			"huge").Observe(float64(len(test.data)))
 		return
 	}
-	// Record the file size.
-	metrics.FileSizeHistogram.WithLabelValues(
-		"normal").Observe(float64(len(test.data)))
 
 	if len(test.data) < 16*1024 {
 		metrics.WarningCount.WithLabelValues(

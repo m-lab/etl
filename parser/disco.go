@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -37,6 +38,15 @@ func (dp *DiscoParser) TaskError() error {
 	return nil
 }
 
+// IsParsable returns the canonical test type and whether to parse data.
+func (dp *DiscoParser) IsParsable(testName string, data []byte) (string, bool) {
+	if strings.HasSuffix(testName, "switch.json") ||
+		strings.HasSuffix(testName, "switch.json.gz") {
+		return "switch", true
+	}
+	return "unknown", false
+}
+
 // Disco data a JSON representation that should be pushed directly into BigQuery.
 // For now, though, we parse into a struct, for compatibility with current inserter
 // backend.
@@ -56,10 +66,6 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 		TestName:  meta["testname"].(string),
 		ParseTime: meta["parse_time"].(time.Time).Unix(),
 	}
-
-	// Measure the distribution of disco file sizes. (bytes / file)
-	// TODO: add table label, add extension label.
-	metrics.FileSizeHistogram.WithLabelValues("normal").Observe(float64(len(test)))
 
 	rdr := bytes.NewReader(test)
 	dec := json.NewDecoder(rdr)

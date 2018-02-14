@@ -250,6 +250,15 @@ func (pt *PTParser) NumBufferedTests() int {
 	return len(pt.previousTests)
 }
 
+// IsParsable returns the canonical test type and whether to parse data.
+func (pt *PTParser) IsParsable(testName string, data []byte) (string, bool) {
+	if strings.HasSuffix(testName, "paris") {
+		return "paris", true
+	}
+	return "unknown", false
+}
+
+// ParseAndInsert parses a paris-traceroute log file and inserts results into a single row.
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(pt.TableName(), "pt").Inc()
 	defer metrics.WorkerState.WithLabelValues(pt.TableName(), "pt").Dec()
