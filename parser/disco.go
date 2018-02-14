@@ -40,6 +40,8 @@ func (dp *DiscoParser) TaskError() error {
 
 // IsParsable returns the canonical test type and whether to parse data.
 func (dp *DiscoParser) IsParsable(testName string, data []byte) (string, bool) {
+	// Files look like: "<date>-to-<date>-switch.json.gz"
+	// Notice the "-" before switch.
 	if strings.HasSuffix(testName, "switch.json") ||
 		strings.HasSuffix(testName, "switch.json.gz") {
 		return "switch", true
