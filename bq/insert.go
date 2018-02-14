@@ -33,17 +33,17 @@ import (
 
 // insertsBeforeRowJSONCount controls how often we perform a wasted JSON marshal
 // on a row before inserting it into BQ. The smaller the number the more wasted
-// CPU time.
-const insertsBeforeRowJSONCount = 5000
+// CPU time. -- 1% of inserts.
+const insertsBeforeRowJSONCount = 100
 
 // tableInsertCounts tracks the number of inserts to each table. Keys are table
-// names and values are *int32.
+// names and values are *uint32.
 var tableInsertCounts = sync.Map{}
 
 func init() {
 	// For every table name, add a counter to the tableInsertCounts map.
 	for _, table := range etl.DataTypeToTable {
-		tableInsertCounts.Store(table, new(int32))
+		tableInsertCounts.Store(table, new(uint32))
 	}
 }
 
@@ -153,18 +153,23 @@ func (in *BQInserter) InsertRow(data interface{}) error {
 }
 
 // maybeCountRowSize periodically converts a row to JSON to measure its size.
-func (in *BQInserter) maybeCountRowSize(data interface{}) {
+func (in *BQInserter) maybeCountRowSize(data []interface{}) {
+	if len(data) == 0 {
+		return
+	}
 	counter, ok := tableInsertCounts.Load(in.TableBase())
 	if !ok {
 		// The inserter is writing to a table not known to etl.DataTypeToTable.
 		return
 	}
-	count := atomic.AddInt32(counter.(*int32), 1)
+	count := atomic.AddUint32(counter.(*uint32), 1)
 	// Do this just once in a while, so it doesn't take much resource.
 	if count%insertsBeforeRowJSONCount != 0 {
 		return
 	}
-	jsonRow, _ := json.Marshal(data)
+	// Note: this estimate works very well for map[]bigquery.Value types. And, we
+	// believe it is an okay estimate for struct types.
+	jsonRow, _ := json.Marshal(data[0])
 	metrics.RowSizeHistogram.WithLabelValues(
 		in.TableBase()).Observe(float64(len(jsonRow)))
 }
