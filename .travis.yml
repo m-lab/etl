@@ -56,15 +56,19 @@ script:
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
 # TODO - separate storage tests into integration and lightweight.
-- MODULES="annotation appengine batch bq dedup etl metrics parser schema storage task web100"
+- MODULES="annotation appengine/queue_pusher batch bq dedup etl metrics parser schema task web100"
 - for module in $MODULES; do
     COVER_PKGS=${COVER_PKGS}./$module/..., ;
   done
 - COVER_PKGS=${COVER_PKGS::-1}  # Trim the trailing comma
-
+- EC=0
 - for module in $MODULES; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module ;
+    EC=$[ $EC || $? ] ;
   done
+- echo "summary status $EC" ;
+- if [[ $EC != 0 ]]; then exit $EC; fi
+
 
 # Rerun modules with integration tests.  This means that some tests are repeated, but otherwise
 # we lose some coverage.  The corresponding cov files are overwritten, but that is OK since
@@ -74,11 +78,13 @@ script:
 - if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
   for module in batch dedup ; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=$module.cov github.com/m-lab/etl/$module -tags=integration ;
+    EC=$[ $EC || $? ] ;
   done ;
+  echo "summary status $EC" ;
+  if [[ $EC != 0 ]]; then exit $EC; fi ;
   fi
 
 # Coveralls
-# TODO - figure out why batch.cov isn't being generated above.
 # Run "unit tests" with coverage.
 
 # Coveralls
