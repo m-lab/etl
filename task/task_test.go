@@ -70,6 +70,10 @@ type TestParser struct {
 	files []string
 }
 
+func (tp *TestParser) IsParsable(testName string, test []byte) (string, bool) {
+	return "ext", true
+}
+
 func (tp *TestParser) TableName() string {
 	return "test-table"
 }
