@@ -150,6 +150,7 @@ deploy:
 ## Service: etl-sidestream-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
+    INJECTED_PROJECT=mab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
   skip_cleanup: true
@@ -161,6 +162,7 @@ deploy:
 ## Service: etl-traceroute-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
+    INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
   skip_cleanup: true
@@ -224,10 +226,12 @@ deploy:
     && INJECTED_PROJECT=mlab-staging
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-staging.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-staging.yaml
+    && INJECTED_PROJECT=mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
+    && INJECTED_PROJECT=mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && INJECTED_PROJECT=mlab-staging
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
@@ -261,10 +265,12 @@ deploy:
 #       leaving the system in a mixed state.  This should be manually addresses ASAP.
 - provider: script
   script:
+    INJECTED_PROJECT=measurement-lab
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute-prod.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream-prod.yaml
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
+    && INJECTED_BUCKET=measurement-lab
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && INJECTED_PROJECT=measurement-lab
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml

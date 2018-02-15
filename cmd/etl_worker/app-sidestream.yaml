@@ -41,6 +41,6 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   MAX_WORKERS: 50
-  BIGQUERY_PROJECT: 'mlab-sandbox'
-  BIGQUERY_DATASET: 'mlab_sandbox'
+  BIGQUERY_PROJECT: ${INJECTED_PROJECT}
+  BIGQUERY_DATASET: 'base_tables'
   ANNOTATE_IP: 'true'
