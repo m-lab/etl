@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -588,16 +587,6 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if deltaFieldCount > 43000 {
 		log.Printf("Lots of fields (%d) processing %s from %s\n",
 			deltaFieldCount, test.fn, n.taskFileName)
-	}
-	// Do this just once in a while, so it doesn't take much resource.
-	if deltaFieldCount > 30000 { // Roughly the top 5%
-		jsonRow, _ := json.Marshal(results)
-		metrics.RowSizeHistogram.WithLabelValues(n.TableName()).
-			Observe(float64(len(jsonRow)))
-		if len(jsonRow) > 800000 {
-			log.Printf("Large json (%d bytes, %d fields) processing %s from %s\n",
-				len(jsonRow), deltaFieldCount, test.fn, n.taskFileName)
-		}
 	}
 
 	// TODO - estimate the size of the json (or fields) to allow more rows per request,
