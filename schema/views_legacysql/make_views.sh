@@ -56,7 +56,7 @@ create_view() {
 
   # Some FROM targets must link to specified dataset.
   # Substitute dataset name for STANDARD_SUB sql vars.
-  sql=`echo "$sql" | DATASET=${dataset/:/.} envsubst '$DATASET'`
+  sql=`echo "$sql" | DATASET=${dataset/:/.} envsubst '$DATASET $PROJECT'`
 
   echo $dataset.$view
   bq rm --force $dataset.$view
