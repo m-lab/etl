@@ -62,8 +62,8 @@ script:
   done
 - COVER_PKGS=${COVER_PKGS::-1}  # Trim the trailing comma
 - EC=0
+# Note that for modules in subdirectories, this replaces separating slashes with _.
 - for module in $MODULES; do
-    # Note that for modules in subdirectories, this replaces separating slashes with _.
     go test -v -coverpkg=$COVER_PKGS -coverprofile=${module.cov//\//_} github.com/m-lab/etl/$module ;
     EC=$[ $EC || $? ] ;
   done
@@ -76,9 +76,9 @@ script:
 # the non-integration tests are repeated.  If we change the unit tests to NOT run when integration
 # test tag is set, then we would need to have separate cov files.
 # Note: we do not run integration tests from forked PRs b/c the SA is unavailable.
+# Note that for modules in subdirectories, this replaces separating slashes with _.
 - if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
   for module in batch dedup ; do
-    # Note that for modules in subdirectories, this replaces separating slashes with _.
     go test -v -coverpkg=$COVER_PKGS -coverprofile=${module.cov//\//_} github.com/m-lab/etl/$module -tags=integration ;
     EC=$[ $EC || $? ] ;
   done ;
