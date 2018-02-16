@@ -67,7 +67,7 @@ script:
     EC=$[ $EC || $? ] ;
   done
 - echo "summary status $EC" ;
-- if [[ $EC != 0 ]]; then exit $EC; fi
+- if [[ $EC != 0 ]]; then false; fi ;
 
 
 # Rerun modules with integration tests.  This means that some tests are repeated, but otherwise
@@ -81,7 +81,7 @@ script:
     EC=$[ $EC || $? ] ;
   done ;
   echo "summary status $EC" ;
-  if [[ $EC != 0 ]]; then exit $EC; fi ;
+  if [[ $EC != 0 ]]; then false; fi ;
   fi
 
 # Coveralls
