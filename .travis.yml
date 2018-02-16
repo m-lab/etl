@@ -182,20 +182,6 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == disco-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
-## Service: etl-gardener -- Service that runs various batch jobs, such as
-#                           reprocessing and dedupping.
-- provider: script
-  script:
-    # These injected params specify the project and bucket used by the service.
-    INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_BRANCH == gardener-sandbox-* || $TRAVIS_BRANCH == sandbox-*
-
 ######################################################################
 #  Staging deployments
 #  Auto deployed on merge with integration branch
@@ -234,9 +220,6 @@ deploy:
     && INJECTED_PROJECT=mlab-staging
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
-    && INJECTED_PROJECT=mlab-staging INJECTED_BUCKET=archive-mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
     && cd $TRAVIS_BUILD_DIR/schema/views_legacysql
