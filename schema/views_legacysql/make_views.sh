@@ -20,6 +20,10 @@
 # This means that each view must be created before being used in other
 # view definitions.
 
+# Service Accounts
+# View targets require bigquery-table-deployer
+# Appengine targets require ...
+
 set -u
 ###########################################################################
 #                            Bash Parameters                              #
@@ -56,7 +60,7 @@ create_view() {
 
   # Some FROM targets must link to specified dataset.
   # Substitute dataset name for STANDARD_SUB sql vars.
-  sql=`echo "$sql" | DATASET=${dataset/:/.} envsubst '$DATASET $PROJECT'`
+  sql=`echo "$sql" | DATASET=${dataset/:/.} PROJECT=${PROJECT} envsubst '$DATASET $PROJECT'`
 
   echo $dataset.$view
   bq rm --force $dataset.$view
