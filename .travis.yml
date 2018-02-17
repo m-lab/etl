@@ -210,7 +210,8 @@ deploy:
   script:
     # Update these version numbers when making changes to the views.
     # TODO - add feature to allow making aliases from existing intermediate.
-    $TRAVIS_BUILD_DIR/travis/activate-service-account.sh -SERVICE_ACCOUNT_mlab_sandbox
+    # $TRAVIS_BUILD_DIR/travis/activate-service-account.sh -SERVICE_ACCOUNT_mlab_sandbox
+    gcloud auth activate-service-account --key-file=/tmp/mlab-sandbox.json
     && cd $TRAVIS_BUILD_DIR/schema/views_legacysql
     && ./make_views.sh mlab-sandbox intermediate_v3_1_1 rc_v3_1 "rc release"
     && cd $TRAVIS_BUILD_DIR/schema/views_standardsql
