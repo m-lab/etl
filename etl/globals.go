@@ -210,7 +210,7 @@ var (
 		NDT:             10,
 		NDT_OMIT_DELTAS: 50,
 		SS:              100,
-		PT:              300,
+		PT:              100,
 		SW:              100,
 		INVALID:         0,
 	}
