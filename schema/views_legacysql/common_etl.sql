@@ -70,5 +70,5 @@ SELECT
   web100_log_entry.snap.X_Rcvbuf, web100_log_entry.snap.X_Sndbuf, web100_log_entry.snap.X_dbg1,
   web100_log_entry.snap.X_dbg2, web100_log_entry.snap.X_dbg3, web100_log_entry.snap.X_dbg4,
   web100_log_entry.snap.X_rcv_ssthresh, web100_log_entry.snap.X_wnd_clamp
-FROM [measurement-lab:base_tables.ndt]
+FROM [${PROJECT}:base_tables.ndt]
 WHERE _PARTITIONTIME >= TIMESTAMP("2017-05-11 00:00:00")
