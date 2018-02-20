@@ -4,7 +4,7 @@
 # This should generally be run from a travis deployment, and the
 # arguments should be derived from the deployment tag.
 # The following legacySQL views are created in the rc/release datasets:
-#      ndt_all​ - all (lightly filtered) tests, excluding EB,
+#    ndt_all​ - all (lightly filtered) tests, excluding EB,
 #              blacklisted, short and very long tests.
 #    Separate views for download and upload NDT tests:
 # ​​​     ndt_downloads
@@ -21,8 +21,8 @@
 # view definitions.
 
 # Service Accounts
-# View targets require bigquery-table-deployer
-# Appengine targets require ...
+#   This script creates datasets and views, which require several bigquery permissions.
+#   The appropriate permissions are provided by the bigquery-table-deployer role.
 
 set -u
 ###########################################################################
