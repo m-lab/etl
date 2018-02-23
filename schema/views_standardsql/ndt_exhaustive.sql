@@ -8,4 +8,4 @@ FROM `${DATASET}.common_etl`
 WHERE partition_date > DATE("2017-05-10")
 UNION ALL
 SELECT *
-FROM `measurement-lab.legacy.ndt_plx`
+FROM `${PROJECT}.legacy.ndt_plx`

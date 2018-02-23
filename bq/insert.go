@@ -15,11 +15,13 @@
 package bq
 
 import (
+	"encoding/json"
 	"log"
 	"math/rand"
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -28,6 +30,22 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 )
+
+// insertsBeforeRowJSONCount controls how often we perform a wasted JSON marshal
+// on a row before inserting it into BQ. The smaller the number the more wasted
+// CPU time. -- 1% of inserts.
+const insertsBeforeRowJSONCount = 100
+
+// tableInsertCounts tracks the number of inserts to each table. Keys are table
+// names and values are *uint32.
+var tableInsertCounts = sync.Map{}
+
+func init() {
+	// For every table name, add a counter to the tableInsertCounts map.
+	for _, table := range etl.DataTypeToTable {
+		tableInsertCounts.Store(table, new(uint32))
+	}
+}
 
 // NewInserter creates a new BQInserter with appropriate characteristics.
 // TODO(P3) Include the project name in the parameters.
@@ -134,6 +152,28 @@ func (in *BQInserter) InsertRow(data interface{}) error {
 	return in.InsertRows([]interface{}{data})
 }
 
+// maybeCountRowSize periodically converts a row to JSON to measure its size.
+func (in *BQInserter) maybeCountRowSize(data []interface{}) {
+	if len(data) == 0 {
+		return
+	}
+	counter, ok := tableInsertCounts.Load(in.TableBase())
+	if !ok {
+		// The inserter is writing to a table not known to etl.DataTypeToTable.
+		return
+	}
+	count := atomic.AddUint32(counter.(*uint32), 1)
+	// Do this just once in a while, so it doesn't take much resource.
+	if count%insertsBeforeRowJSONCount != 0 {
+		return
+	}
+	// Note: this estimate works very well for map[]bigquery.Value types. And, we
+	// believe it is an okay estimate for struct types.
+	jsonRow, _ := json.Marshal(data[0])
+	metrics.RowSizeHistogram.WithLabelValues(
+		in.TableBase()).Observe(float64(len(jsonRow)))
+}
+
 // Caller should check error, and take appropriate action before calling again.
 // TODO - should this return a specific error to indicate that a flush is needed
 // instead of flushing internally?  The "handle errors in the middle" would
@@ -141,6 +181,8 @@ func (in *BQInserter) InsertRow(data interface{}) error {
 func (in *BQInserter) InsertRows(data []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "insert").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "insert").Dec()
+
+	in.maybeCountRowSize(data)
 
 	for len(data)+len(in.rows) >= in.params.BufferSize {
 		// space >= len(data)

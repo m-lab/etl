@@ -4,7 +4,7 @@
 # This should generally be run from a travis deployment, and the
 # arguments should be derived from the deployment tag.
 # The following legacySQL views are created in the rc/release datasets:
-#      ndt_all​ - all (lightly filtered) tests, excluding EB,
+#    ndt_all​ - all (lightly filtered) tests, excluding EB,
 #              blacklisted, short and very long tests.
 #    Separate views for download and upload NDT tests:
 # ​​​     ndt_downloads
@@ -19,6 +19,10 @@
 # bq mk --view validates the view query, and fails if the query isn't valid.
 # This means that each view must be created before being used in other
 # view definitions.
+
+# Service Accounts
+#   This script creates datasets and views, which require several bigquery permissions.
+#   The appropriate permissions are provided by the bigquery-table-deployer role.
 
 set -u
 ###########################################################################
@@ -56,7 +60,7 @@ create_view() {
 
   # Some FROM targets must link to specified dataset.
   # Substitute dataset name for STANDARD_SUB sql vars.
-  sql=`echo "$sql" | DATASET=${dataset/:/.} envsubst '$DATASET'`
+  sql=`echo "$sql" | DATASET=${dataset/:/.} PROJECT=${PROJECT} envsubst '$DATASET $PROJECT'`
 
   echo $dataset.$view
   bq rm --force $dataset.$view

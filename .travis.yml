@@ -182,6 +182,22 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == disco-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
+## Bigquery Views
+- provider: script
+  script:
+    # Update these version numbers when making changes to the views.
+    # TODO - add feature to allow making aliases from existing intermediate.
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && cd $TRAVIS_BUILD_DIR/schema/views_legacysql
+    && ./make_views.sh mlab-sandbox intermediate_v3_1_1 rc_v3_1 "rc release"
+    && cd $TRAVIS_BUILD_DIR/schema/views_standardsql
+    && ./make_views.sh mlab-sandbox intermediate_v3_1_1 rc_v3_1 "rc release"
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == views-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+
 ######################################################################
 #  Staging deployments
 #  Auto deployed on merge with integration branch
