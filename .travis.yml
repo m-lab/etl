@@ -22,15 +22,6 @@ before_install:
 - go get github.com/mattn/goveralls
 - go get github.com/wadey/gocovmerge
 
-# NB: Encrypted values are not defined in forks or pull requests.
-# Decrypt the tar archive containing the GCP service account key files.
-#
-# After unpacking, there should be one service account key file for every GCP
-# project referenced in the "deploy" section. These keys authenticate the
-# gcloud deploy operations.
-
-- travis/decrypt.sh "$encrypted_361547783275_key" "$encrypted_361547783275_iv"
-  keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
 # Install gcloud, for integration tests.
@@ -133,8 +124,8 @@ deploy:
 ## Service: queue-pusher -- AppEngine Standard Environment.
 - provider: script
   script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -144,11 +135,11 @@ deploy:
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
     && INJECTED_PROJECT=mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -159,8 +150,8 @@ deploy:
 - provider: script
   script:
     INJECTED_PROJECT=mab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -171,8 +162,8 @@ deploy:
 - provider: script
   script:
     INJECTED_PROJECT=mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -183,27 +174,13 @@ deploy:
 - provider: script
   script:
     INJECTED_PROJECT=mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_BRANCH == disco-sandbox-* || $TRAVIS_BRANCH == sandbox-*
-
-## Service: etl-gardener -- Service that runs various batch jobs, such as
-#                           reprocessing and dedupping.
-- provider: script
-  script:
-    # These injected params specify the project and bucket used by the service.
-    INJECTED_PROJECT=mlab-sandbox INJECTED_BUCKET=archive-mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-sandbox
-    /tmp/mlab-sandbox.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_BRANCH == gardener-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
 ## Bigquery Views
 - provider: script
@@ -245,25 +222,22 @@ deploy:
 # and better error handling.
 - provider: script
   script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
     && INJECTED_PROJECT=mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
     && INJECTED_PROJECT=mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
     && INJECTED_PROJECT=mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && INJECTED_PROJECT=mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
-    && INJECTED_PROJECT=mlab-staging INJECTED_BUCKET=archive-mlab-staging
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/cmd/gardener app.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-staging
-    /tmp/mlab-staging.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
     && cd $TRAVIS_BUILD_DIR/schema/views_legacysql
     && ./make_views.sh mlab-staging intermediate_v3_1_1 rc_v3_1 "rc release"
     && cd $TRAVIS_BUILD_DIR/schema/views_standardsql
@@ -290,16 +264,16 @@ deploy:
 - provider: script
   script:
     INJECTED_PROJECT=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
     && INJECTED_BUCKET=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && INJECTED_PROJECT=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -311,11 +285,11 @@ deploy:
 # Triggers when *ANY* branch is tagged with qp-prod-* OR prod-*
 - provider: script
   script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
     && INJECTED_PROJECT=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app_legacy_keyfile.sh mlab-oti
-    /tmp/mlab-oti.json $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
