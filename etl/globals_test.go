@@ -64,6 +64,13 @@ func TestValidateTestPath(t *testing.T) {
 				"m-lab-sandbox", "ndt", "2016/07/14", "20160714", "123456", "mlab1", "lax04", "ndt", "0001", ".tar.gz",
 			},
 		},
+		{
+			name: "success-embargo-tar-gz",
+			path: `gs://embargo-mlab-oti/sidestream/2018/02/27/20180227T000010Z-mlab1-dfw02-sidestream-0000-e.tgz`,
+			want: &etl.DataPath{
+				"embargo-mlab-oti", "sidestream", "2018/02/27", "20180227", "000010", "mlab1", "dfw02", "sidestream", "0000", ".tgz",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

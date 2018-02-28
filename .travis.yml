@@ -149,7 +149,7 @@ deploy:
 ## Service: etl-sidestream-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
-    INJECTED_PROJECT=mab-sandbox
+    INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
   skip_cleanup: true
