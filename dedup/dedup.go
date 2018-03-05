@@ -212,21 +212,21 @@ func GetTablesMatching(ctx context.Context, dsExt *bqext.Dataset, filter string)
 
 var denseDateSuffix = regexp.MustCompile(`(.*)([_$])(` + etl.YYYYMMDD + `)$`)
 
-// tableNameParts is used to describe a templated table or table partition.
-type tableNameParts struct {
-	prefix        string
-	isPartitioned bool
-	yyyymmdd      string
+// TableNameParts is used to describe a templated table or table partition.
+type TableNameParts struct {
+	Prefix        string
+	IsPartitioned bool
+	Yyyymmdd      string
 }
 
-// getTableParts separates a table name into prefix/base, separator, and partition date.
-// If tableName does not include valid yyyymmdd suffix, returns an error.
-func getTableParts(tableName string) (tableNameParts, error) {
+// GetTableNameParts separates a table name into Prefix/base, separator, and partition date.
+// If tableName does not include valid Yyyymmdd suffix, returns an error.
+func GetTableNameParts(tableName string) (TableNameParts, error) {
 	date := denseDateSuffix.FindStringSubmatch(tableName)
 	if len(date) != 4 || len(date[3]) != 8 {
-		return tableNameParts{}, errors.New("Invalid template suffix: " + tableName)
+		return TableNameParts{}, errors.New("Invalid template suffix: " + tableName)
 	}
-	return tableNameParts{date[1], date[2] == "$", date[3]}, nil
+	return TableNameParts{date[1], date[2] == "$", date[3]}, nil
 }
 
 // getTable constructs a bigquery Table object from project/dataset/table/partition.
@@ -244,7 +244,7 @@ func getTable(bqClient *bigquery.Client, project, dataset, table, partition stri
 	}
 
 	full := table + "$" + partition
-	_, err := getTableParts(full)
+	_, err := GetTableNameParts(full)
 	if err != nil {
 		return nil, err
 	}
@@ -261,12 +261,12 @@ func getTable(bqClient *bigquery.Client, project, dataset, table, partition stri
 // TODO - possibly migrate this to go/bqext.
 func (at *AnnotatedTable) GetPartitionInfo(ctx context.Context) (*bqext.PartitionInfo, error) {
 	tableName := at.Table.TableID
-	parts, err := getTableParts(tableName)
-	if err != nil || !parts.isPartitioned {
+	parts, err := GetTableNameParts(tableName)
+	if err != nil || !parts.IsPartitioned {
 		return nil, errors.New("TableID missing partition: " + tableName)
 	}
 	// Assemble the FQ table name, without the partition suffix.
-	fullTable := fmt.Sprintf("%s:%s.%s", at.ProjectID, at.DatasetID, parts.prefix)
+	fullTable := fmt.Sprintf("%s:%s.%s", at.ProjectID, at.DatasetID, parts.Prefix)
 
 	// This uses legacy, because PARTITION_SUMMARY is not supported in standard.
 	queryString := fmt.Sprintf(
@@ -277,7 +277,7 @@ func (at *AnnotatedTable) GetPartitionInfo(ctx context.Context) (*bqext.Partitio
 		  MSEC_TO_TIMESTAMP(last_modified_time) AS LastModified
 		FROM
 		  [%s$__PARTITIONS_SUMMARY__]
-		WHERE partition_id = "%s" `, fullTable, parts.yyyymmdd)
+		WHERE partition_id = "%s" `, fullTable, parts.Yyyymmdd)
 	pInfo := bqext.PartitionInfo{}
 
 	err = at.dataset.QueryAndParse(queryString, &pInfo)
@@ -320,17 +320,13 @@ func (at *AnnotatedTable) checkAlmostAsBig(ctx context.Context, other *Annotated
 	return nil
 }
 
-// TODO - should we use the metadata, or the PI?  Are they the same?
+// If at is older than the other table, then return an appropriate error.
+// If a partition does not exist, metadata for it will still exist, and appear to have
+// the LastModificationTime of the whole table.
+// Generally caller should check first that other partition actually exists.
 func (at *AnnotatedTable) checkModifiedAfter(ctx context.Context, other *AnnotatedTable) error {
-	// If the source table is older than the destination table, then
-	// don't overwrite it.
-	thisMeta, err := at.CachedMeta(ctx)
-	if err != nil {
-		return err
-	}
-	// Note that if other doesn't actually exist, its LastModifiedTime will be the time zero value,
-	// so this will generally work as intended.
-	if thisMeta.LastModifiedTime.Before(other.LastModifiedTime(ctx)) {
+	if at.LastModifiedTime(ctx).Before(other.LastModifiedTime(ctx)) {
+		log.Println(at.FullyQualifiedName(), " < ", other.FullyQualifiedName())
 		// TODO should perhaps delete the source table?
 		return ErrSrcOlderThanDest
 	}
@@ -366,29 +362,29 @@ func WaitForJob(ctx context.Context, job *bigquery.Job, maxBackoff time.Duration
 
 // SanityCheckAndCopy uses several sanity checks to improve copy safety.
 // Caller should also have checked source and destination ages, and task/test counts.
-//  1. Source is required to be a single partition or templated table with yyyymmdd suffix.
+//  1. Source is required to be a single partition or templated table with Yyyymmdd suffix.
 //  2. Destination partition matches source partition/suffix
 // TODO(gfr) Ideally this should be done by a separate process with
 // higher priviledge than the reprocessing and dedupping processes.
 // TODO(gfr) Also support copying from a template instead of partition?
 func SanityCheckAndCopy(ctx context.Context, client *bigquery.Client, srcTable, destTable *bigquery.Table) error {
 	// Extract the
-	srcParts, err := getTableParts(srcTable.TableID)
+	srcParts, err := GetTableNameParts(srcTable.TableID)
 	if err != nil {
 		return err
 	}
 
-	destParts, err := getTableParts(destTable.TableID)
+	destParts, err := GetTableNameParts(destTable.TableID)
 	if err != nil {
 		return err
 	}
-	if destParts.yyyymmdd != srcParts.yyyymmdd {
+	if destParts.Yyyymmdd != srcParts.Yyyymmdd {
 		return ErrMismatchedPartitions
 	}
 
 	copier := destTable.CopierFrom(srcTable)
 	copier.WriteDisposition = bigquery.WriteTruncate
-	log.Println("Copying...", srcTable.TableID)
+	log.Println("Copying...", srcTable.FullyQualifiedName())
 	job, err := copier.Run(ctx)
 	if err != nil {
 		return err
@@ -473,16 +469,16 @@ func (job *Job) dedupAndCopy(ctx context.Context, options Options) error {
 //
 func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 	// Check that source and destination are both templated or partitioned.
-	srcParts, err := getTableParts(job.srcTable.TableID)
+	srcParts, err := GetTableNameParts(job.srcTable.TableID)
 	if err != nil {
 		return err
 	}
-	destParts, err := getTableParts(job.destTable.TableID)
+	destParts, err := GetTableNameParts(job.destTable.TableID)
 	if err != nil {
 		return err
 	}
 	// Check that date suffixes match.
-	if destParts.yyyymmdd != srcParts.yyyymmdd {
+	if destParts.Yyyymmdd != srcParts.Yyyymmdd {
 		return errors.New("Source and Destination should have same partition/template date: ")
 	}
 
@@ -495,11 +491,11 @@ func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 		return errors.New("Source and Destination should be in different datasets: ")
 	}
 
-	// For the dedup destination, we use the partitioned table with the same dataset/prefix
+	// For the dedup destination, we use the partitioned table with the same dataset/Prefix
 	// as the source table.
 	// We do the deduplication into the partition with the same date.
 	// dedupTable will later be used to create a copier, so it must use a valid bigquery.Client.
-	tmpTable, err := getTable(job.BqClient, job.ProjectID, job.DatasetID, srcParts.prefix, srcParts.yyyymmdd)
+	tmpTable, err := getTable(job.BqClient, job.ProjectID, job.DatasetID, srcParts.Prefix, srcParts.Yyyymmdd)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -519,10 +515,15 @@ func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 	}
 
 	if !options.IgnoreDestAge {
-		err = job.srcTable.checkModifiedAfter(ctx, job.destTable)
+		destMeta, err := job.destTable.CachedMeta(ctx)
 		if err != nil {
-			log.Println(err)
 			return err
+		}
+		if destMeta.NumRows > 0 {
+			err = job.srcTable.checkModifiedAfter(ctx, job.destTable)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -563,7 +564,7 @@ func (job *Job) CheckAndDedup(ctx context.Context, options Options) error {
 // any that are at least the age specified in options, dedups and copies them to
 // corresponding partitions in the destination table.
 func ProcessTablesMatching(srcDS *bqext.Dataset, srcPattern string, destDataset string, options Options) error {
-	// This may not have full suffix, so we can't use getTableParts.
+	// This may not have full suffix, so we can't use GetTableNameParts.
 	srcParts := strings.Split(srcPattern, "_")
 	if len(srcParts) != 2 {
 		return errors.New("Invalid source pattern: " + srcPattern)
@@ -590,7 +591,7 @@ func ProcessTablesMatching(srcDS *bqext.Dataset, srcPattern string, destDataset 
 			continue
 		}
 
-		srcParts, err := getTableParts(srcTable.TableID)
+		srcParts, err := GetTableNameParts(srcTable.TableID)
 		if err != nil {
 			return err
 		}
@@ -598,7 +599,7 @@ func ProcessTablesMatching(srcDS *bqext.Dataset, srcPattern string, destDataset 
 		// destination should be in a different dataset, but same project and same table name and
 		// date suffix as source.
 		destTable, _ := getTable(srcDS.BqClient, srcDS.ProjectID,
-			destDataset, srcParts.prefix, srcParts.yyyymmdd)
+			destDataset, srcParts.Prefix, srcParts.Yyyymmdd)
 		job := NewJob(srcDS, &srcTable, NewAnnotatedTable(destTable, srcDS))
 		err = job.CheckAndDedup(context.Background(), options)
 		if err != nil {

@@ -10,40 +10,40 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
-// getTableParts separates a table name into prefix/base, separator, and partition date.
-func Test_getTableParts(t *testing.T) {
-	parts, err := getTableParts("table$20160102")
+// GetTableNameParts separates a table name into Prefix/base, separator, and partition date.
+func Test_GetTableNameParts(t *testing.T) {
+	parts, err := GetTableNameParts("table$20160102")
 	if err != nil {
 		t.Error(err)
 	} else {
-		if !parts.isPartitioned {
+		if !parts.IsPartitioned {
 			t.Error("Should be partitioned")
 		}
-		if parts.prefix != "table" {
-			t.Error("incorrect prefix: " + parts.prefix)
+		if parts.Prefix != "table" {
+			t.Error("incorrect Prefix: " + parts.Prefix)
 		}
-		if parts.yyyymmdd != "20160102" {
-			t.Error("incorrect partition: " + parts.yyyymmdd)
+		if parts.Yyyymmdd != "20160102" {
+			t.Error("incorrect partition: " + parts.Yyyymmdd)
 		}
 	}
 
-	parts, err = getTableParts("table_20160102")
+	parts, err = GetTableNameParts("table_20160102")
 	if err != nil {
 		t.Error(err)
 	} else {
-		if parts.isPartitioned {
+		if parts.IsPartitioned {
 			t.Error("Should not be partitioned")
 		}
 	}
-	parts, err = getTableParts("table$2016010")
+	parts, err = GetTableNameParts("table$2016010")
 	if err == nil {
 		t.Error("Should error when partition is incomplete")
 	}
-	parts, err = getTableParts("table$201601022")
+	parts, err = GetTableNameParts("table$201601022")
 	if err == nil {
 		t.Error("Should error when partition is too long")
 	}
-	parts, err = getTableParts("table$20162102")
+	parts, err = GetTableNameParts("table$20162102")
 	if err == nil {
 		t.Error("Should error when partition is invalid")
 	}
