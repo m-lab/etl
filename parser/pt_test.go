@@ -198,30 +198,40 @@ func TestPTPollutionCheck(t *testing.T) {
 			expectedNumRows:      0,
 		},
 		{
-			fileName:             "testdata/PT/20171208T00:00:04Z-37.220.21.130-5667-173.205.3.43-42487.paris",
+			fileName: "testdata/PT/20171208T00:00:04Z-37.220.21.130-5667-173.205.3.43-42487.paris",
+			// The second test reached expected destIP, and was inserted into BigQuery table.
+			// The buffer has only the first test.
 			expectedBufferedTest: 1,
 			expectedNumRows:      16,
 		},
 		{
 			fileName: "testdata/PT/20171208T00:00:14Z-139.60.160.135-2023-173.205.3.44-1101.paris",
-			// expectedBufferedTest means pollution detected and test removed.
+			// The first test was detected that it was polluted by the third test.
+			// expectedBufferedTest is 0, which means pollution detected and test removed.
 			expectedBufferedTest: 0,
-			expectedNumRows:      29,
+			// The third test reached its destIP and was inserted into BigQuery.
+			expectedNumRows: 29,
 		},
 		{
-			fileName:             "testdata/PT/20171208T00:00:14Z-76.227.226.149-37156-173.205.3.37-52156.paris",
+			fileName: "testdata/PT/20171208T00:00:14Z-76.227.226.149-37156-173.205.3.37-52156.paris",
+			// The 4th test was buffered.
 			expectedBufferedTest: 1,
 			expectedNumRows:      29,
 		},
 		{
-			fileName:             "testdata/PT/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris",
+			fileName: "testdata/PT/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris",
+			// The 5th test was buffered too.
 			expectedBufferedTest: 2,
 			expectedNumRows:      29,
 		},
 		{
-			fileName:             "testdata/PT/20171208T22:03:59Z-139.60.160.135-1519-163.22.28.44-1101.paris",
+			fileName: "testdata/PT/20171208T22:03:59Z-139.60.160.135-1519-163.22.28.44-1101.paris",
+			// The 5th test was detected that was polluted by the 6th test.
+			// It was removed from buffer (expectedBufferedTest drop from 2 to 1).
+			// Buffer contains the 4th test now.
 			expectedBufferedTest: 1,
-			expectedNumRows:      46,
+			// The 6th test reached its destIP and was inserted into BigQuery.
+			expectedNumRows: 46,
 		},
 	}
 
@@ -243,9 +253,22 @@ func TestPTPollutionCheck(t *testing.T) {
 		}
 	}
 
+	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
 	if ins.RowsInBuffer() != 56 {
 		t.Fatalf("Data not inserted into BigQuery correctly.")
 	}
 
+}
+
+func TestPTEmptyTest(t *testing.T) {
+	rawData, err := ioutil.ReadFile("testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris")
+	if err != nil {
+		fmt.Println("cannot load test data")
+		return
+	}
+	_, parseErr := parser.Parse(nil, "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily")
+	if parseErr.Error() != "Empty Test." {
+		t.Fatalf("Do not handle empty test correctly.")
+	}
 }

@@ -5,16 +5,16 @@ project.  mlab-oti is the default project, but can be overridden with the
 
 For example:
 ```bash
-go run cmd/reproc/reproc.go -project mlab-oti -day 2017/10/01
+go run cmd/gardener/gardener.go -project mlab-oti -day 2017/10/01
 ```
 OR
 ```bash
-go run cmd/reproc/reproc.go -project mlab-oti -month 2017/10
+go run cmd/gardener/gardener.go -project mlab-oti -month 2017/10
 ```
 
 You can also dry-run a request:
 ```bash
-go run cmd/reproc/reproc.go -dry_run -month 2017/10
+go run cmd/gardener/gardener.go -dry_run -month 2017/10
 ```
 
 The command line flags are:

@@ -1,0 +1,16 @@
+[
+    { "name": "meta", "type": "RECORD", "fields": [
+            { "name": "task_filename", "type": "STRING" },
+            { "name": "test_id", "type": "STRING" },
+            { "name": "parse_time", "type": "TIMESTAMP" }
+        ]
+    },
+    { "name": "sample", "type": "RECORD", "mode": "REPEATED", "fields": [
+            { "name": "timestamp", "type": "TIMESTAMP" },
+            { "name": "value", "type": "FLOAT" }
+        ]
+    },
+    { "name": "metric", "type": "STRING" },
+    { "name": "hostname", "type": "STRING" },
+    { "name": "experiment", "type": "STRING" }
+]

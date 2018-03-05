@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -23,6 +22,9 @@ import (
 var (
 	// NDTOmitDeltas flag indicates if deltas should be suppressed.
 	NDTOmitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
+	// NDTEstimateBW flag indicates if we should run BW estimation code
+	// and annotate rows.
+	NDTEstimateBW, _ = strconv.ParseBool(os.Getenv("NDT_ESTIMATE_BW"))
 )
 
 const (
@@ -65,8 +67,8 @@ var (
 	endPattern  = regexp.MustCompile(suffix + `$`)
 )
 
-// testInfo contains all the fields from a valid NDT test file name.
-type testInfo struct {
+// TestInfo contains all the fields from a valid NDT test file name.
+type TestInfo struct {
 	DateDir   string    // Optional leading date yyyy/mm/dd/
 	Date      string    // The date field from the test file name
 	Time      string    // The time field
@@ -75,7 +77,8 @@ type testInfo struct {
 	Timestamp time.Time // The parsed timestamp, with microsecond resolution
 }
 
-func ParseNDTFileName(path string) (*testInfo, error) {
+// ParseNDTFileName parses the name of a tar or tgz file containing NDT test data.
+func ParseNDTFileName(path string) (*TestInfo, error) {
 	fields := gzTestFilePattern.FindStringSubmatch(path)
 
 	if fields == nil {
@@ -97,7 +100,7 @@ func ParseNDTFileName(path string) (*testInfo, error) {
 		log.Println(fields[2] + "T" + fields[3] + "   " + err.Error())
 		return nil, errors.New("Invalid test path: " + path)
 	}
-	return &testInfo{fields[1], fields[2], fields[3], fields[4], fields[5], timestamp}, nil
+	return &TestInfo{fields[1], fields[2], fields[3], fields[4], fields[5], timestamp}, nil
 }
 
 //=========================================================================
@@ -106,10 +109,11 @@ func ParseNDTFileName(path string) (*testInfo, error) {
 
 type fileInfoAndData struct {
 	fn   string
-	info testInfo
+	info TestInfo
 	data []byte
 }
 
+// NDTParser implements the Parser interface for NDT.
 type NDTParser struct {
 	inserter     etl.Inserter
 	etl.RowStats // Implement RowStats through an embedded struct.
@@ -125,6 +129,7 @@ type NDTParser struct {
 	metaFile *MetaFileData
 }
 
+// NewNDTParser returns a new NDT parser.
 func NewNDTParser(ins etl.Inserter) *NDTParser {
 	return &NDTParser{
 		inserter: ins,
@@ -132,15 +137,19 @@ func NewNDTParser(ins etl.Inserter) *NDTParser {
 }
 
 // These functions are also required to complete the etl.Parser interface.
+
+// TaskError returns non-nil if more than 10% of row inserts failed.
 func (n *NDTParser) TaskError() error {
 	if n.inserter.Committed() < 10*n.inserter.Failed() {
 		log.Printf("Warning: high row insert errors: %d / %d\n",
 			n.inserter.Accepted(), n.inserter.Failed())
-		return errors.New("Too many insertion failures.")
+		return errors.New("too many insertion failures")
 	}
 	return nil
 }
 
+// Flush completes processing of final task group, if any, and flushes
+// buffer to BigQuery.
 func (n *NDTParser) Flush() error {
 	// Process the last group (if it exists) before flushing the inserter.
 	if n.timestamp != "" {
@@ -149,12 +158,42 @@ func (n *NDTParser) Flush() error {
 	return n.inserter.Flush()
 }
 
+// TableName returns the base of the bq table inserter target.
 func (n *NDTParser) TableName() string {
 	return n.inserter.TableBase()
 }
 
+// FullTableName returns the full bq table name inserter target, including date suffix.
 func (n *NDTParser) FullTableName() string {
 	return n.inserter.FullTableName()
+}
+
+// IsParsable returns the canonical test type and whether to parse data.
+func (n *NDTParser) IsParsable(testName string, data []byte) (string, bool) {
+	info, err := ParseNDTFileName(testName)
+	if err != nil {
+		return "unknown", false
+	}
+	switch info.Suffix {
+	// Parsable types:
+	case "c2s_snaplog":
+		fallthrough // b/c this is parsable
+	case "s2c_snaplog":
+		fallthrough // b/c this is parsable
+	case "meta":
+		return info.Suffix, true
+	// Unparsable types:
+	case "c2s_ndttrace":
+		fallthrough // b/c this is unparsable
+	case "s2c_ndttrace":
+		fallthrough // b/c this is unparsable
+	case "cputime":
+		return info.Suffix, false
+	}
+	// All other cases.
+	metrics.TestCount.WithLabelValues(
+		n.TableName(), "unknown", "unknown suffix").Inc()
+	return "unknown", false
 }
 
 // ParseAndInsert extracts the last snaplog from the given raw snap log.
@@ -250,12 +289,9 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		}
 		n.metaFile = ProcessMetaFile(
 			n.TableName(), n.inserter.TableSuffix(), testName, content)
-	case "c2s_ndttrace":
-	case "s2c_ndttrace":
-	case "cputime":
 	default:
 		metrics.TestCount.WithLabelValues(
-			n.TableName(), "unknown", "unknown suffix").Inc()
+			n.TableName(), "unknown", "unparsable file").Inc()
 		return errors.New("Unknown test suffix: " + info.Suffix)
 	}
 
@@ -314,21 +350,14 @@ func (n *NDTParser) processGroup() {
 // However, we often get s2c and c2s without corresponding meta files.  When this happens,
 // we proceed with an empty metaFile.
 func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
-	// NOTE: this file size threshold and the number of simultaneous workers
-	// defined in etl_worker.go must guarantee that all files written to
-	// /mnt/tmpfs will fit.
+	// TODO: handle this logic earlier in ParseAndInsert or in IsParsable.
 	if len(test.data) > 10*1024*1024 {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, ">10MB").Inc()
 		log.Printf("Ignoring oversize snaplog: %d, %s\n",
 			len(test.data), test.fn)
-		metrics.FileSizeHistogram.WithLabelValues(
-			"huge").Observe(float64(len(test.data)))
 		return
 	}
-	// Record the file size.
-	metrics.FileSizeHistogram.WithLabelValues(
-		"normal").Observe(float64(len(test.data)))
 
 	if len(test.data) < 16*1024 {
 		metrics.WarningCount.WithLabelValues(
@@ -341,8 +370,8 @@ func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 			n.TableName(), testType, "4KB").Inc()
 	}
 
-	metrics.WorkerState.WithLabelValues("ndt").Inc()
-	defer metrics.WorkerState.WithLabelValues("ndt").Dec()
+	metrics.WorkerState.WithLabelValues(n.TableName(), "ndt").Inc()
+	defer metrics.WorkerState.WithLabelValues(n.TableName(), "ndt").Dec()
 
 	n.getAndInsertValues(test, testType)
 }
@@ -412,14 +441,15 @@ func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schem
 
 func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	// Extract the values from the last snapshot.
-	metrics.WorkerState.WithLabelValues("parse").Inc()
-	defer metrics.WorkerState.WithLabelValues("parse").Dec()
+	metrics.WorkerState.WithLabelValues(n.TableName(), "parse").Inc()
+	defer metrics.WorkerState.WithLabelValues(n.TableName(), "parse").Dec()
 
 	if !strings.HasSuffix(test.fn, ".gz") {
 		metrics.WarningCount.WithLabelValues(
 			n.TableName(), testType, "uncompressed file").Inc()
 	}
 
+	// Large allocation here.
 	snaplog, err := web100.NewSnapLog(test.data)
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
@@ -490,6 +520,21 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		results["anomalies"].(schema.Web100ValueMap)["snaplog_error"] = true
 	}
 
+	if NDTEstimateBW {
+		// This is not terribly useful as is.  Intended as a place holder for code
+		// we are working on in parallel.
+		congEvents := make(schema.Web100ValueMap, 10)
+		snapNums, err := snaplog.ChangeIndices("SmoothedRTT")
+		if err != nil {
+			log.Println(err)
+		} else {
+			congEvents["indices"] = snapNums
+			congEvents["smoothedRTT"] = snaplog.SliceIntField("SmoothedRTT", snapNums)
+			congEvents["thruOctetsAcked"] = snaplog.SliceIntField("HCThruOctetsAcked", snapNums)
+			results["slices"] = congEvents
+		}
+	}
+
 	// This is the timestamp parsed from the filename.
 	lt, err := test.info.Timestamp.MarshalText()
 	if err != nil {
@@ -542,16 +587,6 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if deltaFieldCount > 43000 {
 		log.Printf("Lots of fields (%d) processing %s from %s\n",
 			deltaFieldCount, test.fn, n.taskFileName)
-	}
-	// Do this just once in a while, so it doesn't take much resource.
-	if deltaFieldCount > 30000 { // Roughly the top 5%
-		jsonRow, _ := json.Marshal(results)
-		metrics.RowSizeHistogram.WithLabelValues(n.TableName()).
-			Observe(float64(len(jsonRow)))
-		if len(jsonRow) > 800000 {
-			log.Printf("Large json (%d bytes, %d fields) processing %s from %s\n",
-				len(jsonRow), deltaFieldCount, test.fn, n.taskFileName)
-		}
 	}
 
 	// TODO - estimate the size of the json (or fields) to allow more rows per request,

@@ -85,6 +85,7 @@ type Saver interface {
 }
 
 //=================================================================================
+
 // CanonicalNames provides the mapping from old names (in snaplog files) to new
 // canonical names.
 // This is exported so that SideStream parser can use it easily.
@@ -162,16 +163,17 @@ var web100Sizes = [WEB100_NUM_TYPES + 1]int{
 
 //=================================================================================
 
-// variable is a representation of a Web100 field specifications, as they appear
+// Variable is a representation of a Web100 field specifications, as they appear
 // in snaplog headers.
-type variable struct {
+type Variable struct {
 	Name   string  // Encoded field name (before conversion to canonicalName)
 	Offset int     // Offset, beyond the BEGIN_SNAP_HEADER
 	Type   varType // Web100 type of the field
 	Size   int     // Size, in bytes, of the raw data field.
 }
 
-func NewVariable(s string) (*variable, error) {
+// NewVariable creates a new variable based on web100 definition string
+func NewVariable(s string) (*Variable, error) {
 	var name string
 	var length, typ, offset int
 	n, err := fmt.Sscanln(s, &name, &offset, &typ, &length)
@@ -182,14 +184,14 @@ func NewVariable(s string) (*variable, error) {
 	}
 	vt := varType(typ)
 	if vt > WEB100_TYPE_OCTET || vt < WEB100_TYPE_INTEGER {
-		return nil, errors.New(fmt.Sprintf("Invalid type field: %d\n", typ))
+		return nil, fmt.Errorf("invalid type field: %d", typ)
 	}
 	if length != web100Sizes[vt] {
-		return nil, errors.New(fmt.Sprintf("Invalid length for %s field: %d\n",
-			name, length))
+		return nil, fmt.Errorf("invalid length for %s field: %d",
+			name, length)
 	}
 
-	return &variable{name, offset, vt, length}, nil
+	return &Variable{name, offset, vt, length}, nil
 }
 
 // IPFromBytes handles the 17 byte web100 IP address fields.
@@ -209,10 +211,11 @@ func IPFromBytes(data []byte) (net.IP, error) {
 	}
 }
 
-// TODO URGENT - unit tests for this!!
 // Save interprets data according to the receiver type, and saves the result to snapValues.
 // Most of the types are unused, but included here for completeness.
-func (v *variable) Save(data []byte, snapValues Saver) error {
+// This does a single alloc per int64 save???
+// TODO URGENT - unit tests for this!!
+func (v *Variable) Save(data []byte, snapValues Saver) error {
 	// Ignore deprecated fields.
 	if v.Name[0] == '_' {
 		return nil
@@ -276,15 +279,15 @@ func (v *variable) Save(data []byte, snapValues Saver) error {
 //=================================================================================
 // fieldSet provides the ordered list of Web100 variable specifications.
 type fieldSet struct {
-	Fields   []variable
+	Fields   []Variable
 	FieldMap map[string]int // Map from field name to index in Fields.
 	// Total length of each record, in bytes, including preamble, e.g. BEGIN_SNAP_DATA
 	// For example, for the standard "/read" snapshot record, the length is 669 bytes.
 	Length int
 }
 
-// Find returns the variable of a given name, or nil.
-func (fs *fieldSet) Find(name string) *variable {
+// find returns the variable spec of a given name, or nil.
+func (fs *fieldSet) find(name string) *Variable {
 	index, ok := fs.FieldMap[name]
 	if !ok {
 		return nil
@@ -293,6 +296,7 @@ func (fs *fieldSet) Find(name string) *variable {
 }
 
 //=================================================================================
+
 // connectionSpec holds the 4-tuple info from the header, and may be used to
 // populate the connection_spec field of the web100_log_entry.  It does not support
 // ipv6, so it is of limited use.
@@ -304,6 +308,7 @@ type connectionSpec struct {
 }
 
 //=================================================================================
+
 // SnapLog encapsulates the raw data and all elements of the header.
 type SnapLog struct {
 	// The entire raw contents of the file.  Generally 1.5MB, but may be much larger
@@ -342,7 +347,7 @@ func (sl *SnapLog) SnapshotNumBytes() int {
 	return sl.read.Length
 }
 
-// SnapshotNumBytes returns the total number of snapshot fields.
+// SnapshotNumFields returns the total number of snapshot fields.
 // Used only for testing.
 func (sl *SnapLog) SnapshotNumFields() int {
 	return len(sl.read.Fields)
@@ -369,9 +374,8 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (*fieldS
 		if err != nil || len(line) > VARNAME_LEN_MAX+20 {
 			if err == io.EOF {
 				return nil, errors.New("Encountered EOF")
-			} else {
-				return nil, errors.New("Corrupted header")
 			}
+			return nil, errors.New("Corrupted header")
 		}
 		if line == terminator {
 			return fields, nil
@@ -438,6 +442,8 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 		return nil, err
 	}
 
+	// Lots of allocation here.
+	// TODO - could improve alloc efficiency here.
 	read, err := parseFields(buf, "/read\n", "\n")
 	if err != nil {
 		return nil, err
@@ -511,27 +517,29 @@ func (sl *SnapLog) ValidateSnapshots() error {
 	// Verify that body size is integer multiple of body record length.
 	total := len(sl.raw) - sl.bodyOffset
 	if total%sl.read.Length != 0 {
-		return errors.New("Last snapshot truncated.")
+		return errors.New("last snapshot truncated")
 	}
 	return nil
 }
 
 //=================================================================================
+
+// Snapshot represents a complete snapshot from a snapshot log.
 type Snapshot struct {
 	// Just the raw data, without BEGIN_SNAP_DATA.
 	raw    []byte    // The raw data, NOT including the BEGIN_SNAP_HEADER
 	fields *fieldSet // The fieldset describing the raw contents.
 }
 
-// Returns the snapshot at index n, or error if n is not a valid index, or data is corrupted.
+// Snapshot returns the snapshot at index n, or error if n is not a valid index, or data is corrupted.
 func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
 	if n > sl.SnapCount()-1 {
-		return Snapshot{}, errors.New(fmt.Sprintf("Invalid snapshot index %d", n))
+		return Snapshot{}, fmt.Errorf("invalid snapshot index %d", n)
 	}
 	offset := sl.bodyOffset + n*sl.read.Length
 	begin := string(sl.raw[offset : offset+len(BEGIN_SNAP_DATA)])
 	if begin != BEGIN_SNAP_DATA {
-		return Snapshot{}, errors.New("Missing BeginSnapData")
+		return Snapshot{}, errors.New("missing BeginSnapData")
 	}
 
 	// We use the "/read" field group, as that is what is always used for NDT snapshots.
@@ -540,12 +548,17 @@ func (sl *SnapLog) Snapshot(n int) (Snapshot, error) {
 		fields: &sl.read}, nil
 }
 
+func (snap *Snapshot) reset(data []byte, fields *fieldSet) {
+	snap.fields = fields
+	snap.raw = data
+}
+
 // SnapshotValues writes all values into the provided Saver.
 func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 	if snap.raw == nil {
 		return errors.New("Empty/Invalid Snaplog")
 	}
-	var field variable
+	var field Variable
 	for _, field = range snap.fields.Fields {
 		// Interpret and save the web100 field value.
 		field.Save(snap.raw[field.Offset:field.Offset+field.Size], snapValues)
@@ -553,7 +566,7 @@ func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 	return nil
 }
 
-// SnapshotValues writes changed values into the provided Saver.
+// SnapshotDeltas writes changed values into the provided Saver.
 func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 	if snap.raw == nil {
 		return errors.New("Empty/Invalid Snaplog")
@@ -562,14 +575,74 @@ func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 		// If other is empty, return full snapshot
 		return snap.SnapshotValues(snapValues)
 	}
-	var field variable
+	var field Variable
 	for _, field = range snap.fields.Fields {
-		// Interpret and save the web100 field value.
 		a := other.raw[field.Offset : field.Offset+field.Size]
 		b := snap.raw[field.Offset : field.Offset+field.Size]
 		if bytes.Compare(a, b) != 0 {
+			// Interpret and save the web100 field value.
 			field.Save(b, snapValues)
 		}
 	}
 	return nil
 }
+
+// ChangeIndices finds all snapshot indices where the specified field
+// changes value.
+func (sl *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
+	result := make([]int, 0, 100)
+	field := sl.read.find(fieldName)
+	if field == nil {
+		return nil, errors.New("Field not found")
+	}
+	last := make([]byte, field.Size)
+	var s Snapshot // This saves about 2 usec, compared with creating new Snapshot for each row.
+	for i := 0; i < sl.SnapCount(); i++ {
+		// This saves about 30 usec
+		offset := sl.bodyOffset + i*sl.read.Length
+		begin := string(sl.raw[offset : offset+len(BEGIN_SNAP_DATA)])
+		if begin != BEGIN_SNAP_DATA {
+			return nil, nil
+		}
+		s.reset(sl.raw[offset+len(BEGIN_SNAP_DATA):offset+sl.read.Length], &sl.read)
+
+		data := s.raw[field.Offset : field.Offset+field.Size]
+		if bytes.Compare(data, last) != 0 {
+			result = append(result, i)
+		}
+		last = data
+	}
+	return result, nil
+}
+
+type IntArraySaver struct {
+	Integers []int64
+}
+
+func NewIntArraySaver(n int) IntArraySaver {
+	return IntArraySaver{make([]int64, 0, n)}
+}
+
+func (s *IntArraySaver) SetInt64(name string, val int64) {
+	s.Integers = append(s.Integers, val)
+}
+func (s *IntArraySaver) SetBool(name string, val bool)     {}
+func (s *IntArraySaver) SetString(name string, val string) {}
+
+// about 40 nsec per field.
+func (sl *SnapLog) SliceIntField(fieldName string, indices []int) []int64 {
+	var s Snapshot // This saves about 2 usec, compared with creating new Snapshot for each row.
+	field := sl.read.find(fieldName)
+	result := NewIntArraySaver(len(indices))
+	for i := 0; i < len(indices); i++ {
+		// Safe to skip the validation, because it was done when getting the indices.
+		offset := sl.bodyOffset + indices[i]*sl.read.Length
+		s.reset(sl.raw[offset+len(BEGIN_SNAP_DATA):offset+sl.read.Length], &sl.read)
+
+		field.Save(s.raw[field.Offset:field.Offset+field.Size], &result)
+	}
+	return result.Integers
+}
+
+// For each increment in CongSignal, we want to add values of snapCount, SRTT
+// the corresponding repeated fields.

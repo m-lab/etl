@@ -17,15 +17,14 @@ import (
 
 func init() {
 	// Register the metrics defined with Prometheus's default registry.
+
+	// Annotator
 	prometheus.MustRegister(AnnotationTimeSummary)
 	prometheus.MustRegister(AnnotationRequestCount)
 	prometheus.MustRegister(AnnotationErrorCount)
 	prometheus.MustRegister(AnnotationWarningCount)
-	prometheus.MustRegister(WorkerCount)
-	prometheus.MustRegister(WorkerState)
-	prometheus.MustRegister(FileCount)
-	prometheus.MustRegister(TaskCount)
-	prometheus.MustRegister(TestCount)
+
+	// PT
 	prometheus.MustRegister(PTHopCount)
 	prometheus.MustRegister(PTTestCount)
 	prometheus.MustRegister(PTNotReachDestCount)
@@ -33,17 +32,25 @@ func init() {
 	prometheus.MustRegister(PTBitsAwayFromDestV4)
 	prometheus.MustRegister(PTBitsAwayFromDestV6)
 	prometheus.MustRegister(PTPollutedCount)
+
+	// NDT
+	prometheus.MustRegister(DeltaNumFieldsHistogram)
+	prometheus.MustRegister(EntryFieldCountHistogram)
+	prometheus.MustRegister(FileSizeHistogram)
+	prometheus.MustRegister(RowSizeHistogram)
+
+	// Common metrics
+	prometheus.MustRegister(PanicCount)
+	prometheus.MustRegister(WorkerCount)
+	prometheus.MustRegister(WorkerState)
+	prometheus.MustRegister(TaskCount)
+	prometheus.MustRegister(TestCount)
 	prometheus.MustRegister(ErrorCount)
 	prometheus.MustRegister(WarningCount)
 	prometheus.MustRegister(BackendFailureCount)
 	prometheus.MustRegister(GCSRetryCount)
-	prometheus.MustRegister(BigQueryInsert)
-	prometheus.MustRegister(RowSizeHistogram)
-	prometheus.MustRegister(DeltaNumFieldsHistogram)
-	prometheus.MustRegister(EntryFieldCountHistogram)
 	prometheus.MustRegister(DurationHistogram)
 	prometheus.MustRegister(InsertionHistogram)
-	prometheus.MustRegister(FileSizeHistogram)
 }
 
 // TODO
@@ -54,7 +61,7 @@ func init() {
 //
 
 var (
-	// Measures the latencies of requests to the Annotation Service as measured by the pipeline
+	// AnnotationTimeSummary measures the latencies of requests to the Annotation Service as measured by the pipeline
 	// Provides metrics:
 	//    etl_annotator_Annotation_Time_Summary
 	// Example usage:
@@ -64,7 +71,7 @@ var (
 		Help: "The total time to annotate, in nanoseconds.",
 	}, []string{"test_type"})
 
-	// Measures the number of annotation requests
+	// AnnotationRequestCount measures the number of annotation requests
 	// Provides metrics:
 	//    etl_annotator_Request_Count
 	// Example usage:
@@ -74,7 +81,7 @@ var (
 		Help: "The current number of annotation requests",
 	})
 
-	// Measures the number of annotation errors
+	// AnnotationErrorCount measures the number of annotation errors
 	// Provides metrics:
 	//    etl_annotator_Error_Count
 	// Example usage:
@@ -85,7 +92,7 @@ var (
 			Help: "The current number of errors encountered while attempting to add geo data.",
 		}, []string{"source"})
 
-	// Measures the number of annotation warnings
+	// AnnotationWarningCount measures the number of annotation warnings
 	// Provides metrics:
 	//    etl_annotator_Warning_Count
 	// Example usage:
@@ -96,32 +103,52 @@ var (
 			Help: "The current number of Warnings encountered while attempting to add geo data.",
 		}, []string{"source"})
 
-	// Counts the number of tasks processed by the pipeline.
+	// PanicCount counts the number of panics encountered in the pipeline.
+	//
+	// Provides metrics:
+	//   etl_panic_count{source}
+	// Example usage:
+	//   metrics.PanicCount.WithLabelValues("worker").Inc()
+	PanicCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_panic_count",
+			Help: "Number of panics encountered.",
+		},
+		// Tag indicating where the panic was recovered.
+		[]string{"source"},
+	)
+
+	// WorkerCount counts the number of workers currently active.
 	//
 	// Provides metrics:
 	//   etl_worker_count
 	// Example usage:
-	//   metrics.WorkerCount.Inc() / .Dec()
-	WorkerCount = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "etl_worker_count",
-		Help: "Number of active workers.",
-	})
+	//   metrics.WorkerCount.WithLabelValues("ndt").Inc()
+	WorkerCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "etl_worker_count",
+			Help: "Number of active workers.",
+		},
+		// Output bigquery base table name, e.g. "ndt".
+		[]string{"table"})
 
-	// Counts the number of tasks processed by the pipeline.
+	// WorkerState counts the number of workers in each worker state..
 	//
 	// Provides metrics:
-	//   etl_worker_count{state}
+	//   etl_worker_count{table="ndt", state="insert"}
 	// Example usage:
-	//   metrics.WorkerState.WithLabelValues("flush").Inc() / .Dec()
-	WorkerState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "etl_worker_state",
-		Help: "Number of workers in different states.",
-	},
+	//   metrics.WorkerState.WithLabelValues("ndt", "flush").Inc() / .Dec()
+	WorkerState = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "etl_worker_state",
+			Help: "Number of workers in different states.",
+		},
+		// Output bigquery base table name, e.g. "ndt".
 		// Worker state, e.g. create task, read, parse, insert
-		[]string{"state"},
+		[]string{"table", "state"},
 	)
 
-	// Counts the number of files processed by machine, rsync module, and day.
+	// FileCount counts the number of files processed by machine, rsync module, and day.
 	//
 	// Provides metrics:
 	//   etl_files_processed{rsync_host_module, day_of_week}
@@ -135,22 +162,22 @@ var (
 		[]string{"rsync_host_module", "day_of_week"},
 	)
 
-	// Counts the number of tasks processed by the pipeline.
+	// TaskCount counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_task_count{package, status}
+	//   etl_task_count{table, package, status}
 	// Example usage:
-	//   metrics.TaskCount.WithLabelValues("Task", "ok").Inc()
+	//   metrics.TaskCount.WithLabelValues("ndt", "Task", "ok").Inc()
 	TaskCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_task_count",
 			Help: "Number of tasks/archive files processed.",
 		},
 		// Go package or filename, and Status
-		[]string{"package", "status"},
+		[]string{"table", "package", "status"},
 	)
 
-	// Counts the number of tests successfully processed by the parsers.
+	// TestCount counts the number of tests successfully processed by the parsers.
 	//
 	// Provides metrics:
 	//   etl_test_count{table, filetype, status}
@@ -166,7 +193,7 @@ var (
 		[]string{"table", "filetype", "status"},
 	)
 
-	// Counts the number of hops in PT tests successfully processed by the parsers.
+	// PTHopCount counts the number of hops in PT tests successfully processed by the parsers.
 	//
 	// Provides metrics:
 	//   etl_pthop_count{table, filetype, status}
@@ -182,7 +209,7 @@ var (
 		[]string{"table", "filetype", "status"},
 	)
 
-	// Counts the PT tests per metro.
+	// PTTestCount counts the PT tests per metro.
 	//
 	// Provides metrics:
 	//   etl_pt_test_count_per_metro{metro}
@@ -197,7 +224,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// Counts the PT tests that did not reach the expected destination IP
+	// PTNotReachDestCount counts the PT tests that did not reach the expected destination IP
 	// at the last hop per metro.
 	//
 	// Provides metrics:
@@ -213,7 +240,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// Counts the PT tests that reach the expected destination IP
+	// PTMoreHopsAfterDest counts the PT tests that reach the expected destination IP
 	// in the middle of a test per metro, but do more hops afterwards instead of ending there.
 	//
 	// Provides metrics:
@@ -229,8 +256,8 @@ var (
 		[]string{"metro"},
 	)
 
-	// A histogram of number of bits difference between last hop and expected destination IP
-	// for the PT tests that did not reach the expected destination IP.
+	// PTBitsAwayFromDestV4 provides a histogram of number of bits difference between
+	// last hop and expected destination IP for the PT tests that did not reach the expected destination IP.
 	// This metric is only for IPv4.
 	//
 	// Provides metrics:
@@ -248,7 +275,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// A histogram of number of bits difference between last hop and expected destination IP
+	// PTBitsAwayFromDestV6 provides a histogram of number of bits difference between last hop and expected destination IP
 	// for the PT tests that did not reach the expected destination IP.
 	// This metric is only for IPv6.
 	//
@@ -267,7 +294,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// Counts the PT polluted tests per metro.
+	// PTPollutedCount counts the PT polluted tests per metro.
 	//
 	// Provides metrics:
 	//   etl_pt_polluted_total{metro}
@@ -282,7 +309,7 @@ var (
 		[]string{"metro"},
 	)
 
-	// Counts the all warnings that do NOT result in test loss.
+	// WarningCount counts the all warnings that do NOT result in test loss.
 	//
 	// Provides metrics:
 	//   etl_warning_count{table, filetype, kind}
@@ -297,7 +324,7 @@ var (
 		[]string{"table", "filetype", "kind"},
 	)
 
-	// Counts the all errors that result in test loss.
+	// ErrorCount counts the all errors that result in test loss.
 	//
 	// Provides metrics:
 	//   etl_error_count{table, filetype, kind}
@@ -312,7 +339,7 @@ var (
 		[]string{"table", "filetype", "kind"},
 	)
 
-	// Counts the all bulk backend failures.  This does not count, e.g.
+	// BackendFailureCount counts the all bulk backend failures.  This does not count, e.g.
 	// single row errors.
 	//
 	// Provides metrics:
@@ -328,38 +355,25 @@ var (
 		[]string{"table", "kind"},
 	)
 
-	// Counts the number of retries on GCS read operations.
+	// GCSRetryCount counts the number of retries on GCS read operations.
 	//
 	// Provides metrics:
-	//   etl_gcs_retry_count{type}
+	//   etl_gcs_retry_count{table, phase, retries, status}
 	// Example usage:
 	// metrics.GCSRetryCount.WithLabelValues(
-	//	TableName(), retries, "ok").Inc()
+	//	TableName(), "open", retries, "ok").Inc()
 	GCSRetryCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_gcs_retry_count",
 			Help: "Number of retries on GCS reads.",
 		},
-		// open/read/zip, num_retries, ok/error/
-		[]string{"phase", "retries", "status"},
+		// ndt/traceroute, open/read/zip, num_retries, ok/error/
+		[]string{"table", "phase", "retries", "status"},
 	)
 
-	// Counts the number of into BigQuery insert operations.
+	// TODO(dev): bytes/row - generalize this metric for any file type.
 	//
-	// Provides metrics:
-	//   etl_worker_bigquery_insert_total{table, status}
-	// Usage example:
-	//   metrics.BigQueryInsert.WithLabelValues("ndt", "200").Inc()
-	BigQueryInsert = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "etl_worker_bigquery_insert_total",
-			Help: "Number of BigQuery insert operations.",
-		},
-		// Worker type, e.g. ndt, sidestream, ptr, etc.
-		[]string{"table", "status"},
-	)
-
-	// A histogram of bq row json sizes.  It is intended primarily for
+	// RowSizeHistogram provides a histogram of bq row json sizes.  It is intended primarily for
 	// NDT, so the bins are fairly large.  NDT average json is around 200K
 	//
 	// Provides metrics:
@@ -383,7 +397,9 @@ var (
 		[]string{"table"},
 	)
 
-	// A histogram of snapshot delta field counts.  It is intended primarily for
+	// TODO(dev): fields/row - generalize this metric for any file type.
+	//
+	// DeltaNumFieldsHistogram provides a histogram of snapshot delta field counts.  It is intended primarily for
 	// NDT.  Typical is about 13, but max might be up to 120 or so.
 	//
 	// Provides metrics:
@@ -406,7 +422,9 @@ var (
 		[]string{"table"},
 	)
 
-	// A histogram of (approximate) row field counts.  It is intended primarily for
+	// TODO(dev): rows/test - generalize this metric for any file type.
+	//
+	// EntryFieldCountHistogram provides a histogram of (approximate) row field counts.  It is intended primarily for
 	// NDT, so the bins are fairly large.  NDT snapshots typically total about 10k
 	// fields, 99th percentile around 35k fields, and occasionally as many as 50k.
 	// Smaller field count bins included so that it is possibly useful for other
@@ -424,7 +442,10 @@ var (
 		prometheus.HistogramOpts{
 			Name: "etl_entry_field_count",
 			Help: "total snapshot field count distributions.",
-			Buckets: []float64{100, 120, 150, 200, 240, 300, 400, 480, 600, 800,
+			Buckets: []float64{
+				1, 2, 3, 4, 6, 8,
+				10, 12, 15, 20, 24, 30, 40, 48, 60, 80,
+				100, 120, 150, 200, 240, 300, 400, 480, 600, 800,
 				1000, 1200, 1500, 2000, 2400, 3000, 4000, 4800, 6000, 8000,
 				10000, 12000, 15000, 20000, 24000, 30000, 40000, 48000, 60000, 80000,
 				100000, 120000, 150000, 200000, 240000, 300000, 400000, 480000,
@@ -433,7 +454,7 @@ var (
 		[]string{"table"},
 	)
 
-	// A histogram of bigquery insertion times. The buckets should use
+	// InsertionHistogram provides a histogram of bigquery insertion times. The buckets should use
 	// periods that are intuitive for people.
 	//
 	// Provides metrics:
@@ -452,14 +473,14 @@ var (
 			Help: "Insertion time distributions.",
 			Buckets: []float64{
 				0.001, 0.003, 0.01, 0.03, 0.1, 0.2, 0.5, 1.0, 2.0,
-				5.0, 10.0, 20.0, 50.0, 100.0, math.Inf(+1),
+				5.0, 10.0, 20.0, 50.0, 100.0, 200.0, math.Inf(+1),
 			},
 		},
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
 		[]string{"table", "status"},
 	)
 
-	// A histogram of worker processing times. The buckets should use
+	// DurationHistogram provides a histogram of worker processing times. The buckets should use
 	// periods that are intuitive for people.
 	//
 	// Provides metrics:
@@ -483,16 +504,30 @@ var (
 		},
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
 		// TODO(soltesz): support a status field based on HTTP status.
-		[]string{"worker"},
+		[]string{"worker", "status"},
 	)
 
-	// TODO(dev): generalize this metric for size of any file type.
+	// FileSizeHistogram provides a histogram of source file sizes. The bucket
+	// sizes should cover a wide range of input file sizes.
+	//
+	// Example usage:
+	//   metrics.FileSizeHistogram.WithLabelValues(
+	//       "ndt", "c2s_snaplog", "parsed").Observe(size)
 	FileSizeHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "etl_web100_snaplog_file_size_bytes",
-			Help: "Size of individual snaplog files.",
+			Name: "etl_test_file_size_bytes",
+			Help: "Size of individual test files.",
 			Buckets: []float64{
 				0,
+				1000,       // 1k
+				5000,       // 5k
+				10000,      // 10k
+				25000,      // 25k
+				50000,      // 50k
+				75000,      // 75k
+				100000,     // 100k
+				200000,     // 200k
+				300000,     // 300k
 				400000,     // 400k
 				500000,     // 500k
 				600000,     // 600k
@@ -525,16 +560,32 @@ var (
 				math.Inf(+1),
 			},
 		},
-		[]string{"range"},
+		[]string{"table", "kind", "group"},
 	)
 )
+
+// catchStatus wraps the native http.ResponseWriter and captures any written HTTP
+// status codes.
+type catchStatus struct {
+	http.ResponseWriter
+	status int
+}
+
+// WriteHeader wraps the http.ResponseWriter.WriteHeader method, and preserves the
+// status code.
+func (cw *catchStatus) WriteHeader(code int) {
+	cw.ResponseWriter.WriteHeader(code)
+	cw.status = code
+}
 
 // DurationHandler wraps the call of an inner http.HandlerFunc and records the runtime.
 func DurationHandler(name string, inner http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()
-		inner.ServeHTTP(w, r)
-		// TODO(soltesz): collect success or failure status.
-		DurationHistogram.WithLabelValues(name).Observe(time.Since(t).Seconds())
+		cw := &catchStatus{w, http.StatusOK} // Default status is OK.
+		inner.ServeHTTP(cw, r)
+		// TODO(soltesz): change 'name' to 'table' label based on request parameter.
+		DurationHistogram.WithLabelValues(name, http.StatusText(cw.status)).Observe(
+			time.Since(t).Seconds())
 	}
 }

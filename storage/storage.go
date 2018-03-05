@@ -40,6 +40,7 @@ type ETLSource struct {
 	TarReader                   // TarReader interface provided by an embedded struct.
 	io.Closer                   // Closer interface to be provided by an embedded struct.
 	RetryBaseTime time.Duration // The base time for backoff and retry.
+	TableBase     string        // TableBase is BQ table associated with this source, or "invalid".
 }
 
 // Retrieve next file header.
@@ -51,14 +52,14 @@ func (rr *ETLSource) nextHeader(trial int) (*tar.Header, bool, error) {
 			return nil, false, err
 		} else if strings.Contains(err.Error(), "unexpected EOF") {
 			metrics.GCSRetryCount.WithLabelValues(
-				"next", strconv.Itoa(trial), "unexpected EOF").Inc()
+				rr.TableBase, "next", strconv.Itoa(trial), "unexpected EOF").Inc()
 			// TODO: These are likely unrecoverable, so we should
 			// just return.
 		} else {
 			// Quite a few of these now, and they seem to be
 			// unrecoverable.
 			metrics.GCSRetryCount.WithLabelValues(
-				"next", strconv.Itoa(trial), "other").Inc()
+				rr.TableBase, "next", strconv.Itoa(trial), "other").Inc()
 		}
 		log.Printf("nextHeader: %v\n", err)
 	}
@@ -81,7 +82,7 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 				return nil, false, err
 			}
 			metrics.GCSRetryCount.WithLabelValues(
-				"open zip", strconv.Itoa(trial), "zipReaderError").Inc()
+				rr.TableBase, "open zip", strconv.Itoa(trial), "zipReaderError").Inc()
 			log.Printf("zipReaderError(%d): %v in file %s\n", trial, err, h.Name)
 			return nil, true, err
 		}
@@ -98,11 +99,11 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			// We are seeing these very rarely, maybe 1 per hour.
 			// They are non-deterministic, so probably related to GCS problems.
 			metrics.GCSRetryCount.WithLabelValues(
-				phase, strconv.Itoa(trial), "stream error").Inc()
+				rr.TableBase, phase, strconv.Itoa(trial), "stream error").Inc()
 		} else {
 			// We haven't seen any of these so far (as of May 9)
 			metrics.GCSRetryCount.WithLabelValues(
-				phase, strconv.Itoa(trial), "other error").Inc()
+				rr.TableBase, phase, strconv.Itoa(trial), "other error").Inc()
 		}
 		log.Printf("nextData(%d): %v\n", trial, err)
 		return nil, true, err
@@ -116,8 +117,8 @@ func (rr *ETLSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 // and storage.ErrOversizeFile.
 // Returns io.EOF when there are no more tests.
 func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
-	metrics.WorkerState.WithLabelValues("read").Inc()
-	defer metrics.WorkerState.WithLabelValues("read").Dec()
+	metrics.WorkerState.WithLabelValues(rr.TableBase, "read").Inc()
+	defer metrics.WorkerState.WithLabelValues(rr.TableBase, "read").Dec()
 
 	// Try to get the next file.  We retry multiple times, because sometimes
 	// GCS stalls and produces stream errors.
@@ -242,7 +243,7 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	tarReader := tar.NewReader(rdr)
 
 	timeout := 16 * time.Millisecond
-	return &ETLSource{tarReader, closer, timeout}, nil
+	return &ETLSource{tarReader, closer, timeout, "invalid"}, nil
 }
 
 // GetStorageClient provides a storage reader client.

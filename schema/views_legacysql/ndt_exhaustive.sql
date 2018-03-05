@@ -6,4 +6,4 @@
 SELECT *
 FROM
  [${DATASET}.common_etl_legacysql],
- [measurement-lab:legacy.ndt_plx_legacysql]
+ [${PROJECT}:legacy.ndt_plx_legacysql]

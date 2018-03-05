@@ -8,37 +8,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/schema"
 )
 
 //=====================================================================================
 //                       Disco Parser
 //=====================================================================================
-
-type PortStats struct {
-	// TODO - replace these with standard meta data.
-	Meta struct {
-		FileName  string `json:"filename, string"`
-		TestName  string `json:"testname, string"`
-		ParseTime int64  `json:"parsetime, int64"`
-	} `json:"meta"`
-
-	Sample []struct { //    []Sample `json: "sample"`
-		Timestamp int64   `json:"timestamp, int64"`
-		Value     float32 `json:"value, float32"`
-	} `json:"sample"`
-	Metric     string `json:"metric"`
-	Hostname   string `json:"hostname"`
-	Experiment string `json:"experiment"`
-
-	// bigquery doesn't handle maps within structs.  8-(
-	// Meta       map[string]bigquery.Value `json:"meta"`
-}
 
 // TODO(dev) add tests
 type DiscoParser struct {
@@ -56,6 +38,17 @@ func (dp *DiscoParser) TaskError() error {
 	return nil
 }
 
+// IsParsable returns the canonical test type and whether to parse data.
+func (dp *DiscoParser) IsParsable(testName string, data []byte) (string, bool) {
+	// Files look like: "<date>-to-<date>-switch.json.gz"
+	// Notice the "-" before switch.
+	if strings.HasSuffix(testName, "switch.json") ||
+		strings.HasSuffix(testName, "switch.json.gz") {
+		return "switch", true
+	}
+	return "unknown", false
+}
+
 // Disco data a JSON representation that should be pushed directly into BigQuery.
 // For now, though, we parse into a struct, for compatibility with current inserter
 // backend.
@@ -67,26 +60,40 @@ func (dp *DiscoParser) TaskError() error {
 //
 // TODO - optimize this to use the JSON directly, if possible.
 func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+	metrics.WorkerState.WithLabelValues(dp.TableName(), "switch").Inc()
+	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "switch").Dec()
 	meta["testname"] = testName
-	ms := struct {
-		FileName  string `json:"filename, string"`
-		TestName  string `json:"testname, string"`
-		ParseTime int64  `json:"parsetime, int64"`
-	}{meta["filename"].(string), meta["testname"].(string), meta["parsetime"].(time.Time).Unix()}
+	ms := schema.Meta{
+		FileName:  meta["filename"].(string),
+		TestName:  meta["testname"].(string),
+		ParseTime: meta["parse_time"].(time.Time).Unix(),
+	}
 
 	rdr := bytes.NewReader(test)
 	dec := json.NewDecoder(rdr)
+	rowCount := 0
+
 	for dec.More() {
-		var ps PortStats
-		ps.Meta = ms
-		err := dec.Decode(&ps)
+		var stats schema.SwitchStats
+		stats.Meta = ms
+		err := dec.Decode(&stats)
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				dp.TableName(), "disco", "Decode").Inc()
 			// TODO(dev) Should accumulate errors, instead of aborting?
 			return err
 		}
-		err = dp.inserter.InsertRow(ps)
+		rowCount++
+
+		// Count the number of samples per record.
+		metrics.DeltaNumFieldsHistogram.WithLabelValues(
+			dp.TableName()).Observe(float64(len(stats.Sample)))
+
+		// TODO: measure metrics.RowSizeHistogram every so often with json size.
+		metrics.RowSizeHistogram.WithLabelValues(
+			dp.TableName()).Observe(float64(stats.Size()))
+
+		err = dp.inserter.InsertRow(stats)
 		if err != nil {
 			switch t := err.(type) {
 			case bigquery.PutMultiError:
@@ -102,6 +109,11 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 			return err
 		}
 	}
+
+	// Measure the distribution of records per file.
+	metrics.EntryFieldCountHistogram.WithLabelValues(
+		dp.TableName()).Observe(float64(rowCount))
+
 	metrics.TestCount.WithLabelValues(dp.TableName(), "disco", "ok").Inc()
 
 	return nil

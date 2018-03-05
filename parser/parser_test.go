@@ -52,6 +52,10 @@ func NewTestParser(ins etl.Inserter) etl.Parser {
 		&parser.FakeRowStats{}} // Use a FakeRowStats to provide the RowStats functions.
 }
 
+func (tp *TestParser) IsParsable(testName string, test []byte) (string, bool) {
+	return "ext", true
+}
+
 func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	metrics.TestCount.WithLabelValues("table", "test", "ok").Inc()
 	values := make(map[string]bigquery.Value, len(meta)+1)

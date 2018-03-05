@@ -102,9 +102,15 @@ func decrementInFlight() {
 
 // TODO(gfr) unify counting for http and pubsub paths?
 func worker(rwr http.ResponseWriter, rq *http.Request) {
+	// This will add metric count and log message from any panic.
+	// The panic will still propagate, and http will report it.
+	defer func() {
+		etl.CountPanics(recover(), "worker")
+	}()
+
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
-		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "worker", "TooManyRequests").Inc()
 		rwr.WriteHeader(http.StatusTooManyRequests)
 		fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
 		return
@@ -146,18 +152,11 @@ func worker(rwr http.ResponseWriter, rq *http.Request) {
 func subworker(rawFileName string, executionCount, retryCount int) (status int, msg string) {
 	// TODO(dev) Check how many times a request has already been attempted.
 
-	// These keep track of the (nested) state of the worker.
-	metrics.WorkerState.WithLabelValues("worker").Inc()
-	defer metrics.WorkerState.WithLabelValues("worker").Dec()
-
-	metrics.WorkerCount.Inc()
-	defer metrics.WorkerCount.Dec()
-
 	var err error
 	// This handles base64 encoding, and requires a gs:// prefix.
 	fn, err := storage.GetFilename(rawFileName)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "worker", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)
 		return http.StatusBadRequest, `{"message": "Invalid filename."}`
 	}
@@ -173,16 +172,24 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 	}
 	dataType := data.GetDataType()
 
+	// Count number of workers operating on each table.
+	metrics.WorkerCount.WithLabelValues(data.TableBase()).Inc()
+	defer metrics.WorkerCount.WithLabelValues(data.TableBase()).Dec()
+
+	// These keep track of the (nested) state of the worker.
+	metrics.WorkerState.WithLabelValues(data.TableBase(), "worker").Inc()
+	defer metrics.WorkerState.WithLabelValues(data.TableBase(), "worker").Dec()
+
 	// Move this into Validate function
 	if dataType == etl.INVALID {
-		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
+		metrics.TaskCount.WithLabelValues(data.TableBase(), "worker", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)
 		return http.StatusBadRequest, `{"message": "Invalid filename."}`
 	}
 
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("unknown", "ServiceUnavailable").Inc()
+		metrics.TaskCount.WithLabelValues(data.TableBase(), "worker", "ServiceUnavailable").Inc()
 		log.Printf("Error getting storage client: %v\n", err)
 		return http.StatusServiceUnavailable, `{"message": "Could not create client."}`
 	}
@@ -190,12 +197,14 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 	// TODO - add a timer for reading the file.
 	tr, err := storage.NewETLSource(client, fn)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(string(dataType), "ETLSourceError").Inc()
+		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "ETLSourceError").Inc()
 		log.Printf("Error opening gcs file: %v", err)
 		return http.StatusInternalServerError, `{"message": "Problem opening gcs file."}`
 		// TODO - anything better we could do here?
 	}
 	defer tr.Close()
+	// Label storage metrics with the expected table name.
+	tr.TableBase = data.TableBase()
 
 	dateFormat := "20060102"
 	date, err := time.Parse(dateFormat, data.PackedDate)
@@ -207,7 +216,7 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 	}
 	ins, err := bq.NewInserter(dataset, dataType, date)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(string(dataType), "NewInserterError").Inc()
+		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)
 		return http.StatusInternalServerError, `{"message": "Problem creating BQ inserter."}`
 		// TODO - anything better we could do here?
@@ -228,16 +237,16 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 		data.Host+"-"+data.Pod+"-"+data.Experiment,
 		date.Weekday().String()).Add(float64(files))
 
-	metrics.WorkerState.WithLabelValues("finish").Inc()
-	defer metrics.WorkerState.WithLabelValues("finish").Dec()
+	metrics.WorkerState.WithLabelValues(data.TableBase(), "finish").Inc()
+	defer metrics.WorkerState.WithLabelValues(data.TableBase(), "finish").Dec()
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(string(dataType), "TaskError").Inc()
+		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "TaskError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
 		return http.StatusInternalServerError, `{"message": "Error in ProcessAllTests"}`
 		// TODO - anything better we could do here?
 	}
 
-	metrics.TaskCount.WithLabelValues(string(dataType), "OK").Inc()
+	metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "OK").Inc()
 	return http.StatusOK, `{"message": "Success"}`
 }
 

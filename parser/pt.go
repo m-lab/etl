@@ -68,7 +68,7 @@ type Node struct {
 
 const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
-const PTBufferSize int = 5
+const PTBufferSize int = 2
 
 func NewPTParser(ins etl.Inserter) *PTParser {
 	return &PTParser{ins, ins, []cachedPTData{}}
@@ -250,9 +250,18 @@ func (pt *PTParser) NumBufferedTests() int {
 	return len(pt.previousTests)
 }
 
+// IsParsable returns the canonical test type and whether to parse data.
+func (pt *PTParser) IsParsable(testName string, data []byte) (string, bool) {
+	if strings.HasSuffix(testName, ".paris") {
+		return "paris", true
+	}
+	return "unknown", false
+}
+
+// ParseAndInsert parses a paris-traceroute log file and inserts results into a single row.
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	metrics.WorkerState.WithLabelValues("pt").Inc()
-	defer metrics.WorkerState.WithLabelValues("pt").Dec()
+	metrics.WorkerState.WithLabelValues(pt.TableName(), "pt").Inc()
+	defer metrics.WorkerState.WithLabelValues(pt.TableName(), "pt").Dec()
 	testId := filepath.Base(testName)
 	if meta["filename"] != nil {
 		testId = CreateTestId(meta["filename"].(string), filepath.Base(testName))
@@ -425,8 +434,8 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte, tableName string) (cachedPTData, error) {
 	//log.Printf("%s", testName)
-	metrics.WorkerState.WithLabelValues("parse").Inc()
-	defer metrics.WorkerState.WithLabelValues("parse").Dec()
+	metrics.WorkerState.WithLabelValues(tableName, "parse").Inc()
+	defer metrics.WorkerState.WithLabelValues(tableName, "parse").Dec()
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
@@ -521,6 +530,10 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
 	// reach destIP at the last hop.
 	lastHop := destIP
+	if len(allNodes) == 0 {
+		// Empty test, stop here.
+		return cachedPTData{}, errors.New("Empty Test.")
+	}
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
 		lastHop = allNodes[len(allNodes)-1].ip
