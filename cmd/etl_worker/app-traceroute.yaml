@@ -22,7 +22,7 @@ automatic_scaling:
   cool_down_period_sec: 3000
   # We don't care much about latency, so a high utilization is desireable.
   cpu_utilization:
-    target_utilization: 0.80
+    target_utilization: 0.6
 
 # Note: add a public port for GCE auto discovery by prometheus.
 # TODO(dev): are any values redundant or irrelevant?
@@ -40,7 +40,7 @@ env_variables:
   RELEASE_TAG: ${TRAVIS_TAG}
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
-  MAX_WORKERS: 10
+  MAX_WORKERS: 5
   BIGQUERY_PROJECT: ${INJECTED_PROJECT}
   BIGQUERY_DATASET: 'base_tables'
   ANNOTATE_IP: 'true'
