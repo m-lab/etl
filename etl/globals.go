@@ -23,7 +23,7 @@ const start = `^gs://(?P<bucket>.*)/(?P<exp>[^/]*)/`
 const datePath = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
 const dateTime = `(?P<packeddate>\d{4}[01]\d[0123]\d)T(?P<packedtime>\d{6})Z`
 const mlabN_podNN = `-(?P<host>mlab\d)-(?P<pod>[[:alpha:]]{3}\d[0-9t])-`
-const exp_NNNN = `(?P<experiment>.*)-(?P<filenumber>\d{4})`
+const exp_NNNN = `(?P<experiment>.*)-(?P<filenumber>\d{4})(?P<etag>-e)?`
 const suffix = `(?P<suffix>\.tar|\.tar.gz|\.tgz)$`
 
 // These are here to facilitate use across queue-pusher and parsing components.
@@ -87,7 +87,7 @@ func ValidateTestPath(path string) (*DataPath, error) {
 		Pod:        fields[7],
 		Experiment: fields[8],
 		FileNumber: fields[9],
-		Suffix:     fields[10],
+		Suffix:     fields[11],
 	}
 	return dp, nil
 }
