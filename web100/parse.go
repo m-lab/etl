@@ -69,12 +69,12 @@ var (
 	ErrIPv6QuadColon           = errors.New("IP address contains :::: ")
 )
 
-// FixBadIPv6 fixes triple colon ::: which is produced by sidestream.
-func FixBadIPv6(ipStr string) (string, error) {
+// NormalizeIPv6 fixes triple colon ::: which is produced by sidestream.
+// This error is produced by older versions of the c-web100 library, which is still
+// used by sidestream.
+func NormalizeIPv6(ipStr string) (string, error) {
 	split := strings.Split(ipStr, ":::")
 	switch len(split) {
-	case 0:
-		fallthrough
 	case 1:
 		return ipStr, nil
 	case 2:
@@ -90,7 +90,7 @@ func FixBadIPv6(ipStr string) (string, error) {
 // ValidateIP validates (and possibly repairs) IP addresses.
 // Return nil if it is a valid IPv4 or IPv6 address (or can be repaired), non-nil otherwise.
 func ValidateIP(ipStr string) error {
-	ipStr, err := FixBadIPv6(ipStr)
+	ipStr, err := NormalizeIPv6(ipStr)
 	if err != nil {
 		return err
 	}
