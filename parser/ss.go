@@ -231,14 +231,14 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				ss.TableName(), "ss", "corrupted content").Inc()
 			continue
 		}
-		err = ValidateIP(ssValue["LocalAddress"])
+		err = web100.ValidateIP(ssValue["LocalAddress"])
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid server IP").Inc()
 			log.Printf("Invalid server IP address: %s with error: %s\n", ssValue["LocalAddress"], err)
 			continue
 		}
-		err = ValidateIP(ssValue["RemAddress"])
+		err = web100.ValidateIP(ssValue["RemAddress"])
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid client IP").Inc()
