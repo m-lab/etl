@@ -4,6 +4,7 @@ package parser
 import (
 	"errors"
 	"net"
+	"strings"
 	"syscall"
 )
 
@@ -17,18 +18,60 @@ func ParseIPFamily(ipStr string) int64 {
 	return -1
 }
 
-// Return nil if it is a valid IP v4 or IPv6 address.
+// IP validation errors.
+var (
+	ErrIPIsUnparseable   = errors.New("IP not parsable")
+	ErrIPIsUnconvertible = errors.New("IP not convertible to ipv4 or ipv6")
+	ErrIPIsZero          = errors.New("IP is zero/unspecified")
+	ErrIPIsUnroutable    = errors.New("IP is nonroutable")
+
+	ErrIPv4IsPrivate    = errors.New("private IPv4")
+	ErrIPv6IsPrivate    = errors.New("private IPv6")
+	ErrIPv4IsUnroutable = errors.New("unroutable IPv4")
+	ErrIPv6IsUnroutable = errors.New("unroutable IPv6")
+
+	ErrIPv6MultipleTripleColon = errors.New("more than one ::: in an ip address")
+	ErrIPv6QuadColon           = errors.New("IP address contains :::: ")
+)
+
+// FixBadIPv6 fixes triple colon ::: which is produced by sidestream.
+func FixBadIPv6(ipStr string) (string, error) {
+	split := strings.Split(ipStr, ":::")
+	switch len(split) {
+	case 0:
+		fallthrough
+	case 1:
+		return ipStr, nil
+	case 2:
+		if split[1][0] == ':' {
+			return "", ErrIPv6QuadColon
+		}
+		return split[0] + "::" + split[1], nil
+	default:
+		return ipStr, ErrIPv6MultipleTripleColon
+	}
+}
+
+// ValidateIP validates (and possibly repairs) IP addresses.
+// Return nil if it is a valid IPv4 or IPv6 address (or can be repaired), non-nil otherwise.
 func ValidateIP(ipStr string) error {
+	ipStr, err := FixBadIPv6(ipStr)
+	if err != nil {
+		return err
+	}
 	ip := net.ParseIP(ipStr)
 	if ip == nil || (ip.To4() == nil && ip.To16() == nil) {
-		return errors.New("IP not parsable.")
+		return ErrIPIsUnparseable
+	}
+	if ip.To4() == nil && ip.To16() == nil {
+		return ErrIPIsUnconvertible
 	}
 	if ip.IsUnspecified() {
-		return errors.New("IP is zero and invalid.")
+		return ErrIPIsZero
 	}
 
 	if ip.IsLoopback() || ip.IsMulticast() || ip.IsLinkLocalUnicast() {
-		return errors.New("Nonroutable IP is invalid")
+		return ErrIPIsUnroutable
 	}
 
 	if ip.To4() != nil {
@@ -39,25 +82,25 @@ func ValidateIP(ipStr string) error {
 		_, private22BitBlock, _ := net.ParseCIDR("100.64.0.0/10")
 		if private24BitBlock.Contains(ip) || private20BitBlock.Contains(ip) ||
 			private16BitBlock.Contains(ip) || private22BitBlock.Contains(ip) {
-			return errors.New("Private IPv4 is invalid.")
+			return ErrIPv4IsPrivate
 		}
 
 		// check whether it is nonroutable IP
 		_, nonroutable1, _ := net.ParseCIDR("0.0.0.0/8")
 		_, nonroutable2, _ := net.ParseCIDR("192.0.2.0/24")
 		if nonroutable1.Contains(ip) || nonroutable2.Contains(ip) {
-			return errors.New("Nonroutable IPv4 is invalid")
+			return ErrIPv4IsUnroutable
 		}
 	} else if ip.To16() != nil {
 		_, private7BitBlock, _ := net.ParseCIDR("FC00::/7")
 		if private7BitBlock.Contains(ip) {
-			return errors.New("Private IPv6 is invalid.")
+			return ErrIPv6IsPrivate
 		}
 
 		_, nonroutable1, _ := net.ParseCIDR("2001:db8::/32")
 		_, nonroutable2, _ := net.ParseCIDR("fec0::/10")
 		if nonroutable1.Contains(ip) || nonroutable2.Contains(ip) {
-			return errors.New("Nonroutable IPv6 is invalid")
+			return ErrIPv6IsUnroutable
 		}
 	}
 	return nil

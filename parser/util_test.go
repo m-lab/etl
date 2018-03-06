@@ -35,6 +35,13 @@ func TestValidateIP(t *testing.T) {
 	if parser.ValidateIP("127.0.0.1") == nil || parser.ValidateIP("::ffff:127.0.0.1") == nil {
 		t.Fatalf("Nonroutable IP was not identified as invalid IP.")
 	}
+
+	if parser.ValidateIP("2001:668:1f:22:::81") != nil {
+		t.Fatalf("IPv6 with triple colon was not repaired.")
+	}
+	if parser.ValidateIP("2001:668:1f::::81") == nil {
+		t.Fatalf("IPv6 with quad colon was allowed.")
+	}
 }
 
 // To run benchmark...
