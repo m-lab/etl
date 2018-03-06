@@ -10,19 +10,18 @@ resources:
   cpu: 2
   # Instances support between [(cpu * 0.9) - 0.4, (cpu * 6.5) - 0.4]
   # Actual memory available is exposed via GAE_MEMORY_MB environment variable.
-  memory_gb: 12
-
-  # TODO - Adjust once we understand requirements.
-  disk_size_gb: 10
+  # even though the parser has extremely limited RAM requirements, the 
+  # minimum RAM assignable to 2 CPUs is around 1.5GB
+  memory_gb: 1.5
 
 automatic_scaling:
   # We expect fairly steady load, so a modest minimum will rarely cost us anything.
   min_num_instances: 2
   max_num_instances: 20
-  cool_down_period_sec: 300
+  cool_down_period_sec: 3000
   # We don't care much about latency, so a high utilization is desireable.
   cpu_utilization:
-    target_utilization: 0.80
+    target_utilization: 0.6
 
 # Note: add a public port for GCE auto discovery by prometheus.
 # TODO(dev): are any values redundant or irrelevant?
@@ -40,7 +39,7 @@ env_variables:
   RELEASE_TAG: ${TRAVIS_TAG}
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
-  MAX_WORKERS: 30
+  MAX_WORKERS: 5
   BIGQUERY_PROJECT: ${INJECTED_PROJECT}
   BIGQUERY_DATASET: 'base_tables'
   ANNOTATE_IP: 'true'
