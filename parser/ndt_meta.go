@@ -13,6 +13,7 @@ import (
 
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/etl/web100"
 )
 
 // MetaFileData is the parsed info from the .meta file.
@@ -55,13 +56,13 @@ var fieldPairs = map[string]string{
 
 func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
 	connSpec.SetString(prefix+"_ip", ipString)
-	if ValidateIP(ipString) != nil {
+	if web100.ValidateIP(ipString) != nil {
 		log.Printf("Failed parsing connSpec IP: %s\n", ipString)
 		metrics.WarningCount.WithLabelValues(
 			"ndt", "unknown", "failed parsing connSpec IP").Inc()
 	} else {
 		connSpec.SetString(prefix+"_ip", ipString)
-		family := ParseIPFamily(ipString)
+		family := web100.ParseIPFamily(ipString)
 		if family != -1 {
 			connSpec.SetInt64(prefix+"_af", family)
 		}

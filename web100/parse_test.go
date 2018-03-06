@@ -2,6 +2,8 @@ package web100_test
 
 import (
 	"bytes"
+	"fmt"
+	"syscall"
 	"testing"
 
 	"github.com/m-lab/etl/web100"
@@ -70,5 +72,49 @@ func TestParseWeb100Definitions(t *testing.T) {
 			t.Errorf("Missing legacy variable %q: got %q; want %q",
 				legacyKey, v, preferedName)
 		}
+	}
+}
+
+func TestParseIPFamily(t *testing.T) {
+	if web100.ParseIPFamily("1.2.3.4") != syscall.AF_INET {
+		t.Fatalf("IPv4 address not parsed correctly.")
+	}
+	if web100.ParseIPFamily("2001:db8:0:1:1:1:1:1") != syscall.AF_INET6 {
+		t.Fatalf("IPv6 address not parsed correctly.")
+	}
+}
+
+func TestValidateIP(t *testing.T) {
+	if web100.ValidateIP("1.2.3.4") != nil {
+		fmt.Println(web100.ValidateIP("1.2.3.4"))
+		t.Fatalf("Valid IPv4 was identified as invalid.")
+	}
+	if web100.ValidateIP("2620:0:1000:2304:8053:fe91:6e2e:b4f1") != nil {
+		t.Fatalf("Valid IPv6 was identified as invalid.")
+	}
+	if web100.ValidateIP("::") == nil || web100.ValidateIP("0.0.0.0") == nil ||
+		web100.ValidateIP("abc.0.0.0") == nil || web100.ValidateIP("1.0.0.256") == nil {
+		t.Fatalf("Invalid IP was identified as valid.")
+	}
+	if web100.ValidateIP("172.16.0.1") == nil {
+		t.Fatalf("Private IP was not identified as invalid IP.")
+	}
+	if web100.ValidateIP("127.0.0.1") == nil || web100.ValidateIP("::ffff:127.0.0.1") == nil {
+		t.Fatalf("Nonroutable IP was not identified as invalid IP.")
+	}
+
+	if web100.ValidateIP("2001:668:1f:22:::81") != nil {
+		t.Fatalf("IPv6 with triple colon was not repaired.")
+	}
+	if web100.ValidateIP("2001:668:1f::::81") == nil {
+		t.Fatalf("IPv6 with quad colon was allowed.")
+	}
+}
+
+// To run benchmark...
+// go test -bench=. ./parser/...
+func BenchmarkValidateIPv4(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = web100.ValidateIP("1.2.3.4")
 	}
 }
