@@ -105,7 +105,7 @@ func PackDataIntoSchema(ss_value map[string]string, log_time time.Time, testName
 
 	conn_spec := &schema.Web100ConnectionSpecification{
 		Local_ip:    ss_value["LocalAddress"],
-		Local_af:    ParseIPFamily(ss_value["LocalAddress"]),
+		Local_af:    web100.ParseIPFamily(ss_value["LocalAddress"]),
 		Local_port:  int64(local_port),
 		Remote_ip:   ss_value["RemAddress"],
 		Remote_port: int64(remote_port),
