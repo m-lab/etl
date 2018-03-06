@@ -4,7 +4,6 @@ package parser
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"log"
 	"path/filepath"
 	"reflect"
@@ -206,16 +205,15 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	metrics.WorkerState.WithLabelValues(ss.TableName(), "ss").Inc()
 	defer metrics.WorkerState.WithLabelValues(ss.TableName(), "ss").Dec()
 
-	log_time, err := ExtractLogtimeFromFilename(testName)
+	logTime, err := ExtractLogtimeFromFilename(testName)
 	if err != nil {
 		return err
 	}
-	var var_names []string
 	testContent := strings.Split(string(rawContent[:]), "\n")
 	if len(testContent) < 2 {
-		return errors.New("empty test file.")
+		return errors.New("empty test file")
 	}
-	var_names, err = ParseKHeader(testContent[0])
+	varNames, err := ParseKHeader(testContent[0])
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			ss.TableName(), "ss", "corrupted header").Inc()
@@ -227,34 +225,34 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if len(oneLine) == 0 {
 			continue
 		}
-		ss_value, err := ParseOneLine(oneLine, var_names)
+		ssValue, err := ParseOneLine(oneLine, varNames)
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "corrupted content").Inc()
-			return err
+			continue
 		}
-		err = ValidateIP(ss_value["LocalAddress"])
+		err = ValidateIP(ssValue["LocalAddress"])
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid server IP").Inc()
-			return fmt.Errorf("Invalid server IP address: %s with error: %s", ss_value["LocalAddress"], err)
+			log.Printf("Invalid server IP address: %s with error: %s\n", ssValue["LocalAddress"], err)
+			continue
 		}
-		err = ValidateIP(ss_value["RemAddress"])
+		err = ValidateIP(ssValue["RemAddress"])
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "Invalid client IP").Inc()
-			return fmt.Errorf("Invalid client IP address: %s with error: %s", ss_value["RemAddress"], err)
+			log.Printf("Invalid client IP address: %s with error: %s", ssValue["RemAddress"], err)
+			continue
 		}
-		ss_test, err := PackDataIntoSchema(ss_value, log_time, testName)
+		ssTest, err := PackDataIntoSchema(ssValue, logTime, testName)
 		if err != nil {
-			metrics.ErrorCount.WithLabelValues(
-				ss.TableName(), "ss", "corrupted data").Inc()
 			metrics.TestCount.WithLabelValues(
 				ss.TableName(), "ss", "corrupted data").Inc()
 			log.Printf("cannot pack data into sidestream schema: %v\n", err)
-			return err
+			continue
 		}
-		err = ss.inserter.InsertRow(ss_test)
+		err = ss.inserter.InsertRow(ssTest)
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				ss.TableName(), "ss", "insert-err").Inc()
