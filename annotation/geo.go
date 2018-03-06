@@ -276,6 +276,7 @@ func BatchParseJSONGeoDataResponse(jsonBuffer []byte) (map[string]GeoData, error
 	parsedJSON := make(map[string]GeoData)
 	err := json.Unmarshal(jsonBuffer, &parsedJSON)
 	if err != nil {
+		log.Println(string(jsonBuffer))
 		return nil, err
 	}
 	return parsedJSON, nil
