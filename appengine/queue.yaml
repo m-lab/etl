@@ -87,83 +87,83 @@ queue:
 #    some headroom for future growth.
 - name: etl-ndt-batch-0
   target: etl-ndt-batch-parser
-  rate: 0.2/s
+  rate: 0.3/s
   bucket_size: 10
   max_concurrent_requests: 55
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 300
+    max_backoff_seconds: 30
     max_doublings: 0
 - name: etl-ndt-batch-1
   target: etl-ndt-batch-parser
-  rate: 0.2/s
+  rate: 0.3/s
   bucket_size: 10
   max_concurrent_requests: 55
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 300
+    max_backoff_seconds: 30
     max_doublings: 0
 - name: etl-ndt-batch-2
   target: etl-ndt-batch-parser
-  rate: 0.2/s
+  rate: 0.3/s
   bucket_size: 10
   max_concurrent_requests: 55
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 300
+    max_backoff_seconds: 30
     max_doublings: 0
 - name: etl-ndt-batch-3
   target: etl-ndt-batch-parser
-  rate: 0.2/s
+  rate: 0.3/s
   bucket_size: 10
   max_concurrent_requests: 55
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 300
+    max_backoff_seconds: 30
     max_doublings: 0
 - name: etl-ndt-batch-4
   target: etl-ndt-batch-parser
-  rate: 0.2/s
+  rate: 0.3/s
   bucket_size: 10
   max_concurrent_requests: 55
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 300
+    max_backoff_seconds: 30
     max_doublings: 0
 - name: etl-ndt-batch-5
   target: etl-ndt-batch-parser
-  rate: 0.2/s
+  rate: 0.3/s
   bucket_size: 10
   max_concurrent_requests: 55
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 300
+    max_backoff_seconds: 30
     max_doublings: 0
 - name: etl-ndt-batch-6
   target: etl-ndt-batch-parser
-  rate: 0.2/s
+  rate: 0.3/s
   bucket_size: 10
   max_concurrent_requests: 55
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 300
+    max_backoff_seconds: 30
     max_doublings: 0
 - name: etl-ndt-batch-7
   target: etl-ndt-batch-parser
-  rate: 0.2/s
+  rate: 0.3/s
   bucket_size: 10
   max_concurrent_requests: 55
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 300
+    max_backoff_seconds: 30
     max_doublings: 0
 
 - name: etl-traceroute-queue
