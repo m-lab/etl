@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/m-lab/etl/web100"
+
 	"github.com/m-lab/etl/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -102,6 +104,8 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 				Labels{"source": "Empty IP Address!!!"}).Inc()
 			continue
 		}
+		// TODO - looks like this is the code path for ss annotation
+		ip, _ := web100.NormalizeIPv6(ip)
 		reqData = append(reqData, RequestData{ip, 0, timestamp})
 	}
 	annotationData := GetBatchGeoData(BatchURL, reqData)
@@ -216,6 +220,7 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Failed to parse JSON"}).Inc()
 		log.Println(err)
+		log.Printf("%+v\n", data)
 		return nil
 	}
 	return geoDataFromResponse

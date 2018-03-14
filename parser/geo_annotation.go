@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/m-lab/etl/web100"
+
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/annotation"
@@ -226,12 +228,14 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 	sip, sok := spec.GetString([]string{"server_ip"})
 	reqData := []annotation.RequestData{}
 	if cok {
+		cip, _ := web100.NormalizeIPv6(cip)
 		reqData = append(reqData, annotation.RequestData{IP: cip, Timestamp: timestamp})
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
 			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
+		sip, _ := web100.NormalizeIPv6(sip)
 		reqData = append(reqData, annotation.RequestData{IP: sip, Timestamp: timestamp})
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
