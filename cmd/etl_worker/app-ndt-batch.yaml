@@ -24,13 +24,13 @@ automatic_scaling:
   # it to scale up to 40 instances to get work done quickly.  However, note that
   # more than 3 tasks/sec may result in bigquery stream quota problems, so this
   # may require changes.
-  min_num_instances: 1
+  min_num_instances: 10  # Too small a number here, and error rate prevents auto-scaling
   max_num_instances: 40
   # Very long cool down period, to reduce the likelihood of tasks being truncated.
   cool_down_period_sec: 1800
   # We don't care much about latency, so a high utilization is desireable.
   cpu_utilization:
-    target_utilization: 0.85
+    target_utilization: 0.70
 
 # Note: add a public port for GCE auto discovery by prometheus.
 # TODO(dev): are any values redundant or irrelevant?
