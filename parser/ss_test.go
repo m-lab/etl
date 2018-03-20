@@ -21,9 +21,25 @@ func TestPopulateSnap(t *testing.T) {
 	ss_value["CERcvd"] = "22"
 	ss_value["RemAddress"] = "abcd"
 	ss_value["TimeStampRcvd"] = "0"
-	_, err := parser.PopulateSnap(ss_value)
+	ss_value["StartTimeStamp"] = "2222"
+	ss_value["StartTimeUsec"] = "1111"
+	snap, err := parser.PopulateSnap(ss_value)
 	if err != nil {
 		t.Fatalf("Snap fields not populated correctly.")
+	}
+
+	if snap.TimeStampRcvd != false {
+		t.Errorf("TimeStampRcvd; got %t; want false", snap.TimeStampRcvd)
+	}
+	if snap.RemAddress != "abcd" {
+		t.Errorf("RemAddress; got %q; want 'abcd'", snap.RemAddress)
+	}
+	if snap.CERcvd != 22 {
+		t.Errorf("CERcvd; got %d; want 22", snap.CERcvd)
+	}
+	// Verify StartTimeStamp is combined correctly with StartTimeUsec.
+	if snap.StartTimeStamp != 2222001111 {
+		t.Errorf("StartTimeStamp; got %d; want 222001111", snap.StartTimeStamp)
 	}
 }
 
