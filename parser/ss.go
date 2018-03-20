@@ -152,25 +152,40 @@ func ParseOneLine(snapshot string, var_names []string) (map[string]string, error
 
 func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 	var snap = &schema.Web100Snap{}
+	var startTimeUsec int64
+
+	// First, extract StartTimeUsec value before all others so we can combine
+	// it with StartTimeStamp below.
+	if valueStr, ok := ss_value["StartTimeUsec"]; ok {
+		value, err := strconv.ParseInt(valueStr, 10, 64)
+		if err == nil {
+			startTimeUsec = value
+		}
+	}
+
+	// Process every other snap key.
 	for key := range ss_value {
 		// Skip cid and PollTime. They are SideStream-specific fields, not web100 variables.
 		if key == "cid" || key == "PollTime" {
 			continue
 		}
-		// We do special handling for this variable
+		// Skip StartTimeUsec because this is not part of the Web100Snap struct.
 		if key == "StartTimeUsec" {
-			// TODO: func CalculateStartTimeStamp() to get correct StartTimeStamp value.
 			continue
 		}
 		x := reflect.ValueOf(snap).Elem().FieldByName(key)
 
 		switch x.Type().String() {
 		case "int64":
-			value, err := strconv.Atoi(ss_value[key])
+			value, err := strconv.ParseInt(ss_value[key], 10, 64)
 			if err != nil {
 				return *snap, err
 			}
-			x.SetInt(int64(value))
+			if key == "StartTimeStamp" {
+				// Combine the StartTimeStamp and StartTimeUsec values.
+				value = value*1000000 + startTimeUsec
+			}
+			x.SetInt(value)
 		case "string":
 			x.Set(reflect.ValueOf(ss_value[key]))
 		case "bool":
