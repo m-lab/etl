@@ -181,10 +181,6 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 			if err != nil {
 				return *snap, err
 			}
-			if key == "StartTimeStamp" {
-				// Combine the StartTimeStamp and StartTimeUsec values.
-				value = value*1000000 + startTimeUsec
-			}
 			x.SetInt(value)
 		case "string":
 			x.Set(reflect.ValueOf(ss_value[key]))
@@ -198,6 +194,9 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 			}
 		}
 	}
+	// Combine the StartTimeStamp and StartTimeUsec values.
+	snap.StartTimeStamp = snap.StartTimeStamp*1000000 + startTimeUsec
+
 	// TODO: check whether snap has valid LocalAddress, RemAddress. Return error if not.
 	return *snap, nil
 }
