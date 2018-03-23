@@ -104,7 +104,6 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 				Labels{"source": "Empty IP Address!!!"}).Inc()
 			continue
 		}
-		// TODO - looks like this is the code path for ss annotation
 		ip, _ := web100.NormalizeIPv6(ip)
 		reqData = append(reqData, RequestData{ip, 0, timestamp})
 	}
