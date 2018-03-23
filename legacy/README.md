@@ -65,6 +65,57 @@ __partition_date__ should instead be derived from the legacy.ndt
 ___partition_time__ field.
 
 ### Validation
+First, there are many snapshot fields in the plx tables that aren't
+actually populated.  To verify this, I ran this query:
+
+```sql
+#standardSQL
+select test_id, web100_log_entry.snap
+from `plx.google.m_lab.ndt.all` 
+where
+     web100_log_entry.snap.DataOctetsIn != 0
+  or web100_log_entry.snap.DataOctetsOut != 0
+  or web100_log_entry.snap.DupAckEpisodes != 0
+  or web100_log_entry.snap.ECESent != 0 
+  or web100_log_entry.snap.ECNNonceRcvd != 0 
+  or web100_log_entry.snap.ECNsignals != 0 
+  or web100_log_entry.snap.ElapsedMicroSecs != 0 
+  or web100_log_entry.snap.ElapsedSecs != 0 
+  or web100_log_entry.snap.HCSumRTT != 0 
+  or web100_log_entry.snap.InRecovery != 0 
+  or web100_log_entry.snap.IpTosIn != 0 
+  or web100_log_entry.snap.IpTosOut != 0 
+  or web100_log_entry.snap.IpTtl != 0 
+  or web100_log_entry.snap.LimMSS != 0 
+  or web100_log_entry.snap.LimSsthresh != 0 
+  or web100_log_entry.snap.MSSSent != 0 
+  or web100_log_entry.snap.MaxCaCwnd != 0 
+  or web100_log_entry.snap.MaxPipeSize != 0 
+  or web100_log_entry.snap.NonRecovDAEpisodes != 0 
+  or web100_log_entry.snap.PipeSize != 0 
+  or web100_log_entry.snap.SoftErrorReason != 0 
+  or web100_log_entry.snap.SoftErrors != 0 
+  or web100_log_entry.snap.SpuriousRtoDetected != 0 
+  or web100_log_entry.snap.SumOctetsReordered != 0 
+  or web100_log_entry.snap.ThruOctetsAcked != 0 
+  or web100_log_entry.snap.ThruOctetsReceived != 0 
+  or web100_log_entry.snap.TimeStampRcvd is true
+  or web100_log_entry.snap.TimeStampSent is true
+  or web100_log_entry.snap.WAD_CwndAdjust != 0 
+  or web100_log_entry.snap.WAD_IFQ != 0 
+  or web100_log_entry.snap.WAD_MaxBurst != 0 
+  or web100_log_entry.snap.WAD_MaxSsthresh != 0 
+  or web100_log_entry.snap.WAD_NoAI != 0 
+# These are enums - can't figure how to compare them.
+#  or web100_log_entry.snap.WillSendSACK != 0
+#  or web100_log_entry.snap.WillUseSACK != 0
+  or web100_log_entry.snap.ZeroRwinRcvd != 0 
+  or web100_log_entry.snap.ZeroRwinSent != 0
+limit 10
+```
+This returns zero results, verifying that these fields are not
+actually used.
+
 The transfer ran into occasional errors, requiring some daily queries
 to be repeated.  In the end, the new table was validated by comparing
 the query counts, per year, against PLX tables, using these queries:
