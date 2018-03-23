@@ -209,7 +209,7 @@ var (
 	dataTypeToBQBufferSize = map[DataType]int{
 		NDT:             10,
 		NDT_OMIT_DELTAS: 50,
-		SS:              100,
+		SS:              500, // Average json size is 2.5K
 		PT:              300,
 		SW:              100,
 		INVALID:         0,
