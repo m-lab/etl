@@ -98,7 +98,7 @@ set -e
 if [[ -v TRAVIS ]];then set -x; fi
 
 create_view ${LEGACY} ndt_plx \
-  'All plx data, with _PARTITIONDATE mapped to partition_date for proper
+  'All plx data, with DATE(_PARTITIONTIME) mapped to partition_date for proper
    partition handling.'
 
 create_view ${INTERMEDIATE} common_etl \
