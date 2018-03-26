@@ -97,12 +97,6 @@ set -e
 # If executing in travis, be verbose.
 if [[ -v TRAVIS ]];then set -x; fi
 
-create_view ${LEGACY} ndt_with_partition_date \
-  'Plx data post 2015, with _PARTITIONDATE passed through.'
-
-create_view ${LEGACY} ndt_pre2015_with_partition_date \
-  'Plx data pre 2015, with _PARTITIONDATE passed through.'
-
 create_view ${LEGACY} ndt_plx \
   'All plx data, with _PARTITIONDATE mapped to partition_date for proper
    partition handling.'

@@ -8,7 +8,7 @@ SELECT
   anomalies,
   connection_spec,
   web100_log_entry
-FROM `mlab-sandbox.legacy.ndt`
+FROM `legacy.ndt`
 UNION ALL
 SELECT
   test_id,
@@ -17,4 +17,4 @@ SELECT
   anomalies,
   connection_spec,
   web100_log_entry
-FROM `mlab-sandbox.legacy.ndt_pre2015`
+FROM `legacy.ndt_pre2015`
