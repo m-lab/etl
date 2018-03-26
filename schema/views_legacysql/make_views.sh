@@ -34,6 +34,7 @@ PROJECT=${1:?Please provide the google cloud project: $USAGE}
 INTERMEDIATE=${PROJECT}:${2:?Please specify the internal dataset e.g. intermediate_v3_1_1: $USAGE}
 PUBLIC=${PROJECT}:${3:?Please specify the release candidate dataset e.g. rc_v3_1: $USAGE}
 ALIASES=${4:?Please specify a single alias, or quoted space separated list of aliases \{rc|\"rc release\"|none\}: $USAGE}
+LEGACY=${PROJECT}:legacy
 
 # TODO - check that public and intermediate aren't swapped?
 # TODO - check that project is valid?
@@ -84,6 +85,7 @@ create_view() {
 # These lines may fail if they already exist, so we run them before set -e.
 bq mk ${PUBLIC}
 bq mk ${INTERMEDIATE}
+bq mk ${LEGACY}
 for ALIAS in $ALIASES; do
   if [ "${ALIAS}" != "none" ]; then
     bq mk ${PROJECT}:${ALIAS}
@@ -94,6 +96,16 @@ done
 set -e
 # If executing in travis, be verbose.
 if [[ -v TRAVIS ]];then set -x; fi
+
+create_view ${LEGACY} ndt_with_partition_date \
+  'Plx data post 2015, with _PARTITIONDATE passed through.'
+
+create_view ${LEGACY} ndt_pre2015_with_partition_date \
+  'Plx data pre 2015, with _PARTITIONDATE passed through.'
+
+create_view ${LEGACY} ndt_plx \
+  'All plx data, with _PARTITIONDATE mapped to partition_date for proper
+   partition handling.'
 
 create_view ${INTERMEDIATE} common_etl \
   'ETL table projected into common schema, for union with PLX legacy data.

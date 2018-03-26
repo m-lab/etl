@@ -2,7 +2,7 @@
 -- ETL table projected into common schema, for union with PLX legacy data.
 SELECT
   test_id,
-  DATE(_partitiontime) AS partition_date,
+  _PARTITIONDATE AS partition_date,
   0 AS project, -- not included in ETL
   log_time,
   task_filename,
