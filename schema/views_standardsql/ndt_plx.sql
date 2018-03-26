@@ -8,7 +8,7 @@ SELECT
   anomalies,
   connection_spec,
   web100_log_entry
-FROM `legacy.ndt`
+FROM `${PROJECT}.legacy.ndt`
 UNION ALL
 SELECT
   test_id,
@@ -17,4 +17,4 @@ SELECT
   anomalies,
   connection_spec,
   web100_log_entry
-FROM `legacy.ndt_pre2015`
+FROM `${PROJECT}.legacy.ndt_pre2015`
