@@ -27,7 +27,7 @@ queue:
 # but we can run about 1200 rows/sec/table without deltas.  This unfortunately
 # means that we should update the number of concurrent requests depending on
 # whether we are doing full deltas.
-# 
+#
 # Without deltas, we are observing about 4 instance-hours / day of data for
 # mid 2017.  This means with 40 instances, we can process about 8 months/day.
 # With deltas, this slows dramatically, to about 10-15 rows/sec/instance,
@@ -37,7 +37,7 @@ queue:
 # per day, which for currentdata rates of 1 million tests per day, is
 # about 30 million rows per day, or about 350 rows/second.
 #
-# When reprocessing data older than 30 days, the pipeline inserts rows 
+# When reprocessing data older than 30 days, the pipeline inserts rows
 # into templated tables, which means there is a separate table per day.
 # So for archive reprocessing more than 30 days in the past, the BQ quota
 # ends up being rows/sec per day/date.
@@ -49,7 +49,7 @@ queue:
 # The new scraper produces about 16K tasks per day, with about 60 row inserts
 # per task.  But older archives are much larger, with perhaps 1000 to 2000 tar
 # files per day, and 600 to 1000 tests per file.
-# 
+#
 # We will limit the rate based on number of concurrent tasks, so we can
 # regulate the throughput independent of the size of the archive files.
 # With deltas, we want 200 rows/second, divided by 1.3 rows/sec per task,
@@ -89,81 +89,161 @@ queue:
   target: etl-ndt-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 55
+  max_concurrent_requests: 40
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 30
+    max_backoff_seconds:120
     max_doublings: 0
 - name: etl-ndt-batch-1
   target: etl-ndt-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 55
+  max_concurrent_requests: 40
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 30
+    max_backoff_seconds:120
     max_doublings: 0
 - name: etl-ndt-batch-2
   target: etl-ndt-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 55
+  max_concurrent_requests: 40
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 30
+    max_backoff_seconds:120
     max_doublings: 0
 - name: etl-ndt-batch-3
   target: etl-ndt-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 55
+  max_concurrent_requests: 40
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 30
+    max_backoff_seconds:120
     max_doublings: 0
 - name: etl-ndt-batch-4
   target: etl-ndt-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 55
+  max_concurrent_requests: 40
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 30
+    max_backoff_seconds:120
     max_doublings: 0
 - name: etl-ndt-batch-5
   target: etl-ndt-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 55
+  max_concurrent_requests: 40
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 30
+    max_backoff_seconds:120
     max_doublings: 0
 - name: etl-ndt-batch-6
   target: etl-ndt-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 55
+  max_concurrent_requests: 40
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 30
+    max_backoff_seconds:120
     max_doublings: 0
 - name: etl-ndt-batch-7
   target: etl-ndt-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 55
+  max_concurrent_requests: 40
   retry_parameters:
     task_age_limit: 8h
     min_backoff_seconds: 30
-    max_backoff_seconds: 30
+    max_backoff_seconds:120
+    max_doublings: 0
+- name: etl-ndt-batch-8
+  target: etl-ndt-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 40
+  retry_parameters:
+    task_age_limit: 8h
+    min_backoff_seconds: 30
+    max_backoff_seconds:120
+    max_doublings: 0
+- name: etl-ndt-batch-9
+  target: etl-ndt-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 40
+  retry_parameters:
+    task_age_limit: 8h
+    min_backoff_seconds: 30
+    max_backoff_seconds:120
+    max_doublings: 0
+- name: etl-ndt-batch-10
+  target: etl-ndt-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 40
+  retry_parameters:
+    task_age_limit: 8h
+    min_backoff_seconds: 30
+    max_backoff_seconds:120
+    max_doublings: 0
+- name: etl-ndt-batch-11
+  target: etl-ndt-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 40
+  retry_parameters:
+    task_age_limit: 8h
+    min_backoff_seconds: 30
+    max_backoff_seconds:120
+    max_doublings: 0
+- name: etl-ndt-batch-12
+  target: etl-ndt-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 40
+  retry_parameters:
+    task_age_limit: 8h
+    min_backoff_seconds: 30
+    max_backoff_seconds:120
+    max_doublings: 0
+- name: etl-ndt-batch-13
+  target: etl-ndt-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 40
+  retry_parameters:
+    task_age_limit: 8h
+    min_backoff_seconds: 30
+    max_backoff_seconds:120
+    max_doublings: 0
+- name: etl-ndt-batch-14
+  target: etl-ndt-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 40
+  retry_parameters:
+    task_age_limit: 8h
+    min_backoff_seconds: 30
+    max_backoff_seconds:120
+    max_doublings: 0
+- name: etl-ndt-batch-15
+  target: etl-ndt-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 40
+  retry_parameters:
+    task_age_limit: 8h
+    min_backoff_seconds: 30
+    max_backoff_seconds:120
     max_doublings: 0
 
 - name: etl-traceroute-queue
