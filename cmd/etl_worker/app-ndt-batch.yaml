@@ -49,7 +49,7 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   NDT_BATCH: 'true'  # Allow instances to discover they are NDT_BATCH instances.
-  MAX_WORKERS: 12
+  MAX_WORKERS: 15  # 12 is good for NDT, but 20 is good for SS.
   BIGQUERY_PROJECT: ${INJECTED_PROJECT}
   BIGQUERY_DATASET: 'batch'
   ANNOTATE_IP: 'true'
