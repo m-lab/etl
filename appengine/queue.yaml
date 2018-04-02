@@ -59,7 +59,7 @@ queue:
 # Without deltas, the throughput is much higher.  We will try with the
 # same number of concurrent tasks, and adjust if needed.
 #
-# To reach the desired 350 rows/second required to process one month's
+# To reach the desired 350 NDT rows/second required to process one month's
 # data each day, we need to process at least 2 days of data in parallel.
 # The quota gaurantee comes from putting any one day's data into a single
 # task queue, and the desired aggregate throughput can be achieved by
@@ -67,33 +67,37 @@ queue:
 # queues.
 #
 # To make things conceptually simple, we will just create queues with
-# suffixes like -0, -1, -2 ...
-# A corresponding batch reprocessing script will use Gregorian ordinal
-# of the date, mod N, to determine which queue to drop any given date
-# into.  We just choose an appropriate N that gives us the throughput
-# we need.  For now, N=16 gives us a bit of headroom, so this config
-# sets up -0 through -15.
+# suffixes like -0, -1, -2 ...  Tasks for each date will be submitted
+# to a single queue, and each queue will be fully drained before
+# submitting a new day's tasks.
+# For now, N=16 gives us a bit of headroom, so this config sets up -0 through -15.
 #
 # The current pipeline config has up to 40 instances with 2 cpus and
-# 12 workers each.  This could handle up to 0.9 * 40 * 12 or 432
+# 15 workers each.  This could handle about 0.9 * 40 * 15 or 560
 # concurrent tasks, which is well in excess of what we currently need.
 # Some adjustments may be needed once this is running regularly.
 #
 # SUMMARY:
 # 1. Each queue must limit concurrent requests to about 55 to limit
-#    rate into individual tables to around 200 rows/second (with deltas)
-# 2. We have 16 queues, to allow up to about 1600 rows/second, across both
-#    ndt and sidestream, and allow queue draining before next submission.
-#    This should allow 30 days of data to be processed within one day, with
-#    some headroom for future growth.
+#    rate into individual tables to around 200 rows/second (with deltas).
+#    We actually limit to 40, so we don't overwhelm the number of workers.
+# 2. We have 16 queues, to allow some queues to be empty and still maintain
+#    nearly 100% cpu utilization across 40 instances.
+# 3. Some tasks are pathological, and may never complete.  Since we are
+#    draining queues between date submissions, we expect a day's data to
+#    complete within a few hours.  We set an expiration of 12 hours in
+#    case some task consistently fails.
+#    TODO - should check into whether limiting retries would be better.
+#
 # TODO - misnomer - we are currently using these queues for sidestream as well.
+#   should rename these to just etl-batch-*
 - name: etl-ndt-batch-0
   target: etl-ndt-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -103,7 +107,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -113,7 +117,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -123,7 +127,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -133,7 +137,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -143,7 +147,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -153,7 +157,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -163,7 +167,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -173,7 +177,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -183,7 +187,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -193,7 +197,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -203,7 +207,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -213,7 +217,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -223,7 +227,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -233,7 +237,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
@@ -243,7 +247,7 @@ queue:
   bucket_size: 10
   max_concurrent_requests: 40
   retry_parameters:
-    task_age_limit: 8h
+    task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
