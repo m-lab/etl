@@ -83,7 +83,9 @@ queue:
 #    We actually limit to 40, so we don't overwhelm the number of workers.
 # 2. We have 16 queues, to allow some queues to be empty and still maintain
 #    nearly 100% cpu utilization across 40 instances.
-# 3. Some tasks are pathological, and may never complete.  Since we are
+# 3. Setting max_doublings to 0 means that backoff will increase linearly
+#    by min_backoff_seconds each retry.
+# 4. Some tasks are pathological, and may never complete.  Since we are
 #    draining queues between date submissions, we expect a day's data to
 #    complete within a few hours.  We set an expiration of 12 hours in
 #    case some task consistently fails.
@@ -100,6 +102,7 @@ queue:
     task_age_limit: 12h
     min_backoff_seconds: 30
     max_backoff_seconds: 120
+    # Setting max_doublings to 0 means that backoff will increase by min_backoff_seconds each retry.
     max_doublings: 0
 - name: etl-ndt-batch-1
   target: etl-ndt-batch-parser
