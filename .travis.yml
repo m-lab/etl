@@ -281,11 +281,13 @@ deploy:
     condition: $TRAVIS_TAG == small-prod-* || $TRAVIS_TAG == prod-*
 
 ###################### NDT SERVICES ###############################
-# Deploys BOTH STREAMING AND BATCH services.
+# Deploys BOTH STREAMING AND BATCH services, along with queue config.
 # Triggers when *ANY* branch is tagged with qp-prod-* OR prod-*
 - provider: script
   script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && gcloud app deploy --project=mlab-oti appengine/queue.yaml
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
     && INJECTED_PROJECT=measurement-lab
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
