@@ -209,13 +209,12 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 				pt.TableName(), "pt", "insert-err").Inc()
 			insertErr = true
 			log.Printf("insert-err: %v\n", err)
+			// Inc TestCount only once per row.
+			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
+		} else {
+			// Inc TestCount on successful row insert.
+			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 		}
-	}
-	if insertErr {
-		// Inc TestCount only once per test.
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
-	} else {
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 	}
 }
 
