@@ -184,22 +184,6 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == disco-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
-## Bigquery Views
-- provider: script
-  script:
-    # Update these version numbers when making changes to the views.
-    # TODO - add feature to allow making aliases from existing intermediate.
-    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
-    && cd $TRAVIS_BUILD_DIR/schema/views_legacysql
-    && ./make_views.sh mlab-sandbox intermediate_v3_1_1 rc_v3_1 "rc release"
-    && cd $TRAVIS_BUILD_DIR/schema/views_standardsql
-    && ./make_views.sh mlab-sandbox intermediate_v3_1_1 rc_v3_1 "rc release"
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_BRANCH == views-sandbox-* || $TRAVIS_BRANCH == sandbox-*
-
 ######################################################################
 #  Staging deployments
 #  Auto deployed on merge with integration branch
@@ -216,7 +200,7 @@ deploy:
 ######################################################################
 
 ###################### ALL ETL SERVICES ###############################
-# Deploys all staging services: NDT, NDT_BATCH, PT, SS, DISCO, QUEUE_PUSHER, GARDENER, VIEWS
+# Deploys all staging services: NDT, NDT_BATCH, PT, SS, DISCO, QUEUE_PUSHER, GARDENER
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
 #  the system in a mixed state.  This should be manually addresses ASAP.
@@ -242,10 +226,6 @@ deploy:
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
-    && cd $TRAVIS_BUILD_DIR/schema/views_legacysql
-    && ./make_views.sh mlab-staging intermediate_v3_1_1 rc_v3_1 "rc release"
-    && cd $TRAVIS_BUILD_DIR/schema/views_standardsql
-    && ./make_views.sh mlab-staging intermediate_v3_1_1 rc_v3_1 "rc release"
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -301,21 +281,3 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_TAG == ndt-prod-* || $TRAVIS_TAG == prod-*
-
-
-##########################  JUST VIEWS #################################
-# Triggers when *ANY* branch is tagged with views-prod-*
-# This is NOT triggered on prod-*
-- provider: script
-  script:
-    # Update these version numbers when making changes to the views.
-    # TODO - add feature to allow making aliases from existing intermediate.
-    cd $TRAVIS_BUILD_DIR/schema/views_legacysql
-    && ./make_views.sh measurement-lab intermediate_v3_1_1 rc_v3_1 "rc release"
-    && cd $TRAVIS_BUILD_DIR/schema/views_standardsql
-    && ./make_views.sh measurement-lab intermediate_v3_1_1 rc_v3_1 "rc release"
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_TAG == views-prod-*
