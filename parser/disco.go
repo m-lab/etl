@@ -108,13 +108,13 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 			// TODO(dev) Should accumulate errors, instead of aborting?
 			return err
 		}
+		// Count successful inserts.
+		metrics.TestCount.WithLabelValues(dp.TableName(), "disco", "ok").Inc()
 	}
 
 	// Measure the distribution of records per file.
 	metrics.EntryFieldCountHistogram.WithLabelValues(
 		dp.TableName()).Observe(float64(rowCount))
-
-	metrics.TestCount.WithLabelValues(dp.TableName(), "disco", "ok").Inc()
 
 	return nil
 }

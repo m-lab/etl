@@ -193,7 +193,6 @@ func (pt *PTParser) FullTableName() string {
 }
 
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
-	insertErr := false
 	for _, hop := range oneTest.Hops {
 		ptTest := schema.PT{
 			Test_id:              oneTest.TestID,
@@ -207,15 +206,13 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				pt.TableName(), "pt", "insert-err").Inc()
-			insertErr = true
 			log.Printf("insert-err: %v\n", err)
+			// Inc TestCount only once per row.
+			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
+		} else {
+			// Inc TestCount on successful row insert.
+			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 		}
-	}
-	if insertErr {
-		// Inc TestCount only once per test.
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
-	} else {
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 	}
 }
 
