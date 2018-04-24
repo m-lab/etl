@@ -33,7 +33,7 @@ func getFlagValues() {
 	}
 }
 
-// For testing.
+// EnableAnnotation is used only for testing.  Should be placed in whitebox _test file.
 func EnableAnnotation() {
 	os.Setenv("ANNOTATE_IP", "True")
 	getFlagValues()
@@ -78,14 +78,17 @@ type RequestData struct {
 	Timestamp time.Time // Holds the timestamp from an incoming request
 }
 
+// AnnotatorURL holds the https address of the annotator.
 // TODO(gfr) See if there is a better way of determining
 // where to send the request (there almost certainly is)
 var AnnotatorURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
 	".appspot.com"
 
+// BaseURL provides the base URL for single annotation requests
 var BaseURL = AnnotatorURL + "/annotate?"
 
+// BatchURL provides the base URL for batch annotation requests
 var BatchURL = AnnotatorURL + "/batch_annotate"
 
 // FetchGeoAnnotations takes a slice of strings
@@ -104,7 +107,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 				Labels{"source": "Empty IP Address!!!"}).Inc()
 			continue
 		}
-		ip, _ := web100.NormalizeIPv6(ip)
+		ip, _ = web100.NormalizeIPv6(ip)
 		reqData = append(reqData, RequestData{ip, 0, timestamp})
 	}
 	annotationData := GetBatchGeoData(BatchURL, reqData)
