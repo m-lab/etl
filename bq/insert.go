@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"

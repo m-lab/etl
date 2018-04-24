@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"golang.org/x/net/context"
+	"context"
 )
 
 // RowStats interface defines some useful Inserter stats that will also be

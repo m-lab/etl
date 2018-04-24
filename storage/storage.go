@@ -21,7 +21,7 @@ import (
 
 	"github.com/m-lab/etl/metrics"
 
-	"golang.org/x/net/context"
+	"context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
 )

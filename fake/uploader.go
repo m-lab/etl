@@ -16,7 +16,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	"golang.org/x/net/context"
+	"context"
 	bqv2 "google.golang.org/api/bigquery/v2"
 )
 
