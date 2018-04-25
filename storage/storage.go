@@ -9,6 +9,7 @@ package storage
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -21,7 +22,6 @@ import (
 
 	"github.com/m-lab/etl/metrics"
 
-	"context"
 	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
 )

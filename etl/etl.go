@@ -2,10 +2,10 @@
 package etl
 
 import (
+	"context"
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"context"
 )
 
 // RowStats interface defines some useful Inserter stats that will also be

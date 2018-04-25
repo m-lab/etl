@@ -15,6 +15,7 @@
 package bq
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"math/rand"
@@ -25,7 +26,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"context"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
