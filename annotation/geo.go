@@ -100,28 +100,32 @@ var BatchURL = AnnotatorURL + "/batch_annotate"
 // in the structs pointed to by the slice of GeolocationIP pointers.
 func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*GeolocationIP) {
 	reqData := make([]RequestData, 0, len(ips))
-	for _, ip := range ips {
-		if ip == "" {
+	normalized := make([]string, len(ips))
+	for i := range ips {
+		if ips[i] == "" {
 			// TODO(gfr) These should be warning, else we have error > request
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "Empty IP Address!!!"}).Inc()
 			continue
 		}
-		ip, _ = web100.NormalizeIPv6(ip)
-		reqData = append(reqData, RequestData{ip, 0, timestamp})
+		var err error
+		normalized[i], err = web100.NormalizeIPv6(ips[i])
+		if err != nil {
+			log.Println(err)
+		}
+		reqData = append(reqData, RequestData{normalized[i], 0, timestamp})
 	}
 	annotationData := GetBatchGeoData(BatchURL, reqData)
 	timeString := strconv.FormatInt(timestamp.Unix(), 36)
-	for index, ip := range ips {
-		data, ok := annotationData[ip+timeString]
+	for i := range normalized {
+		data, ok := annotationData[normalized[i]+timeString]
 		if !ok || data.Geo == nil {
 			// TODO(gfr) These should be warning, else we have error > request
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "Missing or empty data for IP Address!!!"}).Inc()
 			continue
 		}
-		*geoDest[index] = *data.Geo
-
+		*geoDest[i] = *data.Geo
 	}
 }
 
