@@ -229,6 +229,7 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 			Labels{"source": "Failed to parse JSON"}).Inc()
 		log.Println(err)
 		log.Printf("%+v\n", data)
+		log.Printf("%+v\n", string(annotatorResponse))
 		return nil
 	}
 	return geoDataFromResponse
