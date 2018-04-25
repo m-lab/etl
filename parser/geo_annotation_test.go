@@ -345,6 +345,7 @@ func TestAddGeoDataPTHop(t *testing.T) {
 }
 
 func testTime() time.Time {
+	// Note: this timestamp corresponds to the "h3d0c0" in the result strings.
 	tst, _ := time.Parse(time.RFC3339, "2002-10-02T15:00:00Z")
 	return tst
 }
@@ -433,7 +434,7 @@ func TestDisabledAnnotation(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount += 1
-		// TODO Why do these have "h3d0c0" in the IP strings?
+		// Note: the "h3d0c0" in the IP strings is the appended timestamp.
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
@@ -449,7 +450,7 @@ func TestDisabledAnnotation(t *testing.T) {
 func TestAddGeoDataNDTConnSpec(t *testing.T) {
 	annotation.EnableAnnotation()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO Why do these have "h3d0c0" in the IP strings?
+		// Note: the "h3d0c0" in the IP strings is the appended timestamp.
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
 			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
