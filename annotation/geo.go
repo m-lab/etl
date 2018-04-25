@@ -104,7 +104,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 	for i := range ips {
 		if ips[i] == "" {
 			// TODO(gfr) These should be warning, else we have error > request
-			metrics.AnnotationErrorCount.With(prometheus.
+			metrics.AnnotationWarningCount.With(prometheus.
 				Labels{"source": "Empty IP Address!!!"}).Inc()
 			continue
 		}
@@ -112,6 +112,8 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 		normalized[i], err = web100.NormalizeIPv6(ips[i])
 		if err != nil {
 			log.Println(err)
+			metrics.AnnotationWarningCount.With(prometheus.
+				Labels{"source": "NormalizeIPv6 Error"}).Inc()
 		}
 		reqData = append(reqData, RequestData{normalized[i], 0, timestamp})
 	}
@@ -121,7 +123,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 		data, ok := annotationData[normalized[i]+timeString]
 		if !ok || data.Geo == nil {
 			// TODO(gfr) These should be warning, else we have error > request
-			metrics.AnnotationErrorCount.With(prometheus.
+			metrics.AnnotationWarningCount.With(prometheus.
 				Labels{"source": "Missing or empty data for IP Address!!!"}).Inc()
 			continue
 		}
