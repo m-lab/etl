@@ -6,7 +6,6 @@ package fake
 // are ultimately sent to the service.
 //========================================================================================
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -17,6 +16,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
+	"golang.org/x/net/context"
 	bqv2 "google.golang.org/api/bigquery/v2"
 )
 

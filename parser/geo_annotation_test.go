@@ -2,11 +2,9 @@ package parser_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -63,8 +61,8 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"\"10583\""},"ASN":{}}`+
-			`,"127.0.0.20" : {"Geo":{"postal_code":"\"10584\""},"ASN":{}}}`)
+		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
+			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
@@ -119,58 +117,14 @@ func TestAddGeoDataPTConnSpec(t *testing.T) {
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"\"10583\""},"ASN":{}}`+
-			`,"127.0.0.20" : {"Geo":{"postal_code":"\"10584\""},"ASN":{}}}`)
+		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
+			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
 		p.AddGeoDataPTConnSpec(&test.conspec, test.timestamp)
 		if !reflect.DeepEqual(test.conspec, test.res) {
 			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
-		}
-	}
-}
-
-// Test with the ::: bug.
-func TestAddGeoDataPTHopBatchBadIPv6(t *testing.T) {
-	tests := []struct {
-		hops      []*schema.ParisTracerouteHop
-		timestamp time.Time
-		res       []*schema.ParisTracerouteHop
-	}{
-		{
-			hops: []*schema.ParisTracerouteHop{
-				&schema.ParisTracerouteHop{
-					Src_ip:  "fe80:::301f:d5b0:3fb7:3a00",
-					Dest_ip: "2620:0:1003:415:b33e:9d6a:81bf:87a1",
-				},
-			},
-			timestamp: epoch,
-			res: []*schema.ParisTracerouteHop{
-				&schema.ParisTracerouteHop{
-					Src_ip:           "fe80::301f:d5b0:3fb7:3a00",
-					Src_geolocation:  annotation.GeolocationIP{Area_code: 10583},
-					Dest_ip:          "2620:0:1003:415:b33e:9d6a:81bf:87a1",
-					Dest_geolocation: annotation.GeolocationIP{Area_code: 10584},
-				},
-			},
-		},
-	}
-	var body string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, _ := ioutil.ReadAll(r.Body)
-		body = string(b)
-		fmt.Fprint(w, `{"fe80::301f:d5b0:3fb7:3a000" : {"Geo":{"area_code":10583},"ASN":{}}`+
-			`,"2620:0:1003:415:b33e:9d6a:81bf:87a10" : {"Geo":{"area_code":10584},"ASN":{}}}`)
-	}))
-	for _, test := range tests {
-		annotation.BatchURL = ts.URL + "?foobar"
-		p.AddGeoDataPTHopBatch(test.hops, test.timestamp)
-		if strings.Contains(body, ":::") {
-			t.Errorf("Result contains :::")
-		}
-		if !reflect.DeepEqual(test.hops, test.res) {
-			t.Errorf("Expected %v, got %v from data %s", *test.res[0], *test.hops[0], annotation.BatchURL)
 		}
 	}
 }
@@ -194,16 +148,16 @@ func TestAddGeoDataPTHopBatch(t *testing.T) {
 			res: []*schema.ParisTracerouteHop{
 				&schema.ParisTracerouteHop{
 					Src_ip:           "127.0.0.1",
-					Src_geolocation:  annotation.GeolocationIP{Area_code: 914},
+					Src_geolocation:  annotation.GeolocationIP{Area_code: 10583},
 					Dest_ip:          "1.0.0.127",
-					Dest_geolocation: annotation.GeolocationIP{Area_code: 212},
+					Dest_geolocation: annotation.GeolocationIP{Area_code: 10584},
 				},
 			},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"area_code":914},"ASN":{}}`+
-			`,"1.0.0.1270" : {"Geo":{"area_code":212},"ASN":{}}}`)
+		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"area_code":10583},"ASN":{}}`+
+			`,"1.0.0.1270" : {"Geo":{"area_code":10584},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
@@ -333,7 +287,7 @@ func TestAddGeoDataPTHop(t *testing.T) {
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"Geo":{"postal_code":"\"10583\""},"ASN":{}}`)
+		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
 	}))
 	for _, test := range tests {
 		annotation.BaseURL = ts.URL + test.url
@@ -345,7 +299,6 @@ func TestAddGeoDataPTHop(t *testing.T) {
 }
 
 func testTime() time.Time {
-	// Note: this timestamp corresponds to the "h3d0c0" in the result strings.
 	tst, _ := time.Parse(time.RFC3339, "2002-10-02T15:00:00Z")
 	return tst
 }
@@ -434,9 +387,8 @@ func TestDisabledAnnotation(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount += 1
-		// Note: the "h3d0c0" in the IP strings is the appended timestamp.
-		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"\"\"","country_code":"\"US\"","country_code3":"USA","country_name":"\"United States of America\"","region":"\"NY\"","metro_code":0,"city":"\"Scarsdale\"","area_code":914,"postal_code":"\"10583\"","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
-			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"\"\"","country_code":"\"US\"","country_code3":"USA","country_name":"\"United States of America\"","region":"\"NY\"","metro_code":0,"city":"\"Scarsdale\"","area_code":212,"postal_code":"\"10584\"","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
+		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
+			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
@@ -450,9 +402,8 @@ func TestDisabledAnnotation(t *testing.T) {
 func TestAddGeoDataNDTConnSpec(t *testing.T) {
 	annotation.EnableAnnotation()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Note: the "h3d0c0" in the IP strings is the appended timestamp.
-		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"\"\"","country_code":"\"US\"","country_code3":"\"USA\"","country_name":"\"United States of America\"","region":"\"NY\"","metro_code":0,"city":"\"Scarsdale\"","area_code":10583,"postal_code":"\"10583\"","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
-			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"\"\"","country_code":"\"US\"","country_code3":"\"USA\"","country_name":"\"United States of America\"","region":"\"NY\"","metro_code":0,"city":"\"Scarsdale\"","area_code":10584,"postal_code":"\"10584\"","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
+		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
+			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
@@ -546,8 +497,8 @@ func TestGetAndInsertTwoSidedGeoIntoNDTConnSpec(t *testing.T) {
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"\"\"","country_code":"\"US\"","country_code3":"\"USA\"","country_name":"\"United States of America\"","region":"\"NY\"","metro_code":0,"city":"\"Scarsdale\"","area_code":10583,"postal_code":"\"10583\"","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
-			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"\"\"","country_code":"\"US\"","country_code3":"\"USA\"","country_name":"\"United States of America\"","region":"\"NY\"","metro_code":0,"city":"\"Scarsdale\"","area_code":10584,"postal_code":"\"10584\"","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
+		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
+			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
