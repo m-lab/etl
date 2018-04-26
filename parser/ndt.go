@@ -524,9 +524,9 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		// This is not terribly useful as is.  Intended as a place holder for code
 		// we are working on in parallel.
 		congEvents := make(schema.Web100ValueMap, 10)
-		snapNums, snapErr := snaplog.ChangeIndices("SmoothedRTT")
-		if snapErr != nil {
-			log.Println(snapErr)
+		snapNums, err := snaplog.ChangeIndices("SmoothedRTT")
+		if err != nil {
+			log.Println(err)
 		} else {
 			congEvents["indices"] = snapNums
 			congEvents["smoothedRTT"] = snaplog.SliceIntField("SmoothedRTT", snapNums)

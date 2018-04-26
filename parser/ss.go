@@ -234,7 +234,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 	for _, oneLine := range testContent[1:] {
-		oneLine = strings.TrimSuffix(oneLine, "\n")
+		oneLine := strings.TrimSuffix(oneLine, "\n")
 
 		if len(oneLine) == 0 {
 			continue

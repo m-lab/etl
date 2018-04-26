@@ -33,7 +33,7 @@ func getFlagValues() {
 	}
 }
 
-// EnableAnnotation is used only for testing.  Should be placed in whitebox _test file.
+// For testing.
 func EnableAnnotation() {
 	os.Setenv("ANNOTATE_IP", "True")
 	getFlagValues()
@@ -44,17 +44,17 @@ func EnableAnnotation() {
 // capitalized for exporting, although the originals in the DB schema
 // are not.
 type GeolocationIP struct {
-	Continent_code string  `json:"continent_code,string,omitempty"` // Gives a shorthand for the continent
-	Country_code   string  `json:"country_code,string,omitempty"`   // Gives a shorthand for the country
-	Country_code3  string  `json:"country_code3,string,omitempty"`  // Gives a shorthand for the country
-	Country_name   string  `json:"country_name,string,omitempty"`   // Name of the country
-	Region         string  `json:"region,string,omitempty"`         // Region or State within the country
-	Metro_code     int64   `json:"metro_code,integer,omitempty"`    // Metro code within the country
-	City           string  `json:"city,string,omitempty"`           // City within the region
-	Area_code      int64   `json:"area_code,integer,omitempty"`     // Area code, similar to metro code
-	Postal_code    string  `json:"postal_code,string,omitempty"`    // Postal code, again similar to metro
-	Latitude       float64 `json:"latitude,float"`                  // Latitude
-	Longitude      float64 `json:"longitude,float"`                 // Longitude
+	Continent_code string  `json:"continent_code, string,omitempty"` // Gives a shorthand for the continent
+	Country_code   string  `json:"country_code, string,omitempty"`   // Gives a shorthand for the country
+	Country_code3  string  `json:"country_code3, string,omitempty"`  // Gives a shorthand for the country
+	Country_name   string  `json:"country_name, string,omitempty"`   // Name of the country
+	Region         string  `json:"region, string,omitempty"`         // Region or State within the country
+	Metro_code     int64   `json:"metro_code, integer,omitempty"`    // Metro code within the country
+	City           string  `json:"city, string,omitempty"`           // City within the region
+	Area_code      int64   `json:"area_code, integer,omitempty"`     // Area code, similar to metro code
+	Postal_code    string  `json:"postal_code, string,omitempty"`    // Postal code, again similar to metro
+	Latitude       float64 `json:"latitude, float"`                  // Latitude
+	Longitude      float64 `json:"longitude, float"`                 // Longitude
 
 }
 
@@ -78,17 +78,14 @@ type RequestData struct {
 	Timestamp time.Time // Holds the timestamp from an incoming request
 }
 
-// AnnotatorURL holds the https address of the annotator.
 // TODO(gfr) See if there is a better way of determining
 // where to send the request (there almost certainly is)
 var AnnotatorURL = "https://annotator-dot-" +
 	os.Getenv("GCLOUD_PROJECT") +
 	".appspot.com"
 
-// BaseURL provides the base URL for single annotation requests
 var BaseURL = AnnotatorURL + "/annotate?"
 
-// BatchURL provides the base URL for batch annotation requests
 var BatchURL = AnnotatorURL + "/batch_annotate"
 
 // FetchGeoAnnotations takes a slice of strings
@@ -100,34 +97,28 @@ var BatchURL = AnnotatorURL + "/batch_annotate"
 // in the structs pointed to by the slice of GeolocationIP pointers.
 func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*GeolocationIP) {
 	reqData := make([]RequestData, 0, len(ips))
-	normalized := make([]string, len(ips))
-	for i := range ips {
-		if ips[i] == "" {
+	for _, ip := range ips {
+		if ip == "" {
 			// TODO(gfr) These should be warning, else we have error > request
-			metrics.AnnotationWarningCount.With(prometheus.
+			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "Empty IP Address!!!"}).Inc()
 			continue
 		}
-		var err error
-		normalized[i], err = web100.NormalizeIPv6(ips[i])
-		if err != nil {
-			log.Println(err)
-			metrics.AnnotationWarningCount.With(prometheus.
-				Labels{"source": "NormalizeIPv6 Error"}).Inc()
-		}
-		reqData = append(reqData, RequestData{normalized[i], 0, timestamp})
+		ip, _ := web100.NormalizeIPv6(ip)
+		reqData = append(reqData, RequestData{ip, 0, timestamp})
 	}
 	annotationData := GetBatchGeoData(BatchURL, reqData)
 	timeString := strconv.FormatInt(timestamp.Unix(), 36)
-	for i := range normalized {
-		data, ok := annotationData[normalized[i]+timeString]
+	for index, ip := range ips {
+		data, ok := annotationData[ip+timeString]
 		if !ok || data.Geo == nil {
 			// TODO(gfr) These should be warning, else we have error > request
-			metrics.AnnotationWarningCount.With(prometheus.
+			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "Missing or empty data for IP Address!!!"}).Inc()
 			continue
 		}
-		*geoDest[i] = *data.Geo
+		*geoDest[index] = *data.Geo
+
 	}
 }
 
@@ -229,7 +220,6 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 			Labels{"source": "Failed to parse JSON"}).Inc()
 		log.Println(err)
 		log.Printf("%+v\n", data)
-		log.Printf("%+v\n", string(annotatorResponse))
 		return nil
 	}
 	return geoDataFromResponse

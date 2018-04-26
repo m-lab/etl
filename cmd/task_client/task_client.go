@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"context"
 	"github.com/kr/pretty"
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	taskqueue "google.golang.org/api/taskqueue/v1beta2"
 )

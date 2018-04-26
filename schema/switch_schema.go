@@ -4,15 +4,15 @@ package schema
 
 // Meta contains the archive and parse metadata.
 type Meta struct {
-	FileName  string `json:"task_filename,string" bigquery:"task_filename"`
-	TestName  string `json:"test_id,string" bigquery:"test_id"`
-	ParseTime int64  `json:"parse_time,int64" bigquery:"parse_time"`
+	FileName  string `json:"task_filename, string" bigquery:"task_filename"`
+	TestName  string `json:"test_id, string" bigquery:"test_id"`
+	ParseTime int64  `json:"parse_time, int64" bigquery:"parse_time"`
 }
 
 // Sample is an individual measurement taken by DISCO.
 type Sample struct {
-	Timestamp int64   `json:"timestamp,int64" bigquery:"timestamp"`
-	Value     float32 `json:"value,float32" bigquery:"value"`
+	Timestamp int64   `json:"timestamp, int64" bigquery:"timestamp"`
+	Value     float32 `json:"value, float32" bigquery:"value"`
 }
 
 // SwitchStats represents a row of data taken from the raw DISCO export file.

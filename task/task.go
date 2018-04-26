@@ -117,7 +117,7 @@ OUTER:
 			metrics.FileSizeHistogram.WithLabelValues(
 				tt.Parser.TableName(), kind, "parsed").Observe(float64(len(data)))
 		}
-		err = tt.Parser.ParseAndInsert(tt.meta, testname, data)
+		err := tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if err != nil {
 			metrics.TaskCount.WithLabelValues(
