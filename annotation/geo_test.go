@@ -51,7 +51,7 @@ func TestFetchGeoAnnotations(t *testing.T) {
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"\"10583\""},"ASN":{}}`+
+		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
 			`,"2.2.2.20" : {"Geo":null,"ASN":null}}`)
 	}))
 	for _, test := range tests {
@@ -86,7 +86,7 @@ func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"Geo":{"postal_code":"\"10583\""},"ASN":{}}`)
+		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
 	}))
 	for _, test := range tests {
 		annotation.BaseURL = ts.URL + test.url
