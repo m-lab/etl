@@ -181,6 +181,7 @@ const (
 	SS              = DataType("sidestream")
 	PT              = DataType("traceroute")
 	SW              = DataType("switch")
+	NEUBOT		= DataType("neubot")
 	INVALID         = DataType("invalid")
 )
 
@@ -191,6 +192,7 @@ var (
 		"ndt":              NDT,
 		"sidestream":       SS,
 		"paris-traceroute": PT,
+		"neubot":           NEUBOT,
 		"switch":           SW,
 	}
 
