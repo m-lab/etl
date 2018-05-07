@@ -461,7 +461,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	lastValidHopLine := ""
 	reachedDest := false
 	for _, oneLine := range strings.Split(string(rawContent[:]), "\n") {
-		oneLine := strings.TrimSuffix(oneLine, "\n")
+		oneLine = strings.TrimSuffix(oneLine, "\n")
 		// Skip empty line or initial lines starting with #.
 		if len(oneLine) == 0 || oneLine[0] == '#' {
 			continue
