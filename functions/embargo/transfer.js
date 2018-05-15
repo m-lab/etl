@@ -201,16 +201,14 @@ exports.shouldEmbargo = function (file) {
  * @param {string} project The cloud project ID
  * @param {string} sourceBucket The Cloud Storage bucket that holds the source file.
  * @param {string} filename The file name to be embargoed.
- * @param {string} publicBucket The Cloud Storage bucket to move the public files to.
- * @param {string} privateBucket The Cloud Storage bucket to move the embargoed files to.
  * @param {function} callback The callback function called when this function completes.
  */
-exports.triggerEmbargoHandler = function (project, sourceBucket, filename, publicBucket, privateBucket, callback) {
+exports.triggerEmbargoHandler = function (project, sourceBucket, filename, callback) {
     var gsFilename, safeFilename;
     gsFilename = "gs://" + sourceBucket + "/" + filename;
     safeFilename = new Buffer(gsFilename).toString("base64");
     http.get('http://embargo-dot-' + project +
-        '.appspot.com/submit?file=' + safeFilename + "&publicBucket=" + publicBucket + "&privateBucket=" + privateBucket,
+        '.appspot.com/submit?file=' + safeFilename,
         function (res) {
             res.on('data', function (data) {});
             res.on('end',
@@ -231,12 +229,12 @@ exports.triggerEmbargoHandler = function (project, sourceBucket, filename, publi
  * @param {string} destBucket The Cloud Storage bucket to move files to.
  * @param {function} done The callback function called when this function completes.
  */
-exports.embargoOnFileNotification = function (event, project, destPublicBucket, destPrivateBucket, done) {
+exports.embargoOnFileNotification = function (event, project, done) {
     var file = event.data;
 
     if (exports.fileIsProcessable(file)) {
         if (exports.shouldEmbargo(file)) {
-            exports.triggerEmbargoHandler(project, file.bucket, file.name, destPublicBucket, destPrivateBucket, done);
+            exports.triggerEmbargoHandler(project, file.bucket, file.name, done);
             console.log('Embargo: ', file.bucket, file.name);
         } else {
             exports.executeWithAuth(exports.makeMoveWithAuth(file, destPublicBucket, done));
@@ -254,7 +252,7 @@ exports.embargoOnFileNotification = function (event, project, destPublicBucket, 
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationSandbox = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-sandbox', 'archive-mlab-sandbox', 'embargo-mlab-sandbox', done);
+    exports.embargoOnFileNotification(event, 'mlab-sandbox', done);
 };
 
 /**
@@ -265,7 +263,7 @@ exports.embargoOnFileNotificationSandbox = function (event, done) {
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationStaging = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-staging', 'archive-mlab-staging', 'embargo-mlab-staging', done);
+    exports.embargoOnFileNotification(event, 'mlab-staging', done);
 };
 
 /**
@@ -276,5 +274,5 @@ exports.embargoOnFileNotificationStaging = function (event, done) {
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotificationOti = function (event, done) {
-    exports.embargoOnFileNotification(event, 'mlab-oti', 'archive-mlab-oti', 'embargo-mlab-oti', done);
+    exports.embargoOnFileNotification(event, 'mlab-oti', done);
 };
