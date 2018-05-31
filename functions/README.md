@@ -10,7 +10,7 @@ To deploy this cloud function to sandbox, use:
 ```bash
 gcloud beta functions deploy createSandboxTaskOnFileNotification \
     --stage-bucket=functions-mlab-sandbox \
-    --trigger-bucket=m-lab-sandbox \
+    --trigger-resource=m-lab-sandbox \
     --project=mlab-sandbox
 ```
 
@@ -18,7 +18,7 @@ To deploy this cloud function to staging, use:
 ```bash
 gcloud beta functions deploy createStagingTaskOnFileNotification \
     --stage-bucket=functions-mlab-staging \
-    --trigger-bucket=archive-mlab-staging \
+    --trigger-resource=archive-mlab-staging \
     --project=mlab-staging
 ```
 
@@ -26,7 +26,7 @@ To deploy this cloud function to production, use:
 ```bash
 gcloud beta functions deploy createProdTaskOnFileNotification \
     --stage-bucket=functions-mlab-oti \
-    --trigger-bucket=archive-mlab-oti \
+    --trigger-resource=archive-mlab-oti \
     --project=mlab-oti
 ```
 
