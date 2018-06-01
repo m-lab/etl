@@ -226,7 +226,6 @@ exports.triggerEmbargoHandler = function (project, sourceBucket, filename, callb
  *
  * @param {object} event The Cloud Storage notification event.
  * @param {string} project The cloud project ID
- * @param {string} destBucket The Cloud Storage bucket to move files to.
  * @param {function} done The callback function called when this function completes.
  */
 exports.embargoOnFileNotification = function (event, project, done) {
@@ -237,7 +236,7 @@ exports.embargoOnFileNotification = function (event, project, done) {
             exports.triggerEmbargoHandler(project, file.bucket, file.name, done);
             console.log('Embargo: ', file.bucket, file.name);
         } else {
-            exports.executeWithAuth(exports.makeMoveWithAuth(file, destPublicBucket, done));
+            exports.executeWithAuth(exports.makeMoveWithAuth(file, 'archive-' + project, done));
         }
     } else {
         done(null);
