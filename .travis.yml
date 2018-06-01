@@ -19,8 +19,8 @@ language: go
 
 before_install:
 # Install javascript libraries
-- pushd $TRAVIS_BUILD_DIR/functions; npm install package.json; popd
-- pushd $TRAVIS_BUILD_DIR/functions/embargo; npm install package.json; popd
+- pushd $TRAVIS_BUILD_DIR/functions; npm install --verbose; popd
+- pushd $TRAVIS_BUILD_DIR/functions/embargo; npm install --verbose; popd
 
 # Coverage tools
 - go get github.com/mattn/goveralls
