@@ -19,8 +19,8 @@ language: go
 
 before_install:
 # Install javascript libraries
-- pushd functions; npm install package.json; popd
-- pushd functions/embargo; npm install package.json; popd
+- pushd $TRAVIS_BUILD_DIR/functions; npm install package.json; popd
+- pushd $TRAVIS_BUILD_DIR/functions/embargo; npm install package.json; popd
 
 # Coverage tools
 - go get github.com/mattn/goveralls
@@ -48,8 +48,8 @@ cache:
 
 script:
 # Run all javascript tests.
-- pushd functions; npm test; popd
-- pushd functions/embargo; npm test; popd
+- pushd $TRAVIS_BUILD_DIR/functions; npm test; popd
+- pushd $TRAVIS_BUILD_DIR/functions/embargo; npm test; popd
 
 # To start the Go tests, run all the non-integration tests.
 # Currently skipping storage tests, because they depend on GCS, and there is
