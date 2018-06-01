@@ -8,7 +8,7 @@ const sample_data = { kind: 'storage#object', resourceState: 'exists', id: 'm-la
 describe("ProcessNotification", function () {
   it("calls the callback", function () {
     var callback = sinon.spy()
-    enqueue.fileNotification({"data": sample_data}, callback);
+    enqueue.createStagingTaskOnFileNotification({"data": sample_data}, callback);
     assert(callback.called);
   });
 });
