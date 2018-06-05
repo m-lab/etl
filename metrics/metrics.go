@@ -40,6 +40,7 @@ func init() {
 	prometheus.MustRegister(RowSizeHistogram)
 
 	// Common metrics
+	prometheus.MustRegister(FileCount)
 	prometheus.MustRegister(PanicCount)
 	prometheus.MustRegister(WorkerCount)
 	prometheus.MustRegister(WorkerState)
