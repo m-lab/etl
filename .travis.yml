@@ -18,6 +18,13 @@
 language: go
 
 before_install:
+# Install javascript libraries
+- pushd $TRAVIS_BUILD_DIR/functions
+- npm install --verbose
+- pushd embargo
+- npm install --verbose
+- popd; popd
+
 # Coverage tools
 - go get github.com/mattn/goveralls
 - go get github.com/wadey/gocovmerge
@@ -43,7 +50,14 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 script:
-# To start, run all the non-integration tests.
+# Run all javascript tests.
+- pushd $TRAVIS_BUILD_DIR/functions
+- npm test
+- pushd embargo
+- npm test
+- popd; popd
+
+# To start the Go tests, run all the non-integration tests.
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
 # TODO - separate storage tests into integration and lightweight.

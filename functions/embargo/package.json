@@ -8,5 +8,8 @@
   },
   "dependencies": {
     "googleapis": "~19.0.0"
+  },
+  "scripts": {
+    "test": "echo THIS CODE IS UNTESTED"
   }
 }
