@@ -218,8 +218,21 @@ var (
 	// queue_pusher.go
 )
 
-// AddPanicMetric captures panics, increments the
-// panic metric, and then repanics.
+// DataTypeToDataset returns the appropriate dataset to use.
+// This is a bit of a hack, but works for our current needs.
+func DataTypeToDataset(dt DataType) string {
+	if dt == SS {
+		return "private"
+	}
+
+	if IsBatchService() {
+		return "batch"
+	}
+
+	return "base_tables"
+}
+
+// CountPanics updates the PanicCount metric, then repanics.
 // It must be wrapped in a defer.
 // Examples:
 //  For function that returns an error:
