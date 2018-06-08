@@ -10,7 +10,7 @@ To deploy this cloud function to sandbox, use:
 ```bash
 gcloud beta functions deploy createSandboxTaskOnFileNotification \
     --stage-bucket=functions-mlab-sandbox \
-    --trigger-resource=m-lab-sandbox \
+    --trigger-resource=archive-mlab-sandbox \
     --project=mlab-sandbox
 ```
 
