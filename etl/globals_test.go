@@ -198,3 +198,17 @@ func TestCountPanics(t *testing.T) {
 
 	rePanic()
 }
+
+func TestSidestreamDataset(t *testing.T) {
+	if etl.DataTypeToDataset(etl.SS) != "private" {
+		t.Error("For SS, should be private:", etl.DataTypeToDataset(etl.SS))
+	}
+	etl.IsBatch = true
+	if etl.DataTypeToDataset(etl.NDT) != "batch" {
+		t.Error("For IsBatchService, should be batch:", etl.DataTypeToDataset(etl.NDT))
+	}
+	etl.IsBatch = false
+	if etl.DataTypeToDataset(etl.NDT) != "base_tables" {
+		t.Error("For IsBatchService, should be batch:", etl.DataTypeToDataset(etl.NDT))
+	}
+}

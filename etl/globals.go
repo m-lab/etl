@@ -13,6 +13,17 @@ import (
 	"github.com/m-lab/etl/metrics"
 )
 
+// IsBatch indicates this process is a batch processing service.
+var IsBatch bool
+
+// OmitDeltas indicates we should NOT process all snapshots.
+var OmitDeltas bool
+
+func init() {
+	IsBatch, _ = strconv.ParseBool(os.Getenv("NDT_BATCH"))
+	OmitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
+}
+
 // YYYYMMDD is a regexp string for identifying dense dates.
 const YYYYMMDD = `\d{4}[01]\d[0123]\d`
 
@@ -109,8 +120,7 @@ func (fn *DataPath) TableBase() string {
 // IsBatchService return true if this is a NDT batch service.
 // TODO - update this to BATCH_SERVICE, so it makes sense for other pipelines.
 func IsBatchService() bool {
-	isBatch, _ := strconv.ParseBool(os.Getenv("NDT_BATCH"))
-	return isBatch
+	return IsBatch
 }
 
 // GetMetroName extracts metro name like "acc" from file name like
@@ -167,8 +177,7 @@ type DataType string
 func (dt DataType) BQBufferSize() int {
 	// Special case for NDT when omitting deltas.
 	if dt == NDT {
-		omitDeltas, _ := strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
-		if omitDeltas {
+		if OmitDeltas {
 			return dataTypeToBQBufferSize[NDT_OMIT_DELTAS]
 		}
 	}
