@@ -169,7 +169,7 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && gcloud beta functions deploy createSandboxTaskOnFileNotification
-    --stage-bucket=functions-mlab-sandbox --trigger-resource=m-lab-sandbox --project=mlab-sandbox
+    --stage-bucket=functions-mlab-sandbox --trigger-resource=scraper-mlab-sandbox --project=mlab-sandbox
   skip_cleanup: true
   on:
     repo: m-lab/etl
