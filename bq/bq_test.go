@@ -93,7 +93,13 @@ func TestBasicInsert(t *testing.T) {
 	in.Flush()
 }
 
+// This does not currently work with mlab-testing credentials, and we
+// probably don't want it to.  So disabling it in travis.
 func TestInsertConfig(t *testing.T) {
+	_, isTravis := os.LookupEnv("TRAVIS")
+	if isTravis {
+		return
+	}
 	os.Setenv("GCLOUD_PROJECT", "mlab-oti")
 	in, err := bq.NewInserter(etl.SS, time.Now())
 	if err != nil {
@@ -103,7 +109,7 @@ func TestInsertConfig(t *testing.T) {
 		t.Errorf("Want private, got %s", in.Dataset())
 	}
 	if in.Project() != "mlab-oti" {
-		t.Errorf("Want private, got %s", in.Project())
+		t.Errorf("Want mlab-oti, got %s", in.Project())
 	}
 
 	in, err = bq.NewInserter(etl.NDT, time.Now())
