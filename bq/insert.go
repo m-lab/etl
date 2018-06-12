@@ -103,7 +103,7 @@ func GetClient(project string) (*bigquery.Client, error) {
 	// Network request
 	// ctx is used only for the request to create the client.  It is not used by
 	// the client.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return bigquery.NewClient(ctx, project)
 }
