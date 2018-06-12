@@ -318,6 +318,9 @@ func (in *BQInserter) TableBase() string {
 func (in *BQInserter) TableSuffix() string {
 	return in.params.Suffix
 }
+func (in *BQInserter) Project() string {
+	return in.params.Project
+}
 func (in *BQInserter) Dataset() string {
 	return in.params.Dataset
 }

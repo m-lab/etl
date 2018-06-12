@@ -3,6 +3,7 @@ package bq_test
 import (
 	"errors"
 	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -90,6 +91,31 @@ func TestBasicInsert(t *testing.T) {
 		t.Error("Should have accepted three rows")
 	}
 	in.Flush()
+}
+
+func TestInsertConfig(t *testing.T) {
+	os.Setenv("GCLOUD_PROJECT", "mlab-oti")
+	in, err := bq.NewInserter(etl.SS, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Dataset() != "private" {
+		t.Errorf("Want private, got %s", in.Dataset())
+	}
+	if in.Project() != "mlab-oti" {
+		t.Errorf("Want private, got %s", in.Project())
+	}
+
+	in, err = bq.NewInserter(etl.NDT, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Dataset() != "base_tables" {
+		t.Errorf("Want private, got %s", in.Dataset())
+	}
+	if in.Project() != "measurement-lab" {
+		t.Errorf("Want measurement-lab, got %s", in.Project())
+	}
 }
 
 func TestBufferingAndFlushing(t *testing.T) {

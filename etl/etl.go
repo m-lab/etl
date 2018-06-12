@@ -43,6 +43,8 @@ type Inserter interface {
 	FullTableName() string
 	// Dataset name of the BQ dataset containing the table.
 	Dataset() string
+	// Project name
+	Project() string
 
 	RowStats // Inserter must implement RowStats
 }
