@@ -233,10 +233,10 @@ func TestBQProject(t *testing.T) {
 		want     string
 	}{
 		{etl.NDT, true, "mlab-oti", "measurement-lab"},
+		{etl.NDT, true, "staging", "staging"},
 		{etl.PT, false, "mlab-oti", "measurement-lab"},
 		{etl.SS, true, "mlab-oti", "mlab-oti"},
-		{etl.SS, false, "foobar", "foobar"},
-		{etl.NDT, true, "foobar", "foobar"},
+		{etl.SS, false, "mlab-oti", "mlab-oti"},
 	}
 
 	for _, test := range tests {
