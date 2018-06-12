@@ -105,7 +105,7 @@ func ValidateTestPath(path string) (*DataPath, error) {
 
 // GetDataType finds the type of data stored in a file from its complete filename
 func (fn *DataPath) GetDataType() DataType {
-	dt, ok := DirToDataType[fn.Exp1]
+	dt, ok := dirToDataType[fn.Exp1]
 	if !ok {
 		return INVALID
 	}
@@ -114,7 +114,7 @@ func (fn *DataPath) GetDataType() DataType {
 
 // TableBase returns the base bigquery table name associated with the DataPath data type.
 func (fn *DataPath) TableBase() string {
-	return DataTypeToTable[fn.GetDataType()]
+	return fn.GetDataType().Table()
 }
 
 // IsBatchService return true if this is a NDT batch service.
@@ -196,7 +196,7 @@ const (
 var (
 	// DirToDataType maps from gs:// subdirectory to data type.
 	// TODO - this should be loaded from a config.
-	DirToDataType = map[string]DataType{
+	dirToDataType = map[string]DataType{
 		"ndt":              NDT,
 		"sidestream":       SS,
 		"paris-traceroute": PT,
@@ -205,7 +205,7 @@ var (
 
 	// DataTypeToTable maps from data type to BigQuery table name.
 	// TODO - this should be loaded from a config.
-	DataTypeToTable = map[DataType]string{
+	dataTypeToTable = map[DataType]string{
 		NDT:     "ndt",
 		SS:      "sidestream",
 		PT:      "traceroute",
@@ -227,9 +227,9 @@ var (
 	// queue_pusher.go
 )
 
-// DataTypeToDataset returns the appropriate dataset to use.
+// Dataset returns the appropriate dataset to use.
 // This is a bit of a hack, but works for our current needs.
-func DataTypeToDataset(dt DataType) string {
+func (dt DataType) Dataset() string {
 	if dt == SS {
 		return "private"
 	}
@@ -239,6 +239,21 @@ func DataTypeToDataset(dt DataType) string {
 	}
 
 	return "base_tables"
+}
+
+// Table returns the appropriate table to use.
+func (dt DataType) Table() string {
+	return dataTypeToTable[dt]
+}
+
+// BigqueryProject returns the appropriate project.
+func (dt DataType) BigqueryProject() string {
+	project := os.Getenv("GCLOUD_PROJECT")
+	// For production, all datatypes except SS write to tables in measurement-lab.
+	if project == "mlab-oti" && dt != SS {
+		return "measurement-lab"
+	}
+	return project
 }
 
 // CountPanics updates the PanicCount metric, then repanics.

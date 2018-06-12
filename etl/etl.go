@@ -49,8 +49,8 @@ type Inserter interface {
 
 // InserterParams for NewInserter
 type InserterParams struct {
-	// The project comes from os.GetEnv("GCLOUD_PROJECT")
-	// These specify the google cloud dataset/table to write to.
+	// These specify the google cloud project:dataset.table to write to.
+	Project string
 	Dataset string
 	Table   string
 	// Suffix may be an actual _YYYYMMDD or partition $YYYYMMDD
