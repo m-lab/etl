@@ -44,8 +44,8 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   MAX_WORKERS: 12
-  BIGQUERY_PROJECT: 'measurement-lab'
-  BIGQUERY_DATASET: 'base_tables'
+  # BIGQUERY_PROJECT: ''  # Overrides computed project name based on GCLOUD_PROJECT
+  # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
   ANNOTATE_IP: 'true'
   NDT_OMIT_DELTAS: 'true'
   # TODO add custom service-account, instead of using default credentials.

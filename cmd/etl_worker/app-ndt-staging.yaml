@@ -47,7 +47,7 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   MAX_WORKERS: 20
-  BIGQUERY_PROJECT: 'mlab-staging'
-  BIGQUERY_DATASET: 'staging'
+  # BIGQUERY_PROJECT: ''  # Overrides computed project name based on GCLOUD_PROJECT
+  # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
   ANNOTATE_IP: 'true'
   # TODO add custom service-account, instead of using default credentials.

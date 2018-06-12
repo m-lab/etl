@@ -230,6 +230,10 @@ var (
 // Dataset returns the appropriate dataset to use.
 // This is a bit of a hack, but works for our current needs.
 func (dt DataType) Dataset() string {
+	dataset, override := os.LookupEnv("BIGQUERY_DATASET")
+	if override {
+		return dataset
+	}
 	if dt == SS {
 		return "private"
 	}
@@ -248,7 +252,11 @@ func (dt DataType) Table() string {
 
 // BigqueryProject returns the appropriate project.
 func (dt DataType) BigqueryProject() string {
-	project := os.Getenv("GCLOUD_PROJECT")
+	project, override := os.LookupEnv("BIGQUERY_PROJECT")
+	if override {
+		return project
+	}
+	project = os.Getenv("GCLOUD_PROJECT")
 	// For production, all datatypes except SS write to tables in measurement-lab.
 	if project == "mlab-oti" && dt != SS {
 		return "measurement-lab"
