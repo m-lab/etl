@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -199,16 +200,51 @@ func TestCountPanics(t *testing.T) {
 	rePanic()
 }
 
-func TestSidestreamDataset(t *testing.T) {
-	if etl.SS.Dataset() != "private" {
-		t.Error("For SS, should be private:", etl.SS.Dataset())
+func TestDataset(t *testing.T) {
+	tests := []struct {
+		dt       etl.DataType
+		isBatch  bool
+		gproject string // Shouldn't matter
+		want     string
+	}{
+		{etl.NDT, true, "mlab-oti", "batch"},
+		{etl.NDT, false, "mlab-oti", "base_tables"},
+		{etl.PT, true, "mlab-oti", "batch"},
+		{etl.PT, false, "mlab-oti", "base_tables"},
+		{etl.SS, true, "mlab-oti", "private"},
+		{etl.SS, false, "mlab-oti", "private"},
 	}
-	etl.IsBatch = true
-	if etl.NDT.Dataset() != "batch" {
-		t.Error("For IsBatchService, should be batch:", etl.NDT.Dataset())
+
+	for _, test := range tests {
+		etl.IsBatch = test.isBatch
+		os.Setenv("GCLOUD_PROJECT", test.gproject)
+		got := test.dt.Dataset()
+		if got != test.want {
+			t.Errorf("for %s,%s, want: %s, got: %s.", test.dt, test.gproject, test.want, got)
+		}
 	}
-	etl.IsBatch = false
-	if etl.NDT.Dataset() != "base_tables" {
-		t.Error("For IsBatchService, should be batch:", etl.NDT.Dataset())
+}
+
+func TestBQProject(t *testing.T) {
+	tests := []struct {
+		dt       etl.DataType
+		isBatch  bool // Shouldn't matter
+		gproject string
+		want     string
+	}{
+		{etl.NDT, true, "mlab-oti", "measurement-lab"},
+		{etl.PT, false, "mlab-oti", "measurement-lab"},
+		{etl.SS, true, "mlab-oti", "mlab-oti"},
+		{etl.SS, false, "foobar", "foobar"},
+		{etl.NDT, true, "foobar", "foobar"},
+	}
+
+	for _, test := range tests {
+		etl.IsBatch = test.isBatch
+		os.Setenv("GCLOUD_PROJECT", test.gproject)
+		got := test.dt.BigqueryProject()
+		if got != test.want {
+			t.Errorf("for %s,%s, want: %s, got: %s.", test.dt, test.gproject, test.want, got)
+		}
 	}
 }
