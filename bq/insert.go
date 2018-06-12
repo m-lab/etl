@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -41,17 +40,11 @@ const insertsBeforeRowJSONCount = 100
 var tableInsertCounts = sync.Map{}
 
 func init() {
-	// For every table name, add a counter to the tableInsertCounts map.
-	for _, table := range etl.DataTypeToTable {
-		tableInsertCounts.Store(table, new(uint32))
-	}
 }
 
 // NewInserter creates a new BQInserter with appropriate characteristics.
-// TODO(P3) Include the project name in the parameters.
-func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inserter, error) {
+func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 	suffix := ""
-	table := etl.DataTypeToTable[dt]
 	if etl.IsBatchService() || time.Since(partition) > 30*24*time.Hour {
 		// If batch, or too far in the past, we use a templated table, and must merge it later.
 		suffix = "_" + partition.Format("20060102")
@@ -60,12 +53,13 @@ func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inse
 		suffix = "$" + partition.Format("20060102")
 	}
 
-	// TODO - remove dataset parameter.
-	dataset = etl.DataTypeToDataset(dt)
+	bqProject := dt.BigqueryProject()
+	dataset := dt.Dataset()
+	table := dt.Table()
 
 	return NewBQInserter(
-		etl.InserterParams{Dataset: dataset, Table: table, Suffix: suffix,
-			Timeout: 15 * time.Minute, BufferSize: dt.BQBufferSize(), RetryDelay: 30 * time.Second},
+		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: suffix,
+			PutTimeout: 60 * time.Second, BufferSize: dt.BQBufferSize(), RetryDelay: 30 * time.Second},
 		nil)
 }
 
@@ -74,7 +68,10 @@ func NewInserter(dataset string, dt etl.DataType, partition time.Time) (etl.Inse
 // TODO - improve the naming between here and NewInserter.
 func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
 	if uploader == nil {
-		client := MustGetClient(params.Timeout)
+		client, err := GetClient(params.Project)
+		if err != nil {
+			return nil, err
+		}
 		table := params.Table
 		if params.Suffix[0] == '$' {
 			// Suffix starting with $ is just a partition spec.
@@ -90,38 +87,25 @@ func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Insert
 		u.SkipInvalidRows = true
 		uploader = u
 	}
-	in := BQInserter{params: params, uploader: uploader, timeout: params.Timeout}
+	in := BQInserter{params: params, uploader: uploader, putTimeout: params.PutTimeout}
 	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	return &in, nil
 }
 
 //===============================================================================
-var (
-	clientOnce sync.Once // This avoids a race on setting bqClient.
-	bqClient   *bigquery.Client
-)
 
-// MustGetClient returns the Singleton bigquery client for this process.
-// TODO - is there any advantage to using more than one client?
-func MustGetClient(timeout time.Duration) *bigquery.Client {
+// GetClient returns an appropriate bigquery client.
+// This incurs network delay, so it should not be inside fast loops.
+func GetClient(project string) (*bigquery.Client, error) {
 	// We do this here, instead of in init(), because we only want to do it
 	// when we actually want to access the bigquery backend.
-	clientOnce.Do(func() {
-		ctx, _ := context.WithTimeout(context.Background(), timeout)
-		project, ok := os.LookupEnv("BIGQUERY_PROJECT")
-		if !ok {
-			project = os.Getenv("GCLOUD_PROJECT")
-		}
 
-		log.Printf("Using project: %s\n", project)
-		// Heavyweight!
-		var err error
-		bqClient, err = bigquery.NewClient(ctx, project)
-		if err != nil {
-			panic(err.Error())
-		}
-	})
-	return bqClient
+	// Network request
+	// ctx is used only for the request to create the client.  It is not used by
+	// the client.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return bigquery.NewClient(ctx, project)
 }
 
 //===============================================================================
@@ -141,13 +125,13 @@ func (s *MapSaver) Save() (row map[string]bigquery.Value, insertID string, err e
 
 type BQInserter struct {
 	etl.Inserter
-	params   etl.InserterParams
-	uploader etl.Uploader // May be a BQ Uploader, or a test Uploader
-	timeout  time.Duration
-	rows     []interface{}
-	inserted int // Number of rows successfully inserted.
-	badRows  int // Number of row failures, including rows in full failures.
-	failures int // Number of complete insert failures.
+	params     etl.InserterParams
+	uploader   etl.Uploader  // May be a BQ Uploader, or a test Uploader
+	putTimeout time.Duration // Timeout used for BQ put operations.
+	rows       []interface{}
+	inserted   int // Number of rows successfully inserted.
+	badRows    int // Number of row failures, including rows in full failures.
+	failures   int // Number of complete insert failures.
 }
 
 // Caller should check error, and take appropriate action before calling again.
@@ -162,8 +146,12 @@ func (in *BQInserter) maybeCountRowSize(data []interface{}) {
 	}
 	counter, ok := tableInsertCounts.Load(in.TableBase())
 	if !ok {
-		// The inserter is writing to a table not known to etl.DataTypeToTable.
-		return
+		tableInsertCounts.Store(in.TableBase(), new(uint32))
+		counter, ok = tableInsertCounts.Load(in.TableBase())
+		if !ok {
+			log.Println("No counter for", in.TableBase())
+			return
+		}
 	}
 	count := atomic.AddUint32(counter.(*uint32), 1)
 	// Do this just once in a while, so it doesn't take much resource.
@@ -298,7 +286,7 @@ func (in *BQInserter) Flush() error {
 	var err error
 	for i := 0; i < 10; i++ {
 		// This is heavyweight, and may run forever without a context deadline.
-		ctx, _ := context.WithTimeout(context.Background(), in.timeout)
+		ctx, _ := context.WithTimeout(context.Background(), in.putTimeout)
 		err = in.uploader.Put(ctx, in.rows)
 		if err == nil || !strings.Contains(err.Error(), "Quota exceeded:") {
 			break
@@ -331,6 +319,9 @@ func (in *BQInserter) TableBase() string {
 // The $ or _ suffix.
 func (in *BQInserter) TableSuffix() string {
 	return in.params.Suffix
+}
+func (in *BQInserter) Project() string {
+	return in.params.Project
 }
 func (in *BQInserter) Dataset() string {
 	return in.params.Dataset

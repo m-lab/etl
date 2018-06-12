@@ -209,8 +209,7 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 	dateFormat := "20060102"
 	date, err := time.Parse(dateFormat, data.PackedDate)
 
-	dataset := etl.DataTypeToDataset(dataType)
-	ins, err := bq.NewInserter(dataset, dataType, date)
+	ins, err := bq.NewInserter(dataType, date)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)

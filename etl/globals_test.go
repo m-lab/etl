@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -199,16 +200,114 @@ func TestCountPanics(t *testing.T) {
 	rePanic()
 }
 
-func TestSidestreamDataset(t *testing.T) {
-	if etl.DataTypeToDataset(etl.SS) != "private" {
-		t.Error("For SS, should be private:", etl.DataTypeToDataset(etl.SS))
+func TestDataset(t *testing.T) {
+	tests := []struct {
+		dt      etl.DataType
+		isBatch bool
+		want    string
+	}{
+		{etl.NDT, true, "batch"},
+		{etl.NDT, false, "base_tables"},
+		{etl.PT, true, "batch"},
+		{etl.PT, false, "base_tables"},
+		{etl.SS, true, "private"},
+		{etl.SS, false, "private"},
 	}
+
+	// Project shouldn't matter, so test different values to confirm.
+	os.Setenv("GCLOUD_PROJECT", "mlab-sandbox")
+	for _, test := range tests {
+		etl.IsBatch = test.isBatch
+		got := test.dt.Dataset()
+		if got != test.want {
+			t.Errorf("for %s want: %s, got: %s.", test.dt, test.want, got)
+		}
+	}
+	os.Setenv("GCLOUD_PROJECT", "mlab-oti")
+	for _, test := range tests {
+		etl.IsBatch = test.isBatch
+		got := test.dt.Dataset()
+		if got != test.want {
+			t.Errorf("for %s want: %s, got: %s.", test.dt, test.want, got)
+		}
+	}
+
+	override_tests := []struct {
+		dt      etl.DataType
+		isBatch bool
+		want    string
+	}{
+		{etl.NDT, true, "override"},
+		{etl.NDT, false, "override"},
+		{etl.PT, true, "override"},
+		{etl.PT, false, "override"},
+		{etl.SS, true, "override"},
+		{etl.SS, false, "override"},
+	}
+
+	// Test override
+	os.Setenv("BIGQUERY_DATASET", "override")
+	for _, test := range override_tests {
+		etl.IsBatch = test.isBatch
+		got := test.dt.Dataset()
+		if got != test.want {
+			t.Errorf("for %s want: %s, got: %s.", test.dt, test.want, got)
+		}
+	}
+
+}
+
+func TestBQProject(t *testing.T) {
+	tests := []struct {
+		dt       etl.DataType
+		gproject string
+		want     string
+	}{
+		{etl.NDT, "mlab-oti", "measurement-lab"},
+		{etl.NDT, "staging", "staging"},
+		{etl.PT, "mlab-oti", "measurement-lab"},
+		{etl.SS, "mlab-oti", "mlab-oti"},
+		{etl.SS, "mlab-oti", "mlab-oti"},
+	}
+
+	// isBatch  state shouldn't matter, so test with both values
 	etl.IsBatch = true
-	if etl.DataTypeToDataset(etl.NDT) != "batch" {
-		t.Error("For IsBatchService, should be batch:", etl.DataTypeToDataset(etl.NDT))
+	for _, test := range tests {
+		os.Setenv("GCLOUD_PROJECT", test.gproject)
+		got := test.dt.BigqueryProject()
+		if got != test.want {
+			t.Errorf("for %s,%s, want: %s, got: %s.", test.dt, test.gproject, test.want, got)
+		}
 	}
 	etl.IsBatch = false
-	if etl.DataTypeToDataset(etl.NDT) != "base_tables" {
-		t.Error("For IsBatchService, should be batch:", etl.DataTypeToDataset(etl.NDT))
+	for _, test := range tests {
+		os.Setenv("GCLOUD_PROJECT", test.gproject)
+		got := test.dt.BigqueryProject()
+		if got != test.want {
+			t.Errorf("for %s,%s, want: %s, got: %s.", test.dt, test.gproject, test.want, got)
+		}
 	}
+
+	// Test override
+	os.Setenv("BIGQUERY_PROJECT", "override_project")
+	override_tests := []struct {
+		dt       etl.DataType
+		gproject string
+		want     string
+	}{
+		{etl.NDT, "mlab-oti", "override_project"},
+		{etl.NDT, "staging", "override_project"},
+		{etl.PT, "mlab-oti", "override_project"},
+		{etl.SS, "mlab-oti", "override_project"},
+		{etl.SS, "mlab-oti", "override_project"},
+	}
+	etl.IsBatch = false
+	for _, test := range override_tests {
+		os.Setenv("GCLOUD_PROJECT", test.gproject)
+		got := test.dt.BigqueryProject()
+		if got != test.want {
+			t.Errorf("for %s,%s, want: %s, got: %s.", test.dt, test.gproject, test.want, got)
+		}
+	}
+
 }

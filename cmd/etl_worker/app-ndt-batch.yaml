@@ -50,8 +50,8 @@ env_variables:
 
   NDT_BATCH: 'true'  # Allow instances to discover they are NDT_BATCH instances.
   MAX_WORKERS: 15  # 12 is good for NDT, but 20 is good for SS.
-  BIGQUERY_PROJECT: ${INJECTED_PROJECT}
-  BIGQUERY_DATASET: 'batch'
+  # BIGQUERY_PROJECT: ''  # Overrides computed project name based on GCLOUD_PROJECT
+  # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
   ANNOTATE_IP: 'true'
   NDT_OMIT_DELTAS: 'true'
   # TODO add custom service-account, instead of using default credentials.

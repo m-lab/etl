@@ -252,6 +252,9 @@ func (in *inMemoryInserter) FullTableName() string {
 func (in *inMemoryInserter) Dataset() string {
 	return ""
 }
+func (in *inMemoryInserter) Project() string {
+	return ""
+}
 func (in *inMemoryInserter) RowsInBuffer() int {
 	return len(in.data) - in.committed
 }

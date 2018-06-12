@@ -247,14 +247,14 @@ deploy:
 
 ######################################################################
 #  Prod deployments
-#  Deployed on manual tagging with prod-*, or (group)-prod-*
+#  Deployed on manual tagging with prod-*, ndt-prod-*, or small-prod-*
 #  Should be used AFTER code review, commit to integration, and staging soak.
-#  Triggers when *ANY* branch is tagged with prod-*'
+#  Triggers when *ANY* branch is tagged with one of these tags'
 ######################################################################
 
 ###################### SMALLER ETL SERVICES ###############################
 # Deploys smaller production services: PT, SS, DISCO
-# Triggers when *ANY* branch is tagged with qp-prod-* OR prod-*
+# Triggers when *ANY* branch is tagged with small-prod-* OR prod-*
 # NOTE: See later target for ndt-prod-*, which also triggers on prod-*, and
 #       deploys the NDT daily and batch pipelines.
 # NOTE: Failure in one of the deployments will terminate the deployment sequence,
@@ -280,7 +280,7 @@ deploy:
 
 ###################### NDT SERVICES ###############################
 # Deploys BOTH STREAMING AND BATCH services, along with queue config.
-# Triggers when *ANY* branch is tagged with qp-prod-* OR prod-*
+# Triggers when *ANY* branch is tagged with ndt-prod-* OR prod-*
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti

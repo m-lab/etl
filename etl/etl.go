@@ -43,19 +43,21 @@ type Inserter interface {
 	FullTableName() string
 	// Dataset name of the BQ dataset containing the table.
 	Dataset() string
+	// Project name
+	Project() string
 
 	RowStats // Inserter must implement RowStats
 }
 
 // InserterParams for NewInserter
 type InserterParams struct {
-	// The project comes from os.GetEnv("GCLOUD_PROJECT")
-	// These specify the google cloud dataset/table to write to.
+	// These specify the google cloud project:dataset.table to write to.
+	Project string
 	Dataset string
 	Table   string
 	// Suffix may be an actual _YYYYMMDD or partition $YYYYMMDD
 	Suffix     string        // Table name suffix for templated tables or partitions.
-	Timeout    time.Duration // max duration of backend calls.  (for context)
+	PutTimeout time.Duration // max duration of bigquery Put ops.  (for context)
 	BufferSize int           // Number of rows to buffer before writing to backend.
 	RetryDelay time.Duration // Time to sleep between retries on Quota exceeded failures.
 }
