@@ -227,6 +227,26 @@ var (
 	// queue_pusher.go
 )
 
+/*******************************************************************************
+*  TODO: These methods to compute the appropriate project and dataset are ugly.
+*  In not to distant future we need a better solution.
+*  See https://github.com/m-lab/etl/issues/519
+********************************************************************************/
+
+// BigqueryProject returns the appropriate project.
+func (dt DataType) BigqueryProject() string {
+	project, override := os.LookupEnv("BIGQUERY_PROJECT")
+	if override {
+		return project
+	}
+	project = os.Getenv("GCLOUD_PROJECT")
+	// For production, all datatypes except SS write to tables in measurement-lab.
+	if project == "mlab-oti" && dt != SS {
+		return "measurement-lab"
+	}
+	return project
+}
+
 // Dataset returns the appropriate dataset to use.
 // This is a bit of a hack, but works for our current needs.
 func (dt DataType) Dataset() string {
@@ -248,20 +268,6 @@ func (dt DataType) Dataset() string {
 // Table returns the appropriate table to use.
 func (dt DataType) Table() string {
 	return dataTypeToTable[dt]
-}
-
-// BigqueryProject returns the appropriate project.
-func (dt DataType) BigqueryProject() string {
-	project, override := os.LookupEnv("BIGQUERY_PROJECT")
-	if override {
-		return project
-	}
-	project = os.Getenv("GCLOUD_PROJECT")
-	// For production, all datatypes except SS write to tables in measurement-lab.
-	if project == "mlab-oti" && dt != SS {
-		return "measurement-lab"
-	}
-	return project
 }
 
 // CountPanics updates the PanicCount metric, then repanics.
