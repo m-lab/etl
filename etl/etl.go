@@ -57,7 +57,7 @@ type InserterParams struct {
 	Table   string
 	// Suffix may be an actual _YYYYMMDD or partition $YYYYMMDD
 	Suffix     string        // Table name suffix for templated tables or partitions.
-	Timeout    time.Duration // max duration of backend calls.  (for context)
+	PutTimeout time.Duration // max duration of bigquery Put ops.  (for context)
 	BufferSize int           // Number of rows to buffer before writing to backend.
 	RetryDelay time.Duration // Time to sleep between retries on Quota exceeded failures.
 }

@@ -59,7 +59,7 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 
 	return NewBQInserter(
 		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: suffix,
-			Timeout: 15 * time.Minute, BufferSize: dt.BQBufferSize(), RetryDelay: 30 * time.Second},
+			PutTimeout: 60 * time.Second, BufferSize: dt.BQBufferSize(), RetryDelay: 30 * time.Second},
 		nil)
 }
 
@@ -68,7 +68,7 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 // TODO - improve the naming between here and NewInserter.
 func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Inserter, error) {
 	if uploader == nil {
-		client, err := GetClient(params.Project, params.Timeout)
+		client, err := GetClient(params.Project)
 		if err != nil {
 			return nil, err
 		}
@@ -87,21 +87,23 @@ func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Insert
 		u.SkipInvalidRows = true
 		uploader = u
 	}
-	in := BQInserter{params: params, uploader: uploader, timeout: params.Timeout}
+	in := BQInserter{params: params, uploader: uploader, putTimeout: params.PutTimeout}
 	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	return &in, nil
 }
 
 //===============================================================================
 
-// GetClient returns an appropriate bigquery client for datatype.
+// GetClient returns an appropriate bigquery client.
 // This incurs network delay, so it should not be inside fast loops.
-func GetClient(project string, timeout time.Duration) (*bigquery.Client, error) {
+func GetClient(project string) (*bigquery.Client, error) {
 	// We do this here, instead of in init(), because we only want to do it
 	// when we actually want to access the bigquery backend.
 
 	// Network request
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	// ctx is used only for the request to create the client.  It is not used by
+	// the client.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return bigquery.NewClient(ctx, project)
 }
@@ -123,13 +125,13 @@ func (s *MapSaver) Save() (row map[string]bigquery.Value, insertID string, err e
 
 type BQInserter struct {
 	etl.Inserter
-	params   etl.InserterParams
-	uploader etl.Uploader // May be a BQ Uploader, or a test Uploader
-	timeout  time.Duration
-	rows     []interface{}
-	inserted int // Number of rows successfully inserted.
-	badRows  int // Number of row failures, including rows in full failures.
-	failures int // Number of complete insert failures.
+	params     etl.InserterParams
+	uploader   etl.Uploader  // May be a BQ Uploader, or a test Uploader
+	putTimeout time.Duration // Timeout used for BQ put operations.
+	rows       []interface{}
+	inserted   int // Number of rows successfully inserted.
+	badRows    int // Number of row failures, including rows in full failures.
+	failures   int // Number of complete insert failures.
 }
 
 // Caller should check error, and take appropriate action before calling again.
@@ -284,7 +286,7 @@ func (in *BQInserter) Flush() error {
 	var err error
 	for i := 0; i < 10; i++ {
 		// This is heavyweight, and may run forever without a context deadline.
-		ctx, _ := context.WithTimeout(context.Background(), in.timeout)
+		ctx, _ := context.WithTimeout(context.Background(), in.putTimeout)
 		err = in.uploader.Put(ctx, in.rows)
 		if err == nil || !strings.Contains(err.Error(), "Quota exceeded:") {
 			break
