@@ -3,6 +3,7 @@ package bq_test
 import (
 	"errors"
 	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -46,7 +47,7 @@ func xTestRealPartitionInsert(t *testing.T) {
 		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
 
 	in, err := bq.NewBQInserter(
-		etl.InserterParams{"mlab_sandbox", "test2", "_20160201", 10 * time.Second, 1, 0 * time.Second}, nil)
+		etl.InserterParams{"mlab-testing", "dataset", "test2", "_20160201", 10 * time.Second, 1, 0 * time.Second}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +74,7 @@ func TestBasicInsert(t *testing.T) {
 		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
 
 	in, err := bq.NewBQInserter(
-		etl.InserterParams{"mlab_sandbox", "test2", "", 10 * time.Second, 1, 0 * time.Second},
+		etl.InserterParams{"mlab-testing", "dataset", "test2", "", 10 * time.Second, 1, 0 * time.Second},
 		fake.NewFakeUploader())
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +93,37 @@ func TestBasicInsert(t *testing.T) {
 	in.Flush()
 }
 
+// This does not currently work with mlab-testing credentials, and we
+// probably don't want it to.  So disabling it in travis.
+func TestInsertConfig(t *testing.T) {
+	_, isTravis := os.LookupEnv("TRAVIS")
+	if isTravis {
+		return
+	}
+	os.Setenv("GCLOUD_PROJECT", "mlab-oti")
+	in, err := bq.NewInserter(etl.SS, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Dataset() != "private" {
+		t.Errorf("Want private, got %s", in.Dataset())
+	}
+	if in.Project() != "mlab-oti" {
+		t.Errorf("Want mlab-oti, got %s", in.Project())
+	}
+
+	in, err = bq.NewInserter(etl.NDT, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Dataset() != "base_tables" {
+		t.Errorf("Want private, got %s", in.Dataset())
+	}
+	if in.Project() != "measurement-lab" {
+		t.Errorf("Want measurement-lab, got %s", in.Project())
+	}
+}
+
 func TestBufferingAndFlushing(t *testing.T) {
 	var items []interface{}
 	items = append(items, Item{Name: "x1", Count: 17, Foobar: 44})
@@ -100,7 +132,7 @@ func TestBufferingAndFlushing(t *testing.T) {
 	// Set up an Inserter with a fake Uploader backend for testing.
 	// Buffer 3 rows, so that we can test the buffering.
 	in, err := bq.NewBQInserter(
-		etl.InserterParams{"mlab_sandbox", "test2", "", 10 * time.Second, 3, 0 * time.Second},
+		etl.InserterParams{"mlab-testing", "dataset", "test2", "", 10 * time.Second, 3, 0 * time.Second},
 		fake.NewFakeUploader())
 	if err != nil {
 		log.Printf("%v\n", err)
@@ -163,7 +195,7 @@ func TestBufferingAndFlushing(t *testing.T) {
 // Just manual testing for now - need to assert something useful.
 func TestHandleInsertErrors(t *testing.T) {
 	in, e := bq.NewBQInserter(
-		etl.InserterParams{"dataset", "table", "", time.Minute, 5, 0 * time.Second},
+		etl.InserterParams{"mlab-testing", "dataset", "table", "", time.Minute, 5, 0 * time.Second},
 		fake.NewFakeUploader())
 	if e != nil {
 		log.Printf("%v\n", e)
@@ -192,7 +224,7 @@ func TestQuotaError(t *testing.T) {
 	// Set up an Inserter with a fake Uploader backend for testing.
 	// Buffer 3 rows, so that we can test the buffering.
 	in, e := bq.NewBQInserter(
-		etl.InserterParams{"dataset", "table", "", time.Minute, 5, 1 * time.Millisecond},
+		etl.InserterParams{"mlab-testing", "dataset", "table", "", time.Minute, 5, 1 * time.Millisecond},
 		fakeUploader)
 	if e != nil {
 		log.Printf("%v\n", e)

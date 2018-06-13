@@ -13,6 +13,17 @@ import (
 	"github.com/m-lab/etl/metrics"
 )
 
+// IsBatch indicates this process is a batch processing service.
+var IsBatch bool
+
+// OmitDeltas indicates we should NOT process all snapshots.
+var OmitDeltas bool
+
+func init() {
+	IsBatch, _ = strconv.ParseBool(os.Getenv("NDT_BATCH"))
+	OmitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
+}
+
 // YYYYMMDD is a regexp string for identifying dense dates.
 const YYYYMMDD = `\d{4}[01]\d[0123]\d`
 
@@ -94,7 +105,7 @@ func ValidateTestPath(path string) (*DataPath, error) {
 
 // GetDataType finds the type of data stored in a file from its complete filename
 func (fn *DataPath) GetDataType() DataType {
-	dt, ok := DirToDataType[fn.Exp1]
+	dt, ok := dirToDataType[fn.Exp1]
 	if !ok {
 		return INVALID
 	}
@@ -103,14 +114,13 @@ func (fn *DataPath) GetDataType() DataType {
 
 // TableBase returns the base bigquery table name associated with the DataPath data type.
 func (fn *DataPath) TableBase() string {
-	return DataTypeToTable[fn.GetDataType()]
+	return fn.GetDataType().Table()
 }
 
 // IsBatchService return true if this is a NDT batch service.
 // TODO - update this to BATCH_SERVICE, so it makes sense for other pipelines.
 func IsBatchService() bool {
-	isBatch, _ := strconv.ParseBool(os.Getenv("NDT_BATCH"))
-	return isBatch
+	return IsBatch
 }
 
 // GetMetroName extracts metro name like "acc" from file name like
@@ -167,8 +177,7 @@ type DataType string
 func (dt DataType) BQBufferSize() int {
 	// Special case for NDT when omitting deltas.
 	if dt == NDT {
-		omitDeltas, _ := strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
-		if omitDeltas {
+		if OmitDeltas {
 			return dataTypeToBQBufferSize[NDT_OMIT_DELTAS]
 		}
 	}
@@ -187,7 +196,7 @@ const (
 var (
 	// DirToDataType maps from gs:// subdirectory to data type.
 	// TODO - this should be loaded from a config.
-	DirToDataType = map[string]DataType{
+	dirToDataType = map[string]DataType{
 		"ndt":              NDT,
 		"sidestream":       SS,
 		"paris-traceroute": PT,
@@ -196,7 +205,7 @@ var (
 
 	// DataTypeToTable maps from data type to BigQuery table name.
 	// TODO - this should be loaded from a config.
-	DataTypeToTable = map[DataType]string{
+	dataTypeToTable = map[DataType]string{
 		NDT:     "ndt",
 		SS:      "sidestream",
 		PT:      "traceroute",
@@ -218,8 +227,50 @@ var (
 	// queue_pusher.go
 )
 
-// AddPanicMetric captures panics, increments the
-// panic metric, and then repanics.
+/*******************************************************************************
+*  TODO: These methods to compute the appropriate project and dataset are ugly.
+*  In not to distant future we need a better solution.
+*  See https://github.com/m-lab/etl/issues/519
+********************************************************************************/
+
+// BigqueryProject returns the appropriate project.
+func (dt DataType) BigqueryProject() string {
+	project, override := os.LookupEnv("BIGQUERY_PROJECT")
+	if override {
+		return project
+	}
+	project = os.Getenv("GCLOUD_PROJECT")
+	// For production, all datatypes except SS write to tables in measurement-lab.
+	if project == "mlab-oti" && dt != SS {
+		return "measurement-lab"
+	}
+	return project
+}
+
+// Dataset returns the appropriate dataset to use.
+// This is a bit of a hack, but works for our current needs.
+func (dt DataType) Dataset() string {
+	dataset, override := os.LookupEnv("BIGQUERY_DATASET")
+	if override {
+		return dataset
+	}
+	if dt == SS {
+		return "private"
+	}
+
+	if IsBatchService() {
+		return "batch"
+	}
+
+	return "base_tables"
+}
+
+// Table returns the appropriate table to use.
+func (dt DataType) Table() string {
+	return dataTypeToTable[dt]
+}
+
+// CountPanics updates the PanicCount metric, then repanics.
 // It must be wrapped in a defer.
 // Examples:
 //  For function that returns an error:
