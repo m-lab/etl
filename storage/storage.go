@@ -220,7 +220,9 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	}
 
 	// TODO(prod) Evaluate whether this is long enough.
-	obj, err := getObject(client, bucket, fn, 60*time.Minute)
+	// SS processing sometimes times out with 1 hour.
+	// Is there a limit on http requests from task queue, or into flex instance?
+	obj, err := getObject(client, bucket, fn, 300*time.Minute)
 	if err != nil {
 		return nil, err
 	}

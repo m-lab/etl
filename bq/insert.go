@@ -101,10 +101,11 @@ func GetClient(project string) (*bigquery.Client, error) {
 	// when we actually want to access the bigquery backend.
 
 	// Network request
-	// ctx is used only for the request to create the client.  It is not used by
-	// the client.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	// It appears that ctx can have a short timeout, BUT we cannot call cancel on it.
+	// If we call defer cancel(), then the client later fails with cancelled context.
+	// So apparently the client holds on to the context, but doesn't care if it
+	// expires.
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 	return bigquery.NewClient(ctx, project)
 }
 

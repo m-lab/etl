@@ -218,7 +218,8 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 	// Query the service and grab the response safely
 	annotatorResponse, err := BatchQueryAnnotationService(url, data)
 	if err != nil {
-		log.Println(err)
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": err.Error()}).Inc()
 		return nil
 	}
 
