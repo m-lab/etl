@@ -283,6 +283,8 @@ func (in *BQInserter) updateMetrics(tableBase string, err error) error {
 	return err
 }
 
+// acquire and release handle the single token that protects the FlushSlice and
+// access to the metrics.
 func (in *BQInserter) acquire() {
 	<-in.token
 }
@@ -290,38 +292,37 @@ func (in *BQInserter) release() {
 	in.token <- struct{}{} // return the token.
 }
 
-// TODO - is this actually needed?  Or can we rely on the acquire in the metrics
-// accessors.
-func (in *BQInserter) Sync() {
-	in.acquire()
-	in.release()
-}
-
-// Should only be called from owning thread.
+// Flush synchronously flushes the rows in the row buffer up to BigQuery
+// It is NOT threadsafe, as it touches the row buffer, so should only be called
+// by the owning thread.
 func (in *BQInserter) Flush() error {
 	rows := in.rows
 	// Allocate new slice of rows.  Any failed rows are lost.
 	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	in.acquire()
-	err := in.FlushSlice(rows)
+	err := in.flushSlice(rows)
 	in.release()
 	return err
 }
 
-// Should only be called from owning thread.
+// FlushAsync asynchronously flushes the rows in the row buffer up to BigQuery.
+// It is NOT threadsafe, as it touches the row buffer, so should only be called
+// by the owning thread.
+// It may block if there is already a flush in progress.
 func (in *BQInserter) FlushAsync() {
 	rows := in.rows
 	// Allocate new slice of rows.  Any failed rows are lost.
 	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	in.acquire()
 	go func() {
-		in.FlushSlice(rows)
+		in.flushSlice(rows)
 		in.release()
 	}()
 }
 
-// TODO(dev) Should have a recovery mechanism for failed inserts.
-func (in *BQInserter) FlushSlice(rows []interface{}) error {
+// flushSlice flushes a slice of rows to BigQuery.
+// It is NOT threadsafe, and should only be called by Flush or FlushAsync.
+func (in *BQInserter) flushSlice(rows []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Dec()
 
@@ -414,25 +415,20 @@ func (in *BQInserter) Project() string {
 func (in *BQInserter) Dataset() string {
 	return in.params.Dataset
 }
+
 func (in *BQInserter) RowsInBuffer() int {
 	return len(in.rows)
 }
-
-// TODO HACK must deal with rows submitted to go flush()
 func (in *BQInserter) Accepted() int {
 	in.acquire()
 	defer in.release()
 	return in.inserted + in.badRows + in.pending + len(in.rows)
 }
-
-// TODO HACK must deal with rows submitted to go flush()
 func (in *BQInserter) Committed() int {
 	in.acquire()
 	defer in.release()
 	return in.inserted
 }
-
-// TODO HACK must deal with rows submitted to go flush()
 func (in *BQInserter) Failed() int {
 	in.acquire()
 	defer in.release()
