@@ -216,12 +216,8 @@ func ParseJSONGeoDataResponse(jsonBuffer []byte) (*GeoData, error) {
 // TODO - dedup common code in GetGeoData
 func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 	// Query the service and grab the response safely
-	annotatorResponse, err := BatchQueryAnnotationService(url, data)
-	if err != nil {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": err.Error()}).Inc()
-		return nil
-	}
+	// All errors are recorded to metrics, so OK to ignore them here.
+	annotatorResponse, _ := BatchQueryAnnotationService(url, data)
 
 	// Safely parse the JSON response and pass it back to the caller
 	geoDataFromResponse, err := BatchParseJSONGeoDataResponse(annotatorResponse)
@@ -274,7 +270,12 @@ func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error)
 	defer resp.Body.Close()
 
 	// Copy response into a byte slice
-	return ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		metrics.AnnotationErrorCount.
+			With(prometheus.Labels{"source": "Problem reading response body"}).Inc()
+	}
+	return body, err
 }
 
 // BatchParseJSONGeoDataResponse takes a byte slice containing the
