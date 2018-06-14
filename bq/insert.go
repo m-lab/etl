@@ -59,7 +59,7 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 
 	return NewBQInserter(
 		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: suffix,
-			PutTimeout: 60 * time.Second, BufferSize: dt.BQBufferSize(), RetryDelay: 30 * time.Second},
+			PutTimeout: 60 * time.Second, BufferSize: dt.BQBufferSize(), RetryBaseDelay: 20 * time.Millisecond},
 		nil)
 }
 
@@ -101,10 +101,11 @@ func GetClient(project string) (*bigquery.Client, error) {
 	// when we actually want to access the bigquery backend.
 
 	// Network request
-	// ctx is used only for the request to create the client.  It is not used by
-	// the client.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	// It appears that ctx can have a short timeout, BUT we cannot call cancel on it.
+	// If we call defer cancel(), then the client later fails with cancelled context.
+	// So apparently the client holds on to the context, but doesn't care if it
+	// expires.
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 	return bigquery.NewClient(ctx, project)
 }
 
@@ -284,17 +285,21 @@ func (in *BQInserter) Flush() error {
 	//   experience 'Quota error' events.
 
 	var err error
-	for i := 0; i < 10; i++ {
+	for backoff := in.params.RetryBaseDelay; backoff < time.Minute; backoff *= 2 {
 		// This is heavyweight, and may run forever without a context deadline.
-		ctx, _ := context.WithTimeout(context.Background(), in.putTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), in.putTimeout)
 		err = in.uploader.Put(ctx, in.rows)
+		cancel()
+
 		if err == nil || !strings.Contains(err.Error(), "Quota exceeded:") {
 			break
 		}
 		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Quota Exceeded").Inc()
+
 		// Use some randomness to reduce risk of synchronization across tasks.
-		t := in.params.RetryDelay.Seconds() * (0.5 + rand.Float64()) // between 0.5 and 1.5 * RetryDelay
-		time.Sleep(time.Duration(1000000*t) * time.Microsecond)
+		delayNanos := float32(backoff.Nanoseconds()) * (0.5 + rand.Float32()) // between 0.5 and 1.5 * RetryDelay
+		// Duration is int64 in nanoseconds, so this converts back to a Duration.
+		time.Sleep(time.Duration(delayNanos))
 	}
 
 	// If there is still an error, then handle it.
