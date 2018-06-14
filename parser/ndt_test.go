@@ -228,9 +228,6 @@ func newInMemoryInserter() *inMemoryInserter {
 	return &inMemoryInserter{data, 0, 0}
 }
 
-func (in *inMemoryInserter) Sync() {
-}
-
 func (in *inMemoryInserter) InsertRow(data interface{}) error {
 	in.data = append(in.data, data)
 	return nil
