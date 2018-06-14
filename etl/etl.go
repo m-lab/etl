@@ -56,10 +56,10 @@ type InserterParams struct {
 	Dataset string
 	Table   string
 	// Suffix may be an actual _YYYYMMDD or partition $YYYYMMDD
-	Suffix     string        // Table name suffix for templated tables or partitions.
-	PutTimeout time.Duration // max duration of bigquery Put ops.  (for context)
-	BufferSize int           // Number of rows to buffer before writing to backend.
-	RetryDelay time.Duration // Time to sleep between retries on Quota exceeded failures.
+	Suffix         string        // Table name suffix for templated tables or partitions.
+	PutTimeout     time.Duration // max duration of bigquery Put ops.  (for context)
+	BufferSize     int           // Number of rows to buffer before writing to backend.
+	RetryBaseDelay time.Duration // Base of doubling sleep time between retries.
 }
 
 // Parser is the generic interface implemented by each experiment parser.

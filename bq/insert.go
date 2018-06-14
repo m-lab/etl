@@ -59,7 +59,7 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 
 	return NewBQInserter(
 		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: suffix,
-			PutTimeout: 60 * time.Second, BufferSize: dt.BQBufferSize(), RetryDelay: 30 * time.Second},
+			PutTimeout: 60 * time.Second, BufferSize: dt.BQBufferSize(), RetryBaseDelay: 20 * time.Millisecond},
 		nil)
 }
 
@@ -285,17 +285,20 @@ func (in *BQInserter) Flush() error {
 	//   experience 'Quota error' events.
 
 	var err error
+	retryDelay := in.params.RetryBaseDelay
 	for i := 0; i < 10; i++ {
 		// This is heavyweight, and may run forever without a context deadline.
-		ctx, _ := context.WithTimeout(context.Background(), in.putTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), in.putTimeout)
 		err = in.uploader.Put(ctx, in.rows)
 		if err == nil || !strings.Contains(err.Error(), "Quota exceeded:") {
 			break
 		}
 		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Quota Exceeded").Inc()
 		// Use some randomness to reduce risk of synchronization across tasks.
-		t := in.params.RetryDelay.Seconds() * (0.5 + rand.Float64()) // between 0.5 and 1.5 * RetryDelay
+		t := retryDelay.Seconds() * (0.5 + rand.Float64()) // between 0.5 and 1.5 * RetryDelay
+		retryDelay = retryDelay + retryDelay
 		time.Sleep(time.Duration(1000000*t) * time.Microsecond)
+		cancel()
 	}
 
 	// If there is still an error, then handle it.
