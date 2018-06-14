@@ -28,11 +28,24 @@ type RowStats interface {
 //   After Flush() returns, RowsInBuffer == 0
 type Inserter interface {
 	// InsertRow inserts one row into the insert buffer.
+	// Deprecated:
 	InsertRow(data interface{}) error
 	// InsertRows inserts multiple rows into the insert buffer.
+	// Deprecated:
 	InsertRows(data []interface{}) error
 	// Flush flushes any rows in the buffer out to bigquery.
+	// This is synchronous - on return, rows should be committed.
 	Flush() error
+
+	// AddRow adds a single row to the output buffer.  It
+	// may return ErrBufferFull, but does not trigger flushes.
+	AddRow(data interface{}) error
+	// FlushAsync does an asynchronous buffer flush using
+	// another goroutine.  It may block if another flush is in
+	// progress.
+	FlushAsync()
+	// Sync waits for any pending FlushAsync() to complete.
+	Sync() // Synchronize with the async flusher.
 
 	// Base Table name of the BQ table that the uploader pushes to.
 	TableBase() string

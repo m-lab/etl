@@ -213,7 +213,7 @@ func TestHandleInsertErrors(t *testing.T) {
 
 	var pme bigquery.PutMultiError
 	pme = append(pme, rie)
-	in.(*bq.BQInserter).HandleInsertErrors(pme)
+	in.(*bq.BQInserter).HandleInsertErrors(pme, in.RowsInBuffer())
 
 	// TODO - assert something.
 }

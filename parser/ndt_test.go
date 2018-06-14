@@ -228,6 +228,9 @@ func newInMemoryInserter() *inMemoryInserter {
 	return &inMemoryInserter{data, 0, 0}
 }
 
+func (in *inMemoryInserter) Sync() {
+}
+
 func (in *inMemoryInserter) InsertRow(data interface{}) error {
 	in.data = append(in.data, data)
 	return nil
@@ -236,9 +239,15 @@ func (in *inMemoryInserter) InsertRows(data []interface{}) error {
 	in.data = append(in.data, data...)
 	return nil
 }
+func (in *inMemoryInserter) AddRow(data interface{}) error {
+	in.data = append(in.data, data)
+	return nil
+}
 func (in *inMemoryInserter) Flush() error {
 	in.committed = len(in.data)
 	return nil
+}
+func (in *inMemoryInserter) FlushAsync() {
 }
 func (in *inMemoryInserter) TableBase() string {
 	return "ndt_test"
