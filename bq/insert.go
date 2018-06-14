@@ -17,7 +17,6 @@ package bq
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log"
 	"math/rand"
 	"strings"
@@ -43,10 +42,13 @@ var tableInsertCounts = sync.Map{}
 func init() {
 }
 
-// InsertBuffer related constants.
-var (
-	// ErrBufferFull is returned when an InsertBuffer is full.
-	ErrBufferFull = errors.New("insert buffer is full")
+const (
+	// MaxPutRetryDelay is one minute.  So aggregate delay will be around 2 minutes.
+	// Beyond this point, we likely have a serious problem so no point in continuing.
+	MaxPutRetryDelay = time.Minute
+	// PutContextTimeout limits how long we allow a single BQ Put call to take.  These
+	// typically complete in one or two seconds.
+	PutContextTimeout = 60 * time.Second
 )
 
 // NewInserter creates a new BQInserter with appropriate characteristics.
@@ -66,7 +68,8 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 
 	return NewBQInserter(
 		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: suffix,
-			PutTimeout: 60 * time.Second, BufferSize: dt.BQBufferSize(), RetryBaseDelay: 20 * time.Millisecond},
+			PutTimeout: PutContextTimeout, MaxRetryDelay: MaxPutRetryDelay,
+			BufferSize: dt.BQBufferSize()},
 		nil)
 }
 
@@ -150,21 +153,25 @@ type BQInserter struct {
 	// but released by the flusher goroutine.
 	token chan struct{} // Token required for metric updates.
 
+	pending  int // Number of rows being flushed.
 	inserted int // Number of rows successfully inserted.
 	badRows  int // Number of row failures, including rows in full failures.
 	failures int // Number of complete insert failures.
 }
 
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
+// Not threadsafe.  Should only be called by owning thread.
 func (in *BQInserter) AddRow(data interface{}) error {
 	for len(in.rows) >= in.params.BufferSize-1 {
-		return ErrBufferFull
+		return etl.ErrBufferFull
 	}
 	in.rows = append(in.rows, data)
 	return nil
 }
 
 // Caller should check error, and take appropriate action before calling again.
+// Not threadsafe.  Should only be called by owning thread.
+// Deprecated:
 func (in *BQInserter) InsertRow(data interface{}) error {
 	return in.InsertRows([]interface{}{data})
 }
@@ -196,6 +203,7 @@ func (in *BQInserter) maybeCountRowSize(data []interface{}) {
 }
 
 // Caller should check error, and take appropriate action before calling again.
+// Not threadsafe.  Should only be called by owning thread.
 // Deprecated:
 func (in *BQInserter) InsertRows(data []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "insert").Inc()
@@ -219,20 +227,28 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 	return nil
 }
 
-func (in *BQInserter) HandleInsertErrors(err error, numRows int) error {
+func (in *BQInserter) updateMetrics(tableBase string, err error) error {
+	if in.pending == 0 {
+		log.Println("Unexpected state error!!")
+	}
+	in.inserted += in.pending
+
 	switch typedErr := err.(type) {
 	case bigquery.PutMultiError:
-		if len(typedErr) == numRows {
+		if len(typedErr) > in.pending {
+			log.Println("Inconsistent state error!!")
+		}
+		if len(typedErr) == in.pending {
 			log.Printf("%v\n", err)
 			metrics.BackendFailureCount.WithLabelValues(
-				in.TableBase(), "failed insert").Inc()
+				tableBase, "failed insert").Inc()
 			in.failures++
 		}
 		// If ALL rows failed, and number of rows is large, just report single failure.
-		if len(typedErr) > 10 && len(typedErr) == numRows {
+		if len(typedErr) > 10 && len(typedErr) == in.pending {
 			log.Printf("Insert error: %v\n", err)
 			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "unknown", "insert row error").
+				tableBase, "unknown", "insert row error").
 				Add(float64(len(typedErr)))
 		} else {
 			// Handle each error individually.
@@ -244,24 +260,26 @@ func (in *BQInserter) HandleInsertErrors(err error, numRows int) error {
 				for _, oneErr := range rowError.Errors {
 					log.Printf("Insert error: %v\n", oneErr)
 					metrics.ErrorCount.WithLabelValues(
-						in.TableBase(), "unknown", "insert row error").Inc()
+						tableBase, "unknown", "insert row error").Inc()
 				}
 			}
 		}
-		in.inserted += numRows - len(typedErr)
+		in.inserted -= len(typedErr)
 		in.badRows += len(typedErr)
 		err = nil
 	default:
 		log.Printf("Unhandled insert error %v\n", typedErr)
 		metrics.BackendFailureCount.WithLabelValues(
-			in.TableBase(), "failed insert").Inc()
+			tableBase, "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
+			tableBase, "unknown", "UNHANDLED insert error").Inc()
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
-		in.badRows += numRows
+		in.inserted -= in.pending
+		in.badRows += in.pending
 		err = nil
 	}
+	in.pending = 0
 	return err
 }
 
@@ -272,19 +290,46 @@ func (in *BQInserter) release() {
 	in.token <- struct{}{} // return the token.
 }
 
+// TODO - is this actually needed?  Or can we rely on the acquire in the metrics
+// accessors.
 func (in *BQInserter) Sync() {
 	in.acquire()
 	in.release()
 }
 
-// TODO(dev) Should have a recovery mechanism for failed inserts.
+// Should only be called from owning thread.
 func (in *BQInserter) Flush() error {
+	rows := in.rows
+	// Allocate new slice of rows.  Any failed rows are lost.
+	in.rows = make([]interface{}, 0, in.params.BufferSize)
+	in.acquire()
+	err := in.FlushSlice(rows)
+	in.release()
+	return err
+}
+
+// Should only be called from owning thread.
+func (in *BQInserter) FlushAsync() {
+	rows := in.rows
+	// Allocate new slice of rows.  Any failed rows are lost.
+	in.rows = make([]interface{}, 0, in.params.BufferSize)
+	in.acquire()
+	go func() {
+		in.FlushSlice(rows)
+		in.release()
+	}()
+}
+
+// TODO(dev) Should have a recovery mechanism for failed inserts.
+func (in *BQInserter) FlushSlice(rows []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Dec()
 
-	if len(in.rows) == 0 {
+	if len(rows) == 0 {
 		return nil
 	}
+
+	in.pending = len(rows)
 
 	// If we exceed the quota, this basically backs off and tries again.  When
 	// operating near quota, this will fire enough times to slow down each task
@@ -324,10 +369,10 @@ func (in *BQInserter) Flush() error {
 	//   experience 'Quota error' events.
 
 	var err error
-	for backoff := in.params.RetryBaseDelay; backoff < time.Minute; backoff *= 2 {
+	for backoff := 10 * time.Millisecond; backoff < in.params.MaxRetryDelay; backoff *= 2 {
 		// This is heavyweight, and may run forever without a context deadline.
 		ctx, cancel := context.WithTimeout(context.Background(), in.putTimeout)
-		err = in.uploader.Put(ctx, in.rows)
+		err = in.uploader.Put(ctx, rows)
 		cancel()
 
 		if err == nil || !strings.Contains(err.Error(), "Quota exceeded:") {
@@ -343,13 +388,12 @@ func (in *BQInserter) Flush() error {
 
 	// If there is still an error, then handle it.
 	if err == nil {
-		in.inserted += len(in.rows)
+		in.inserted += in.pending
+		in.pending = 0
 	} else {
 		// This adjusts the inserted count, failure count, and updates in.rows.
-		err = in.HandleInsertErrors(err, len(in.rows))
+		err = in.updateMetrics(in.TableBase(), err)
 	}
-	// Allocate new slice of rows.  Any failed rows are lost.
-	in.rows = make([]interface{}, 0, in.params.BufferSize)
 	return err
 }
 
@@ -378,7 +422,7 @@ func (in *BQInserter) RowsInBuffer() int {
 func (in *BQInserter) Accepted() int {
 	in.acquire()
 	defer in.release()
-	return in.inserted + in.badRows + len(in.rows)
+	return in.inserted + in.badRows + in.pending + len(in.rows)
 }
 
 // TODO HACK must deal with rows submitted to go flush()

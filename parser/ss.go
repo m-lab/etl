@@ -266,7 +266,11 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			log.Printf("cannot pack data into sidestream schema: %v\n", err)
 			continue
 		}
-		err = ss.inserter.InsertRow(ssTest)
+		err = ss.inserter.AddRow(ssTest)
+		if err == etl.ErrBufferFull {
+			ss.inserter.FlushAsync()
+			err = ss.inserter.InsertRow(ssTest)
+		}
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				ss.TableName(), "ss", "insert-err").Inc()
@@ -276,7 +280,6 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			continue
 		}
 		metrics.TestCount.WithLabelValues(ss.TableName(), "ss", "ok").Inc()
-
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package etl
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -44,8 +45,6 @@ type Inserter interface {
 	// another goroutine.  It may block if another flush is in
 	// progress.
 	FlushAsync()
-	// Sync waits for any pending FlushAsync() to complete.
-	Sync() // Synchronize with the async flusher.
 
 	// Base Table name of the BQ table that the uploader pushes to.
 	TableBase() string
@@ -62,17 +61,26 @@ type Inserter interface {
 	RowStats // Inserter must implement RowStats
 }
 
+// Inserter related constants.
+var (
+	// ErrBufferFull is returned when an InsertBuffer is full.
+	ErrBufferFull = errors.New("insert buffer is full")
+)
+
 // InserterParams for NewInserter
 type InserterParams struct {
 	// These specify the google cloud project:dataset.table to write to.
 	Project string
 	Dataset string
 	Table   string
-	// Suffix may be an actual _YYYYMMDD or partition $YYYYMMDD
-	Suffix         string        // Table name suffix for templated tables or partitions.
-	PutTimeout     time.Duration // max duration of bigquery Put ops.  (for context)
-	BufferSize     int           // Number of rows to buffer before writing to backend.
-	RetryBaseDelay time.Duration // Base of doubling sleep time between retries.
+
+	// Suffix may be table suffix _YYYYMMDD or partition $YYYYMMDD
+	Suffix string // Table name suffix for templated tables or partitions.
+
+	BufferSize int // Number of rows to buffer before writing to backend.
+
+	PutTimeout    time.Duration // max duration of bigquery Put ops.  (for context)
+	MaxRetryDelay time.Duration // Maximum backoff time for Put retries.
 }
 
 // Parser is the generic interface implemented by each experiment parser.

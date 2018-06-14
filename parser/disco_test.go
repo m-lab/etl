@@ -17,7 +17,8 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
-var test_data []byte = []byte(`{
+var test_data []byte = []byte(
+	`{
 	"sample": [{"timestamp": 69850, "value": 0.0}, {"timestamp": 69860, "value": 0.0}],
 	"metric": "switch.multicast.local.rx",
 	"hostname": "mlab4.sea05.measurement-lab.org",
@@ -32,7 +33,7 @@ func TestJSONParsing(t *testing.T) {
 	// This creates a real inserter, with a fake uploader, for local testing.
 	uploader := fake.FakeUploader{}
 	ins, err := bq.NewBQInserter(etl.InserterParams{
-		"mlab-sandbox", "dataset", "disco_test", "", 10 * time.Second, 3, 0 * time.Second}, &uploader)
+		"mlab-sandbox", "dataset", "disco_test", "", 3, 10 * time.Second, time.Second}, &uploader)
 
 	var parser etl.Parser = parser.NewDiscoParser(ins)
 
@@ -47,7 +48,7 @@ func TestJSONParsing(t *testing.T) {
 	// Adds two more rows, triggering an upload of 3 rows.
 	err = parser.ParseAndInsert(meta, "testName", test_data)
 	if len(uploader.Rows) != 3 {
-		t.Error("Uploader Row Count = ", len(uploader.Rows))
+		t.Error("Expected 3, got", len(uploader.Rows))
 	}
 
 	// Adds two more rows, triggering an upload of 3 rows.
@@ -60,7 +61,7 @@ func TestJSONParsing(t *testing.T) {
 		t.Error("RowsInBuffer = ", ins.RowsInBuffer())
 	}
 	if len(uploader.Rows) != 3 {
-		t.Error("Uploader Row Count = ", len(uploader.Rows))
+		t.Error("Expected 3, got", len(uploader.Rows))
 	}
 
 	if err != nil {
