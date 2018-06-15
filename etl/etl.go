@@ -3,6 +3,7 @@ package etl
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -28,11 +29,22 @@ type RowStats interface {
 //   After Flush() returns, RowsInBuffer == 0
 type Inserter interface {
 	// InsertRow inserts one row into the insert buffer.
+	// Deprecated:  Please use AddRow and FlushAsync instead.
 	InsertRow(data interface{}) error
 	// InsertRows inserts multiple rows into the insert buffer.
+	// Deprecated:  Please use AddRow and FlushAsync instead.
 	InsertRows(data []interface{}) error
 	// Flush flushes any rows in the buffer out to bigquery.
+	// This is synchronous - on return, rows should be committed.
 	Flush() error
+
+	// AddRow adds a single row to the output buffer.  It
+	// may return ErrBufferFull, but does not trigger flushes.
+	AddRow(data interface{}) error
+	// FlushAsync does an asynchronous buffer flush using
+	// another goroutine.  It may block if another flush is in
+	// progress.
+	FlushAsync()
 
 	// Base Table name of the BQ table that the uploader pushes to.
 	TableBase() string
@@ -49,17 +61,26 @@ type Inserter interface {
 	RowStats // Inserter must implement RowStats
 }
 
+// Inserter related constants.
+var (
+	// ErrBufferFull is returned when an InsertBuffer is full.
+	ErrBufferFull = errors.New("insert buffer is full")
+)
+
 // InserterParams for NewInserter
 type InserterParams struct {
 	// These specify the google cloud project:dataset.table to write to.
 	Project string
 	Dataset string
 	Table   string
-	// Suffix may be an actual _YYYYMMDD or partition $YYYYMMDD
-	Suffix         string        // Table name suffix for templated tables or partitions.
-	PutTimeout     time.Duration // max duration of bigquery Put ops.  (for context)
-	BufferSize     int           // Number of rows to buffer before writing to backend.
-	RetryBaseDelay time.Duration // Base of doubling sleep time between retries.
+
+	// Suffix may be table suffix _YYYYMMDD or partition $YYYYMMDD
+	Suffix string // Table name suffix for templated tables or partitions.
+
+	BufferSize int // Number of rows to buffer before writing to backend.
+
+	PutTimeout    time.Duration // max duration of bigquery Put ops.  (for context)
+	MaxRetryDelay time.Duration // Maximum backoff time for Put retries.
 }
 
 // Parser is the generic interface implemented by each experiment parser.
