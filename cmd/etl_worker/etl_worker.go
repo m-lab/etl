@@ -217,9 +217,6 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 		// TODO - anything better we could do here?
 	}
 
-	// Wrap inserter to give insertion time metrics.
-	ins = bq.DurationWrapper{ins}
-
 	// Create parser, injecting Inserter
 	p := parser.NewParser(dataType, ins)
 	tsk := task.NewTask(fn, tr, p)

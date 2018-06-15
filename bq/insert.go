@@ -45,10 +45,10 @@ func init() {
 const (
 	// MaxPutRetryDelay is one minute.  So aggregate delay will be around 2 minutes.
 	// Beyond this point, we likely have a serious problem so no point in continuing.
-	MaxPutRetryDelay = time.Minute
+	maxPutRetryDelay = time.Minute
 	// PutContextTimeout limits how long we allow a single BQ Put call to take.  These
 	// typically complete in one or two seconds.
-	PutContextTimeout = 60 * time.Second
+	putContextTimeout = 60 * time.Second
 )
 
 // NewInserter creates a new BQInserter with appropriate characteristics.
@@ -68,7 +68,7 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 
 	return NewBQInserter(
 		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: suffix,
-			PutTimeout: PutContextTimeout, MaxRetryDelay: MaxPutRetryDelay,
+			PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
 			BufferSize: dt.BQBufferSize()},
 		nil)
 }
@@ -171,7 +171,7 @@ func (in *BQInserter) AddRow(data interface{}) error {
 
 // Caller should check error, and take appropriate action before calling again.
 // Not threadsafe.  Should only be called by owning thread.
-// Deprecated:
+// Deprecated:  Please use AddRow and FlushAsync instead.
 func (in *BQInserter) InsertRow(data interface{}) error {
 	return in.InsertRows([]interface{}{data})
 }
@@ -204,7 +204,7 @@ func (in *BQInserter) maybeCountRowSize(data []interface{}) {
 
 // Caller should check error, and take appropriate action before calling again.
 // Not threadsafe.  Should only be called by owning thread.
-// Deprecated:
+// Deprecated:  Please use AddRow and FlushAsync instead.
 func (in *BQInserter) InsertRows(data []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "insert").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "insert").Dec()
@@ -227,7 +227,7 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 	return nil
 }
 
-func (in *BQInserter) updateMetrics(tableBase string, err error) error {
+func (in *BQInserter) updateMetrics(err error) error {
 	if in.pending == 0 {
 		log.Println("Unexpected state error!!")
 	}
@@ -241,14 +241,14 @@ func (in *BQInserter) updateMetrics(tableBase string, err error) error {
 		if len(typedErr) == in.pending {
 			log.Printf("%v\n", err)
 			metrics.BackendFailureCount.WithLabelValues(
-				tableBase, "failed insert").Inc()
+				in.TableBase(), "failed insert").Inc()
 			in.failures++
 		}
 		// If ALL rows failed, and number of rows is large, just report single failure.
 		if len(typedErr) > 10 && len(typedErr) == in.pending {
 			log.Printf("Insert error: %v\n", err)
 			metrics.ErrorCount.WithLabelValues(
-				tableBase, "unknown", "insert row error").
+				in.TableBase(), "unknown", "insert row error").
 				Add(float64(len(typedErr)))
 		} else {
 			// Handle each error individually.
@@ -260,7 +260,7 @@ func (in *BQInserter) updateMetrics(tableBase string, err error) error {
 				for _, oneErr := range rowError.Errors {
 					log.Printf("Insert error: %v\n", oneErr)
 					metrics.ErrorCount.WithLabelValues(
-						tableBase, "unknown", "insert row error").Inc()
+						in.TableBase(), "unknown", "insert row error").Inc()
 				}
 			}
 		}
@@ -270,9 +270,9 @@ func (in *BQInserter) updateMetrics(tableBase string, err error) error {
 	default:
 		log.Printf("Unhandled insert error %v\n", typedErr)
 		metrics.BackendFailureCount.WithLabelValues(
-			tableBase, "failed insert").Inc()
+			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
-			tableBase, "unknown", "UNHANDLED insert error").Inc()
+			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
 		in.inserted -= in.pending
@@ -369,6 +369,7 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 	//   concurrent tasks, and thus the frequency at which the tasks would
 	//   experience 'Quota error' events.
 
+	start := time.Now()
 	var err error
 	for backoff := 10 * time.Millisecond; backoff < in.params.MaxRetryDelay; backoff *= 2 {
 		// This is heavyweight, and may run forever without a context deadline.
@@ -391,9 +392,13 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 	if err == nil {
 		in.inserted += in.pending
 		in.pending = 0
+		metrics.InsertionHistogram.WithLabelValues(
+			in.TableBase(), "succeed").Observe(time.Since(start).Seconds())
 	} else {
 		// This adjusts the inserted count, failure count, and updates in.rows.
-		err = in.updateMetrics(in.TableBase(), err)
+		err = in.updateMetrics(err)
+		metrics.InsertionHistogram.WithLabelValues(
+			in.TableBase(), "fail").Observe(time.Since(start).Seconds())
 	}
 	return err
 }
@@ -433,24 +438,4 @@ func (in *BQInserter) Failed() int {
 	in.acquire()
 	defer in.release()
 	return in.badRows
-}
-
-//----------------------------------------------------------------------------
-
-// Inserter wrapper that handles flush metrics.
-// TODO - add prometheus counters for attempts, number of rows.
-type DurationWrapper struct {
-	etl.Inserter
-}
-
-func (dw DurationWrapper) Flush() error {
-	t := time.Now()
-	status := "succeed"
-	err := dw.Inserter.Flush()
-	if err != nil {
-		status = "fail"
-	}
-	metrics.InsertionHistogram.WithLabelValues(
-		dw.TableBase(), status).Observe(time.Since(t).Seconds())
-	return err
 }
