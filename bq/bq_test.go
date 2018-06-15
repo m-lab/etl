@@ -226,7 +226,7 @@ func TestHandleInsertErrors(t *testing.T) {
 
 	var pme bigquery.PutMultiError
 	pme = append(pme, rie)
-	fakeUploader.SetErr(&rie)
+	fakeUploader.SetErr(&pme)
 	in.AddRow(struct{}{})
 	in.AddRow(struct{}{})
 	in.Flush()

@@ -271,7 +271,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if err == etl.ErrBufferFull {
 			// Flush asynchronously, to improve throughput.
 			ss.inserter.FlushAsync()
-			err = ss.inserter.InsertRow(ssTest)
+			err = ss.inserter.AddRow(ssTest)
 		}
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
