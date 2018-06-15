@@ -29,10 +29,10 @@ type RowStats interface {
 //   After Flush() returns, RowsInBuffer == 0
 type Inserter interface {
 	// InsertRow inserts one row into the insert buffer.
-	// Deprecated:
+	// Deprecated:  Please use AddRow and FlushAsync instead.
 	InsertRow(data interface{}) error
 	// InsertRows inserts multiple rows into the insert buffer.
-	// Deprecated:
+	// Deprecated:  Please use AddRow and FlushAsync instead.
 	InsertRows(data []interface{}) error
 	// Flush flushes any rows in the buffer out to bigquery.
 	// This is synchronous - on return, rows should be committed.
