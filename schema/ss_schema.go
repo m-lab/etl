@@ -2,7 +2,11 @@
 // Any changes here should also be made in ss.json
 package schema
 
-import "github.com/m-lab/etl/annotation"
+import (
+	"time"
+
+	"github.com/m-lab/etl/annotation"
+)
 
 type Web100ConnectionSpecification struct {
 	Local_ip           string                   `json:"local_ip,string"`
@@ -176,9 +180,12 @@ type Web100LogEntry struct {
 }
 
 type SS struct {
-	Test_id          string         `json:"test_id,string"`
-	Project          int64          `json:"project,int64"`
-	Log_time         int64          `json:"log_time,int64"`
+	Test_id      string    `json:"test_id,string"`
+	Project      int64     `json:"project,int64"`
+	Log_time     int64     `json:"log_time,int64"`
+	ParseTime    time.Time `bigquery:"parse_time"`
+	TaskFileName string    `bigquery:"task_filename"`
+
 	Type             int64          `json:"type,int64"`
 	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`
 }

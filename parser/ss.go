@@ -341,6 +341,10 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			continue
 		}
 
+		ssTest.ParseTime = time.Now() // for map, use string(time.Now().MarshalText())
+		if meta["filename"] != nil {
+			ssTest.TaskFileName = meta["filename"].(string)
+		}
 		// Add row to buffer, possibly flushing buffer if it is full.
 		err = ss.AddRow(ssTest)
 		if err == etl.ErrBufferFull {

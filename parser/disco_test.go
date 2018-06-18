@@ -62,6 +62,9 @@ func TestJSONParsing(t *testing.T) {
 
 	// Adds two more rows, triggering an upload of 3 rows.
 	err = parser.ParseAndInsert(meta, "testName", test_data)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if ins.Accepted() != 6 {
 		t.Error("Accepted = ", ins.Accepted())
