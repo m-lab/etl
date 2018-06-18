@@ -18,6 +18,10 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+func assertInserter(in etl.Inserter) {
+	func(in etl.Inserter) {}(&bq.BQInserter{})
+}
+
 func foobar(vs bigquery.ValueSaver) {
 	_, _, _ = vs.Save()
 }
@@ -200,9 +204,32 @@ func TestBufferingAndFlushing(t *testing.T) {
 
 }
 
+// RowBuffer for SS.
+type RowBuffer struct {
+	bufferSize int
+	rows       []interface{}
+}
+
+// AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
+// Not threadsafe.  Should only be called by owning thread.
+func (buf *RowBuffer) AddRow(row struct{}) error {
+	for len(buf.rows) >= buf.bufferSize-1 {
+		return etl.ErrBufferFull
+	}
+	buf.rows = append(buf.rows, &row)
+	return nil
+}
+
+func (buf *RowBuffer) TakeRows() []interface{} {
+	res := buf.rows
+	buf.rows = make([]interface{}, 0, buf.bufferSize)
+	return res
+}
+
 // Just manual testing for now - need to assert something useful.
 func TestHandleInsertErrors(t *testing.T) {
 	fakeUploader := fake.NewFakeUploader()
+	buf := RowBuffer{5, make([]interface{}, 0, 5)}
 	in, e := bq.NewBQInserter(standardInsertParams(5), fakeUploader)
 	if e != nil {
 		log.Printf("%v\n", e)
@@ -218,8 +245,8 @@ func TestHandleInsertErrors(t *testing.T) {
 	// *bigquery.Error.  So that is what we test here.
 	rie.Errors = append(rie.Errors, &bqe)
 	fakeUploader.SetErr(&rie)
-	in.AddRow(struct{}{})
-	in.Flush()
+	buf.AddRow(struct{}{})
+	in.Put(buf.TakeRows())
 	if in.Failed() != 1 {
 		t.Error()
 	}
@@ -227,9 +254,9 @@ func TestHandleInsertErrors(t *testing.T) {
 	var pme bigquery.PutMultiError
 	pme = append(pme, rie)
 	fakeUploader.SetErr(&pme)
-	in.AddRow(struct{}{})
-	in.AddRow(struct{}{})
-	in.Flush()
+	buf.AddRow(struct{}{})
+	buf.AddRow(struct{}{})
+	in.Put(buf.TakeRows())
 
 	if fakeUploader.CallCount != 2 {
 		t.Errorf("Expected %d calls, got %d\n", 2, fakeUploader.CallCount)
@@ -240,7 +267,6 @@ func TestHandleInsertErrors(t *testing.T) {
 	if in.Failed() != 3 {
 		t.Error()
 	}
-	// TODO - assert something.
 }
 
 func TestQuotaError(t *testing.T) {

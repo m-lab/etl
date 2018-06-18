@@ -283,13 +283,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			log.Printf("cannot pack data into sidestream schema: %v\n", err)
 			continue
 		}
-		// Add row to buffer, possibly flushing buffer if it is full.
-		err = ss.inserter.AddRow(ssTest)
-		if err == etl.ErrBufferFull {
-			// Flush asynchronously, to improve throughput.
-			ss.inserter.FlushAsync()
-			err = ss.inserter.AddRow(ssTest)
-		}
+		err = ss.inserter.InsertRow(ssTest)
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				ss.TableName(), "ss", "insert-err").Inc()
