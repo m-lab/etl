@@ -99,11 +99,11 @@ type Parser interface {
 	// Flush flushes any pending rows.
 	Flush() error
 
-	// The name of the table that this Parser inserts into.
+	// TableName of the table that this Parser inserts into.
 	// Used for metrics and logging.
 	TableName() string
 
-	// Full table name of the BQ table that the uploader pushes to,
+	// FullTableName of the BQ table that the uploader pushes to,
 	// including $YYYYMMNN, or _YYYYMMNN
 	FullTableName() string
 

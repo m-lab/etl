@@ -1,4 +1,3 @@
-// Parse Sidestream tests.
 package parser
 
 import (
@@ -19,16 +18,21 @@ import (
 	"github.com/m-lab/etl/web100"
 )
 
+// Parser for parsing sidestream tests.
+
+// SSParser provides a parser implementation for SideStream data.
 type SSParser struct {
 	inserter etl.Inserter
 	etl.RowStats
 }
 
+// NewSSParser creates a new sidestream parser.
 func NewSSParser(ins etl.Inserter) *SSParser {
 	return &SSParser{ins, ins}
 }
 
-// The legacy filename is like  "20170203T00:00:00Z_ALL0.web100"
+// ExtractLogtimeFromFilename extracts the log time.
+// legacy filename is like  "20170203T00:00:00Z_ALL0.web100"
 // The current filename is like "20170315T01:00:00Z_173.205.3.39_0.web100"
 // Return time stamp if the filename is in right format
 func ExtractLogtimeFromFilename(fileName string) (time.Time, error) {
@@ -46,117 +50,130 @@ func ExtractLogtimeFromFilename(fileName string) (time.Time, error) {
 	return t, nil
 }
 
-// the first line of SS test is in format "K: cid PollTime LocalAddress LocalPort ... other_web100_variables_separated_by_space"
+// ParseKHeader parses the first line of SS file, in format "K: cid PollTime LocalAddress LocalPort ... other_web100_variables_separated_by_space"
 func ParseKHeader(header string) ([]string, error) {
-	var var_names []string
-	web100_vars := strings.Split(header, " ")
-	if web100_vars[0] != "K:" {
-		return var_names, errors.New("Corrupted header")
+	var varNames []string
+	web100Vars := strings.Split(header, " ")
+	if web100Vars[0] != "K:" {
+		return varNames, errors.New("Corrupted header")
 	}
 
 	data, err := web100.Asset("tcp-kis.txt")
 	if err != nil {
+		// TODO - convert this panic to something else.
 		panic("tcp-kis.txt not found")
 	}
 	b := bytes.NewBuffer(data)
 
 	mapping, err := web100.ParseWeb100Definitions(b)
+	if err != nil {
+		// TODO - convert this panic to something else.
+		panic("tcp-kis.txt not found")
+	}
 
-	for index, name := range web100_vars {
+	for index, name := range web100Vars {
 		if index == 0 {
 			continue
 		}
 
 		if mapping[name] != "" {
-			var_names = append(var_names, mapping[name])
+			varNames = append(varNames, mapping[name])
 		} else {
-			var_names = append(var_names, name)
+			varNames = append(varNames, name)
 		}
 	}
-	return var_names, nil
+	return varNames, nil
 }
 
+// TaskError return the task level error, based on failed rows, or any other criteria.
 func (ss *SSParser) TaskError() error {
 	return nil
 }
 
+// TableName of the table that this Parser inserts into.
 func (ss *SSParser) TableName() string {
 	return ss.inserter.TableBase()
 }
 
+// FullTableName of the BQ table that the uploader pushes to,
+// including $YYYYMMNN, or _YYYYMMNN
 func (ss *SSParser) FullTableName() string {
 	return ss.inserter.FullTableName()
 }
 
+// Flush flushes any pending rows.
 func (ss *SSParser) Flush() error {
 	return ss.inserter.Flush()
 }
 
-// Prepare data into sidestream BigQeury schema and insert it.
-func PackDataIntoSchema(ss_value map[string]string, log_time time.Time, testName string) (schema.SS, error) {
-	local_port, err := strconv.Atoi(ss_value["LocalPort"])
+// PackDataIntoSchema packs data into sidestream BigQeury schema and buffers it.
+func PackDataIntoSchema(ssValue map[string]string, logTime time.Time, testName string) (schema.SS, error) {
+	localPort, err := strconv.Atoi(ssValue["LocalPort"])
 	if err != nil {
 		return schema.SS{}, err
 	}
-	remote_port, err := strconv.Atoi(ss_value["RemPort"])
+	remotePort, err := strconv.Atoi(ssValue["RemPort"])
 	if err != nil {
 		return schema.SS{}, err
 	}
 
-	conn_spec := &schema.Web100ConnectionSpecification{
-		Local_ip:    ss_value["LocalAddress"],
-		Local_af:    web100.ParseIPFamily(ss_value["LocalAddress"]),
-		Local_port:  int64(local_port),
-		Remote_ip:   ss_value["RemAddress"],
-		Remote_port: int64(remote_port),
+	connSpec := &schema.Web100ConnectionSpecification{
+		Local_ip:    ssValue["LocalAddress"],
+		Local_af:    web100.ParseIPFamily(ssValue["LocalAddress"]),
+		Local_port:  int64(localPort),
+		Remote_ip:   ssValue["RemAddress"],
+		Remote_port: int64(remotePort),
 	}
 
-	AddGeoDataSSConnSpec(conn_spec, log_time)
-	snap, err := PopulateSnap(ss_value)
+	// TODO: Move this annotation
+	//AddGeoDataSSConnSpec(conn_spec, logTime)
+	snap, err := PopulateSnap(ssValue)
 	if err != nil {
 		return schema.SS{}, err
 	}
-	web100_log := &schema.Web100LogEntry{
-		Log_time:        log_time.Unix(),
+	web100Log := &schema.Web100LogEntry{
+		Log_time:        logTime.Unix(), // TODO: Should use timestamp, not integer
 		Version:         "unknown",
-		Group_name:      "read",
-		Connection_spec: *conn_spec,
+		Group_name:      "read", // TODO: Use Camelcase, with json annotations?
+		Connection_spec: *connSpec,
 		Snap:            snap,
 	}
 
-	ss_test := &schema.SS{
+	ssTest := &schema.SS{
 		Test_id:          testName,
-		Log_time:         log_time.Unix(),
+		Log_time:         logTime.Unix(),
 		Type:             int64(1),
 		Project:          int64(2),
-		Web100_log_entry: *web100_log,
+		Web100_log_entry: *web100Log,
 	}
-	return *ss_test, nil
+	return *ssTest, nil
 }
 
-func ParseOneLine(snapshot string, var_names []string) (map[string]string, error) {
+// ParseOneLine parses a single line of sidestream data.
+func ParseOneLine(snapshot string, varNames []string) (map[string]string, error) {
 	value := strings.Split(snapshot, " ")
-	ss_value := make(map[string]string)
-	if value[0] != "C:" || len(value) != len(var_names)+1 {
+	ssValue := make(map[string]string)
+	if value[0] != "C:" || len(value) != len(varNames)+1 {
 		log.Printf("corrupted content:")
 		log.Printf(snapshot)
-		return ss_value, errors.New("corrupted content")
+		return ssValue, errors.New("corrupted content")
 	}
 
 	for index, val := range value[1:] {
 		// Match value with var_name
-		ss_value[var_names[index]] = val
+		ssValue[varNames[index]] = val
 	}
-	return ss_value, nil
+	return ssValue, nil
 }
 
-func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
+// PopulateSnap fills in the snapshot data.
+func PopulateSnap(ssValue map[string]string) (schema.Web100Snap, error) {
 	var snap = &schema.Web100Snap{}
 	var startTimeUsec int64
 
 	// First, extract StartTimeUsec value before all others so we can combine
 	// it with StartTimeStamp below.
-	if valueStr, ok := ss_value["StartTimeUsec"]; ok {
+	if valueStr, ok := ssValue["StartTimeUsec"]; ok {
 		value, err := strconv.ParseInt(valueStr, 10, 64)
 		if err == nil {
 			startTimeUsec = value
@@ -164,7 +181,7 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 	}
 
 	// Process every other snap key.
-	for key := range ss_value {
+	for key := range ssValue {
 		// Skip cid and PollTime. They are SideStream-specific fields, not web100 variables.
 		if key == "cid" || key == "PollTime" {
 			continue
@@ -177,17 +194,17 @@ func PopulateSnap(ss_value map[string]string) (schema.Web100Snap, error) {
 
 		switch x.Type().String() {
 		case "int64":
-			value, err := strconv.ParseInt(ss_value[key], 10, 64)
+			value, err := strconv.ParseInt(ssValue[key], 10, 64)
 			if err != nil {
 				return *snap, err
 			}
 			x.SetInt(value)
 		case "string":
-			x.Set(reflect.ValueOf(ss_value[key]))
+			x.Set(reflect.ValueOf(ssValue[key]))
 		case "bool":
-			if ss_value[key] == "0" {
+			if ssValue[key] == "0" {
 				x.Set(reflect.ValueOf(false))
-			} else if ss_value[key] == "1" {
+			} else if ssValue[key] == "1" {
 				x.Set(reflect.ValueOf(true))
 			} else {
 				return *snap, errors.New("Cannot parse field " + key + " into a valie bool value.")
