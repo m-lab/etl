@@ -34,12 +34,18 @@ func TestJSONParsing(t *testing.T) {
 	uploader := fake.FakeUploader{}
 	ins, err := bq.NewBQInserter(etl.InserterParams{
 		"mlab-sandbox", "dataset", "disco_test", "", 3, 10 * time.Second, time.Second}, &uploader)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var parser etl.Parser = parser.NewDiscoParser(ins)
 
 	meta := map[string]bigquery.Value{"filename": "filename", "parse_time": time.Now()}
 	// Should result in two tests sent to inserter, but no call to uploader.
 	err = parser.ParseAndInsert(meta, "testName", test_data)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if ins.Accepted() != 2 {
 		t.Error("Accepted = ", ins.Accepted())
 		t.Fail()
@@ -47,6 +53,9 @@ func TestJSONParsing(t *testing.T) {
 
 	// Adds two more rows, triggering an upload of 3 rows.
 	err = parser.ParseAndInsert(meta, "testName", test_data)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(uploader.Rows) != 3 {
 		t.Error("Expected 3, got", len(uploader.Rows))
 	}

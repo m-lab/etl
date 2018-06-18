@@ -28,7 +28,7 @@ func TestPopulateSnap(t *testing.T) {
 		t.Fatalf("Snap fields not populated correctly.")
 	}
 
-	if snap.TimeStampRcvd != false {
+	if snap.TimeStampRcvd {
 		t.Errorf("TimeStampRcvd; got %t; want false", snap.TimeStampRcvd)
 	}
 	if snap.RemAddress != "abcd" {
@@ -70,7 +70,9 @@ func TestSSInserter(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if ins.RowsInBuffer() != 6 {
-		t.Fatalf("Number of rows in PT table is wrong.")
+	n.Flush()
+	if ins.Committed() != 6 {
+		t.Fatalf("Expected %d, Got %d.", 6, ins.Committed())
 	}
 }
+

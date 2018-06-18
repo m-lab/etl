@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 
@@ -88,6 +89,9 @@ func TestNDTParser(t *testing.T) {
 	}
 
 	err = n.ParseAndInsert(meta, metaName, metaData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
 	// Nothing should happen (with this parser) until new test group or Flush.
 	if ins.Accepted() != 0 {
 		t.Fatalf("Data processed prematurely.")
@@ -217,6 +221,10 @@ func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100V
 	return match
 }
 
+func assertInserter(in etl.Inserter) {
+	func(in etl.Inserter) {}(&inMemoryInserter{})
+}
+
 type inMemoryInserter struct {
 	data      []interface{}
 	committed int
@@ -228,6 +236,17 @@ func newInMemoryInserter() *inMemoryInserter {
 	return &inMemoryInserter{data, 0, 0}
 }
 
+func (in *inMemoryInserter) Put(data []interface{}) error {
+	in.data = append(in.data, data...)
+	in.committed = len(in.data)
+	return nil
+}
+
+func (in *inMemoryInserter) PutAsync(data []interface{}) {
+	in.data = append(in.data, data...)
+	in.committed = len(in.data)
+}
+
 func (in *inMemoryInserter) InsertRow(data interface{}) error {
 	in.data = append(in.data, data)
 	return nil
@@ -235,13 +254,6 @@ func (in *inMemoryInserter) InsertRow(data interface{}) error {
 func (in *inMemoryInserter) InsertRows(data []interface{}) error {
 	in.data = append(in.data, data...)
 	return nil
-}
-func (in *inMemoryInserter) Put(data []interface{}) error {
-	in.data = append(in.data, data...)
-	return nil
-}
-func (in *inMemoryInserter) PutAsync(data []interface{}) {
-	in.data = append(in.data, data...)
 }
 func (in *inMemoryInserter) Flush() error {
 	in.committed = len(in.data)

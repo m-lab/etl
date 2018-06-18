@@ -12,23 +12,76 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/web100"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Parser for parsing sidestream tests.
 
 // SSParser provides a parser implementation for SideStream data.
+// RowBuffer for SS.
+type RowBuffer struct {
+	bufferSize int
+	rows       []interface{}
+}
+
+// AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
+// Not threadsafe.  Should only be called by owning thread.
+func (buf *RowBuffer) AddRow(row schema.SS) error {
+	for len(buf.rows) >= buf.bufferSize-1 {
+		return etl.ErrBufferFull
+	}
+	buf.rows = append(buf.rows, &row)
+	return nil
+}
+
+func (buf *RowBuffer) TakeRows() []interface{} {
+	res := buf.rows
+	buf.rows = make([]interface{}, 0, buf.bufferSize)
+	return res
+}
+
+func (buf *RowBuffer) Annotate(tableBase string) {
+	metrics.WorkerState.WithLabelValues(tableBase, "annotate").Inc()
+	defer metrics.WorkerState.WithLabelValues(tableBase, "annotate").Dec()
+	if len(buf.rows) == 0 {
+		return
+	}
+
+	ipSlice := make([]string, 2*len(buf.rows))
+	geoSlice := make([]*annotation.GeolocationIP, 2*len(buf.rows))
+	for i := range buf.rows {
+		row := buf.rows[i].(*schema.SS)
+		connSpec := &row.Web100_log_entry.Connection_spec
+		ipSlice[i+i] = connSpec.Local_ip
+		geoSlice[i+i] = &connSpec.Local_geolocation
+		ipSlice[i+i+1] = connSpec.Remote_ip
+		geoSlice[i+i+1] = &connSpec.Remote_geolocation
+	}
+	// Just use the logtime of the first row.
+	logTime := time.Unix(buf.rows[0].(*schema.SS).Web100_log_entry.Log_time, 0)
+	start := time.Now()
+	// TODO - are there any errors we should process from Fetch?
+	annotation.FetchGeoAnnotations(ipSlice, logTime, geoSlice)
+	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": "SS"}).Observe(float64(time.Since(start).Nanoseconds()))
+}
+
+// SSParser contains the elements of a sidestream parser.
 type SSParser struct {
 	inserter etl.Inserter
 	etl.RowStats
+	RowBuffer
 }
 
 // NewSSParser creates a new sidestream parser.
 func NewSSParser(ins etl.Inserter) *SSParser {
-	return &SSParser{ins, ins}
+	bufSize := etl.SS.BQBufferSize()
+	buf := RowBuffer{bufSize, make([]interface{}, 0, bufSize)}
+	return &SSParser{ins, ins, buf}
 }
 
 // ExtractLogtimeFromFilename extracts the log time.
@@ -103,6 +156,7 @@ func (ss *SSParser) FullTableName() string {
 
 // Flush flushes any pending rows.
 func (ss *SSParser) Flush() error {
+	ss.inserter.Put(ss.TakeRows())
 	return ss.inserter.Flush()
 }
 
@@ -283,7 +337,15 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			log.Printf("cannot pack data into sidestream schema: %v\n", err)
 			continue
 		}
-		err = ss.inserter.InsertRow(ssTest)
+
+		// Add row to buffer, possibly flushing buffer if it is full.
+		err = ss.AddRow(ssTest)
+		if err == etl.ErrBufferFull {
+			// Flush asynchronously, to improve throughput.
+			ss.Annotate(ss.inserter.TableBase())
+			ss.inserter.PutAsync(ss.TakeRows())
+			err = ss.AddRow(ssTest)
+		}
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				ss.TableName(), "ss", "insert-err").Inc()
