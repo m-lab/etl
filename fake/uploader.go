@@ -252,8 +252,8 @@ type FakeUploader struct {
 	CallCount int // Number of times Put is called.
 }
 
-func (up *FakeUploader) SetErr(err error) {
-	up.Err = err
+func (u *FakeUploader) SetErr(err error) {
+	u.Err = err
 }
 
 func NewFakeUploader() *FakeUploader {

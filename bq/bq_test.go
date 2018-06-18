@@ -34,6 +34,16 @@ type Item struct {
 	Foobar int `json:"foobar"`
 }
 
+func standardInsertParams(bufferSize int) etl.InserterParams {
+	return etl.InserterParams{
+		Project: "mlab-testing", Dataset: "dataset", Table: "table",
+		Suffix:        "",
+		BufferSize:    bufferSize,
+		PutTimeout:    10 * time.Second,
+		MaxRetryDelay: 1 * time.Second,
+	}
+}
+
 //==================================================================================
 // These tests hit the backend, to verify expected behavior of table creation and
 // access to partitions.  They deliberately have a leading "x" to prevent running
@@ -46,8 +56,9 @@ func xTestRealPartitionInsert(t *testing.T) {
 		Item{Name: tag + "_x0", Count: 17, Foobar: 44},
 		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
 
-	in, err := bq.NewBQInserter(
-		etl.InserterParams{"mlab-testing", "dataset", "test2", "_20160201", 10 * time.Second, 1, 0 * time.Second}, nil)
+	params := standardInsertParams(1)
+	params.Suffix = "_20160201"
+	in, err := bq.NewBQInserter(params, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,9 +84,8 @@ func TestBasicInsert(t *testing.T) {
 		Item{Name: tag + "_x0", Count: 17, Foobar: 44},
 		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
 
-	in, err := bq.NewBQInserter(
-		etl.InserterParams{"mlab-testing", "dataset", "test2", "", 10 * time.Second, 1, 0 * time.Second},
-		fake.NewFakeUploader())
+	params := standardInsertParams(1)
+	in, err := bq.NewBQInserter(params, fake.NewFakeUploader())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,9 +141,7 @@ func TestBufferingAndFlushing(t *testing.T) {
 
 	// Set up an Inserter with a fake Uploader backend for testing.
 	// Buffer 3 rows, so that we can test the buffering.
-	in, err := bq.NewBQInserter(
-		etl.InserterParams{"mlab-testing", "dataset", "test2", "", 10 * time.Second, 3, 0 * time.Second},
-		fake.NewFakeUploader())
+	in, err := bq.NewBQInserter(standardInsertParams(3), fake.NewFakeUploader())
 	if err != nil {
 		log.Printf("%v\n", err)
 		t.Fatal()
@@ -194,9 +202,8 @@ func TestBufferingAndFlushing(t *testing.T) {
 
 // Just manual testing for now - need to assert something useful.
 func TestHandleInsertErrors(t *testing.T) {
-	in, e := bq.NewBQInserter(
-		etl.InserterParams{"mlab-testing", "dataset", "table", "", time.Minute, 5, 0 * time.Second},
-		fake.NewFakeUploader())
+	fakeUploader := fake.NewFakeUploader()
+	in, e := bq.NewBQInserter(standardInsertParams(5), fakeUploader)
 	if e != nil {
 		log.Printf("%v\n", e)
 		t.Fatal()
@@ -210,22 +217,38 @@ func TestHandleInsertErrors(t *testing.T) {
 	// This is a little wierd.  MultiError we receive from insert contain
 	// *bigquery.Error.  So that is what we test here.
 	rie.Errors = append(rie.Errors, &bqe)
+	fakeUploader.SetErr(&rie)
+	in.AddRow(struct{}{})
+	in.Flush()
+	if in.Failed() != 1 {
+		t.Error()
+	}
 
 	var pme bigquery.PutMultiError
 	pme = append(pme, rie)
-	in.(*bq.BQInserter).HandleInsertErrors(pme)
+	fakeUploader.SetErr(&pme)
+	in.AddRow(struct{}{})
+	in.AddRow(struct{}{})
+	in.Flush()
 
+	if fakeUploader.CallCount != 2 {
+		t.Errorf("Expected %d calls, got %d\n", 2, fakeUploader.CallCount)
+	}
+	if len(fakeUploader.Rows) != 0 {
+		t.Errorf("Expected %d rows, got %d\n", 0, len(fakeUploader.Rows))
+	}
+	if in.Failed() != 3 {
+		t.Error()
+	}
 	// TODO - assert something.
 }
 
 func TestQuotaError(t *testing.T) {
-	fakeUploader := fake.NewFakeUploader()
 
 	// Set up an Inserter with a fake Uploader backend for testing.
-	// Buffer 3 rows, so that we can test the buffering.
-	in, e := bq.NewBQInserter(
-		etl.InserterParams{"mlab-testing", "dataset", "table", "", time.Minute, 5, 1 * time.Millisecond},
-		fakeUploader)
+	// Buffer 5 rows, so that we can test the buffering.
+	fakeUploader := fake.NewFakeUploader()
+	in, e := bq.NewBQInserter(standardInsertParams(5), fakeUploader)
 	if e != nil {
 		log.Printf("%v\n", e)
 		t.Fatal()
@@ -281,4 +304,10 @@ func TestQuotaError(t *testing.T) {
 		t.Error("Should have increased Committed to 2: ", in.Committed())
 	}
 
+	if fakeUploader.CallCount != 3 {
+		t.Errorf("Expected %d calls, got %d\n", 3, fakeUploader.CallCount)
+	}
+	if len(fakeUploader.Rows) != 2 {
+		t.Errorf("Expected %d rows, got %d\n", 2, len(fakeUploader.Rows))
+	}
 }
