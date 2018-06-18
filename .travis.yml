@@ -168,7 +168,7 @@ deploy:
     INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
-    && cd $TRAVIS_BUILD_DIR/function/embargo
+    && cd $TRAVIS_BUILD_DIR/functions/embargo
     && gcloud beta functions deploy embargoOnFileNotificationSandbox --stage-bucket=functions-mlab-sandbox --trigger-resource=scraper-mlab-sandbox --project=mlab-sandbox
   skip_cleanup: true
   on:
@@ -242,6 +242,7 @@ deploy:
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    && cd $TRAVIS_BUILD_DIR/functions/embargo
     && gcloud beta functions deploy embargoOnFileNotificationStaging --stage-bucket=functions-mlab-staging --trigger-resource=scraper-mlab-staging --project=mlab-staging
   skip_cleanup: true
   on:
@@ -293,6 +294,7 @@ deploy:
     && INJECTED_PROJECT=measurement-lab
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
+    && cd $TRAVIS_BUILD_DIR/functions/embargo
     && gcloud beta functions deploy embargoOnFileNotificationOti --stage-bucket=functions-mlab-oti --trigger-resource=scraper-mlab-oti --project=mlab-oti
   skip_cleanup: true
   on:
