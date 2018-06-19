@@ -30,7 +30,7 @@ type RowBuffer struct {
 }
 
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
-// Not threadsafe.  Should only be called by owning thread.
+// Not thread-safe.  Should only be called by owning thread.
 func (buf *RowBuffer) AddRow(row schema.SS) error {
 	for len(buf.rows) >= buf.bufferSize-1 {
 		return etl.ErrBufferFull
@@ -39,12 +39,16 @@ func (buf *RowBuffer) AddRow(row schema.SS) error {
 	return nil
 }
 
+// TakeRows returns all rows in the buffer, and clears the buffer.
+// Not thread-safe.  Should only be called by owning thread.
 func (buf *RowBuffer) TakeRows() []interface{} {
 	res := buf.rows
 	buf.rows = make([]interface{}, 0, buf.bufferSize)
 	return res
 }
 
+// Annotate fetches annotations for all rows in the buffer.
+// Not thread-safe.  Should only be called by owning thread.
 func (buf *RowBuffer) Annotate(tableBase string) {
 	metrics.WorkerState.WithLabelValues(tableBase, "annotate").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableBase, "annotate").Dec()
