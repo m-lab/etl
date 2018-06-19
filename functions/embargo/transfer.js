@@ -4,75 +4,19 @@
  * CAUTION: There are subtleties in deploying this, because of our intended
  * separation of sandbox, staging, and production pipelines.
  *
- * This is far from ideal.  Also, beware that doing multiple transfers from
- * scraper-mlab-oti will soon stop working, because we intend for the production
- * transfer function to also DELETE the file from the scraper-mlab-oti source.
- * We just haven't enabled that yet, because we want to be comfortable that
- * there won't be any risk of data loss, and we haven't done the testing yet
- * to ensure that.
- *
  * These functions process fileNotifications from google cloud storage,
  * determine whether a new file needs to be embargoed, and if not, moves
- * the file to the destination bucket.
+ * the file to the destination bucket. Only one function can be registered
+ * to trigger on a bucket operation.
  *
  * The destination bucket is hard coded into different functions, one for each
  * project.  The trigger bucket and the project are both determined by the
  * deployment command.  Tried using projectId to determine destination bucket,
  * but the projectId is not reliably available.
  *
- * To deploy this cloud function to mlab-oti (until we get autodeploy set up):
+ * We should trigger buckets within the same project the function will be deployed
+ * in. The cmds for triggering those functions can be found in README of this dir.
  *
- * // Create the buckets
-   export GCLOUD_PROJECT=mlab-oti
-   gsutil mb -p $GCLOUD_PROJECT archive-$GCLOUD_PROJECT
-   gsutil mb -p $GCLOUD_PROJECT scraper-$GCLOUD_PROJECT
-   gsutil mb -p $GCLOUD_PROJECT functions-$GCLOUD_PROJECT
-   // Deploy the functions.
-   export FN_SUFFIX=${GCLOUD_PROJECT##*-}
-   gcloud beta functions deploy embargoOnFileNotification${FN_SUFFIX^} \
-     --stage-bucket=functions-$GCLOUD_PROJECT \
-     --trigger-bucket=scraper-$GCLOUD_PROJECT \
-     --project=$GCLOUD_PROJECT
-
- * Scraper pushes files into scraper-mlab-oti, but not to corresponding buckets
- * for staging or sandbox.  So staging and sandbox deployments require you to
- * choose what to trigger from.
- * When triggering on any mlab-oti bucket, we MUST NOT delete the file, so
- * please ensure that this will not happen.  (There should be ACLs to prevent
- * this, but please do not rely on them).
- * If we trigger on scraper-mlab-oti, we may miss some files, if they are
- * deleted (by the mlab-oti functions) before we handle them.
- * A simple way to get most of the files that prod is handling is to trigger on
- * archive-mlab-oti, so that the files are copied in a waterfall manner.  However,
- * any embargoed files won't show up in archive-mlab-oti, so use this strategy
- * with caution.
- *
- * // Create the buckets
-   export GCLOUD_PROJECT=mlab-staging
-   gsutil mb -p $GCLOUD_PROJECT archive-$GCLOUD_PROJECT
-   gsutil mb -p $GCLOUD_PROJECT functions-$GCLOUD_PROJECT
-   // Deploy the functions.
-   export FN_SUFFIX=${GCLOUD_PROJECT##*-}
-   gcloud beta functions deploy embargoOnFileNotification${FN_SUFFIX^} \
-     --stage-bucket=functions-$GCLOUD_PROJECT \
-     --trigger-bucket=scraper-mlab-oti \
-     --project=$GCLOUD_PROJECT
-
- * Or for sandbox, also triggering by files appearing in scraper-mlab-oti:
- *
- * // Create the buckets
-   export GCLOUD_PROJECT=mlab-sandbox
-   gsutil mb -p $GCLOUD_PROJECT archive-$GCLOUD_PROJECT
-   gsutil mb -p $GCLOUD_PROJECT functions-$GCLOUD_PROJECT
-   // Deploy the functions.
-   export FN_SUFFIX=${GCLOUD_PROJECT##*-}
-   gcloud beta functions deploy embargoOnFileNotification${FN_SUFFIX^} \
-     --stage-bucket=functions-$GCLOUD_PROJECT \
-     --trigger-bucket=scraper-mlab-oti \
-     --project=$GCLOUD_PROJECT
-
- * Alternatively, it might be more desireable to create another sandbox bucket,
- * designate it as the trigger source, and use file transfers to populate it.
  */
 
 'use strict';
