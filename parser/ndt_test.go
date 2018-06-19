@@ -236,15 +236,16 @@ func (in *inMemoryInserter) InsertRows(data []interface{}) error {
 	in.data = append(in.data, data...)
 	return nil
 }
-func (in *inMemoryInserter) AddRow(data interface{}) error {
-	in.data = append(in.data, data)
+func (in *inMemoryInserter) Put(data []interface{}) error {
+	in.data = append(in.data, data...)
 	return nil
+}
+func (in *inMemoryInserter) PutAsync(data []interface{}) {
+	in.data = append(in.data, data...)
 }
 func (in *inMemoryInserter) Flush() error {
 	in.committed = len(in.data)
 	return nil
-}
-func (in *inMemoryInserter) FlushAsync() {
 }
 func (in *inMemoryInserter) TableBase() string {
 	return "ndt_test"

@@ -153,25 +153,16 @@ type BQInserter struct {
 	// but released by the flusher goroutine.
 	token chan struct{} // Token required for metric updates.
 
+	// TODO: Consider making some of these atomics?
 	pending  int // Number of rows being flushed.
 	inserted int // Number of rows successfully inserted.
 	badRows  int // Number of row failures, including rows in full failures.
 	failures int // Number of complete insert failures.
 }
 
-// AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
-// Not threadsafe.  Should only be called by owning thread.
-func (in *BQInserter) AddRow(data interface{}) error {
-	for len(in.rows) >= in.params.BufferSize-1 {
-		return etl.ErrBufferFull
-	}
-	in.rows = append(in.rows, data)
-	return nil
-}
-
 // Caller should check error, and take appropriate action before calling again.
 // Not threadsafe.  Should only be called by owning thread.
-// Deprecated:  Please use AddRow and FlushAsync instead.
+// Deprecated:  Please use external buffer, Put, and PutAsync instead.
 func (in *BQInserter) InsertRow(data interface{}) error {
 	return in.InsertRows([]interface{}{data})
 }
@@ -204,7 +195,7 @@ func (in *BQInserter) maybeCountRowSize(data []interface{}) {
 
 // Caller should check error, and take appropriate action before calling again.
 // Not threadsafe.  Should only be called by owning thread.
-// Deprecated:  Please use AddRow and FlushAsync instead.
+// Deprecated:  Please use external buffer, Put, and PutAsync instead.
 func (in *BQInserter) InsertRows(data []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "insert").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "insert").Dec()
@@ -292,9 +283,39 @@ func (in *BQInserter) release() {
 	in.token <- struct{}{} // return the token.
 }
 
+// Put sends a slice of rows to BigQuery, processes any
+// errors, and updates row stats. It uses a token to serialize with any previous
+// calls to PutAsync, to ensure that when Put() returns, all flushes
+// have completed and row stats reflect PutAsync requests.  (Of course races
+// may occur if calls are made from multiple goroutines).
+// It is THREAD-SAFE.
+// It may block if there is already a Put or Flush in progress.
+func (in *BQInserter) Put(rows []interface{}) error {
+	in.acquire()
+	err := in.flushSlice(rows)
+	in.release()
+	return err
+}
+
+// PutAsync asynchronously sends a slice of rows to BigQuery, processes any
+// errors, and updates row stats. It uses a token to serialize with other
+// (likely synchronous) calls, to ensure that when Put() returns, all flushes
+// have completed and row stats reflect PutAsync requests.  (Of course races
+// may occur if these are called from multiple goroutines).
+// It is THREAD-SAFE.
+// It may block if there is already a Put or Flush in progress.
+func (in *BQInserter) PutAsync(rows []interface{}) {
+	in.acquire()
+	go func() {
+		in.flushSlice(rows)
+		in.release()
+	}()
+}
+
 // Flush synchronously flushes the rows in the row buffer up to BigQuery
 // It is NOT threadsafe, as it touches the row buffer, so should only be called
 // by the owning thread.
+// Deprecated:  Please use external buffer, Put, and PutAsync instead.
 func (in *BQInserter) Flush() error {
 	rows := in.rows
 	// Allocate new slice of rows.  Any failed rows are lost.
@@ -305,23 +326,8 @@ func (in *BQInserter) Flush() error {
 	return err
 }
 
-// FlushAsync asynchronously flushes the rows in the row buffer up to BigQuery.
-// It is NOT threadsafe, as it touches the row buffer, so should only be called
-// by the owning thread.
-// It may block if there is already a flush in progress.
-func (in *BQInserter) FlushAsync() {
-	rows := in.rows
-	// Allocate new slice of rows.  Any failed rows are lost.
-	in.rows = make([]interface{}, 0, in.params.BufferSize)
-	in.acquire()
-	go func() {
-		in.flushSlice(rows)
-		in.release()
-	}()
-}
-
 // flushSlice flushes a slice of rows to BigQuery.
-// It is NOT threadsafe, and should only be called by Flush or FlushAsync.
+// It is NOT threadsafe, and should only be called by Flush.
 func (in *BQInserter) flushSlice(rows []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Dec()
