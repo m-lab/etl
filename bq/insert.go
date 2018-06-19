@@ -283,8 +283,12 @@ func (in *BQInserter) release() {
 	in.token <- struct{}{} // return the token.
 }
 
-// Put sends a slice of rows to BigQuery.
-// It is THREADSAFE.
+// Put sends a slice of rows to BigQuery, processes any
+// errors, and updates row stats. It uses a token to serialize with any previous
+// calls to PutAsync, to ensure that when Put() returns, all flushes
+// have completed and row stats reflect PutAsync requests.  (Of course races
+// may occur if calls are made from multiple goroutines).
+// It is THREAD-SAFE.
 // It may block if there is already a Put or Flush in progress.
 func (in *BQInserter) Put(rows []interface{}) error {
 	in.acquire()
@@ -293,8 +297,12 @@ func (in *BQInserter) Put(rows []interface{}) error {
 	return err
 }
 
-// PutAsync asynchronously sends a slice of rows to BigQuery.
-// It is THREADSAFE.
+// PutAsync asynchronously sends a slice of rows to BigQuery, processes any
+// errors, and updates row stats. It uses a token to serialize with other
+// (likely synchronous) calls, to ensure that when Put() returns, all flushes
+// have completed and row stats reflect PutAsync requests.  (Of course races
+// may occur if these are called from multiple goroutines).
+// It is THREAD-SAFE.
 // It may block if there is already a Put or Flush in progress.
 func (in *BQInserter) PutAsync(rows []interface{}) {
 	in.acquire()
