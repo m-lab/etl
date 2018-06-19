@@ -28,23 +28,27 @@ type RowStats interface {
 // Inserters should provide the invariants:
 //   After Flush() returns, RowsInBuffer == 0
 type Inserter interface {
+	// Put synchronously sends a slice of rows to BigQuery
+	// This is THREADSAFE
+	Put(rows []interface{}) error
+	// PutAsync asynchronously sends a slice of rows to BigQuery.
+	// It is THREADSAFE.
+	// It may block if there is already a Put (or Flush) in progress.
+	// To synchronize following PutAsync, call one of the stats functions,
+	// e.g. Commited() or Failed()
+	PutAsync(rows []interface{})
+
 	// InsertRow inserts one row into the insert buffer.
 	// Deprecated:  Please use AddRow and FlushAsync instead.
 	InsertRow(data interface{}) error
 	// InsertRows inserts multiple rows into the insert buffer.
 	// Deprecated:  Please use AddRow and FlushAsync instead.
 	InsertRows(data []interface{}) error
+
 	// Flush flushes any rows in the buffer out to bigquery.
 	// This is synchronous - on return, rows should be committed.
+        // Deprecated:  Please use external buffer, Put, and PutAsync instead.
 	Flush() error
-
-	// AddRow adds a single row to the output buffer.  It
-	// may return ErrBufferFull, but does not trigger flushes.
-	AddRow(data interface{}) error
-	// FlushAsync does an asynchronous buffer flush using
-	// another goroutine.  It may block if another flush is in
-	// progress.
-	FlushAsync()
 
 	// Base Table name of the BQ table that the uploader pushes to.
 	TableBase() string
