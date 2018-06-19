@@ -22,7 +22,6 @@ import (
 
 // Parser for parsing sidestream tests.
 
-// SSParser provides a parser implementation for SideStream data.
 // RowBuffer for SS.
 type RowBuffer struct {
 	bufferSize int
@@ -74,7 +73,7 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": "SS"}).Observe(float64(time.Since(start).Nanoseconds()))
 }
 
-// SSParser contains the elements of a sidestream parser.
+// SSParser provides a parser implementation for SideStream data.
 type SSParser struct {
 	inserter etl.Inserter
 	etl.RowStats
