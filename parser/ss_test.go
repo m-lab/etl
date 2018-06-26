@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"testing"
+	"time"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/schema"
 )
 
 func TestExtractLogtimeFromFilename(t *testing.T) {
@@ -62,11 +65,14 @@ func TestParseOneLine(t *testing.T) {
 func TestSSInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
 	n := parser.NewSSParser(ins)
-	rawData, err := ioutil.ReadFile("testdata/20170203T00:00:00Z_ALL0.web100")
+	filename := "testdata/20170203T00:00:00Z_ALL0.web100"
+	rawData, err := ioutil.ReadFile(filename)
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
 	}
-	err = n.ParseAndInsert(nil, "testdata/20170203T00:00:00Z_ALL0.web100", rawData)
+
+	meta := map[string]bigquery.Value{"filename": filename}
+	err = n.ParseAndInsert(meta, filename, rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -74,5 +80,16 @@ func TestSSInserter(t *testing.T) {
 	if ins.Committed() != 6 {
 		t.Fatalf("Expected %d, Got %d.", 6, ins.Committed())
 	}
-}
 
+	if len(ins.data) < 1 {
+		t.Fatal("Should have at least one inserted row")
+	}
+	inserted := ins.data[0].(*schema.SS)
+	if inserted.ParseTime.After(time.Now()) {
+		t.Error("Should have inserted parse_time")
+	}
+	if inserted.TaskFileName != filename {
+		t.Error("Should have correct filename", filename, "!=", inserted.TaskFileName)
+	}
+
+}
