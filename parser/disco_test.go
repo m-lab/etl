@@ -40,7 +40,7 @@ func TestJSONParsing(t *testing.T) {
 
 	var parser etl.Parser = parser.NewDiscoParser(ins)
 
-	meta := map[string]bigquery.Value{"filename": "filename", "parse_time": time.Now()}
+	meta := map[string]bigquery.Value{"filename": "fake-filename.tar", "parse_time": time.Now()}
 	// Should result in two tests sent to inserter, but no call to uploader.
 	err = parser.ParseAndInsert(meta, "testName", test_data)
 	if err != nil {
@@ -75,11 +75,25 @@ func TestJSONParsing(t *testing.T) {
 	if len(uploader.Rows) != 3 {
 		t.Error("Expected 3, got", len(uploader.Rows))
 	}
+	if len(uploader.Rows[0].Row["sample"].([]bigquery.Value)) != 1 {
+		t.Error("Expected 1, got", len(uploader.Rows[0].Row["sample"].([]bigquery.Value)))
+	}
+	if uploader.Rows[0].Row["task_filename"].(string) != "fake-filename.tar" {
+		t.Error("task_filename incorrect: Expected 'fake-filename.tar', got",
+			uploader.Rows[0].Row["task_filename"].(string))
+	}
+	if uploader.Rows[0].Row["test_id"].(string) != "testName" {
+		t.Error("task_filename incorrect: Expected 'testName', got",
+			uploader.Rows[0].Row["test_id"].(string))
+	}
 
 	if err != nil {
-		log.Printf("%v\n", uploader.Request)
-		log.Printf("%d Rows\n", len(uploader.Rows))
-		log.Printf("%v\n", uploader.Rows[0])
+		log.Printf("Request: %v\n", uploader.Request)
+		log.Printf("Rows Len: %d\n", len(uploader.Rows))
+		if len(uploader.Rows) > 0 {
+			log.Printf("Rows[0]: %v\n", uploader.Rows[0])
+			log.Printf("Rows[0]['sample']: %v\n", len(uploader.Rows[0].Row["sample"].([]bigquery.Value)))
+		}
 		t.Error(err)
 	}
 }
