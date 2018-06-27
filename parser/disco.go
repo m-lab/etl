@@ -62,21 +62,20 @@ func (dp *DiscoParser) IsParsable(testName string, data []byte) (string, bool) {
 func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "switch").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "switch").Dec()
-	meta["testname"] = testName
-	ms := schema.Meta{
-		FileName:  meta["filename"].(string),
-		TestName:  meta["testname"].(string),
-		ParseTime: meta["parse_time"].(time.Time).Unix(),
-	}
 
 	rdr := bytes.NewReader(test)
 	dec := json.NewDecoder(rdr)
 	rowCount := 0
 
 	for dec.More() {
-		var stats schema.SwitchStats
-		stats.Meta = ms
-		err := dec.Decode(&stats)
+		stats := schema.SwitchStats{
+			TaskFilename: meta["filename"].(string),
+			TestID:       testName,
+			ParseTime:    meta["parse_time"].(time.Time).Unix(),
+			// TODO: original archive "log_time" is unknown.
+		}
+		tmp := schema.SwitchStats{}
+		err := dec.Decode(&tmp)
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				dp.TableName(), "disco", "Decode").Inc()
@@ -84,6 +83,13 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 			return err
 		}
 		rowCount++
+
+		// By design, the raw data time range starts and ends on the hour. This means
+		// that the raw dataset inclues 361 time bins (360 + 1 extra). Originally,
+		// this was so the last sample of the current time range would overlap with
+		// the first sample of the next time range. However, this parser does not use
+		// the extra sample, so we unconditionally ignore it here.
+		stats.Sample = tmp.Sample[:len(tmp.Sample)-1]
 
 		// Count the number of samples per record.
 		metrics.DeltaNumFieldsHistogram.WithLabelValues(
