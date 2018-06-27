@@ -180,11 +180,12 @@ type Web100LogEntry struct {
 }
 
 type SS struct {
-	Test_id      string    `json:"test_id,string"`
-	Project      int64     `json:"project,int64"`
-	Log_time     int64     `json:"log_time,int64"`
-	ParseTime    time.Time `bigquery:"parse_time"`
-	TaskFileName string    `bigquery:"task_filename"`
+	Test_id       string    `json:"test_id,string"`
+	Project       int64     `json:"project,int64"`
+	Log_time      int64     `json:"log_time,int64"`
+	ParseTime     time.Time `bigquery:"parse_time"`
+	ParserVersion string    `bigquery:parser_version`
+	TaskFileName  string    `bigquery:"task_filename"`
 
 	Type             int64          `json:"type,int64"`
 	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"log"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -20,7 +21,24 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var gParserVersion string
+
+func initParserVersion() {
+	release, ok := os.LookupEnv("RELEASE_TAG")
+	if ok && release != "empty_tag" {
+		gParserVersion = "https://github.com/m-lab/etl/tree/" + release
+	} else {
+		hash := os.Getenv("COMMIT_HASH")
+		if len(hash) >= 8 {
+			gParserVersion = "https://github.com/m-lab/etl/tree/" + hash[0:8]
+		}
+	}
+}
+
 // Parser for parsing sidestream tests.
+func init() {
+	initParserVersion()
+}
 
 // RowBuffer for SS.
 type RowBuffer struct {
@@ -342,6 +360,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 
 		ssTest.ParseTime = time.Now() // for map, use string(time.Now().MarshalText())
+		ssTest.ParserVersion = gParserVersion
 		if meta["filename"] != nil {
 			ssTest.TaskFileName = meta["filename"].(string)
 		}

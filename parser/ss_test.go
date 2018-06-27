@@ -3,6 +3,7 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -63,6 +64,9 @@ func TestParseOneLine(t *testing.T) {
 }
 
 func TestSSInserter(t *testing.T) {
+	os.Setenv("RELEASE_TAG", "foobar")
+	parser.InitParserVersionForTest()
+
 	ins := &inMemoryInserter{}
 	n := parser.NewSSParser(ins)
 	filename := "testdata/20170203T00:00:00Z_ALL0.web100"
@@ -92,4 +96,7 @@ func TestSSInserter(t *testing.T) {
 		t.Error("Should have correct filename", filename, "!=", inserted.TaskFileName)
 	}
 
+	if inserted.ParserVersion != "https://github.com/m-lab/etl/tree/foobar" {
+		t.Error("ParserVersion not properly set")
+	}
 }
