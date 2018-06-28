@@ -342,6 +342,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 
 		ssTest.ParseTime = time.Now() // for map, use string(time.Now().MarshalText())
+		ssTest.ParserVersion = Version()
 		if meta["filename"] != nil {
 			ssTest.TaskFileName = meta["filename"].(string)
 		}
