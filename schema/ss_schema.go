@@ -184,7 +184,7 @@ type SS struct {
 	Project       int64     `json:"project,int64"`
 	Log_time      int64     `json:"log_time,int64"`
 	ParseTime     time.Time `bigquery:"parse_time"`
-	ParserVersion string    `bigquery:parser_version`
+	ParserVersion string    `bigquery:"parser_version"`
 	TaskFileName  string    `bigquery:"task_filename"`
 
 	Type             int64          `json:"type,int64"`
