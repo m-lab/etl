@@ -69,9 +69,10 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 
 	for dec.More() {
 		stats := schema.SwitchStats{
-			TaskFilename: meta["filename"].(string),
-			TestID:       testName,
-			ParseTime:    meta["parse_time"].(time.Time).Unix(),
+			TaskFilename:  meta["filename"].(string),
+			TestID:        testName,
+			ParseTime:     time.Now().Unix(),
+			ParserVersion: Version(),
 			// TODO: original archive "log_time" is unknown.
 		}
 		tmp := schema.SwitchStats{}
