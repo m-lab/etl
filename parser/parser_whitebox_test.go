@@ -5,6 +5,6 @@ package parser
 
 // InitParserVersionForTest allows tests to rerun initParserVersion after initializing
 // environment variables.
-func InitParserVersionForTest() {
-	initParserVersion()
-}
+// See https://groups.google.com/forum/#!topic/golang-nuts/v1TXLIRZjv4 and
+// https://golang.org/src/net/http/export_test.go
+var InitParserVersionForTest = initParserVersion
