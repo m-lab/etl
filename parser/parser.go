@@ -11,7 +11,6 @@ import (
 	"github.com/m-lab/etl/metrics"
 )
 
-// Parser for parsing sidestream tests.
 func init() {
 	initParserVersion()
 }
@@ -27,6 +26,8 @@ func initParserVersion() {
 		hash := os.Getenv("COMMIT_HASH")
 		if len(hash) >= 8 {
 			gParserVersion = "https://github.com/m-lab/etl/tree/" + hash[0:8]
+		} else {
+			gParserVersion = "local development"
 		}
 	}
 }

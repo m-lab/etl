@@ -20,6 +20,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Parser for parsing sidestream tests.
+
 // RowBuffer for SS.
 type RowBuffer struct {
 	bufferSize int
