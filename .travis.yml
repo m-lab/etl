@@ -146,6 +146,18 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == qp-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
+## Service: cloud function -- AppEngine Flexible Environment.
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && cd $TRAVIS_BUILD_DIR/functions
+    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox --trigger-resource=archive-mlab-sandbox --project=mlab-sandbox
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == cf-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+    
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
@@ -242,6 +254,8 @@ deploy:
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    && cd $TRAVIS_BUILD_DIR/functions
+    && gcloud beta functions deploy createStagingTaskOnFileNotification --stage-bucket=functions-mlab-staging --trigger-resource=archive-mlab-staging --project=mlab-staging
     && cd $TRAVIS_BUILD_DIR/functions/embargo
     && gcloud beta functions deploy embargoOnFileNotificationStaging --stage-bucket=functions-mlab-staging --trigger-resource=scraper-mlab-staging --project=mlab-staging
   skip_cleanup: true
@@ -255,6 +269,21 @@ deploy:
 #  Should be used AFTER code review, commit to integration, and staging soak.
 #  Triggers when *ANY* branch is tagged with one of these tags'
 ######################################################################
+
+## Service: cloud function -- AppEngine Flexible Environment.
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && cd $TRAVIS_BUILD_DIR/functions
+    && gcloud beta functions deploy createProdTaskOnFileNotification --stage-bucket=functions-mlab-oti --trigger-resource=archive-mlab-oti --project=mlab-oti
+    && cd $TRAVIS_BUILD_DIR/functions/embargo
+    && gcloud beta functions deploy embargoOnFileNotificationOti --stage-bucket=functions-mlab-oti --trigger-resource=scraper-mlab-oti --project=mlab-oti
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == cf-prod-* || $TRAVIS_BRANCH == prod-*
+
 
 ###################### SMALLER ETL SERVICES ###############################
 # Deploys smaller production services: PT, SS, DISCO
@@ -294,8 +323,6 @@ deploy:
     && INJECTED_PROJECT=measurement-lab
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
-    && cd $TRAVIS_BUILD_DIR/functions/embargo
-    && gcloud beta functions deploy embargoOnFileNotificationOti --stage-bucket=functions-mlab-oti --trigger-resource=scraper-mlab-oti --project=mlab-oti
   skip_cleanup: true
   on:
     repo: m-lab/etl
