@@ -140,14 +140,24 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/queue_pusher
-    && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox -trigger-resource=archive-mlab-sandbox --project=mlab-sandbox
   skip_cleanup: true
   on:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_BRANCH == qp-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
+## Service: cloud function -- AppEngine Flexible Environment.
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && cd $TRAVIS_BUILD_DIR/functions
+    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox -trigger-resource=archive-mlab-sandbox --project=mlab-sandbox
+  skip_cleanup: true  
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == cf-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+    
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
@@ -158,8 +168,6 @@ deploy:
     && INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
-    && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox -trigger-resource=archive-mlab-sandbox --project=mlab-sandbox
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -172,8 +180,6 @@ deploy:
     INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
-    && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox -trigger-resource=archive-mlab-sandbox --project=mlab-sandbox
     && cd $TRAVIS_BUILD_DIR/functions/embargo
     && gcloud beta functions deploy embargoOnFileNotificationSandbox --stage-bucket=functions-mlab-sandbox --trigger-resource=scraper-mlab-sandbox --project=mlab-sandbox
   skip_cleanup: true
@@ -188,8 +194,6 @@ deploy:
     INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
-    && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox -trigger-resource=archive-mlab-sandbox --project=mlab-sandbox
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -202,8 +206,6 @@ deploy:
     INJECTED_PROJECT=mlab-sandbox
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
-    && cd $TRAVIS_BUILD_DIR/functions/embargo
-    && gcloud beta functions deploy embargoOnFileNotificationSandbox --stage-bucket=functions-mlab-sandbox --trigger-resource=scraper-mlab-sandbox --project=mlab-sandbox
   skip_cleanup: true
   on:
     repo: m-lab/etl
