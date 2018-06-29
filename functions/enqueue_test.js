@@ -22,6 +22,7 @@ describe("queueForFile", function () {
     assert.isOk(enqueue.queueForFile("ndt/2008/07/12/blah.tgz"));
     assert.isOk(enqueue.queueForFile("sidestream/2008/07/12/blah.tgz"));
     assert.isOk(enqueue.queueForFile("paris-traceroute/2008/07/12/blah.tgz"));
+    assert.isOk(enqueue.queueForFile("switch/2018/07/12/blah.tgz"));
   });
 });
 
