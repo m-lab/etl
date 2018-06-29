@@ -151,7 +151,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox -trigger-resource=archive-mlab-sandbox --project=mlab-sandbox
+    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox --trigger-resource=archive-mlab-sandbox --project=mlab-sandbox
   skip_cleanup: true  
   on:
     repo: m-lab/etl
