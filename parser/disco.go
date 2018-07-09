@@ -92,6 +92,11 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 		// the extra sample, so we unconditionally ignore it here.
 		stats.Sample = tmp.Sample[:len(tmp.Sample)-1]
 
+		// Copy remaining fields.
+		stats.Metric = tmp.Metric
+		stats.Hostname = tmp.Hostname
+		stats.Experiment = tmp.Experiment
+
 		// Count the number of samples per record.
 		metrics.DeltaNumFieldsHistogram.WithLabelValues(
 			dp.TableName()).Observe(float64(len(stats.Sample)))

@@ -86,6 +86,18 @@ func TestJSONParsing(t *testing.T) {
 		t.Error("task_filename incorrect: Expected 'testName', got",
 			uploader.Rows[0].Row["test_id"].(string))
 	}
+	if uploader.Rows[0].Row["metric"].(string) != "switch.multicast.local.rx" {
+		t.Error("task_filename incorrect: Expected 'switch.multicast.local.rx', got",
+			uploader.Rows[0].Row["metric"].(string))
+	}
+	if uploader.Rows[0].Row["hostname"].(string) != "mlab1.sea05.measurement-lab.org" {
+		t.Error("task_filename incorrect: Expected 'mlab1.sea05.measuremet-lab.org', got",
+			uploader.Rows[0].Row["hostname"].(string))
+	}
+	if uploader.Rows[0].Row["experiment"].(string) != "s1.sea05.measurement-lab.org" {
+		t.Error("task_filename incorrect: Expected 's1.sea05.measuremet-lab.org', got",
+			uploader.Rows[0].Row["experiment"].(string))
+	}
 
 	if err != nil {
 		log.Printf("Request: %v\n", uploader.Request)
