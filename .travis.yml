@@ -157,7 +157,7 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_BRANCH == cf-sandbox-* || $TRAVIS_BRANCH == sandbox-*
-    
+
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
@@ -282,7 +282,7 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == cf-prod-* || $TRAVIS_BRANCH == prod-*
+    condition: $TRAVIS_BRANCH == cf-prod-* || $TRAVIS_BRANCH == ndt-prod-* || $TRAVIS_BRANCH == prod-*
 
 
 ###################### SMALLER ETL SERVICES ###############################
