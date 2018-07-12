@@ -90,7 +90,9 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 		// this was so the last sample of the current time range would overlap with
 		// the first sample of the next time range. However, this parser does not use
 		// the extra sample, so we unconditionally ignore it here.
-		stats.Sample = tmp.Sample[:len(tmp.Sample)-1]
+		if len(tmp.Sample) > 0 {
+			stats.Sample = tmp.Sample[:len(tmp.Sample)-1]
+		}
 
 		// Copy remaining fields.
 		stats.Metric = tmp.Metric
