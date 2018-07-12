@@ -151,8 +151,10 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox --trigger-resource=archive-mlab-sandbox --project=mlab-sandbox
-    && gcloud beta functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox --trigger-resource=embargo-mlab-sandbox --project=mlab-sandbox
+    && gcloud beta functions deploy createSandboxTaskOnFileNotification --project=mlab-sandbox\
+     --stage-bucket=functions-mlab-sandbox --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-sandbox
+    && gcloud beta functions deploy createSandboxTaskOnFileNotification --project=mlab-sandbox\
+     --stage-bucket=functions-mlab-sandbox --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-sandbox
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -182,7 +184,8 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && cd $TRAVIS_BUILD_DIR/functions/embargo
-    && gcloud beta functions deploy embargoOnFileNotificationSandbox --stage-bucket=functions-mlab-sandbox --trigger-resource=scraper-mlab-sandbox --project=mlab-sandbox
+    && gcloud beta functions deploy embargoOnFileNotificationSandbox --project=mlab-sandbox\
+     --stage-bucket=functions-mlab-sandbox --trigger-event=providers/cloud.storage/eventTypes/object.change--trigger-resource=scraper-mlab-sandbox
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -256,10 +259,13 @@ deploy:
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
     && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud beta functions deploy createStagingTaskOnFileNotification --stage-bucket=functions-mlab-staging --trigger-resource=archive-mlab-staging --project=mlab-staging
-    && gcloud beta functions deploy createStagingTaskOnFileNotification --stage-bucket=functions-mlab-staging --trigger-resource=embargo-mlab-staging --project=mlab-staging
+    && gcloud beta functions deploy createStagingTaskOnFileNotification --project=mlab-staging\
+     --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-staging
+    && gcloud beta functions deploy createStagingTaskOnFileNotification --project=mlab-staging\
+     --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-staging
     && cd $TRAVIS_BUILD_DIR/functions/embargo
-    && gcloud beta functions deploy embargoOnFileNotificationStaging --stage-bucket=functions-mlab-staging --trigger-resource=scraper-mlab-staging --project=mlab-staging
+    && gcloud beta functions deploy embargoOnFileNotificationStaging --project=mlab-staging\
+     --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=scraper-mlab-staging
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -277,10 +283,13 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud beta functions deploy createProdTaskOnFileNotification --stage-bucket=functions-mlab-oti --trigger-resource=archive-mlab-oti --project=mlab-oti
-    && gcloud beta functions deploy createProdTaskOnFileNotification --stage-bucket=functions-mlab-oti --trigger-resource=embargo-mlab-oti --project=mlab-oti
+    && gcloud beta functions deploy createProdTaskOnFileNotification --project=mlab-oti\
+     --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-oti
+    && gcloud beta functions deploy createProdTaskOnFileNotification --project=mlab-oti\
+     --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-oti
     && cd $TRAVIS_BUILD_DIR/functions/embargo
-    && gcloud beta functions deploy embargoOnFileNotificationOti --stage-bucket=functions-mlab-oti --trigger-resource=scraper-mlab-oti --project=mlab-oti
+    && gcloud beta functions deploy embargoOnFileNotificationOti --project=mlab-oti\
+     --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=scraper-mlab-oti
   skip_cleanup: true
   on:
     repo: m-lab/etl
