@@ -95,3 +95,7 @@ exports.createProdTaskOnFileNotification = function (event, callback) {
         callback();
     }
 };
+
+exports.createSandboxTaskOnEmbargoFileNotification = exports.createSandboxTaskOnFileNotification
+exports.createStagingTaskOnEmbargoFileNotification = exports.createStagingTaskOnFileNotification
+exports.createProdTaskOnEmbargoFileNotification = exports.createProdTaskOnFileNotification

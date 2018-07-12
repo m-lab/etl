@@ -153,7 +153,7 @@ deploy:
     && cd $TRAVIS_BUILD_DIR/functions
     && gcloud beta functions deploy createSandboxTaskOnFileNotification --project=mlab-sandbox\
      --stage-bucket=functions-mlab-sandbox --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-sandbox
-    && gcloud beta functions deploy createSandboxTaskOnFileNotification --project=mlab-sandbox\
+    && gcloud beta functions deploy createSandboxTaskOnEmbargoFileNotification --project=mlab-sandbox\
      --stage-bucket=functions-mlab-sandbox --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-sandbox
   skip_cleanup: true
   on:
@@ -261,7 +261,7 @@ deploy:
     && cd $TRAVIS_BUILD_DIR/functions
     && gcloud beta functions deploy createStagingTaskOnFileNotification --project=mlab-staging\
      --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-staging
-    && gcloud beta functions deploy createStagingTaskOnFileNotification --project=mlab-staging\
+    && gcloud beta functions deploy createStagingTaskOnEmbargoFileNotification --project=mlab-staging\
      --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-staging
     && cd $TRAVIS_BUILD_DIR/functions/embargo
     && gcloud beta functions deploy embargoOnFileNotificationStaging --project=mlab-staging\
@@ -285,7 +285,7 @@ deploy:
     && cd $TRAVIS_BUILD_DIR/functions
     && gcloud beta functions deploy createProdTaskOnFileNotification --project=mlab-oti\
      --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-oti
-    && gcloud beta functions deploy createProdTaskOnFileNotification --project=mlab-oti\
+    && gcloud beta functions deploy createProdTaskOnEmbargoFileNotification --project=mlab-oti\
      --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-oti
     && cd $TRAVIS_BUILD_DIR/functions/embargo
     && gcloud beta functions deploy embargoOnFileNotificationOti --project=mlab-oti\
