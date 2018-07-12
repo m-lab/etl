@@ -185,7 +185,7 @@ deploy:
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && cd $TRAVIS_BUILD_DIR/functions/embargo
     && gcloud beta functions deploy embargoOnFileNotificationSandbox --project=mlab-sandbox\
-     --stage-bucket=functions-mlab-sandbox --trigger-event=providers/cloud.storage/eventTypes/object.change--trigger-resource=scraper-mlab-sandbox
+     --stage-bucket=functions-mlab-sandbox --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=scraper-mlab-sandbox
   skip_cleanup: true
   on:
     repo: m-lab/etl
