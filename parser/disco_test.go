@@ -23,7 +23,7 @@ var test_data []byte = []byte(
 	"metric": "switch.multicast.local.rx",
 	"hostname": "mlab4.sea05.measurement-lab.org",
 	"experiment": "s1.sea05.measurement-lab.org"}
-	{"sample": [{"timestamp": 69870, "value": 0.0}, {"timestamp": 69880, "value": 0.0}],
+	{"sample": [],
 	"metric": "switch.multicast.local.rx",
 	"hostname": "mlab1.sea05.measurement-lab.org",
 	"experiment": "s1.sea05.measurement-lab.org"}`)
@@ -75,7 +75,8 @@ func TestJSONParsing(t *testing.T) {
 	if len(uploader.Rows) != 3 {
 		t.Error("Expected 3, got", len(uploader.Rows))
 	}
-	if len(uploader.Rows[0].Row["sample"].([]bigquery.Value)) != 1 {
+
+	if uploader.Rows[0].Row["sample"] != nil && len(uploader.Rows[0].Row["sample"].([]bigquery.Value)) != 1 {
 		t.Error("Expected 1, got", len(uploader.Rows[0].Row["sample"].([]bigquery.Value)))
 	}
 	if uploader.Rows[0].Row["task_filename"].(string) != "fake-filename.tar" {
