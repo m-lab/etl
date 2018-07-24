@@ -127,10 +127,11 @@ type TCPInfoProto struct {
 	RwndLimited   int64 `protobuf:"varint,45,opt,name=rwnd_limited,json=rwndLimited,proto3" json:"rwnd_limited,omitempty"`
 	SndbufLimited int64 `protobuf:"varint,46,opt,name=sndbuf_limited,json=sndbufLimited,proto3" json:"sndbuf_limited,omitempty"`
 }
+
 type TCPDiagnosticsProto struct {
 	InetDiagMsg *InetDiagMsgProto `protobuf:"bytes,1,opt,name=inet_diag_msg,json=inetDiagMsg,proto3" json:"inet_diag_msg,omitempty"`
 	// From INET_DIAG_PROTOCOL message.
-	//DiagProtocol tcp.Protocol `protobuf:"varint,2,opt,name=diag_protocol,json=diagProtocol,proto3,enum=Protocol" json:"diag_protocol,omitempty"`
+	DiagProtocol tcp.Protocol `protobuf:"varint,2,opt,name=diag_protocol,json=diagProtocol,proto3,enum=Protocol" json:"diag_protocol,omitempty"`
 	// From INET_DIAG_CONG message.
 	CongestionAlgorithm string `protobuf:"bytes,3,opt,name=congestion_algorithm,json=congestionAlgorithm,proto3" json:"congestion_algorithm,omitempty"`
 	// The following three are mutually exclusive, as they provide
@@ -142,9 +143,9 @@ type TCPDiagnosticsProto struct {
 	//	*TCPDiagnosticsProto_BbrInfo
 	//CcInfo isTCPDiagnosticsProto_CcInfo `protobuf_oneof:"cc_info"`
 	// Data obtained from INET_DIAG_SKMEMINFO.
-	//SocketMem *tcp.SocketMemInfoProto `protobuf:"bytes,7,opt,name=socket_mem,json=socketMem,proto3" json:"socket_mem,omitempty"`
+	SocketMem *tcp.SocketMemInfoProto `protobuf:"bytes,7,opt,name=socket_mem,json=socketMem,proto3" json:"socket_mem,omitempty"`
 	// Data obtained from INET_DIAG_MEMINFO.
-	//MemInfo *tcp.MemInfoProto `protobuf:"bytes,8,opt,name=mem_info,json=memInfo,proto3" json:"mem_info,omitempty"`
+	MemInfo *tcp.MemInfoProto `protobuf:"bytes,8,opt,name=mem_info,json=memInfo,proto3" json:"mem_info,omitempty"`
 	// Data obtained from struct tcp_info.
 	TcpInfo *TCPInfoProto `protobuf:"bytes,9,opt,name=tcp_info,json=tcpInfo,proto3" json:"tcp_info,omitempty"`
 	// If there is shutdown info, this is the mask value.
@@ -179,6 +180,7 @@ func TestProtoParsing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// TODO just use a StructSaver directly?
 	pMap, err := fake.StructToMap(reflect.ValueOf(protos[0]), schema)
 	if err != nil {
 		t.Fatal(err)
