@@ -17,7 +17,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
-	tcpinfo "github.com/m-lab/tcp-info/nl-proto"
+	tcp "github.com/m-lab/tcp-info/nl-proto"
 )
 
 // RowBuffer for tcpinfo.
@@ -69,7 +69,7 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 			ipSlice[i+i+1] = connSpec.Remote_ip
 			geoSlice[i+i+1] = &connSpec.Remote_geolocation
 		}
-	case *tcpinfo.TCPDiagnosticsProto:
+	case *tcp.TCPDiagnosticsProto:
 	default:
 	}
 
@@ -80,8 +80,8 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 }
 
 // ReadAll reads and marshals all protobufs from a Reader.
-func ReadAll(rdr io.Reader) ([]tcpinfo.TCPDiagnosticsProto, error) {
-	var result []tcpinfo.TCPDiagnosticsProto
+func ReadAll(rdr io.Reader) ([]tcp.TCPDiagnosticsProto, error) {
+	var result []tcp.TCPDiagnosticsProto
 
 	byteRdr := bufio.NewReader(rdr)
 	bufSize := 100
@@ -104,7 +104,7 @@ func ReadAll(rdr io.Reader) ([]tcpinfo.TCPDiagnosticsProto, error) {
 			return nil, errors.New("corrupted protobuf file")
 		}
 
-		pb := tcpinfo.TCPDiagnosticsProto{}
+		pb := tcp.TCPDiagnosticsProto{}
 		proto.Unmarshal(buf, &pb)
 		result = append(result, pb)
 		rowBuf.AddRow(&pb)
