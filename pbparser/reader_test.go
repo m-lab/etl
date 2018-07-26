@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/golang/protobuf/jsonpb"
@@ -57,14 +58,14 @@ type TCPDiagnosticsProto struct {
 	// Shutdown isTCPDiagnosticsProto_Shutdown `protobuf_oneof:"shutdown"`
 	ShutdownMask uint32
 	// Timestamp of batch of messages containing this message.
-	Timestamp int64 `protobuf:"varint,11,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Timestamp time.Time `protobuf:"varint,11,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 }
 
 func removeXXX(schema bigquery.Schema) bigquery.Schema {
 	result := make([]*bigquery.FieldSchema, 0, len(schema))
 	for i := range schema {
-		log.Println(i, schema[i].Name)
 		if !strings.HasPrefix(schema[i].Name, "XXX_") {
+			log.Println(i, schema[i].Name, schema[i].Type)
 			if schema[i].Type == bigquery.RecordFieldType {
 				schema[i].Schema = removeXXX(schema[i].Schema)
 			}
