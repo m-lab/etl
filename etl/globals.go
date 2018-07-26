@@ -186,6 +186,7 @@ const (
 	SS              = DataType("sidestream")
 	PT              = DataType("traceroute")
 	SW              = DataType("switch")
+	TCPINFO         = DataType("tcp_info")
 	INVALID         = DataType("invalid")
 )
 
@@ -197,6 +198,7 @@ var (
 		"sidestream":       SS,
 		"paris-traceroute": PT,
 		"switch":           SW,
+		"tcpinfo":          TCPINFO,
 	}
 
 	// DataTypeToTable maps from data type to BigQuery table name.
@@ -217,6 +219,7 @@ var (
 		SS:              500, // Average json size is 2.5K
 		PT:              300,
 		SW:              100,
+		TCPINFO:         100,
 		INVALID:         0,
 	}
 	// There is also a mapping of data types to queue names in
