@@ -125,24 +125,6 @@ func ReadAll(rdr io.Reader) ([]tcp.TCPDiagnosticsProto, error) {
 }
 
 type TCPDiagnosticsProto struct {
-	InetDiagMsg *tcp.InetDiagMsgProto `protobuf:"bytes,1,opt,name=inet_diag_msg,json=inetDiagMsg,proto3" json:"inet_diag_msg,omitempty"`
-	// From INET_DIAG_PROTOCOL message.
-	DiagProtocol tcp.Protocol `protobuf:"varint,2,opt,name=diag_protocol,json=diagProtocol,proto3,enum=Protocol" json:"diag_protocol,omitempty"`
-	// From INET_DIAG_CONG message.
-	CongestionAlgorithm string `protobuf:"bytes,3,opt,name=congestion_algorithm,json=congestionAlgorithm,proto3" json:"congestion_algorithm,omitempty"`
-	// The following three are mutually exclusive, as they provide
-	// data from different congestion control strategies.
-	//
-	// Types that are valid to be assigned to CcInfo:
-	//	*TCPDiagnosticsProto_Vegas
-	//	*TCPDiagnosticsProto_Dctcp
-	//	*TCPDiagnosticsProto_BbrInfo
-	//CcInfo isTCPDiagnosticsProto_CcInfo `protobuf_oneof:"cc_info"`
-	// Data obtained from INET_DIAG_SKMEMINFO.
-	SocketMem *tcp.SocketMemInfoProto `protobuf:"bytes,7,opt,name=socket_mem,json=socketMem,proto3" json:"socket_mem,omitempty"`
-	// Data obtained from INET_DIAG_MEMINFO.
-	MemInfo *tcp.MemInfoProto `protobuf:"bytes,8,opt,name=mem_info,json=memInfo,proto3" json:"mem_info,omitempty"`
-	// Data obtained from struct tcp_info.
 	TcpInfo *tcp.TCPInfoProto `protobuf:"bytes,9,opt,name=tcp_info,json=tcpInfo,proto3" json:"tcp_info,omitempty"`
 	// If there is shutdown info, this is the mask value.
 	// Check has_shutdown_mask to determine whether present.
@@ -160,24 +142,79 @@ type InfoWrapper struct {
 	tcp.TCPDiagnosticsProto
 }
 
+func add(name string, row map[string]bigquery.Value, pstruct interface{}) error {
+	schema, err := bigquery.InferSchema(pstruct)
+	if err != nil {
+		return err
+	}
+	schema = removeXXX(schema)
+	ss := bigquery.StructSaver{Schema: schema, InsertID: "", Struct: pstruct}
+	row[name], _, err = ss.Save()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Save implements the ValueSaver.Save() method.
 func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, err error) {
 	// Assemble the full map by examining each top level field.
 	row = make(map[string]bigquery.Value, 10)
-	var schema bigquery.Schema
-	if iw.InetDiagMsg != nil {
-		schema, err = bigquery.InferSchema(*iw.InetDiagMsg)
-		if err != nil {
-			return
-		}
-		schema = removeXXX(schema)
-		ss := bigquery.StructSaver{Schema: schema, InsertID: "", Struct: *iw.InetDiagMsg}
-		row["InetDiagMsg"], _, err = ss.Save()
-		if err != nil {
-			return
-		}
+
+	err = add("InetDiagMsg", row, iw.InetDiagMsg)
+	if err != nil {
+		log.Println(err)
+		return
 	}
 
+	if iw.DiagProtocol != tcp.Protocol_IPPROTO_UNUSED {
+		row["DiagProtocol"] = iw.DiagProtocol
+	}
+
+	if iw.CongestionAlgorithm != "" {
+		row["CongestionAlgorithm"] = iw.CongestionAlgorithm
+	}
+
+	switch iw.CcInfo.(type) {
+	case *tcp.TCPDiagnosticsProto_BbrInfo:
+		err = add("BBR", row, iw.CcInfo)
+	case *tcp.TCPDiagnosticsProto_Dctcp:
+		err = add("DCTCP", row, iw.CcInfo)
+	case *tcp.TCPDiagnosticsProto_Vegas:
+		err = add("VEGAS", row, iw.CcInfo)
+	default:
+	}
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	//	*TCPDiagnosticsProto_ShutdownMask
+	err = add("SocketMem", row, iw.SocketMem)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = add("MemInfo", row, iw.MemInfo)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = add("MemInfo", row, iw.MemInfo)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = add("TCPInfo", row, iw.TcpInfo)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	row["timestamp"] = time.Now()
 	return
 }
 

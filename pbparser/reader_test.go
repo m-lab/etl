@@ -43,7 +43,7 @@ func TestProtoParsing(t *testing.T) {
 		t.Error("Should be 17 messages", len(protos))
 	}
 
-	row, _, _ := pbparser.InfoWrapper{protos[0]}.Save()
+	row, _, _ := pbparser.InfoWrapper{TCPDiagnosticsProto: protos[0]}.Save()
 	log.Println(row)
 
 	log.Fatal("foo")
