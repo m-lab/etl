@@ -61,6 +61,16 @@ type TCPDiagnosticsProto struct {
 	Timestamp time.Time `protobuf:"varint,11,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 }
 
+// InfoWrapper that implements ValueSaver
+type InfoWrapper struct {
+	tcp.TCPDiagnosticsProto
+}
+
+// Save implements the ValueSaver.Save() method.
+func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, err error) {
+	return nil, "", nil
+}
+
 func removeXXX(schema bigquery.Schema) bigquery.Schema {
 	result := make([]*bigquery.FieldSchema, 0, len(schema))
 	for i := range schema {
