@@ -1,9 +1,11 @@
 package pbparser_test
 
 import (
+	"context"
 	"log"
 	"testing"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/m-lab/etl/pbparser"
 	"github.com/m-lab/tcp-info/zstd"
@@ -55,5 +57,21 @@ func TestProtoParsing(t *testing.T) {
 		}
 		log.Println(string(str))
 		log.Println(protos[i])
+	}
+}
+
+func TestMakeTable(t *testing.T) {
+	schema, err := pbparser.BuildSchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	client, err := bigquery.NewClient(ctx, "mlab-testing")
+	dataset := client.Dataset("gfr")
+	table := dataset.Table("tcpinfo")
+
+	if err := table.Create(ctx, &bigquery.TableMetadata{Schema: schema}); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -124,19 +124,6 @@ func ReadAll(rdr io.Reader) ([]tcp.TCPDiagnosticsProto, error) {
 	return result, nil
 }
 
-type TCPDiagnosticsProto struct {
-	TcpInfo *tcp.TCPInfoProto `protobuf:"bytes,9,opt,name=tcp_info,json=tcpInfo,proto3" json:"tcp_info,omitempty"`
-	// If there is shutdown info, this is the mask value.
-	// Check has_shutdown_mask to determine whether present.
-	//
-	// Types that are valid to be assigned to Shutdown:
-	//	*TCPDiagnosticsProto_ShutdownMask
-	// Shutdown isTCPDiagnosticsProto_Shutdown `protobuf_oneof:"shutdown"`
-	ShutdownMask uint32
-	// Timestamp of batch of messages containing this message.
-	Timestamp time.Time `protobuf:"varint,11,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-}
-
 // InfoWrapper that implements ValueSaver
 type InfoWrapper struct {
 	tcp.TCPDiagnosticsProto
@@ -154,6 +141,69 @@ func add(name string, row map[string]bigquery.Value, pstruct interface{}) error 
 		return err
 	}
 	return nil
+}
+
+func addSchema(name string, outer *bigquery.Schema, pstruct interface{}) error {
+	schema, err := bigquery.InferSchema(pstruct)
+	if err != nil {
+		return err
+	}
+	schema = removeXXX(schema)
+	*outer = append(*outer, &bigquery.FieldSchema{Name: name, Schema: schema, Type: bigquery.RecordFieldType})
+	return nil
+}
+
+// BuildSchema creates the full TCPInfo bigquery schema
+func BuildSchema() (bigquery.Schema, error) {
+	schema := bigquery.Schema{}
+
+	err := addSchema("InetDiagMsg", &schema, tcp.InetDiagMsgProto{})
+	if err != nil {
+		log.Println(err)
+		return schema, err
+	}
+
+	schema = append(schema, &bigquery.FieldSchema{Name: "DiagProtocol", Type: bigquery.IntegerFieldType})
+	schema = append(schema, &bigquery.FieldSchema{Name: "CongestionAlgorithm", Type: bigquery.StringFieldType})
+
+	err = addSchema("BBR", &schema, tcp.TCPDiagnosticsProto_BbrInfo{})
+	if err != nil {
+		log.Println(err)
+		return schema, err
+	}
+	err = addSchema("DCTCP", &schema, tcp.TCPDiagnosticsProto_Dctcp{})
+	if err != nil {
+		log.Println(err)
+		return schema, err
+	}
+	err = addSchema("VEGAS", &schema, tcp.TCPDiagnosticsProto_Vegas{})
+	if err != nil {
+		log.Println(err)
+		return schema, err
+	}
+
+	err = addSchema("SocketMem", &schema, tcp.SocketMemInfoProto{})
+	if err != nil {
+		log.Println(err)
+		return schema, err
+	}
+
+	err = addSchema("MemInfo", &schema, tcp.MemInfoProto{})
+	if err != nil {
+		log.Println(err)
+		return schema, err
+	}
+
+	err = addSchema("TCPInfo", &schema, tcp.TCPInfoProto{})
+	if err != nil {
+		log.Println(err)
+		return schema, err
+	}
+
+	schema = append(schema, &bigquery.FieldSchema{Name: "Shutdown", Type: bigquery.IntegerFieldType})
+	schema = append(schema, &bigquery.FieldSchema{Name: "Timestamp", Type: bigquery.DateTimeFieldType})
+
+	return schema, nil
 }
 
 // Save implements the ValueSaver.Save() method.
@@ -214,7 +264,12 @@ func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, er
 		return
 	}
 
-	row["timestamp"] = time.Now()
+	shutdown := iw.GetShutdownMask()
+	if shutdown != 0 {
+		row["Shutdown"] = shutdown
+	}
+
+	row["Timestamp"] = time.Unix(0, iw.Timestamp)
 	return
 }
 
@@ -230,12 +285,4 @@ func removeXXX(schema bigquery.Schema) bigquery.Schema {
 		}
 	}
 	return result
-}
-
-func GetSchema() (bigquery.Schema, error) {
-	schema, err := bigquery.InferSchema(TCPDiagnosticsProto{})
-	if err != nil {
-		return bigquery.Schema{}, err
-	}
-	return removeXXX(schema), nil
 }
