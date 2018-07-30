@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/golang/protobuf/jsonpb"
@@ -71,7 +72,35 @@ func TestMakeTable(t *testing.T) {
 	dataset := client.Dataset("gfr")
 	table := dataset.Table("tcpinfo")
 
-	if err := table.Create(ctx, &bigquery.TableMetadata{Schema: schema}); err != nil {
+	if err := table.Create(ctx, &bigquery.TableMetadata{Schema: schema, TimePartitioning: &bigquery.TimePartitioning{}}); err != nil {
+		t.Error(err)
+	}
+
+	source := "testdata/20180607Z153856.193U00000000L2620:0:1003:415:b33e:9d6a:81bf:87a1:36032R2607:f8b0:400d:c0d::81:5034_00000.zst"
+	log.Println("Reading messages from", source)
+	rdr := zstd.NewReader(source)
+	startRead := time.Now()
+	protos, err := pbparser.ReadAll(rdr)
+	log.Println("Read", time.Now().Sub(startRead)/17)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(protos) != 17 {
+		t.Error("Should be 17 messages", len(protos))
+	}
+
+	u := table.Uploader()
+	start := time.Now()
+	err = u.Put(ctx, pbparser.InfoWrapper{TCPDiagnosticsProto: protos[0]})
+	log.Println(time.Now().Sub(start))
+	if err != nil {
+		e := err.(bigquery.PutMultiError)
+		if e != nil {
+			for i := range e {
+				log.Println(e[i])
+			}
+		}
 		t.Fatal(err)
 	}
 }

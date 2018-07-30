@@ -83,6 +83,7 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 }
 
 // ReadAll reads and marshals all protobufs from a Reader.
+// Maybe about 120 usec per record, not counting storage latency (for 17 rows, local workstation)
 func ReadAll(rdr io.Reader) ([]tcp.TCPDiagnosticsProto, error) {
 	var result []tcp.TCPDiagnosticsProto
 
@@ -112,14 +113,6 @@ func ReadAll(rdr io.Reader) ([]tcp.TCPDiagnosticsProto, error) {
 		result = append(result, pb)
 		rowBuf.AddRow(&pb)
 	}
-
-	/*
-		inserter, err := bq.NewInserter(etl.TCPINFO, time.Now())
-		log.Println(inserter)
-		if err != nil {
-			log.Fatal("foobar")
-		}
-		inserter.PutAsync(rowBuf.TakeRows()) */
 
 	return result, nil
 }
@@ -207,8 +200,10 @@ func BuildSchema() (bigquery.Schema, error) {
 }
 
 // Save implements the ValueSaver.Save() method.
+// Benchmark - about 1 msec.
 func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, err error) {
 	// Assemble the full map by examining each top level field.
+	start := time.Now()
 	row = make(map[string]bigquery.Value, 10)
 
 	err = add("InetDiagMsg", row, iw.InetDiagMsg)
@@ -269,7 +264,8 @@ func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, er
 		row["Shutdown"] = shutdown
 	}
 
-	row["Timestamp"] = time.Unix(0, iw.Timestamp)
+	//row["Timestamp"] = float64(iw.Timestamp) / 1E9
+	log.Println(time.Now().Sub(start))
 	return
 }
 
