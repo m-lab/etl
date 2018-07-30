@@ -2,11 +2,9 @@ package pbparser_test
 
 import (
 	"log"
-	"reflect"
 	"testing"
 
 	"github.com/golang/protobuf/jsonpb"
-	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/pbparser"
 	"github.com/m-lab/tcp-info/zstd"
 )
@@ -45,30 +43,8 @@ func TestProtoParsing(t *testing.T) {
 		t.Error("Should be 17 messages", len(protos))
 	}
 
-	// This is a bit of a hack to get a bigquery compatible schema.
-	schema, err := pbparser.GetSchema()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// TODO just use a StructSaver directly?
-	if true {
-		row, _, _ := pbparser.InfoWrapper{protos[0]}.Save()
-		log.Println(row)
-
-	} else {
-		pMap, err := fake.StructToMap(reflect.ValueOf(protos[0]), schema)
-		if err != nil {
-			t.Fatal(err)
-		}
-		log.Println(pMap)
-
-		pMap, err = fake.StructToMap(reflect.ValueOf(protos[1]), schema)
-		if err != nil {
-			t.Fatal(err)
-		}
-		log.Println(pMap)
-	}
+	row, _, _ := pbparser.InfoWrapper{protos[0]}.Save()
+	log.Println(row)
 
 	log.Fatal("foo")
 	marshaler := jsonpb.Marshaler{EnumsAsInts: true, Indent: "  ", OrigName: true}
