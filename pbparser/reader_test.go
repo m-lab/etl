@@ -72,7 +72,7 @@ func TestMakeTable(t *testing.T) {
 	dataset := client.Dataset("gfr")
 	table := dataset.Table("tcpinfo")
 
-	if err := table.Create(ctx, &bigquery.TableMetadata{Schema: schema, TimePartitioning: &bigquery.TimePartitioning{}}); err != nil {
+	if err = table.Create(ctx, &bigquery.TableMetadata{Schema: schema, TimePartitioning: &bigquery.TimePartitioning{}}); err != nil {
 		t.Error(err)
 	}
 
@@ -90,17 +90,19 @@ func TestMakeTable(t *testing.T) {
 		t.Error("Should be 17 messages", len(protos))
 	}
 
-	u := table.Uploader()
-	start := time.Now()
-	err = u.Put(ctx, pbparser.InfoWrapper{TCPDiagnosticsProto: protos[0]})
-	log.Println(time.Now().Sub(start))
-	if err != nil {
-		e := err.(bigquery.PutMultiError)
-		if e != nil {
-			for i := range e {
-				log.Println(e[i])
+	for i := range protos {
+		u := table.Uploader()
+		start := time.Now()
+		err = u.Put(ctx, pbparser.InfoWrapper{TCPDiagnosticsProto: protos[i]})
+		log.Println(time.Now().Sub(start))
+		if err != nil {
+			e := err.(bigquery.PutMultiError)
+			if e != nil {
+				for i := range e {
+					log.Println(e[i])
+				}
 			}
+			t.Error(err)
 		}
-		t.Fatal(err)
 	}
 }
