@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/golang/protobuf/jsonpb"
 	"github.com/m-lab/etl/pbparser"
 	"github.com/m-lab/tcp-info/zstd"
 )
@@ -48,17 +47,6 @@ func TestProtoParsing(t *testing.T) {
 
 	row, _, _ := pbparser.InfoWrapper{TCPDiagnosticsProto: protos[0]}.Save()
 	log.Println(row)
-
-	log.Fatal("foo")
-	marshaler := jsonpb.Marshaler{EnumsAsInts: true, Indent: "  ", OrigName: true}
-	for i := range protos {
-		str, err := marshaler.MarshalToString(&protos[i])
-		if err != nil {
-			t.Fatal(err)
-		}
-		log.Println(string(str))
-		log.Println(protos[i])
-	}
 }
 
 func TestMakeTable(t *testing.T) {
@@ -72,10 +60,18 @@ func TestMakeTable(t *testing.T) {
 	dataset := client.Dataset("gfr")
 	table := dataset.Table("tcpinfo")
 
+	if err = table.Delete(ctx); err != nil {
+		t.Error(err)
+	}
+
 	if err = table.Create(ctx, &bigquery.TableMetadata{Schema: schema, TimePartitioning: &bigquery.TimePartitioning{}}); err != nil {
 		t.Error(err)
 	}
 
+}
+
+func TestUploadData(t *testing.T) {
+	//        "testdata/20180717Z144141.694U00148024L100.101.230.223:53464R35.226.80.19:443_00000.zst"
 	source := "testdata/20180607Z153856.193U00000000L2620:0:1003:415:b33e:9d6a:81bf:87a1:36032R2607:f8b0:400d:c0d::81:5034_00000.zst"
 	log.Println("Reading messages from", source)
 	rdr := zstd.NewReader(source)
@@ -90,10 +86,15 @@ func TestMakeTable(t *testing.T) {
 		t.Error("Should be 17 messages", len(protos))
 	}
 
+	ctx := context.Background()
+	client, err := bigquery.NewClient(ctx, "mlab-testing")
+	dataset := client.Dataset("gfr")
+	table := dataset.Table("tcpinfo")
+
 	for i := range protos {
 		u := table.Uploader()
 		start := time.Now()
-		err = u.Put(ctx, pbparser.InfoWrapper{TCPDiagnosticsProto: protos[i]})
+		err = u.Put(ctx, pbparser.InfoWrapper{TCPDiagnosticsProto: protos[i], TaskFilename: source})
 		log.Println(time.Now().Sub(start))
 		if err != nil {
 			e := err.(bigquery.PutMultiError)

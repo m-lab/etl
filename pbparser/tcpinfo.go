@@ -120,7 +120,7 @@ func ReadAll(rdr io.Reader) ([]tcp.TCPDiagnosticsProto, error) {
 // InfoWrapper that implements ValueSaver
 type InfoWrapper struct {
 	tcp.TCPDiagnosticsProto
-	schema *bigquery.Schema
+	TaskFilename string
 }
 
 // GetStructMap infers schema, removes XXX_ fields, and returns complete map.
@@ -151,6 +151,10 @@ func addSchema(name string, outer *bigquery.Schema, pstruct interface{}) error {
 // Used only for creating table in TestMakeTable()
 func BuildSchema() (bigquery.Schema, error) {
 	schema := bigquery.Schema{}
+	schema = append(schema, &bigquery.FieldSchema{Name: "test_id", Type: bigquery.StringFieldType})
+	schema = append(schema, &bigquery.FieldSchema{Name: "task_filename", Type: bigquery.StringFieldType})
+	schema = append(schema, &bigquery.FieldSchema{Name: "parse_time", Type: bigquery.TimestampFieldType})
+	schema = append(schema, &bigquery.FieldSchema{Name: "log_time", Type: bigquery.TimestampFieldType})
 
 	err := addSchema("InetDiagMsg", &schema, tcp.InetDiagMsgProto{})
 	if err != nil {
@@ -161,17 +165,17 @@ func BuildSchema() (bigquery.Schema, error) {
 	schema = append(schema, &bigquery.FieldSchema{Name: "DiagProtocol", Type: bigquery.IntegerFieldType})
 	schema = append(schema, &bigquery.FieldSchema{Name: "CongestionAlgorithm", Type: bigquery.StringFieldType})
 
-	err = addSchema("BBR", &schema, tcp.TCPDiagnosticsProto_BbrInfo{})
+	err = addSchema("Bbr", &schema, tcp.TCPDiagnosticsProto_BbrInfo{}.BbrInfo)
 	if err != nil {
 		log.Println(err)
 		return schema, err
 	}
-	err = addSchema("DCTCP", &schema, tcp.TCPDiagnosticsProto_Dctcp{})
+	err = addSchema("Dctcp", &schema, tcp.TCPDiagnosticsProto_Dctcp{}.Dctcp)
 	if err != nil {
 		log.Println(err)
 		return schema, err
 	}
-	err = addSchema("VEGAS", &schema, tcp.TCPDiagnosticsProto_Vegas{})
+	err = addSchema("Vegas", &schema, tcp.TCPDiagnosticsProto_Vegas{}.Vegas)
 	if err != nil {
 		log.Println(err)
 		return schema, err
@@ -196,7 +200,6 @@ func BuildSchema() (bigquery.Schema, error) {
 	}
 
 	schema = append(schema, &bigquery.FieldSchema{Name: "Shutdown", Type: bigquery.IntegerFieldType})
-	schema = append(schema, &bigquery.FieldSchema{Name: "Timestamp", Type: bigquery.TimestampFieldType})
 
 	return schema, nil
 }
@@ -207,6 +210,10 @@ func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, er
 	// Assemble the full map by examining each top level field.
 	start := time.Now()
 	row = make(map[string]bigquery.Value, 10)
+
+	row["task_filename"] = iw.TaskFilename
+	row["log_time"] = time.Unix(0, iw.Timestamp)
+	row["parse_time"] = time.Now().Unix()
 
 	row["InetDiagMsg"], err = GetStructMap(iw.InetDiagMsg)
 	if err != nil {
@@ -224,12 +231,16 @@ func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, er
 
 	switch iw.CcInfo.(type) {
 	case *tcp.TCPDiagnosticsProto_BbrInfo:
-		row["BBR"], err = GetStructMap(iw.CcInfo)
+		// TODO - verify that these actually work.
+		row["Bbr"], err = GetStructMap(iw.GetBbrInfo())
 	case *tcp.TCPDiagnosticsProto_Dctcp:
-		row["DCTCP"], err = GetStructMap(iw.CcInfo)
+		row["Dctcp"], err = GetStructMap(iw.GetDctcp())
 	case *tcp.TCPDiagnosticsProto_Vegas:
-		row["VEGAS"], err = GetStructMap(iw.CcInfo)
+		row["Vegas"], err = GetStructMap(iw.GetVegas())
 	default:
+		row["Bbr"], err = GetStructMap(tcp.BBRInfoProto{})
+		row["Dctcp"], err = GetStructMap(tcp.DCTCPInfoProto{})
+		row["Vegas"], err = GetStructMap(tcp.TCPVegasInfoProto{})
 	}
 	if err != nil {
 		log.Println(err)
@@ -260,8 +271,6 @@ func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, er
 		row["Shutdown"] = shutdown
 	}
 
-	//row["Timestamp"] = civil.DateTimeOf(time.Unix(0, iw.Timestamp))
-	row["Timestamp"] = time.Unix(0, iw.Timestamp)
 	log.Println(time.Now().Sub(start))
 	return
 }
