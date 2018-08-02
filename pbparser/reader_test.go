@@ -50,18 +50,18 @@ func TestProtoParsing(t *testing.T) {
 }
 
 func TestMakeTable(t *testing.T) {
-	schema, err := pbparser.BuildSchema()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx := context.Background()
 	client, err := bigquery.NewClient(ctx, "mlab-testing")
 	dataset := client.Dataset("gfr")
 	table := dataset.Table("tcpinfo")
 
 	if err = table.Delete(ctx); err != nil {
-		t.Error(err)
+		log.Println(err)
+	}
+
+	schema, err := pbparser.BuildSchema()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if err = table.Create(ctx, &bigquery.TableMetadata{Schema: schema, TimePartitioning: &bigquery.TimePartitioning{}}); err != nil {

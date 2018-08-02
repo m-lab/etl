@@ -186,7 +186,7 @@ const (
 	SS              = DataType("sidestream")
 	PT              = DataType("traceroute")
 	SW              = DataType("switch")
-	TCPINFO         = DataType("tcp_info")
+	TCPINFO         = DataType("tcpinfo")
 	INVALID         = DataType("invalid")
 )
 
@@ -208,6 +208,7 @@ var (
 		SS:      "sidestream",
 		PT:      "traceroute",
 		SW:      "switch",
+		TCPINFO: "tcpinfo",
 		INVALID: "invalid",
 	}
 
@@ -219,7 +220,7 @@ var (
 		SS:              500, // Average json size is 2.5K
 		PT:              300,
 		SW:              100,
-		TCPINFO:         100,
+		TCPINFO:         500,
 		INVALID:         0,
 	}
 	// There is also a mapping of data types to queue names in
@@ -242,7 +243,12 @@ func (dt DataType) BigqueryProject() string {
 	if project != "" {
 		return project
 	}
-	return os.Getenv("GCLOUD_PROJECT")
+	project = os.Getenv("GCLOUD_PROJECT")
+	// For production, all datatypes except SS write to tables in measurement-lab.
+	if project == "mlab-oti" && dt != TCPINFO {
+		return "measurement-lab"
+	}
+	return project
 }
 
 // Dataset returns the appropriate dataset to use.
@@ -252,6 +258,12 @@ func (dt DataType) Dataset() string {
 	if dataset != "" {
 		return dataset
 	}
+
+	// For now these must be private, as they contain embargoed data.
+	if dt == TCPINFO {
+		return "private"
+	}
+
 	if IsBatchService() {
 		return "batch"
 	}

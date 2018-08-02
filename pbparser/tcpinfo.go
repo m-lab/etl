@@ -149,6 +149,7 @@ func addSchema(name string, outer *bigquery.Schema, pstruct interface{}) error {
 
 // BuildSchema creates the full TCPInfo bigquery schema
 // Used only for creating table in TestMakeTable()
+// TODO - create an appropriate struct, and just use InferSchema and removeXXX
 func BuildSchema() (bigquery.Schema, error) {
 	schema := bigquery.Schema{}
 	schema = append(schema, &bigquery.FieldSchema{Name: "test_id", Type: bigquery.StringFieldType})
