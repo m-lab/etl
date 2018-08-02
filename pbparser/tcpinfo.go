@@ -5,10 +5,13 @@ package pbparser
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
 	"log"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -80,6 +83,123 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 	// TODO - are there any errors we should process from Fetch?
 	annotation.FetchGeoAnnotations(ipSlice, logTime, geoSlice)
 	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": "SS"}).Observe(float64(time.Since(start).Nanoseconds()))
+}
+
+type TCPInfoParser struct {
+	inserter etl.Inserter
+	etl.RowStats
+	RowBuffer
+}
+
+// NewSSParser creates a new sidestream parser.
+func NewTCPInfoParser(ins etl.Inserter) *TCPInfoParser {
+	bufSize := etl.SS.BQBufferSize()
+	buf := RowBuffer{bufSize, make([]interface{}, 0, bufSize)}
+	return &TCPInfoParser{ins, ins, buf}
+}
+
+// TaskError return the task level error, based on failed rows, or any other criteria.
+func (tip *TCPInfoParser) TaskError() error {
+	return nil
+}
+
+// TableName of the table that this Parser inserts into.
+func (tip *TCPInfoParser) TableName() string {
+	return tip.inserter.TableBase()
+}
+
+// FullTableName of the BQ table that the uploader pushes to,
+// including $YYYYMMNN, or _YYYYMMNN
+func (tip *TCPInfoParser) FullTableName() string {
+	return tip.inserter.FullTableName()
+}
+
+// Flush flushes any pending rows.
+func (tip *TCPInfoParser) Flush() error {
+	tip.inserter.Put(tip.TakeRows())
+	return tip.inserter.Flush()
+}
+
+// IsParsable returns the canonical test type and whether to parse data.
+func (tip *TCPInfoParser) IsParsable(testName string, data []byte) (string, bool) {
+	// TODO
+	return "tcpinfo", true
+}
+
+// NewByteReader creates a reader piped through external zstd process reading from byte array.
+// Read from returned pipe
+// Close pipe when done
+func NewByteReader(raw []byte) io.ReadCloser {
+	pipeR, pipeW, err := os.Pipe()
+	if err != nil {
+		// TODO - should return error to caller.
+		log.Fatal(err)
+	}
+	cmd := exec.Command("zstd", "-d", "-")
+	cmd.Stdout = pipeW
+	cmd.Stdin = bytes.NewReader(raw)
+
+	go func() {
+		err := cmd.Run()
+		if err != nil {
+			log.Println("ZSTD error reading from byte array", err)
+		}
+		pipeW.Close()
+	}()
+
+	return pipeR
+}
+
+// ParseAndInsert extracts each sidestream record from the rawContent and inserts each into a separate row.
+func (tip *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
+	// TODO: for common metric states with constant labels, define global constants.
+	metrics.WorkerState.WithLabelValues(tip.TableName(), "tcpinfo").Inc()
+	defer metrics.WorkerState.WithLabelValues(tip.TableName(), "tcpinfo").Dec()
+
+	rdr := NewByteReader(rawContent)
+	startRead := time.Now()
+	protos, err := ReadAll(rdr)
+
+	log.Println("Read", time.Now().Sub(startRead)/17)
+	if err != nil {
+		// TODO
+		metrics.TestCount.WithLabelValues(
+			tip.TableName(), "tcpinfo", "corrupted data").Inc()
+		// TODO
+		return nil
+	}
+
+	for i := range protos {
+		taskFilename := ""
+		if meta["filename"] != nil {
+			taskFilename = meta["filename"].(string)
+		}
+		row, _, err := InfoWrapper{TCPDiagnosticsProto: protos[i], TaskFilename: taskFilename}.Save()
+		if err != nil {
+			// TODO
+		}
+		// TODO set parser_version
+		// Add row to buffer, possibly flushing buffer if it is full.
+		err = tip.AddRow(row)
+
+		if err == etl.ErrBufferFull {
+			// Flush asynchronously, to improve throughput.
+			//tip.Annotate(ss.inserter.TableBase())
+			tip.inserter.PutAsync(tip.TakeRows())
+			err = tip.AddRow(row)
+		}
+		if err != nil {
+			metrics.ErrorCount.WithLabelValues(
+				tip.TableName(), "tip", "insert-err").Inc()
+			metrics.TestCount.WithLabelValues(
+				tip.TableName(), "tip", "insert-err").Inc()
+			log.Printf("insert-err: %v\n", err)
+			continue
+		}
+		metrics.TestCount.WithLabelValues(tip.TableName(), "tip", "ok").Inc()
+	}
+
+	return nil
 }
 
 // ReadAll reads and marshals all protobufs from a Reader.

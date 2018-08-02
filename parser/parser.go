@@ -3,12 +3,14 @@
 package parser
 
 import (
+	"log"
 	"os"
 
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/pbparser"
 )
 
 func init() {
@@ -48,7 +50,10 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 		return NewPTParser(ins)
 	case etl.SW:
 		return NewDiscoParser(ins)
+	case etl.TCPINFO:
+		return pbparser.NewTCPInfoParser(ins)
 	default:
+		log.Println("Unknown parser type")
 		return nil
 	}
 }

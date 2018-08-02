@@ -222,6 +222,11 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 
 	// Create parser, injecting Inserter
 	p := parser.NewParser(dataType, ins)
+	if p == nil {
+		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "TaskError").Inc()
+		log.Printf("Unknown dataType in subworker.")
+		return http.StatusInternalServerError, `{"message": "Unknown dataType"}`
+	}
 	tsk := task.NewTask(fn, tr, p)
 
 	files, err := tsk.ProcessAllTests()
