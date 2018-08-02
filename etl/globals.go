@@ -199,6 +199,7 @@ var (
 		"paris-traceroute": PT,
 		"switch":           SW,
 		"tcpinfo":          TCPINFO,
+		"fast-sidestream":  TCPINFO, // We haven't settled on final directory name.
 	}
 
 	// DataTypeToTable maps from data type to BigQuery table name.
