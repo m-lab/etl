@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/DataDog/zstd"
 	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -156,11 +157,11 @@ func (tip *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testNam
 	metrics.WorkerState.WithLabelValues(tip.TableName(), "tcpinfo").Inc()
 	defer metrics.WorkerState.WithLabelValues(tip.TableName(), "tcpinfo").Dec()
 
-	rdr := NewByteReader(rawContent)
-	startRead := time.Now()
+	decomp, err := zstd.Decompress(nil, rawContent)
+	rdr := bytes.NewReader(decomp)
+
 	protos, err := ReadAll(rdr)
 
-	log.Println("Read", time.Now().Sub(startRead)/17)
 	if err != nil {
 		// TODO
 		metrics.TestCount.WithLabelValues(
