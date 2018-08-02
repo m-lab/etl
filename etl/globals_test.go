@@ -70,16 +70,24 @@ func TestValidateTestPath(t *testing.T) {
 				"embargo-mlab-oti", "sidestream", "2018/02/27", "20180227", "000010", "mlab1", "dfw02", "sidestream", "0000", ".tgz",
 			},
 		},
+		{
+			name: "pusher-success-tgz",
+			path: `gs://dropbox-mlab-sandbox/fast-sidestream/2018/08/02/20180802T000849.528Z-mlab5-abc0t-fast-sidestream.tgz`,
+			want: &etl.DataPath{
+				"dropbox-mlab-sandbox", "fast-sidestream", "2018/08/02", "20180802", "000849.528", "mlab5", "abc0t", "fast-sidestream", "", ".tgz",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := etl.ValidateTestPath(tt.path)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateTestPath() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("got %v, want %v", got, tt.want)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ValidateTestPath() = %v, want %v", got, tt.want)
+				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}

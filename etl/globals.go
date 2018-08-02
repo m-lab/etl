@@ -29,9 +29,13 @@ const MlabDomain = `measurement-lab.org`
 
 const start = `^gs://(?P<bucket>.*)/(?P<exp>[^/]*)/`
 const datePath = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
-const dateTime = `(?P<packeddate>\d{4}[01]\d[0123]\d)T(?P<packedtime>\d{6})Z`
+
+const dateTime = `(?P<packeddate>\d{4}[01]\d[0123]\d)T(?P<packedtime>\d{6}(?:.\d{3})?)?Z`
 const mlabN_podNN = `-(?P<host>mlab\d)-(?P<pod>[[:alpha:]]{3}\d[0-9t])-`
-const exp_NNNN = `(?P<experiment>.*)-(?P<filenumber>\d{4})(?P<etag>-e)?`
+
+// Experiment name may contain -, but may not contain digits
+// Optional filenumber, optional -e tag.
+const exp_NNNN = `(?P<experiment>[^0-9]*)(?:-(?P<filenumber>\d{4}))?(?P<etag>-e)?`
 const suffix = `(?P<suffix>\.tar|\.tar.gz|\.tgz)$`
 
 // These are here to facilitate use across queue-pusher and parsing components.
@@ -44,9 +48,12 @@ var (
 		exp_NNNN + // #7 #8 e.g. ndt-0001
 		suffix) // #9 typically .tgz
 
-	startPattern = regexp.MustCompile(start)
-	endPattern   = regexp.MustCompile(suffix)
-	podPattern   = regexp.MustCompile(mlabN_podNN)
+	startPattern    = regexp.MustCompile(start)
+	datePathPattern = regexp.MustCompile(datePath)
+	dateTimePattern = regexp.MustCompile(dateTime)
+	podPattern      = regexp.MustCompile(mlabN_podNN)
+	expPattern      = regexp.MustCompile(exp_NNNN)
+	endPattern      = regexp.MustCompile(suffix)
 )
 
 // DataPath breaks out the components of a task filename.
@@ -69,13 +76,23 @@ type DataPath struct {
 // ValidateTestPath validates a task filename.
 func ValidateTestPath(path string) (*DataPath, error) {
 	fields := TaskPattern.FindStringSubmatch(path)
+	log.Println(fields)
 
 	if fields == nil {
+		if !datePathPattern.MatchString(path) {
+			return nil, errors.New("Path should contain /YYYY/MM/DD/: " + path)
+		}
+		if !dateTimePattern.MatchString(path) {
+			return nil, errors.New("Path should contain YYYYMMDDZHHMMSS.SSS: " + path)
+		}
 		if !startPattern.MatchString(path) {
 			return nil, errors.New("Path should begin with gs://.../.../: " + path)
 		}
 		if !endPattern.MatchString(path) {
 			return nil, errors.New("Path should end in .tar, .tgz, or .tar.gz: " + path)
+		}
+		if !expPattern.MatchString(path) {
+			return nil, errors.New("Path should contain experiment string: " + path)
 		}
 		if !podPattern.MatchString(path) {
 			return nil, errors.New("Path should contain -mlabN-podNN: " + path)
