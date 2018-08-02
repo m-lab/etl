@@ -175,7 +175,7 @@ func (tip *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testNam
 		if meta["filename"] != nil {
 			taskFilename = meta["filename"].(string)
 		}
-		row := InfoWrapper{TCPDiagnosticsProto: protos[i], TaskFilename: taskFilename}
+		row := InfoWrapper{TCPDiagnosticsProto: protos[i], TaskFilename: taskFilename, TestID: testName}
 		// TODO set parser_version
 		// Add row to buffer, possibly flushing buffer if it is full.
 		err = tip.AddRow(row)
@@ -239,6 +239,7 @@ func ReadAll(rdr io.Reader) ([]tcp.TCPDiagnosticsProto, error) {
 type InfoWrapper struct {
 	tcp.TCPDiagnosticsProto
 	TaskFilename string
+	TestID       string
 }
 
 // GetStructMap infers schema, removes XXX_ fields, and returns complete map.
@@ -331,6 +332,7 @@ func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, er
 	row = make(map[string]bigquery.Value, 10)
 
 	row["task_filename"] = iw.TaskFilename
+	row["test_id"] = iw.TestID
 	row["log_time"] = time.Unix(0, iw.Timestamp)
 	row["parse_time"] = time.Now().Unix()
 
