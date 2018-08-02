@@ -76,7 +76,6 @@ type DataPath struct {
 // ValidateTestPath validates a task filename.
 func ValidateTestPath(path string) (*DataPath, error) {
 	fields := TaskPattern.FindStringSubmatch(path)
-	log.Println(fields)
 
 	if fields == nil {
 		if !datePathPattern.MatchString(path) {

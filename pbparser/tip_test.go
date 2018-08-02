@@ -2,12 +2,16 @@ package pbparser_test
 
 import (
 	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/pbparser"
+	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/etl/task"
 )
 
 func assertInserter(in etl.Inserter) {
@@ -104,5 +108,54 @@ func TestInserter(t *testing.T) {
 	}
 	if inserted["task_filename"].(string) != filename {
 		t.Error("Should have correct filename", filename, "!=", inserted["task_filename"])
+	}
+}
+
+func TestTask(t *testing.T) {
+	os.Setenv("GCLOUD_PROJECT", "mlab-sandbox")
+	fn := `gs://dropbox-mlab-sandbox/fast-sidestream/2018/08/02/20180802T195219.460Z-mlab4-lga0t-fast-sidestream.tgz`
+	data, err := etl.ValidateTestPath(fn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataType := data.GetDataType()
+	if dataType == etl.INVALID {
+		t.Fatal(err)
+	}
+
+	client, err := storage.GetStorageClient(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO - add a timer for reading the file.
+	tr, err := storage.NewETLSource(client, fn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr.Close()
+	// Label storage metrics with the expected table name.
+	tr.TableBase = data.TableBase()
+
+	ins := &inMemoryInserter{}
+
+	// Create parser, injecting Inserter
+	p := parser.NewParser(dataType, ins)
+	if p == nil {
+		t.Fatal(err)
+	}
+	tsk := task.NewTask(fn, tr, p)
+
+	files, err := tsk.ProcessAllTests()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if files != 61 {
+		t.Error(files)
+	}
+
+	if p.Committed() != 247254 {
+		t.Error(p.Committed())
 	}
 }

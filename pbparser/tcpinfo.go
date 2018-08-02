@@ -94,7 +94,7 @@ type TCPInfoParser struct {
 
 // NewSSParser creates a new sidestream parser.
 func NewTCPInfoParser(ins etl.Inserter) *TCPInfoParser {
-	bufSize := etl.SS.BQBufferSize()
+	bufSize := etl.TCPINFO.BQBufferSize()
 	buf := RowBuffer{bufSize, make([]interface{}, 0, bufSize)}
 	return &TCPInfoParser{ins, ins, buf}
 }
@@ -175,10 +175,7 @@ func (tip *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testNam
 		if meta["filename"] != nil {
 			taskFilename = meta["filename"].(string)
 		}
-		row, _, err := InfoWrapper{TCPDiagnosticsProto: protos[i], TaskFilename: taskFilename}.Save()
-		if err != nil {
-			// TODO
-		}
+		row := InfoWrapper{TCPDiagnosticsProto: protos[i], TaskFilename: taskFilename}
 		// TODO set parser_version
 		// Add row to buffer, possibly flushing buffer if it is full.
 		err = tip.AddRow(row)
@@ -246,13 +243,13 @@ type InfoWrapper struct {
 
 // GetStructMap infers schema, removes XXX_ fields, and returns complete map.
 func GetStructMap(pstruct interface{}) (bigquery.Value, error) {
-	start := time.Now()
+	//start := time.Now()
 	schema, err := bigquery.InferSchema(pstruct)
 	if err != nil {
 		return bigquery.NullBool{}, err
 	}
 	schema = removeXXX(schema)
-	log.Println(time.Now().Sub(start))
+	//log.Println(time.Now().Sub(start))
 	ss := bigquery.StructSaver{Schema: schema, InsertID: "", Struct: pstruct}
 	result, _, err := ss.Save()
 	return result, err
@@ -330,7 +327,7 @@ func BuildSchema() (bigquery.Schema, error) {
 // Benchmark - about 1 msec.
 func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, err error) {
 	// Assemble the full map by examining each top level field.
-	start := time.Now()
+	//start := time.Now()
 	row = make(map[string]bigquery.Value, 10)
 
 	row["task_filename"] = iw.TaskFilename
@@ -393,7 +390,7 @@ func (iw InfoWrapper) Save() (row map[string]bigquery.Value, insertID string, er
 		row["Shutdown"] = shutdown
 	}
 
-	log.Println(time.Now().Sub(start))
+	//log.Println(time.Now().Sub(start))
 	return
 }
 

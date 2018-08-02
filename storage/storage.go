@@ -145,12 +145,13 @@ func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 		time.Sleep(delay)
 	}
 
+	log.Printf("%+v\n", h)
 	if h.Size > maxSize {
 		return h.Name, data, ErrOversizeFile
 	}
 
 	// Only process regular files.
-	if h.Typeflag != tar.TypeReg {
+	if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeRegA {
 		return h.Name, data, nil
 	}
 
@@ -159,6 +160,7 @@ func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 	for {
 		trial++
 		var retry bool
+		log.Println("Reading #", trial, h.Name)
 		data, retry, err = rr.nextData(h, trial)
 		if err == nil {
 			break
@@ -167,6 +169,7 @@ func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 			// FYI, it appears that stream errors start in the
 			// nextData phase of reading, but then persist on
 			// the next call to nextHeader.
+			log.Println("Failed reading", h.Name)
 			break
 		}
 		// For each trial, increase backoff delay by 2x.
