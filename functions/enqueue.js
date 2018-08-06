@@ -16,6 +16,7 @@ exports.queueForFile = function (filename) {
         "switch": "etl-disco-queue",
         "ndt": "etl-ndt-queue",
         "sidestream": "etl-sidestream-queue",
+        "fast-sidestream": "etl-fast-ss-queue",
         "paris-traceroute": "etl-paris-traceroute-queue"
     };
     // TODO - fix this.
@@ -96,6 +97,14 @@ exports.createProdTaskOnFileNotification = function (event, callback) {
     }
 };
 
+// We make a second copy of each function, because we have to trigger from two buckets,
+// and each function can only be associated with one bucket.  (Double check this?)
 exports.createSandboxTaskOnEmbargoFileNotification = exports.createSandboxTaskOnFileNotification
 exports.createStagingTaskOnEmbargoFileNotification = exports.createStagingTaskOnFileNotification
 exports.createProdTaskOnEmbargoFileNotification = exports.createProdTaskOnFileNotification
+
+// And now we need a third copy, to support new Pusher destination bucket.
+exports.createSandboxTaskOnDropboxFileNotification = exports.createSandboxTaskOnFileNotification
+exports.createStagingTaskOnDropboxFileNotification = exports.createStagingTaskOnFileNotification
+exports.createProdTaskOnDropboxFileNotification = exports.createProdTaskOnFileNotification
+
