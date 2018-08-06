@@ -190,6 +190,18 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == ss-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
+## Service: etl-fast-ss-parser -- AppEngine Flexible Environment.
+- provider: script
+  script:
+    INJECTED_PROJECT=mlab-sandbox
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker fast-sidestream.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == fast-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+
 ## Service: etl-traceroute-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
@@ -253,6 +265,9 @@ deploy:
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && INJECTED_PROJECT=mlab-staging
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker fast-sidestream.yaml
+    && INJECTED_PROJECT=mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
@@ -265,6 +280,19 @@ deploy:
   on:
     repo: m-lab/etl
     branch: integration
+
+## Service: etl-fast-ss-parser -- AppEngine Flexible Environment.
+## Hack for demo
+- provider: script
+  script:
+    INJECTED_PROJECT=mlab-staging
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker fast-sidestream.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == fast-staging-*
 
 ######################################################################
 #  Prod deployments
