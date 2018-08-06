@@ -325,8 +325,7 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker fast-sidestream.yaml
     && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud functions deploy createStagingTaskOnFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-staging
-    && gcloud functions deploy createStagingTaskOnDropboxNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=dropbox-mlab-staging
+    && gcloud functions deploy createStagingTaskOnDropboxFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=dropbox-mlab-staging
   skip_cleanup: true
   on:
     repo: m-lab/etl
