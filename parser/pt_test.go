@@ -154,9 +154,10 @@ func TestPTInserter(t *testing.T) {
 	}
 
 	expectedValues := &schema.PT{
-		Test_id:  "20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris",
-		Project:  3,
-		Log_time: 1490053990,
+		TestID:        "20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris",
+		Project:       3,
+		LogTime:       1490053990,
+		ParserVersion: parser.Version(),
 		Connection_spec: schema.MLabConnectionSpecification{
 			Server_ip:      "172.17.94.34",
 			Server_af:      2,
@@ -176,6 +177,8 @@ func TestPTInserter(t *testing.T) {
 		},
 		Type: 2,
 	}
+	// Copy ParseTime from actual output before using DeepEqual.
+	expectedValues.ParseTime = (ins.data[0].(schema.PT)).ParseTime
 	if !reflect.DeepEqual(ins.data[0], *expectedValues) {
 		fmt.Printf("Here is expected    : %v\n", expectedValues)
 		fmt.Printf("Here is what is real: %v\n", ins.data[0])
