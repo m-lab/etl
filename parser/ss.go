@@ -66,7 +66,7 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 		geoSlice[i+i+1] = &connSpec.Remote_geolocation
 	}
 	// Just use the logtime of the first row.
-	logTime := time.Unix(buf.rows[0].(*schema.SS).Web100_log_entry.Log_time, 0)
+	logTime := time.Unix(buf.rows[0].(*schema.SS).Web100_log_entry.LogTime, 0)
 	start := time.Now()
 	// TODO - are there any errors we should process from Fetch?
 	annotation.FetchGeoAnnotations(ipSlice, logTime, geoSlice)
@@ -189,7 +189,7 @@ func PackDataIntoSchema(ssValue map[string]string, logTime time.Time, testName s
 		return schema.SS{}, err
 	}
 	web100Log := &schema.Web100LogEntry{
-		Log_time:        logTime.Unix(), // TODO: Should use timestamp, not integer
+		LogTime:         logTime.Unix(), // TODO: Should use timestamp, not integer
 		Version:         "unknown",
 		Group_name:      "read", // TODO: Use Camelcase, with json annotations?
 		Connection_spec: *connSpec,
@@ -197,8 +197,8 @@ func PackDataIntoSchema(ssValue map[string]string, logTime time.Time, testName s
 	}
 
 	ssTest := &schema.SS{
-		Test_id:          testName,
-		Log_time:         logTime.Unix(),
+		TestID:           testName,
+		LogTime:          logTime.Unix(),
 		Type:             int64(1),
 		Project:          int64(2),
 		Web100_log_entry: *web100Log,
