@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 )
@@ -143,7 +144,8 @@ func TestPTInserter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
 	}
-	err = pt.ParseAndInsert(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
+	meta := map[string]bigquery.Value{"filename": "gs://fake-bucket/fake-archive.tgz"}
+	err = pt.ParseAndInsert(meta, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -158,6 +160,7 @@ func TestPTInserter(t *testing.T) {
 		Project:       3,
 		LogTime:       1490053990,
 		ParserVersion: parser.Version(),
+		TaskFilename:  "gs://fake-bucket/fake-archive.tgz",
 		Connection_spec: schema.MLabConnectionSpecification{
 			Server_ip:      "172.17.94.34",
 			Server_af:      2,
