@@ -1,7 +1,11 @@
 // This files contains schema for Paris TraceRoute tests.
 package schema
 
-import "github.com/m-lab/etl/annotation"
+import (
+	"time"
+
+	"github.com/m-lab/etl/annotation"
+)
 
 // TODO(dev): use mixed case Go variable names throughout
 
@@ -29,9 +33,12 @@ type MLabConnectionSpecification struct {
 }
 
 type PT struct {
-	Test_id              string                      `json:"test_id,string"`
+	TestID               string                      `json:"test_id,string"`
 	Project              int32                       `json:"project,int32"`
-	Log_time             int64                       `json:"log_time,int64"`
+	TaskFilename         string                      `json:"task_filename,string"`
+	ParseTime            time.Time                   `json:"parse_time"`
+	ParserVersion        string                      `json:"parser_version,string"`
+	LogTime              int64                       `json:"log_time,int64"`
 	Connection_spec      MLabConnectionSpecification `json:"connection_spec"`
 	Paris_traceroute_hop ParisTracerouteHop          `json:"paris_traceroute_hop"`
 	Type                 int32                       `json:"type,int32"`

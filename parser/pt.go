@@ -195,8 +195,11 @@ func (pt *PTParser) FullTableName() string {
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 	for _, hop := range oneTest.Hops {
 		ptTest := schema.PT{
-			Test_id:              oneTest.TestID,
-			Log_time:             oneTest.LogTime.Unix(),
+			TestID:        oneTest.TestID,
+			LogTime:       oneTest.LogTime.Unix(),
+			ParseTime:     time.Now(),
+			ParserVersion: Version(),
+			// TODO: add TaskFilename
 			Connection_spec:      *(oneTest.ConnSpec),
 			Paris_traceroute_hop: *hop,
 			Type:                 int32(2),
