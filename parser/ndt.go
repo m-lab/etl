@@ -552,6 +552,8 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	} else {
 		results["parse_time"] = string(now)
 	}
+	// Record the parser version used to calculate this row.
+	results["parser_version"] = Version()
 
 	connSpec := schema.EmptyConnectionSpec()
 	if n.metaFile != nil {
