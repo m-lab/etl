@@ -49,6 +49,7 @@ type PTParser struct {
 	// Care should be taken to ensure this does not accumulate many rows and
 	// lead to OOM problems.
 	previousTests []cachedPTData
+	taskFileName  string // The tar file containing these tests.
 }
 
 type Node struct {
@@ -71,7 +72,11 @@ const IPv6_AF int32 = 10
 const PTBufferSize int = 2
 
 func NewPTParser(ins etl.Inserter) *PTParser {
-	return &PTParser{ins, ins, []cachedPTData{}}
+	return &PTParser{
+		inserter:      ins,
+		RowStats:      ins,
+		previousTests: []cachedPTData{},
+	}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
@@ -195,11 +200,11 @@ func (pt *PTParser) FullTableName() string {
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 	for _, hop := range oneTest.Hops {
 		ptTest := schema.PT{
-			TestID:        oneTest.TestID,
-			LogTime:       oneTest.LogTime.Unix(),
-			ParseTime:     time.Now(),
-			ParserVersion: Version(),
-			// TODO: add TaskFilename
+			TestID:               oneTest.TestID,
+			LogTime:              oneTest.LogTime.Unix(),
+			ParseTime:            time.Now(),
+			ParserVersion:        Version(),
+			TaskFilename:         pt.taskFileName,
 			Connection_spec:      *(oneTest.ConnSpec),
 			Paris_traceroute_hop: *hop,
 			Type:                 int32(2),
@@ -265,6 +270,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	testId := filepath.Base(testName)
 	if meta["filename"] != nil {
 		testId = CreateTestId(meta["filename"].(string), filepath.Base(testName))
+		pt.taskFileName = meta["filename"].(string)
 	}
 
 	cashedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
