@@ -160,6 +160,20 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == cf-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
+## Service: etl-batch-parser -- AppEngine Flexible Environment.
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && gcloud app deploy --project=mlab-sandbox $TRAVIS_BUILD_DIR/appengine/queue.yaml
+    && INJECTED_PROJECT=mlab-sandbox
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == batch-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
@@ -167,9 +181,6 @@ deploy:
     && gcloud app deploy --project=mlab-sandbox $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
-    && INJECTED_PROJECT=mlab-sandbox
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -256,7 +267,7 @@ deploy:
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-staging.yaml
     && INJECTED_PROJECT=mlab-staging
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
     && INJECTED_PROJECT=mlab-staging
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
@@ -321,7 +332,7 @@ deploy:
 # Deploys smaller production services: PT, SS, DISCO
 # Triggers when *ANY* branch is tagged with small-prod-* OR prod-*
 # NOTE: See later target for ndt-prod-*, which also triggers on prod-*, and
-#       deploys the NDT daily and batch pipelines.
+#       deploys the NDT daily pipelines.
 # NOTE: Failure in one of the deployments will terminate the deployment sequence,
 #       leaving the system in a mixed state.  This should be manually addresses ASAP.
 - provider: script
@@ -343,8 +354,22 @@ deploy:
     all_branches: true
     condition: $TRAVIS_TAG == small-prod-* || $TRAVIS_TAG == prod-*
 
+###################### BATCH SERVICES ###############################
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
+    && INJECTED_PROJECT=mlab-oti
+    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_TAG == batch-prod-* || $TRAVIS_TAG == prod-*
+
 ###################### NDT SERVICES ###############################
-# Deploys BOTH STREAMING AND BATCH services, along with queue config.
+# Deploys STREAMING NDT services, along with queue config.
 # Triggers when *ANY* branch is tagged with ndt-prod-* OR prod-*
 - provider: script
   script:
@@ -352,9 +377,6 @@ deploy:
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-prod.yaml
-    && INJECTED_PROJECT=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt-batch.yaml
   skip_cleanup: true
   on:
     repo: m-lab/etl

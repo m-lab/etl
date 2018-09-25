@@ -3,7 +3,7 @@
 
 runtime: custom
 env: flex
-service: etl-ndt-batch-parser
+service: etl-batch-parser
 
 # Resource and scaling options. For more background, see:
 #   https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml
