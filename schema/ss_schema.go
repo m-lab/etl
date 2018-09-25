@@ -172,7 +172,7 @@ type Web100Snap struct {
 }
 
 type Web100LogEntry struct {
-	LogTime         int64                         `json:"log_time,int64"`
+	LogTime         int64                         `json:"log_time,int64" bigquery:"log_time"`
 	Version         string                        `json:"version,string"`
 	Group_name      string                        `json:"group_name,string"`
 	Connection_spec Web100ConnectionSpecification `json:"connection_spec"`
@@ -180,12 +180,12 @@ type Web100LogEntry struct {
 }
 
 type SS struct {
-	TestID        string    `json:"test_id,string"`
-	Project       int64     `json:"project,int64"`
-	LogTime       int64     `json:"log_time,int64"`
-	ParseTime     time.Time `bigquery:"parse_time"`
-	ParserVersion string    `bigquery:"parser_version"`
-	TaskFileName  string    `bigquery:"task_filename"`
+	TestID        string    `json:"test_id,string" bigquery:"test_id"`
+	Project       int64     `json:"project,int64" bigquery:"project"`
+	LogTime       int64     `json:"log_time,int64" bigquery:"log_time"`
+	ParseTime     time.Time `bigquery:"parse_time" bigquery:"parse_time"`
+	ParserVersion string    `bigquery:"parser_version" bigquery:"parser_version"`
+	TaskFileName  string    `bigquery:"task_filename" bigquery:"task_filename"`
 
 	Type             int64          `json:"type,int64"`
 	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`
