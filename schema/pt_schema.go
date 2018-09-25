@@ -33,12 +33,12 @@ type MLabConnectionSpecification struct {
 }
 
 type PT struct {
-	TestID               string                      `json:"test_id,string"`
-	Project              int32                       `json:"project,int32"`
-	TaskFilename         string                      `json:"task_filename,string"`
-	ParseTime            time.Time                   `json:"parse_time"`
-	ParserVersion        string                      `json:"parser_version,string"`
-	LogTime              int64                       `json:"log_time,int64"`
+	TestID               string                      `json:"test_id,string" bigquery:"test_id"`
+	Project              int32                       `json:"project,int32" bigquery:"project"`
+	TaskFilename         string                      `json:"task_filename,string" bigquery:"task_filename"`
+	ParseTime            time.Time                   `json:"parse_time" bigquery:"parse_time"`
+	ParserVersion        string                      `json:"parser_version,string" bigquery:"parser_version"`
+	LogTime              int64                       `json:"log_time,int64" bigquery:"log_time"`
 	Connection_spec      MLabConnectionSpecification `json:"connection_spec"`
 	Paris_traceroute_hop ParisTracerouteHop          `json:"paris_traceroute_hop"`
 	Type                 int32                       `json:"type,int32"`
