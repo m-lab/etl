@@ -253,7 +253,7 @@ deploy:
 ######################################################################
 
 ###################### ALL ETL SERVICES ###############################
-# Deploys all staging services: NDT, NDT_BATCH, PT, SS, DISCO, QUEUE_PUSHER, GARDENER
+# Deploys all staging services: NDT, BATCH, PT, SS, DISCO, QUEUE_PUSHER, GARDENER
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
 #  the system in a mixed state.  This should be manually addresses ASAP.
