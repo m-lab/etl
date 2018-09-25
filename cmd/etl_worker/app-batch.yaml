@@ -48,8 +48,8 @@ env_variables:
   RELEASE_TAG: ${TRAVIS_TAG}
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
-  NDT_BATCH: 'true'  # Allow instances to discover they are NDT_BATCH instances.
-  MAX_WORKERS: 15  # 12 is good for NDT, but 20 is good for SS.
+  BATCH_SERVICE: 'true'   # Allow instances to discover they are BATCH instances.
+  MAX_WORKERS: 15         # 12 is good for NDT, but 20 is good for SS.
   # BIGQUERY_PROJECT: ''  # Overrides computed project name based on GCLOUD_PROJECT
   # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
   ANNOTATE_IP: 'true'

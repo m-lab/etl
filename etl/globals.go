@@ -20,7 +20,7 @@ var IsBatch bool
 var OmitDeltas bool
 
 func init() {
-	IsBatch, _ = strconv.ParseBool(os.Getenv("NDT_BATCH"))
+	IsBatch, _ = strconv.ParseBool(os.Getenv("BATCH_SERVICE"))
 	OmitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
 }
 
@@ -117,8 +117,7 @@ func (fn *DataPath) TableBase() string {
 	return fn.GetDataType().Table()
 }
 
-// IsBatchService return true if this is a NDT batch service.
-// TODO - update this to BATCH_SERVICE, so it makes sense for other pipelines.
+// IsBatchService return true if this is a batch service.
 func IsBatchService() bool {
 	return IsBatch
 }
