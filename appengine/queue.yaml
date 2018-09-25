@@ -94,7 +94,7 @@ queue:
 # TODO - misnomer - we are currently using these queues for sidestream as well.
 #   should rename these to just etl-batch-*
 - name: etl-ndt-batch-0
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -105,7 +105,7 @@ queue:
     # Setting max_doublings to 0 means that backoff will increase by min_backoff_seconds each retry.
     max_doublings: 0
 - name: etl-ndt-batch-1
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -115,7 +115,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-2
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -125,7 +125,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-3
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -135,7 +135,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-4
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -145,7 +145,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-5
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -155,7 +155,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-6
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -165,7 +165,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-7
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -175,7 +175,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-8
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -185,7 +185,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-9
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -195,7 +195,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-10
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -205,7 +205,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-11
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -215,7 +215,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-12
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -225,7 +225,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-13
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -235,7 +235,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-14
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
@@ -245,7 +245,7 @@ queue:
     max_backoff_seconds: 120
     max_doublings: 0
 - name: etl-ndt-batch-15
-  target: etl-ndt-batch-parser
+  target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
   max_concurrent_requests: 40
