@@ -78,7 +78,7 @@ queue:
 # Some adjustments may be needed once this is running regularly.
 #
 # SUMMARY:
-# 1. Each queue must limit concurrent requests to about 55 to limit
+# 1. Each queue must limit concurrent requests to about 40 to limit
 #    rate into individual tables to around 200 rows/second (with deltas).
 #    We actually limit to 40, so we don't overwhelm the number of workers.
 # 2. We have 16 queues, to allow some queues to be empty and still maintain
@@ -91,8 +91,6 @@ queue:
 #    case some task consistently fails.
 #    TODO - should check into whether limiting retries would be better.
 #
-# TODO - misnomer - we are currently using these queues for sidestream as well.
-#   should rename these to just etl-batch-*
 - name: etl-ndt-batch-0
   target: etl-batch-parser
   rate: 5/s
@@ -254,6 +252,215 @@ queue:
     min_backoff_seconds: 30
     max_backoff_seconds: 120
     max_doublings: 0
+
+- name: etl-sidestream-batch-0
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-1
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-2
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-3
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-4
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-5
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-6
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-7
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-8
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-9
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-10
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-11
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-12
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-13
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-14
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-sidestream-batch-15
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because sidestream days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
 
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
