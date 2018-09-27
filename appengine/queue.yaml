@@ -462,6 +462,196 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 
+- name: etl-traceroute-batch-0
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because traceroute days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-1
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-2
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-3
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-4
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-5
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-6
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-7
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-8
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-9
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-10
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-11
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-12
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-13
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-14
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-traceroute-batch-15
+  target: etl-batch-parser
+  rate: 5/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+
+- name: etl-disco-batch-0
+  target: etl-batch-parser
+  rate: 2/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because disco days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-disco-batch-1
+  target: etl-batch-parser
+  rate: 2/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-disco-batch-2
+  target: etl-batch-parser
+  rate: 2/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-disco-batch-3
+  target: etl-batch-parser
+  rate: 2/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
