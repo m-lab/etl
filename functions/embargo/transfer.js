@@ -134,9 +134,8 @@ exports.makeMoveWithAuth = function (file, destBucket, done) {
  * @param {object} file The file under consideration
  */
 exports.shouldEmbargo = function (file) {
-    // Only sidestream files need to be embargoed.  All others can be
-    // transferred.
-    return (file.name.substring(0, 11) === 'sidestream/');
+    // Unconditionally return false.
+    return false;
 };
 
 /**
