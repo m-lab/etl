@@ -10,7 +10,6 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
-	"encoding/base64"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -265,25 +264,6 @@ func GetStorageClient(writeAccess bool) (*http.Client, error) {
 		return nil, err
 	}
 	return client, nil
-}
-
-// GetFilename converts request received from the queue into a filename.
-// TODO(dev) Add unit test
-func GetFilename(filename string) (string, error) {
-	if strings.HasPrefix(filename, "gs://") {
-		return filename, nil
-	}
-
-	decode, err := base64.StdEncoding.DecodeString(filename)
-	if err != nil {
-		return "", errors.New("invalid file path: " + filename)
-	}
-	fn := string(decode[:])
-	if strings.HasPrefix(fn, "gs://") {
-		return fn, nil
-	}
-
-	return "", errors.New("invalid base64 encoded file path: " + fn)
 }
 
 //---------------------------------------------------------------------------------

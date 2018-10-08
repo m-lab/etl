@@ -105,7 +105,7 @@ func worker(rwr http.ResponseWriter, rq *http.Request) {
 	// This will add metric count and log message from any panic.
 	// The panic will still propagate, and http will report it.
 	defer func() {
-		etl.CountPanics(recover(), "worker")
+		metrics.CountPanics(recover(), "worker")
 	}()
 
 	// Throttle by grabbing a semaphore from channel.
@@ -154,7 +154,7 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 
 	var err error
 	// This handles base64 encoding, and requires a gs:// prefix.
-	fn, err := storage.GetFilename(rawFileName)
+	fn, err := etl.GetFilename(rawFileName)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues("unknown", "worker", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)

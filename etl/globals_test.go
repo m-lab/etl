@@ -1,12 +1,10 @@
 package etl_test
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
 	"reflect"
-	"runtime/debug"
 	"testing"
 
 	"github.com/m-lab/etl/etl"
@@ -138,68 +136,6 @@ func TestCalculateIPDistance(t *testing.T) {
 	}
 }
 
-func panicAndRecover() (err error) {
-	defer func() {
-		err = etl.PanicToErr(nil, recover(), "foobar")
-	}()
-	a := []int{1, 2, 3}
-	log.Println(a[4])
-	// This is never reached.
-	return
-}
-
-func errorWithoutPanic(prior error) (err error) {
-	err = prior
-	defer func() {
-		err = etl.PanicToErr(err, recover(), "foobar")
-	}()
-	return
-}
-
-func TestHandlePanic(t *testing.T) {
-	err := panicAndRecover()
-	log.Println("Actually did recover")
-	if err == nil {
-		t.Fatal("Should have errored")
-	}
-}
-
-func TestNoPanic(t *testing.T) {
-	err := errorWithoutPanic(nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = errorWithoutPanic(errors.New("prior"))
-	if err.Error() != "prior" {
-		t.Error("Should have returned prior error.")
-	}
-}
-
-func rePanic() {
-	defer func() {
-		etl.CountPanics(recover(), "foobar")
-	}()
-	a := []int{1, 2, 3}
-	log.Println(a[4])
-	// This is never reached.
-	return
-}
-
-func TestCountPanics(t *testing.T) {
-	// When we call RePanic, the panic should cause a log and a metric
-	// increment, but should still panic.  This intercepts the panic,
-	// and errors if the panic doesn't happen.
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("The code did not panic")
-		}
-		fmt.Printf("%s\n", debug.Stack())
-	}()
-
-	rePanic()
-}
-
 func TestDataset(t *testing.T) {
 	tests := []struct {
 		dt      etl.DataType
@@ -310,4 +246,47 @@ func TestBQProject(t *testing.T) {
 		}
 	}
 
+}
+
+func TestGetFilename(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		want     string
+		wantErr  bool
+	}{
+		{
+			name:     "success",
+			filename: "gs://minimal-valid-name/thing.tgz",
+			want:     "gs://minimal-valid-name/thing.tgz",
+		},
+		{
+			name:     "success-decode-correct",
+			filename: "Z3M6Ly9taW5pbWFsLXZhbGlkLW5hbWUvdGhpbmcudGd6",
+			want:     "gs://minimal-valid-name/thing.tgz",
+		},
+		{
+			name:     "failure-not-base64",
+			filename: "THIS-IS-NOT-BASE64-ENCODED",
+			wantErr:  true,
+		},
+		{
+			name: "failure-base64-has-bad-filename",
+			// echo "this-is-invalid-path" | base64
+			filename: "dGhpcy1pcy1pbnZhbGlkLXBhdGgK",
+			wantErr:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := etl.GetFilename(tt.filename)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetFilename() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetFilename() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

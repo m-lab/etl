@@ -10,7 +10,6 @@ import (
 	"net/url"
 
 	"github.com/m-lab/etl/etl"
-	"github.com/m-lab/etl/storage"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/taskqueue"
 )
@@ -95,7 +94,7 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decodedFilename, err := storage.GetFilename(filename)
+	decodedFilename, err := etl.GetFilename(filename)
 	if err != nil {
 		http.Error(w, `{"message": "Could not base64decode filename"}`, http.StatusBadRequest)
 		return
