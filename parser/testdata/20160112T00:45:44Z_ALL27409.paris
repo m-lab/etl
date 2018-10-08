@@ -1,0 +1,14 @@
+traceroute [(4.71.254.138:33456) -> (207.150.205.159:33457)], protocol icmp, algo exhaustive, duration 8 s
+ 1  P(6, 6) ge-7-2.car2.Atlanta2.Level3.net (4.71.254.129)  7.172/72.348/166.927/55.462 ms 
+ 2  P(6, 6) vlan52.ebr2.Atlanta2.Level3.net (4.69.150.126)  19.861/19.899/19.932/0.023 ms !T2 
+   MPLS Label 2029 TTL=1
+ 3  P(0, 6)
+ 4  P(6, 6) ae-7-7.ebr3.Dallas1.Level3.net (4.69.134.21)  20.101/20.123/20.158/0.018 ms !T4 
+   MPLS Label 1459 TTL=1
+ 5  P(6, 6) ae-73-73.csw2.Dallas1.Level3.net (4.69.151.145)  20.094/20.114/20.137/0.014 ms !T5 
+   MPLS Label 1493 TTL=1
+ 6  P(6, 6) ae-2-70.edge3.Dallas1.Level3.net (4.69.145.72)  20.134/20.149/20.168/0.013 ms 
+ 7  P(6, 6) HOSTWAY-COR.ear1.Dallas1.Level3.net (4.59.112.38)  24.658/24.684/24.709/0.016 ms 
+ 8  P(6, 6) xe-3-3.dist-rtr-02.aus.us.siteprotect.com (216.139.253.70)  24.672/24.718/24.767/0.036 ms 
+ 9  P(6, 6) xe-49.core-fesx-01.tc.aus.us.siteprotect.com (216.139.253.234)  24.985/25.114/25.593/0.217 ms 
+10  P(6, 6) txapp1.samknows.com (207.150.205.159)  24.900/24.972/25.055/0.045 ms 
