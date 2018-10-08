@@ -107,7 +107,7 @@ script:
 #
 #  Overview:
 #   1.  Test in sandbox during development
-#   2.  Deploy to staging on commit to integration
+#   2.  Deploy to staging on commit to master
 #   3.  Deploy to prod when a branch is tagged with prod-* or xxx-prod-*
 #
 #  We want to test individual components in sandbox, and avoid stepping on each
@@ -116,16 +116,16 @@ script:
 #
 #  We want to soak all code in staging before deploying to prod.  To avoid
 #  incompatible components, we deploy ALL elements to staging when we merge
-#  to integration branch.
+#  to master branch.
 #
 #  Deployments to prod are done by deliberately tagging a specific commit,
-#  typically in the integration branch, with a tag starting with prod-*.
-#  DO NOT just tag the latest version in integration, as someone may have
+#  typically in the master branch, with a tag starting with prod-*.
+#  DO NOT just tag the latest version in master, as someone may have
 #  pushed new code that hasn't had a chance to soak in staging.
 #
 #
 # Deploy steps never trigger on a new Pull Request. Deploy steps will trigger
-# on specific branch name patterns, after a merge to integration, or on
+# on specific branch name patterns, after a merge to master, or on
 # an explicit tag that matches "on:" conditions.
 #################################################################################
 
@@ -239,9 +239,9 @@ deploy:
 
 ######################################################################
 #  Staging deployments
-#  Auto deployed on merge with integration branch
+#  Auto deployed on merge with master branch
 #  There are no mini-deployments here.  ALL elements are redeployed
-#  when merges to integration occur, and they have no other trigger.
+#  when merges to master occur, and they have no other trigger.
 #  NOTE: This may lead to timeouts.  Generally, triggering the build
 #        again will help, as the redeployment of the same image is
 #        faster than deployment of a new image.
@@ -290,7 +290,7 @@ deploy:
   skip_cleanup: true
   on:
     repo: m-lab/etl
-    branch: integration
+    branch: master
 
 ## Service: etl-fast-ss-parser -- AppEngine Flexible Environment.
 ## Hack for demo
@@ -308,7 +308,7 @@ deploy:
 ######################################################################
 #  Prod deployments
 #  Deployed on manual tagging with prod-*, ndt-prod-*, or small-prod-*
-#  Should be used AFTER code review, commit to integration, and staging soak.
+#  Should be used AFTER code review, commit to master, and staging soak.
 #  Triggers when *ANY* branch is tagged with one of these tags'
 ######################################################################
 
