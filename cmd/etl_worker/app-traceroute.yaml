@@ -40,6 +40,6 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   MAX_WORKERS: 5
-  # BIGQUERY_PROJECT: ''  # Overrides computed project name based on GCLOUD_PROJECT
+  BIGQUERY_PROJECT: '${INJECTED_PROJECT}'  # Overrides GCLOUD_PROJECT
   # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
   ANNOTATE_IP: 'true'
