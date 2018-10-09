@@ -49,7 +49,7 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   BATCH_SERVICE: 'true'   # Allow instances to discover they are BATCH instances.
-  MAX_WORKERS: 15         # 12 is good for NDT, but 20 is good for SS.
+  MAX_WORKERS: 15
   BIGQUERY_PROJECT: '${INJECTED_PROJECT}'  # Overrides GCLOUD_PROJECT
   # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
   ANNOTATE_IP: 'true'
