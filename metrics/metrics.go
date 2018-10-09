@@ -8,8 +8,11 @@
 package metrics
 
 import (
+	"fmt"
+	"log"
 	"math"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -589,4 +592,62 @@ func DurationHandler(name string, inner http.HandlerFunc) http.HandlerFunc {
 		DurationHistogram.WithLabelValues(name, http.StatusText(cw.status)).Observe(
 			time.Since(t).Seconds())
 	}
+}
+
+// CountPanics updates the PanicCount metric, then repanics.
+// It must be wrapped in a defer.
+// Examples:
+//  For function that returns an error:
+//    func foobar() () {
+//        defer func() {
+//		      etl.AddPanicMetric(recover(), "foobar")
+// 	      }()
+//        ...
+//        ...
+//    }
+// TODO - possibly move this to metrics.go
+func CountPanics(r interface{}, tag string) {
+	if r != nil {
+		err, ok := r.(error)
+		if !ok {
+			log.Println("bad recovery conversion")
+			err = fmt.Errorf("pkg: %v", r)
+		}
+		log.Println("Adding metrics for panic:", err)
+		PanicCount.WithLabelValues(tag).Inc()
+		panic(r)
+	}
+}
+
+// PanicToErr captures panics and converts them to
+// errors.  Use with extreme care, as panic may mean that
+// state is corrupted, and continuing to execut may result
+// in undefined behavior.
+// It must be wrapped in a defer.
+// Example:
+//    // err must be a named return value to be captured.
+//    func foobar() (err error) {
+//        defer func() {
+//			  // Possibly do something with existing error
+//            // before calling PanicToErr
+//		      err = etl.PanicToErr(err, recover(), "foobar")
+// 	      }()
+//        ...
+//        ...
+//    }
+func PanicToErr(err error, r interface{}, tag string) error {
+	if r != nil {
+		var ok bool
+		err, ok = r.(error)
+		// TODO - Check if err == runtime.Error, and treat
+		// differently ?
+		if !ok {
+			log.Println("bad recovery conversion")
+			err = fmt.Errorf("pkg: %v", r)
+		}
+		log.Println("Recovered from panic:", err)
+		PanicCount.WithLabelValues(tag).Inc()
+		fmt.Printf("%s\n", debug.Stack())
+	}
+	return err
 }
