@@ -146,8 +146,8 @@ func TestDataset(t *testing.T) {
 		{etl.NDT, false, "base_tables"},
 		{etl.PT, true, "batch"},
 		{etl.PT, false, "base_tables"},
-		{etl.SS, true, "private"},
-		{etl.SS, false, "private"},
+		{etl.SS, true, "batch"},
+		{etl.SS, false, "base_tables"},
 	}
 
 	// Project shouldn't matter, so test different values to confirm.
@@ -199,9 +199,9 @@ func TestBQProject(t *testing.T) {
 		gproject string
 		want     string
 	}{
-		{etl.NDT, "mlab-oti", "measurement-lab"},
+		{etl.NDT, "mlab-oti", "mlab-oti"},
 		{etl.NDT, "staging", "staging"},
-		{etl.PT, "mlab-oti", "measurement-lab"},
+		{etl.PT, "mlab-oti", "mlab-oti"},
 		{etl.SS, "mlab-oti", "mlab-oti"},
 		{etl.SS, "mlab-oti", "mlab-oti"},
 	}

@@ -119,8 +119,8 @@ func TestInsertConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if in.Dataset() != "private" {
-		t.Errorf("Want private, got %s", in.Dataset())
+	if in.Dataset() != "base_tables" {
+		t.Errorf("Want base_tables, got %s", in.Dataset())
 	}
 	if in.Project() != "mlab-oti" {
 		t.Errorf("Want mlab-oti, got %s", in.Project())
@@ -131,10 +131,10 @@ func TestInsertConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	if in.Dataset() != "base_tables" {
-		t.Errorf("Want private, got %s", in.Dataset())
+		t.Errorf("Want base_tables, got %s", in.Dataset())
 	}
-	if in.Project() != "measurement-lab" {
-		t.Errorf("Want measurement-lab, got %s", in.Project())
+	if in.Project() != "mlab-oti" {
+		t.Errorf("Want mlab-oti, got %s", in.Project())
 	}
 }
 
