@@ -231,8 +231,8 @@ var (
 
 // BigqueryProject returns the appropriate project.
 func (dt DataType) BigqueryProject() string {
-	project, override := os.LookupEnv("BIGQUERY_PROJECT")
-	if override && project != "" {
+	project := os.Getenv("BIGQUERY_PROJECT")
+	if project != "" {
 		return project
 	}
 	return os.Getenv("GCLOUD_PROJECT")
@@ -241,8 +241,8 @@ func (dt DataType) BigqueryProject() string {
 // Dataset returns the appropriate dataset to use.
 // This is a bit of a hack, but works for our current needs.
 func (dt DataType) Dataset() string {
-	dataset, override := os.LookupEnv("BIGQUERY_DATASET")
-	if override && dataset != "" {
+	dataset := os.Getenv("BIGQUERY_DATASET")
+	if dataset != "" {
 		return dataset
 	}
 	if IsBatchService() {
