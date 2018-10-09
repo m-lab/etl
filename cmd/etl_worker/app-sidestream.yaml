@@ -1,3 +1,5 @@
+# Use github release to trigger deployment.
+
 runtime: custom
 env: flex
 service: etl-sidestream-parser
