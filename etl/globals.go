@@ -228,6 +228,10 @@ var (
 *  In not to distant future we need a better solution.
 *  See https://github.com/m-lab/etl/issues/519
 ********************************************************************************/
+// Translate gs dir to BQ tablename.
+func DirToTablename(dir string) string {
+	return dataTypeToTable[dirToDataType[dir]]
+}
 
 // BigqueryProject returns the appropriate project.
 func (dt DataType) BigqueryProject() string {
