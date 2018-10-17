@@ -18,10 +18,11 @@ const defaultMessage = "<html><body>This is not the app you're looking for.</bod
 
 // The following queues should not be directly addressed.
 var queueForType = map[etl.DataType]string{
-	etl.NDT: "etl-ndt-queue",
-	etl.SS:  "etl-sidestream-queue",
-	etl.PT:  "etl-traceroute-queue",
-	etl.SW:  "etl-disco-queue",
+	etl.NDT:     "etl-ndt-queue",
+	etl.SS:      "etl-sidestream-queue",
+	etl.TCPINFO: "etl-fast-ss-queue",
+	etl.PT:      "etl-traceroute-queue",
+	etl.SW:      "etl-disco-queue",
 }
 
 // Disallow any queue name that is an automatic queue target.
