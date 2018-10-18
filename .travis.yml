@@ -18,6 +18,7 @@
 language: go
 
 before_install:
+- apt-get install -y jq  # Dependency for sync_tables_with_schema.sh.
 # Install javascript libraries
 - pushd $TRAVIS_BUILD_DIR/functions
 - npm install --verbose
