@@ -1,3 +1,6 @@
 [submodule "travis"]
 	path = travis
 	url = https://github.com/m-lab/travis.git
+[submodule "etl-schema"]
+	path = etl-schema
+	url = https://github.com/m-lab/etl-schema
