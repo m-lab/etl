@@ -18,6 +18,7 @@
 language: go
 
 before_install:
+- sudo apt-get install -y jq  # Dependency for sync_tables_with_schema.sh.
 # Install javascript libraries
 - pushd $TRAVIS_BUILD_DIR/functions
 - npm install --verbose
@@ -164,6 +165,7 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox batch nodryrun
     && gcloud app deploy --project=mlab-sandbox $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
@@ -172,6 +174,22 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_BRANCH == batch-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+
+## Synchronize base_tables with etl-schemas.
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == sandbox-* ||
+               $TRAVIS_BRANCH == ndt-sandbox-* ||
+               $TRAVIS_BRANCH == ss-sandbox-* ||
+               $TRAVIS_BRANCH == fast-sandbox-* ||
+               $TRAVIS_BRANCH == pt-sandbox-* ||
+               $TRAVIS_BRANCH == disco-sandbox-*
 
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
 - provider: script
@@ -258,6 +276,8 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_staging
     && gcloud app deploy --project=mlab-staging $TRAVIS_BUILD_DIR/appengine/queue.yaml
+    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging batch nodryrun
+    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging base_tables nodryrun
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
@@ -326,7 +346,9 @@ deploy:
 #       leaving the system in a mixed state.  This should be manually addresses ASAP.
 - provider: script
   script:
-    INJECTED_PROJECT=measurement-lab
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
+    && INJECTED_PROJECT=measurement-lab
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
     && INJECTED_PROJECT=measurement-lab
@@ -347,6 +369,7 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti batch nodryrun
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
@@ -362,6 +385,7 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && INJECTED_PROJECT=measurement-lab
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
