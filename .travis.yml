@@ -36,6 +36,14 @@ before_install:
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
 - source "${HOME}/google-cloud-sdk/path.bash.inc"
 
+- if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_sandbox" ]] ; then
+  echo $TEST_SERVICE_ACCOUNT_mlab_sandbox | base64 -d > travis-sandbox.key ;
+  gcloud auth activate-service-account --key-file=travis-sandbox.key ;
+  fi
+- bq --project mlab-sandbox show base_tables.ndt
+# TODO: try --headless
+- exit 1
+
 # Install test credentials.
 # Note that anyone with github ACLs to push to a branch can hack .travis.yml
 # and discover these credentials in the travis logs.
@@ -43,9 +51,6 @@ before_install:
   echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key ;
   gcloud auth activate-service-account --key-file=travis-testing.key ;
   fi
-- bq --project mlab-sandbox show base_tables.ndt
-# TODO: try --headless
-- exit 1
 
 # These directories will be cached on successful "script" builds, and restored,
 # if available, to save time on future builds.
