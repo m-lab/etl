@@ -36,14 +36,6 @@ before_install:
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
 - source "${HOME}/google-cloud-sdk/path.bash.inc"
 
-# TODO: remove this after merging https://github.com/m-lab/etl-schema/pull/10
-- if [[ -n "$SERVICE_ACCOUNT_mlab_sandbox" ]] ; then
-  echo $SERVICE_ACCOUNT_mlab_sandbox > travis-sandbox.key ;
-  gcloud auth activate-service-account --key-file=travis-sandbox.key ;
-  fi
-# Trick bq into setting up auth so sync_tables_with_schema.sh works correctly.
-- bq --project mlab-sandbox ls fake-dataset || true
-
 # Install test credentials.
 # Note that anyone with github ACLs to push to a branch can hack .travis.yml
 # and discover these credentials in the travis logs.
