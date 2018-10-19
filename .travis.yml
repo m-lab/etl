@@ -35,6 +35,9 @@ before_install:
 # Install gcloud, for integration tests.
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
 - source "${HOME}/google-cloud-sdk/path.bash.inc"
+- bq --project mlab-sandbox show base_tables.ndt
+# TODO: try --headless
+- exit 1
 
 # Install test credentials.
 # Note that anyone with github ACLs to push to a branch can hack .travis.yml
