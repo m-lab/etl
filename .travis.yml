@@ -42,7 +42,7 @@ before_install:
   gcloud auth activate-service-account --key-file=travis-sandbox.key ;
   fi
 # Trick bq into setting up auth so sync_tables_with_schema.sh works correctly.
-- bq --project mlab-sandbox ls fake-dataset
+- bq --project mlab-sandbox ls fake-dataset || :
 
 # Install test credentials.
 # Note that anyone with github ACLs to push to a branch can hack .travis.yml
