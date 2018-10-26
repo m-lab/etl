@@ -174,7 +174,16 @@ func GetGeoData(url string) *GeoData {
 func QueryAnnotationService(url string) ([]byte, error) {
 	metrics.AnnotationRequestCount.Inc()
 	// Make the actual request
-	resp, err := http.Get(url)
+	// Do not use default client, use a customerized one with Timeout
+	var netClient = &http.Client{
+		// Median response time is < 10 msec, but 99th percentile is 0.6 seconds.
+		Timeout: 2 * time.Second,
+	}
+	req, err:= http.NewRequest("GET", url, nil)
+        if err != nil {
+                return nil, err
+        }
+        resp, err:= netClient.Do(req)
 
 	// Catch http errors
 	if err != nil {
