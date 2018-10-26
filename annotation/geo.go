@@ -267,10 +267,12 @@ func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error)
 			With(prometheus.Labels{"source": http.StatusText(resp.StatusCode)}).Inc()
 		return nil, errors.New("URL:" + url + " gave response code " + resp.Status)
 	}
-	defer resp.Body.Close()
+	//defer resp.Body.Close()
 
 	// Copy response into a byte slice
 	body, err := ioutil.ReadAll(resp.Body)
+	
+	resp.Body.Close()
 	if err != nil {
 		metrics.AnnotationErrorCount.
 			With(prometheus.Labels{"source": "Problem reading response body"}).Inc()
