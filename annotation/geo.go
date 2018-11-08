@@ -91,6 +91,15 @@ var BaseURL = AnnotatorURL + "/annotate?"
 // BatchURL provides the base URL for batch annotation requests
 var BatchURL = AnnotatorURL + "/batch_annotate"
 
+// BatchURLSS provides the base URL for batch annotation requests from sidestream
+var BatchURLSS = "https://annotatorss-dot-" +
+	os.Getenv("GCLOUD_PROJECT") +
+	".appspot.com" + "/batch_annotate"
+
+var BatchURLPT = "https://annotator-dot-" +
+	os.Getenv("GCLOUD_PROJECT") +
+	".appspot.com" + "/batch_annotate"
+
 // FetchGeoAnnotations takes a slice of strings
 // containing ip addresses, a timestamp, and a slice of pointers to
 // the GeolocationIP structs that correspond to the ip addresses. A
@@ -98,7 +107,7 @@ var BatchURL = AnnotatorURL + "/batch_annotate"
 // same length. It will then make a call to the batch annotator, using
 // the ip addresses and the timestamp. Then, it uses that data to fill
 // in the structs pointed to by the slice of GeolocationIP pointers.
-func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*GeolocationIP) {
+func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*GeolocationIP, dataType string) {
 	reqData := make([]RequestData, 0, len(ips))
 	normalized := make([]string, len(ips))
 	for i := range ips {
@@ -117,7 +126,11 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 		}
 		reqData = append(reqData, RequestData{normalized[i], 0, timestamp})
 	}
-	annotationData := GetBatchGeoData(BatchURL, reqData)
+        batchURL := BatchURL
+        if dataType == "SS" {
+            batchURL = BatchURLSS
+        }
+	annotationData := GetBatchGeoData(batchURL, reqData)
 	timeString := strconv.FormatInt(timestamp.Unix(), 36)
 	for i := range normalized {
 		data, ok := annotationData[normalized[i]+timeString]
@@ -179,11 +192,11 @@ func QueryAnnotationService(url string) ([]byte, error) {
 		// Median response time is < 10 msec, but 99th percentile is 0.6 seconds.
 		Timeout: 2 * time.Second,
 	}
-	req, err:= http.NewRequest("GET", url, nil)
-        if err != nil {
-                return nil, err
-        }
-        resp, err:= netClient.Do(req)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := netClient.Do(req)
 
 	// Catch http errors
 	if err != nil {
@@ -280,7 +293,7 @@ func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error)
 
 	// Copy response into a byte slice
 	body, err := ioutil.ReadAll(resp.Body)
-	
+
 	resp.Body.Close()
 	if err != nil {
 		metrics.AnnotationErrorCount.
