@@ -136,7 +136,7 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 		}
 	}
 
-	requestSlice := make([]annotation.RequestData, 4, len(hopMap))
+	requestSlice := make([]annotation.RequestData, 0, len(hopMap))
 	for _, req := range hopMap {
 		requestSlice = append(requestSlice, req)
 	}
