@@ -18,7 +18,7 @@ import (
 )
 
 var epoch time.Time = time.Unix(0, 0)
-
+/*
 func TestAddGeoDataSSConnSpec(t *testing.T) {
 	tests := []struct {
 		conspec   schema.Web100ConnectionSpecification
@@ -74,7 +74,7 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 		}
 	}
 }
-
+*/
 func TestAddGeoDataPTConnSpec(t *testing.T) {
 	tests := []struct {
 		conspec   schema.MLabConnectionSpecification
