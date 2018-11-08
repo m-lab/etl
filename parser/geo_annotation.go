@@ -36,7 +36,7 @@ func AddGeoDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp 
 
 	ipSlice := []string{spec.Local_ip, spec.Remote_ip}
 	geoSlice := []*annotation.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
-	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
+	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice, "SS")
 }
 
 // AddGeoDataPTConnSpec takes a pointer to a
@@ -58,7 +58,7 @@ func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp ti
 	}(timerStart)
 	ipSlice := []string{spec.Server_ip, spec.Client_ip}
 	geoSlice := []*annotation.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
-	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
+	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice, "PT")
 }
 
 // AddGeoDataPTHopBatch takes a slice of pointers to
@@ -73,7 +73,7 @@ func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 	requestSlice := CreateRequestDataFromPTHops(hops, timestamp)
-	annotationData := annotation.GetBatchGeoData(annotation.BatchURL, requestSlice)
+	annotationData := annotation.GetBatchGeoData(annotation.BatchURLPT, requestSlice)
 	AnnotatePTHops(hops, annotationData, timestamp)
 }
 
@@ -135,7 +135,7 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 		}
 	}
 
-	requestSlice := make([]annotation.RequestData, 0, len(hopMap))
+	requestSlice := make([]annotation.RequestData, 4, len(hopMap))
 	for _, req := range hopMap {
 		requestSlice = append(requestSlice, req)
 	}
