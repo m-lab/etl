@@ -56,7 +56,7 @@ func TestFetchGeoAnnotations(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL
-		annotation.FetchGeoAnnotations(test.ips, test.timestamp, test.geoDest)
+		annotation.FetchGeoAnnotations(test.ips, test.timestamp, test.geoDest, "NDT")
 		if !reflect.DeepEqual(test.geoDest, test.res) {
 			t.Errorf("Expected %v, got %v", test.res, test.geoDest)
 		}
