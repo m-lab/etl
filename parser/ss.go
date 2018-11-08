@@ -69,7 +69,7 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 	logTime := time.Unix(buf.rows[0].(*schema.SS).Web100_log_entry.LogTime, 0)
 	start := time.Now()
 	// TODO - are there any errors we should process from Fetch?
-	annotation.FetchGeoAnnotations(ipSlice, logTime, geoSlice)
+	annotation.FetchGeoAnnotations(ipSlice, logTime, geoSlice, "SS")
 	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": "SS"}).Observe(float64(time.Since(start).Nanoseconds()))
 }
 
