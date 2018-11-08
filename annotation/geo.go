@@ -239,7 +239,11 @@ func ParseJSONGeoDataResponse(jsonBuffer []byte) (*GeoData, error) {
 func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 	// Query the service and grab the response safely
 	// All errors are recorded to metrics, so OK to ignore them here.
-	annotatorResponse, _ := BatchQueryAnnotationService(url, data)
+	annotatorResponse, err := BatchQueryAnnotationService(url, data)
+	if err != nil {
+		log.Println("BatchQueryAnnotationService Error:", err)
+		return nil
+	}
 
 	// Safely parse the JSON response and pass it back to the caller
 	geoDataFromResponse, err := BatchParseJSONGeoDataResponse(annotatorResponse)
@@ -279,7 +283,7 @@ func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error)
 	// Catch http errors
 	if err != nil {
 		metrics.AnnotationErrorCount.
-			With(prometheus.Labels{"source": err.Error()}).Inc()
+			With(prometheus.Labels{"source": "Post Error"}).Inc()
 		return nil, err
 	}
 
