@@ -73,8 +73,7 @@ func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 	requestSlice := CreateRequestDataFromPTHops(hops, timestamp)
-	//annotationData := annotation.GetBatchGeoData(annotation.BatchURLPT, requestSlice)
-	annotationData := annotation.GetBatchGeoData(annotation.BatchURL, requestSlice)
+	annotationData := annotation.GetBatchGeoData(annotation.BatchURLPT, requestSlice)
 	AnnotatePTHops(hops, annotationData, timestamp)
 }
 
