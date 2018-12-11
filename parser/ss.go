@@ -12,6 +12,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -56,7 +57,7 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 	}
 
 	ipSlice := make([]string, 2*len(buf.rows))
-	geoSlice := make([]*annotation.GeolocationIP, 2*len(buf.rows))
+	geoSlice := make([]*api.GeolocationIP, 2*len(buf.rows))
 	for i := range buf.rows {
 		row := buf.rows[i].(*schema.SS)
 		connSpec := &row.Web100_log_entry.Connection_spec

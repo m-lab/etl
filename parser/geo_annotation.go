@@ -6,11 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/m-lab/annotation-service/api"
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/web100"
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 	"github.com/prometheus/client_golang/prometheus"
@@ -35,7 +36,7 @@ func AddGeoDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp 
 	}(timerStart)
 
 	ipSlice := []string{spec.Local_ip, spec.Remote_ip}
-	geoSlice := []*annotation.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
+	geoSlice := []*api.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
 	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
@@ -57,7 +58,7 @@ func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp ti
 			Observe(float64(time.Since(tStart).Nanoseconds()))
 	}(timerStart)
 	ipSlice := []string{spec.Server_ip, spec.Client_ip}
-	geoSlice := []*annotation.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
+	geoSlice := []*api.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
 	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
@@ -80,7 +81,7 @@ func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time
 // AnnotatePTHops takes a slice of hop pointers, the annotation data
 // mapping ip addresses to geo data and a timestamp. It will then use
 // these to attach the appropriate geo data to the PT hops.
-func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]annotation.GeoData, timestamp time.Time) {
+func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]api.GeoData, timestamp time.Time) {
 	if annotationData == nil {
 		return
 	}
@@ -110,8 +111,8 @@ func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string
 // and the associate timestamp. From those, it will create a slice of
 // requests to send to the annotation service, removing duplicates
 // along the way.
-func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp time.Time) []annotation.RequestData {
-	hopMap := map[string]annotation.RequestData{}
+func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp time.Time) []api.RequestData {
+	hopMap := map[string]api.RequestData{}
 	for _, hop := range hops {
 		if hop == nil {
 			metrics.AnnotationErrorCount.With(prometheus.
@@ -120,7 +121,7 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 		}
 		if hop.Src_ip != "" {
 			hop.Src_ip, _ = web100.NormalizeIPv6(hop.Src_ip)
-			hopMap[hop.Src_ip] = annotation.RequestData{hop.Src_ip, 0, timestamp}
+			hopMap[hop.Src_ip] = api.RequestData{hop.Src_ip, 0, timestamp}
 		} else {
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()
@@ -128,14 +129,14 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 
 		if hop.Dest_ip != "" {
 			hop.Dest_ip, _ = web100.NormalizeIPv6(hop.Dest_ip)
-			hopMap[hop.Dest_ip] = annotation.RequestData{hop.Dest_ip, 0, timestamp}
+			hopMap[hop.Dest_ip] = api.RequestData{hop.Dest_ip, 0, timestamp}
 		} else {
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()
 		}
 	}
 
-	requestSlice := make([]annotation.RequestData, 0, len(hopMap))
+	requestSlice := make([]api.RequestData, 0, len(hopMap))
 	for _, req := range hopMap {
 		requestSlice = append(requestSlice, req)
 	}
@@ -177,15 +178,6 @@ func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 // Address. It will either sucessfully add the geo data or fail
 // silently and make no changes.
 func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
-	// Only annotate if flag enabled...
-	// TODO(gfr) - should propogate this to other pipelines, or push to a common
-	// intercept point.
-	if !annotation.IPAnnotationEnabled {
-		metrics.AnnotationErrorCount.With(prometheus.Labels{
-			"source": "IP Annotation Disabled."}).Inc()
-		return
-	}
-
 	// Time the response
 	timerStart := time.Now()
 	defer func(tStart time.Time) {
@@ -238,17 +230,17 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 	// TODO: Make metrics for sok and cok failures. And double check metrics for cleanliness.
 	cip, cok := spec.GetString([]string{"client_ip"})
 	sip, sok := spec.GetString([]string{"server_ip"})
-	reqData := []annotation.RequestData{}
+	reqData := []api.RequestData{}
 	if cok {
 		cip, _ = web100.NormalizeIPv6(cip)
-		reqData = append(reqData, annotation.RequestData{IP: cip, Timestamp: timestamp})
+		reqData = append(reqData, api.RequestData{IP: cip, Timestamp: timestamp})
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
 			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
 		sip, _ = web100.NormalizeIPv6(sip)
-		reqData = append(reqData, annotation.RequestData{IP: sip, Timestamp: timestamp})
+		reqData = append(reqData, api.RequestData{IP: sip, Timestamp: timestamp})
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
 			Labels{"source": "Missing server side IP."}).Inc()

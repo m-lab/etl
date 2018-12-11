@@ -600,11 +600,9 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		// TODO: This is an insert error, that might be recoverable if we try again.
 		log.Println("insert-err: " + err.Error())
 		return
-	} else {
-		metrics.TestCount.WithLabelValues(
-			n.TableName(), testType, "ok").Inc()
-		return
 	}
+	metrics.TestCount.WithLabelValues(
+		n.TableName(), testType, "ok").Inc()
 }
 
 const (

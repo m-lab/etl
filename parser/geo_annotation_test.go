@@ -12,6 +12,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/annotation"
 	p "github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -38,7 +39,7 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 			url:       "/src",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:          "127.0.0.1",
-				Local_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
+				Local_geolocation: api.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -47,7 +48,7 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 			url:       "/dest",
 			res: schema.Web100ConnectionSpecification{
 				Remote_ip:          "127.0.0.1",
-				Remote_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
+				Remote_geolocation: api.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -56,9 +57,9 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 			url:       "/both",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:           "127.0.0.1",
-				Local_geolocation:  annotation.GeolocationIP{PostalCode: "10583"},
+				Local_geolocation:  api.GeolocationIP{PostalCode: "10583"},
 				Remote_ip:          "127.0.0.2",
-				Remote_geolocation: annotation.GeolocationIP{PostalCode: "10584"},
+				Remote_geolocation: api.GeolocationIP{PostalCode: "10584"},
 			},
 		},
 	}
@@ -94,7 +95,7 @@ func TestAddGeoDataPTConnSpec(t *testing.T) {
 			url:       "/src",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
-				Server_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
+				Server_geolocation: api.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -103,7 +104,7 @@ func TestAddGeoDataPTConnSpec(t *testing.T) {
 			url:       "/dest",
 			res: schema.MLabConnectionSpecification{
 				Client_ip:          "127.0.0.1",
-				Client_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
+				Client_geolocation: api.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -112,9 +113,9 @@ func TestAddGeoDataPTConnSpec(t *testing.T) {
 			url:       "/both",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
-				Server_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
+				Server_geolocation: api.GeolocationIP{PostalCode: "10583"},
 				Client_ip:          "127.0.0.2",
-				Client_geolocation: annotation.GeolocationIP{PostalCode: "10584"},
+				Client_geolocation: api.GeolocationIP{PostalCode: "10584"},
 			},
 		},
 	}
@@ -149,9 +150,9 @@ func TestAddGeoDataPTHopBatchBadIPv6(t *testing.T) {
 			res: []*schema.ParisTracerouteHop{
 				&schema.ParisTracerouteHop{
 					Src_ip:           "fe80::301f:d5b0:3fb7:3a00",
-					Src_geolocation:  annotation.GeolocationIP{AreaCode: 10583},
+					Src_geolocation:  api.GeolocationIP{AreaCode: 10583},
 					Dest_ip:          "2620:0:1003:415:b33e:9d6a:81bf:87a1",
-					Dest_geolocation: annotation.GeolocationIP{AreaCode: 10584},
+					Dest_geolocation: api.GeolocationIP{AreaCode: 10584},
 				},
 			},
 		},
@@ -194,9 +195,9 @@ func TestAddGeoDataPTHopBatch(t *testing.T) {
 			res: []*schema.ParisTracerouteHop{
 				&schema.ParisTracerouteHop{
 					Src_ip:           "127.0.0.1",
-					Src_geolocation:  annotation.GeolocationIP{AreaCode: 914},
+					Src_geolocation:  api.GeolocationIP{AreaCode: 914},
 					Dest_ip:          "1.0.0.127",
-					Dest_geolocation: annotation.GeolocationIP{AreaCode: 212},
+					Dest_geolocation: api.GeolocationIP{AreaCode: 212},
 				},
 			},
 		},
@@ -217,7 +218,7 @@ func TestAddGeoDataPTHopBatch(t *testing.T) {
 func TestAnnotatePTHops(t *testing.T) {
 	tests := []struct {
 		hops           []*schema.ParisTracerouteHop
-		annotationData map[string]annotation.GeoData
+		annotationData map[string]api.GeoData
 		timestamp      time.Time
 		res            []*schema.ParisTracerouteHop
 	}{
@@ -229,25 +230,25 @@ func TestAnnotatePTHops(t *testing.T) {
 		},
 		{
 			hops:           []*schema.ParisTracerouteHop{nil},
-			annotationData: map[string]annotation.GeoData{},
+			annotationData: map[string]api.GeoData{},
 			timestamp:      epoch,
 			res:            []*schema.ParisTracerouteHop{nil},
 		},
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
-			annotationData: map[string]annotation.GeoData{"127.0.0.10": annotation.GeoData{
-				Geo: &annotation.GeolocationIP{}, ASN: nil}},
+			annotationData: map[string]api.GeoData{"127.0.0.10": api.GeoData{
+				Geo: &api.GeolocationIP{}, ASN: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1",
-				Src_geolocation: annotation.GeolocationIP{}}},
+				Src_geolocation: api.GeolocationIP{}}},
 		},
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
-			annotationData: map[string]annotation.GeoData{"1.0.0.1270": annotation.GeoData{
-				Geo: &annotation.GeolocationIP{}, ASN: nil}},
+			annotationData: map[string]api.GeoData{"1.0.0.1270": api.GeoData{
+				Geo: &api.GeolocationIP{}, ASN: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127",
-				Dest_geolocation: annotation.GeolocationIP{}}},
+				Dest_geolocation: api.GeolocationIP{}}},
 		},
 	}
 	for _, test := range tests {
@@ -263,22 +264,22 @@ func TestCreateRequestDataFromPTHops(t *testing.T) {
 	tests := []struct {
 		hops      []*schema.ParisTracerouteHop
 		timestamp time.Time
-		res       []annotation.RequestData
+		res       []api.RequestData
 	}{
 		{
 			hops:      []*schema.ParisTracerouteHop{},
 			timestamp: epoch,
-			res:       []annotation.RequestData{},
+			res:       []api.RequestData{},
 		},
 		{
 			hops:      []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
 			timestamp: epoch,
-			res:       []annotation.RequestData{annotation.RequestData{"1.0.0.127", 0, epoch}},
+			res:       []api.RequestData{api.RequestData{"1.0.0.127", 0, epoch}},
 		},
 		{
 			hops:      []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
 			timestamp: epoch,
-			res:       []annotation.RequestData{annotation.RequestData{"127.0.0.1", 0, epoch}},
+			res:       []api.RequestData{api.RequestData{"127.0.0.1", 0, epoch}},
 		},
 	}
 	for _, test := range tests {
@@ -308,7 +309,7 @@ func TestAddGeoDataPTHop(t *testing.T) {
 			url:       "/src",
 			res: schema.ParisTracerouteHop{
 				Src_ip:          "127.0.0.1",
-				Src_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
+				Src_geolocation: api.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -317,7 +318,7 @@ func TestAddGeoDataPTHop(t *testing.T) {
 			url:       "/dest",
 			res: schema.ParisTracerouteHop{
 				Dest_ip:          "127.0.0.1",
-				Dest_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
+				Dest_geolocation: api.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -326,9 +327,9 @@ func TestAddGeoDataPTHop(t *testing.T) {
 			url:       "/both",
 			res: schema.ParisTracerouteHop{
 				Src_ip:           "127.0.0.1",
-				Src_geolocation:  annotation.GeolocationIP{PostalCode: "10583"},
+				Src_geolocation:  api.GeolocationIP{PostalCode: "10583"},
 				Dest_ip:          "127.0.0.2",
-				Dest_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
+				Dest_geolocation: api.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 	}
@@ -350,105 +351,87 @@ func testTime() time.Time {
 	return tst
 }
 
-var tests = []struct {
-	spec      schema.Web100ValueMap
-	timestamp time.Time
-	url       string
-	res       schema.Web100ValueMap
-}{
-	{
-		spec: func() schema.Web100ValueMap {
-			spec := schema.EmptyConnectionSpec()
-			spec["client_ip"] = "127.0.0.1"
-			spec["server_ip"] = "1.0.0.127"
-			return spec
-		}(),
-		timestamp: testTime(),
-		url:       "/10583?",
-		res: func() schema.Web100ValueMap {
-			spec := schema.EmptyConnectionSpec()
-			spec["client_ip"] = "127.0.0.1"
-			spec["server_ip"] = "1.0.0.127"
-			geoc := spec.Get("client_geolocation")
-			geoc["country_code"] = "US"
-			geoc["country_code3"] = "USA"
-			geoc["country_name"] = "United States of America"
-			geoc["region"] = "NY"
-			geoc["city"] = "Scarsdale"
-			geoc["area_code"] = int64(10583)
-			geoc["postal_code"] = "10583"
-			geoc["latitude"] = float64(41.0051)
-			geoc["longitude"] = float64(73.7846)
-			geos := spec.Get("server_geolocation")
-			geos["country_code"] = "US"
-			geos["country_code3"] = "USA"
-			geos["country_name"] = "United States of America"
-			geos["region"] = "NY"
-			geos["city"] = "Scarsdale"
-			geos["area_code"] = int64(10584)
-			geos["postal_code"] = "10584"
-			geos["latitude"] = float64(41.0051)
-			geos["longitude"] = float64(73.7846)
-			return spec
-		}(),
-	},
-	{ // This test exercises the error path one missing IP
-		spec: func() schema.Web100ValueMap {
-			spec := schema.EmptyConnectionSpec()
-			spec["client_ip"] = "127.0.0.1"
-			return spec
-		}(),
-		timestamp: testTime(),
-		url:       "/10583?",
-		res: func() schema.Web100ValueMap {
-			spec := schema.EmptyConnectionSpec()
-			spec["client_ip"] = "127.0.0.1"
-			geoc := spec.Get("client_geolocation")
-			geoc["country_code"] = "US"
-			geoc["country_code3"] = "USA"
-			geoc["country_name"] = "United States of America"
-			geoc["region"] = "NY"
-			geoc["city"] = "Scarsdale"
-			geoc["area_code"] = int64(10583)
-			geoc["postal_code"] = "10583"
-			geoc["latitude"] = float64(41.0051)
-			geoc["longitude"] = float64(73.7846)
-			return spec
-		}(),
-	},
-	{ // This test exercises the error path for missing IP addresses.
-		spec: func() schema.Web100ValueMap {
-			spec := schema.EmptyConnectionSpec()
-			return spec
-		}(),
-		timestamp: testTime(),
-		url:       "/10583?",
-		res: func() schema.Web100ValueMap {
-			spec := schema.EmptyConnectionSpec()
-			return spec
-		}(),
-	},
-}
-
-func TestDisabledAnnotation(t *testing.T) {
-	callCount := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount += 1
-		// Note: the "h3d0c0" in the IP strings is the appended timestamp.
-		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
-			`,"1.0.0.127h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}`)
-	}))
-	for _, test := range tests {
-		annotation.BatchURL = ts.URL + test.url
-		p.AddGeoDataNDTConnSpec(test.spec, test.timestamp)
-	}
-	if callCount != 0 {
-		t.Errorf("Annotator should not have been called.  Call count: %d", callCount)
-	}
-}
-
 func TestAddGeoDataNDTConnSpec(t *testing.T) {
-	annotation.EnableAnnotation()
+	var tests = []struct {
+		spec      schema.Web100ValueMap
+		timestamp time.Time
+		url       string
+		res       schema.Web100ValueMap
+	}{
+		{
+			spec: func() schema.Web100ValueMap {
+				spec := schema.EmptyConnectionSpec()
+				spec["client_ip"] = "127.0.0.1"
+				spec["server_ip"] = "1.0.0.127"
+				return spec
+			}(),
+			timestamp: testTime(),
+			url:       "/10583?",
+			res: func() schema.Web100ValueMap {
+				spec := schema.EmptyConnectionSpec()
+				spec["client_ip"] = "127.0.0.1"
+				spec["server_ip"] = "1.0.0.127"
+				geoc := spec.Get("client_geolocation")
+				geoc["country_code"] = "US"
+				geoc["country_code3"] = "USA"
+				geoc["country_name"] = "United States of America"
+				geoc["region"] = "NY"
+				geoc["city"] = "Scarsdale"
+				geoc["area_code"] = int64(10583)
+				geoc["postal_code"] = "10583"
+				geoc["latitude"] = float64(41.0051)
+				geoc["longitude"] = float64(73.7846)
+				geos := spec.Get("server_geolocation")
+				geos["country_code"] = "US"
+				geos["country_code3"] = "USA"
+				geos["country_name"] = "United States of America"
+				geos["region"] = "NY"
+				geos["city"] = "Scarsdale"
+				geos["area_code"] = int64(10584)
+				geos["postal_code"] = "10584"
+				geos["latitude"] = float64(41.0051)
+				geos["longitude"] = float64(73.7846)
+				return spec
+			}(),
+		},
+		{ // This test exercises the error path one missing IP
+			spec: func() schema.Web100ValueMap {
+				spec := schema.EmptyConnectionSpec()
+				spec["client_ip"] = "127.0.0.1"
+				return spec
+			}(),
+			timestamp: testTime(),
+			url:       "/10583?",
+			res: func() schema.Web100ValueMap {
+				spec := schema.EmptyConnectionSpec()
+				spec["client_ip"] = "127.0.0.1"
+				geoc := spec.Get("client_geolocation")
+				geoc["country_code"] = "US"
+				geoc["country_code3"] = "USA"
+				geoc["country_name"] = "United States of America"
+				geoc["region"] = "NY"
+				geoc["city"] = "Scarsdale"
+				geoc["area_code"] = int64(10583)
+				geoc["postal_code"] = "10583"
+				geoc["latitude"] = float64(41.0051)
+				geoc["longitude"] = float64(73.7846)
+				return spec
+			}(),
+		},
+		{ // This test exercises the error path for missing IP addresses.
+			spec: func() schema.Web100ValueMap {
+				spec := schema.EmptyConnectionSpec()
+				return spec
+			}(),
+			timestamp: testTime(),
+			url:       "/10583?",
+			res: func() schema.Web100ValueMap {
+				spec := schema.EmptyConnectionSpec()
+				return spec
+			}(),
+		},
+	}
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Note: the "h3d0c0" in the IP strings is the appended timestamp.
 		fmt.Fprint(w, `{"127.0.0.1h3d0c0" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+

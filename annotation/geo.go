@@ -12,72 +12,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/web100"
 
 	"github.com/m-lab/etl/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-var IPAnnotationEnabled = false
-
-func init() {
-	getFlagValues()
-}
-
-func getFlagValues() {
-	// Check for ANNOTATE_IP = 'true'
-	flag, ok := os.LookupEnv("ANNOTATE_IP")
-	if ok {
-		IPAnnotationEnabled, _ = strconv.ParseBool(flag)
-		// If parse fails, then ipAnn will be set to false.
-	}
-}
-
-// EnableAnnotation is used only for testing.  Should be placed in whitebox _test file.
-func EnableAnnotation() {
-	os.Setenv("ANNOTATE_IP", "True")
-	getFlagValues()
-}
-
-// The GeolocationIP struct contains all the information needed for the
-// geolocation data that will be inserted into big query. The fiels are
-// capitalized for exporting, although the originals in the DB schema
-// are not.
-type GeolocationIP struct {
-	// TODO - Are these correct?  Looks like double ,, should be single ,
-	ContinentCode string  `json:"continent_code,,omitempty"` // Gives a shorthand for the continent
-	CountryCode   string  `json:"country_code,,omitempty"`   // Gives a shorthand for the country
-	CountryCode3  string  `json:"country_code3,,omitempty"`  // Gives a shorthand for the country
-	CountryName   string  `json:"country_name,,omitempty"`   // Name of the country
-	Region        string  `json:"region,,omitempty"`         // Region or State within the country
-	MetroCode     int64   `json:"metro_code,,omitempty"`     // Metro code within the country
-	City          string  `json:"city,,omitempty"`           // City within the region
-	AreaCode      int64   `json:"area_code,,omitempty"`      // Area code, similar to metro code
-	PostalCode    string  `json:"postal_code,,omitempty"`    // Postal code, again similar to metro
-	Latitude      float64 `json:"latitude"`                  // Latitude
-	Longitude     float64 `json:"longitude"`                 // Longitude
-
-}
-
-// The struct that will hold the IP/ASN data when it gets added to the
-// schema. Currently empty and unused.
-type IPASNData struct{}
-
-// The main struct for the geo metadata, which holds pointers to the
-// Geolocation data and the IP/ASN data. This is what we parse the JSON
-// response from the annotator into.
-type GeoData struct {
-	Geo *GeolocationIP // Holds the geolocation data
-	ASN *IPASNData     // Holds the IP/ASN data
-}
-
-// The RequestData schema is the schema for the json that we will send
-// down the pipe to the annotation service.
-type RequestData struct {
-	IP        string    // Holds the IP from an incoming request
-	IPFormat  int       // Holds the ip format, 4 or 6
-	Timestamp time.Time // Holds the timestamp from an incoming request
-}
 
 // AnnotatorURL holds the https address of the annotator.
 // TODO(gfr) See if there is a better way of determining
@@ -99,8 +39,8 @@ var BatchURL = AnnotatorURL + "/batch_annotate"
 // same length. It will then make a call to the batch annotator, using
 // the ip addresses and the timestamp. Then, it uses that data to fill
 // in the structs pointed to by the slice of GeolocationIP pointers.
-func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*GeolocationIP) {
-	reqData := make([]RequestData, 0, len(ips))
+func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.GeolocationIP) {
+	reqData := make([]api.RequestData, 0, len(ips))
 	normalized := make([]string, len(ips))
 	for i := range ips {
 		if ips[i] == "" {
@@ -116,7 +56,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 			metrics.AnnotationWarningCount.With(prometheus.
 				Labels{"source": "NormalizeIPv6 Error"}).Inc()
 		}
-		reqData = append(reqData, RequestData{normalized[i], 0, timestamp})
+		reqData = append(reqData, api.RequestData{normalized[i], 0, timestamp})
 	}
 	annotationData := GetBatchGeoData(BatchURL, reqData)
 	timeString := strconv.FormatInt(timestamp.Unix(), 36)
@@ -137,7 +77,7 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*Geolocati
 // timestamp. It will connect to the annotation service, get the
 // geo data, and insert the geo data into the reigion pointed to by
 // the GeolocationIP pointer.
-func GetAndInsertGeolocationIPStruct(geo *GeolocationIP, ip string, timestamp time.Time) {
+func GetAndInsertGeolocationIPStruct(geo *api.GeolocationIP, ip string, timestamp time.Time) {
 	url := BaseURL + "ip_addr=" + url.QueryEscape(ip) +
 		"&since_epoch=" + strconv.FormatInt(timestamp.Unix(), 10)
 	annotationData := GetGeoData(url)
@@ -150,7 +90,7 @@ func GetAndInsertGeolocationIPStruct(geo *GeolocationIP, ip string, timestamp ti
 // ParseJSONGeoDataResponse to query the annotator service and return
 // the corresponding GeoData if it can, or a nil pointer if it
 // encounters any error and cannot get the data for any reason
-func GetGeoData(url string) *GeoData {
+func GetGeoData(url string) *api.GeoData {
 	// Query the service and grab the response safely
 	annotatorResponse, err := QueryAnnotationService(url)
 	if err != nil {
@@ -200,8 +140,8 @@ func QueryAnnotationService(url string) ([]byte, error) {
 // the JSON from the annotator service and parses it into a GeoData
 // struct, for easy manipulation. It returns a pointer to the struct on
 // success and an error if an error occurs.
-func ParseJSONGeoDataResponse(jsonBuffer []byte) (*GeoData, error) {
-	parsedJSON := &GeoData{}
+func ParseJSONGeoDataResponse(jsonBuffer []byte) (*api.GeoData, error) {
+	parsedJSON := &api.GeoData{}
 	err := json.Unmarshal(jsonBuffer, parsedJSON)
 	if err != nil {
 		return nil, err
@@ -215,7 +155,7 @@ func ParseJSONGeoDataResponse(jsonBuffer []byte) (*GeoData, error) {
 // ip-timestamp strings to GeoData structs, or a nil map if it
 // encounters any error and cannot get the data for any reason
 // TODO - dedup common code in GetGeoData
-func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
+func GetBatchGeoData(url string, data []api.RequestData) map[string]api.GeoData {
 	// Query the service and grab the response safely
 	// All errors are recorded to metrics, so OK to ignore them here.
 	annotatorResponse, err := BatchQueryAnnotationService(url, data)
@@ -242,7 +182,7 @@ func GetBatchGeoData(url string, data []RequestData) map[string]GeoData {
 // format. It will copy the response into a []byte and return it to
 // the user, returning an error if any occurs
 // TODO(gfr) Should pass the annotator's request context through and use it here.
-func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error) {
+func BatchQueryAnnotationService(url string, data []api.RequestData) ([]byte, error) {
 	metrics.AnnotationRequestCount.Inc()
 
 	encodedData, err := json.Marshal(data)
@@ -289,9 +229,10 @@ func BatchQueryAnnotationService(url string, data []RequestData) ([]byte, error)
 // easy manipulation. It returns a pointer to the struct on success
 // and an error if one occurs.
 // TODO - is there duplicate code with ParseJSON... ?
-func BatchParseJSONGeoDataResponse(jsonBuffer []byte) (map[string]GeoData, error) {
-	parsedJSON := make(map[string]GeoData)
+func BatchParseJSONGeoDataResponse(jsonBuffer []byte) (map[string]api.GeoData, error) {
+	parsedJSON := make(map[string]api.GeoData)
 	err := json.Unmarshal(jsonBuffer, &parsedJSON)
+	log.Println(parsedJSON)
 	if err != nil {
 		return nil, err
 	}

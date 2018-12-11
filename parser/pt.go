@@ -13,11 +13,9 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type PTFileName struct {
@@ -573,13 +571,8 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	}
 
 	// Only annotate if flag enabled...
-	if !annotation.IPAnnotationEnabled {
-		metrics.AnnotationErrorCount.With(prometheus.Labels{
-			"source": "IP Annotation Disabled."}).Inc()
-	} else {
-		AddGeoDataPTConnSpec(connSpec, logTime)
-		AddGeoDataPTHopBatch(PTHops, logTime)
-	}
+	AddGeoDataPTConnSpec(connSpec, logTime)
+	AddGeoDataPTHopBatch(PTHops, logTime)
 
 	return cachedPTData{
 		TestID:           testId,
