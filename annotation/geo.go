@@ -44,17 +44,18 @@ func EnableAnnotation() {
 // capitalized for exporting, although the originals in the DB schema
 // are not.
 type GeolocationIP struct {
-	Continent_code string  `json:"continent_code,,omitempty"` // Gives a shorthand for the continent
-	Country_code   string  `json:"country_code,,omitempty"`   // Gives a shorthand for the country
-	Country_code3  string  `json:"country_code3,,omitempty"`  // Gives a shorthand for the country
-	Country_name   string  `json:"country_name,,omitempty"`   // Name of the country
-	Region         string  `json:"region,,omitempty"`         // Region or State within the country
-	Metro_code     int64   `json:"metro_code,,omitempty"`     // Metro code within the country
-	City           string  `json:"city,,omitempty"`           // City within the region
-	Area_code      int64   `json:"area_code,,omitempty"`      // Area code, similar to metro code
-	Postal_code    string  `json:"postal_code,,omitempty"`    // Postal code, again similar to metro
-	Latitude       float64 `json:"latitude"`                  // Latitude
-	Longitude      float64 `json:"longitude"`                 // Longitude
+	// TODO - Are these correct?  Looks like double ,, should be single ,
+	ContinentCode string  `json:"continent_code,,omitempty"` // Gives a shorthand for the continent
+	CountryCode   string  `json:"country_code,,omitempty"`   // Gives a shorthand for the country
+	CountryCode3  string  `json:"country_code3,,omitempty"`  // Gives a shorthand for the country
+	CountryName   string  `json:"country_name,,omitempty"`   // Name of the country
+	Region        string  `json:"region,,omitempty"`         // Region or State within the country
+	MetroCode     int64   `json:"metro_code,,omitempty"`     // Metro code within the country
+	City          string  `json:"city,,omitempty"`           // City within the region
+	AreaCode      int64   `json:"area_code,,omitempty"`      // Area code, similar to metro code
+	PostalCode    string  `json:"postal_code,,omitempty"`    // Postal code, again similar to metro
+	Latitude      float64 `json:"latitude"`                  // Latitude
+	Longitude     float64 `json:"longitude"`                 // Longitude
 
 }
 
