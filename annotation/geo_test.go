@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/annotation"
 )
 
@@ -26,27 +27,27 @@ func TestFetchGeoAnnotations(t *testing.T) {
 	tests := []struct {
 		ips       []string
 		timestamp time.Time
-		geoDest   []*annotation.GeolocationIP
-		res       []*annotation.GeolocationIP
+		geoDest   []*api.GeolocationIP
+		res       []*api.GeolocationIP
 	}{
 		{
 			ips:       []string{},
 			timestamp: epoch,
-			geoDest:   []*annotation.GeolocationIP{},
-			res:       []*annotation.GeolocationIP{},
+			geoDest:   []*api.GeolocationIP{},
+			res:       []*api.GeolocationIP{},
 		},
 		{
 			ips:       []string{"", "127.0.0.1", "2.2.2.2"},
 			timestamp: epoch,
-			geoDest: []*annotation.GeolocationIP{
-				&annotation.GeolocationIP{},
-				&annotation.GeolocationIP{},
-				&annotation.GeolocationIP{},
+			geoDest: []*api.GeolocationIP{
+				&api.GeolocationIP{},
+				&api.GeolocationIP{},
+				&api.GeolocationIP{},
 			},
-			res: []*annotation.GeolocationIP{
-				&annotation.GeolocationIP{},
-				&annotation.GeolocationIP{PostalCode: "10583"},
-				&annotation.GeolocationIP{},
+			res: []*api.GeolocationIP{
+				&api.GeolocationIP{},
+				&api.GeolocationIP{PostalCode: "10583"},
+				&api.GeolocationIP{},
 			},
 		},
 	}
@@ -65,24 +66,24 @@ func TestFetchGeoAnnotations(t *testing.T) {
 
 func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
 	tests := []struct {
-		geo       *annotation.GeolocationIP
+		geo       *api.GeolocationIP
 		ip        string
 		timestamp time.Time
 		url       string
-		res       *annotation.GeolocationIP
+		res       *api.GeolocationIP
 	}{
 		{
-			geo:       &annotation.GeolocationIP{},
+			geo:       &api.GeolocationIP{},
 			ip:        "123.123.123.001",
 			timestamp: time.Now(),
 			url:       "portGarbage",
-			res:       &annotation.GeolocationIP{},
+			res:       &api.GeolocationIP{},
 		},
 		{
-			geo: &annotation.GeolocationIP{},
+			geo: &api.GeolocationIP{},
 			ip:  "127.0.0.1",
 			url: "/10583",
-			res: &annotation.GeolocationIP{PostalCode: "10583"},
+			res: &api.GeolocationIP{PostalCode: "10583"},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +102,7 @@ func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
 func TestGetGeoData(t *testing.T) {
 	tests := []struct {
 		url string
-		res *annotation.GeoData
+		res *api.GeoData
 	}{
 		{
 			url: "portGarbage",
@@ -113,7 +114,7 @@ func TestGetGeoData(t *testing.T) {
 		},
 		{
 			url: "/goodJson",
-			res: &annotation.GeoData{},
+			res: &api.GeoData{},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -179,12 +180,12 @@ func TestQueryAnnotationService(t *testing.T) {
 func TestParseJSONGeoDataResponse(t *testing.T) {
 	tests := []struct {
 		testBuffer  []byte
-		resultData  *annotation.GeoData
+		resultData  *api.GeoData
 		resultError error
 	}{
 		{
 			testBuffer:  []byte(`{"Geo":null,"ASN":null}`),
-			resultData:  &annotation.GeoData{Geo: nil, ASN: nil},
+			resultData:  &api.GeoData{Geo: nil, ASN: nil},
 			resultError: nil,
 		},
 		{
@@ -213,7 +214,7 @@ func TestParseJSONGeoDataResponse(t *testing.T) {
 func TestGetBatchGeoData(t *testing.T) {
 	tests := []struct {
 		url string
-		res map[string]annotation.GeoData
+		res map[string]api.GeoData
 	}{
 		{
 			url: "portGarbage",
@@ -225,7 +226,7 @@ func TestGetBatchGeoData(t *testing.T) {
 		},
 		{
 			url: "/goodJson",
-			res: map[string]annotation.GeoData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
+			res: map[string]api.GeoData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -291,7 +292,7 @@ func TestBatchQueryAnnotationService(t *testing.T) {
 func TestBatchParseJSONGeoDataResponse(t *testing.T) {
 	tests := []struct {
 		testBuffer  []byte
-		resultData  map[string]annotation.GeoData
+		resultData  map[string]api.GeoData
 		resultError error
 	}{
 		{
@@ -299,7 +300,7 @@ func TestBatchParseJSONGeoDataResponse(t *testing.T) {
 			// addresses. The xyz could be a base36
 			// encoded timestamp.
 			testBuffer:  []byte(`{"127.0.0.1xyz": {"Geo":null,"ASN":null}}`),
-			resultData:  map[string]annotation.GeoData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
+			resultData:  map[string]api.GeoData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
 			resultError: nil,
 		},
 		{
