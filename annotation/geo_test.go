@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-test/deep"
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/annotation"
 )
@@ -51,15 +52,17 @@ func TestFetchGeoAnnotations(t *testing.T) {
 			},
 		},
 	}
+	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
+	                  "Annotations":{"127.0.0.1":{"Geo":{"postal_code":"10583"}},
+	                                 "127.0.0.2":{"Geo":{"postal_code":"10584"}}}}`
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
-			`,"2.2.2.20" : {"Geo":null,"ASN":null}}`)
+		fmt.Fprint(w, responseJSON)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL
 		annotation.FetchGeoAnnotations(test.ips, test.timestamp, test.geoDest)
-		if !reflect.DeepEqual(test.geoDest, test.res) {
-			t.Errorf("Expected %v, got %v", test.res, test.geoDest)
+		if diff := deep.Equal(test.geoDest, test.res); diff != nil {
+			t.Error(diff)
 		}
 	}
 }

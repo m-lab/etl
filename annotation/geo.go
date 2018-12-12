@@ -2,6 +2,7 @@ package annotation
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
+	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/web100"
 
 	"github.com/m-lab/etl/metrics"
@@ -40,7 +42,6 @@ var BatchURL = AnnotatorURL + "/batch_annotate"
 // the ip addresses and the timestamp. Then, it uses that data to fill
 // in the structs pointed to by the slice of GeolocationIP pointers.
 func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.GeolocationIP) {
-	reqData := make([]api.RequestData, 0, len(ips))
 	normalized := make([]string, len(ips))
 	for i := range ips {
 		if ips[i] == "" {
@@ -56,12 +57,15 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.Geolo
 			metrics.AnnotationWarningCount.With(prometheus.
 				Labels{"source": "NormalizeIPv6 Error"}).Inc()
 		}
-		reqData = append(reqData, api.RequestData{normalized[i], 0, timestamp})
 	}
-	annotationData := GetBatchGeoData(BatchURL, reqData)
-	timeString := strconv.FormatInt(timestamp.Unix(), 36)
+	resp, err := v2.GetAnnotations(context.Background(), BatchURL, timestamp, normalized)
+	if err != nil {
+		log.Println(err)
+		// TODO
+	}
+
 	for i := range normalized {
-		data, ok := annotationData[normalized[i]+timeString]
+		data, ok := resp.Annotations[normalized[i]]
 		if !ok || data.Geo == nil {
 			// TODO(gfr) These should be warning, else we have error > request
 			metrics.AnnotationWarningCount.With(prometheus.
@@ -165,7 +169,7 @@ func GetBatchGeoData(url string, data []api.RequestData) map[string]api.GeoData 
 	}
 
 	// Safely parse the JSON response and pass it back to the caller
-	geoDataFromResponse, err := BatchParseJSONGeoDataResponse(annotatorResponse)
+	geoDataFromResponse, err := batchParseJSONGeoDataResponse(annotatorResponse)
 	if err != nil {
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Failed to parse JSON"}).Inc()
@@ -229,7 +233,7 @@ func BatchQueryAnnotationService(url string, data []api.RequestData) ([]byte, er
 // easy manipulation. It returns a pointer to the struct on success
 // and an error if one occurs.
 // TODO - is there duplicate code with ParseJSON... ?
-func BatchParseJSONGeoDataResponse(jsonBuffer []byte) (map[string]api.GeoData, error) {
+func batchParseJSONGeoDataResponse(jsonBuffer []byte) (map[string]api.GeoData, error) {
 	parsedJSON := make(map[string]api.GeoData)
 	err := json.Unmarshal(jsonBuffer, &parsedJSON)
 	if err != nil {
