@@ -45,7 +45,7 @@ func TestFetchGeoAnnotations(t *testing.T) {
 			},
 			res: []*annotation.GeolocationIP{
 				&annotation.GeolocationIP{},
-				&annotation.GeolocationIP{Postal_code: "10583"},
+				&annotation.GeolocationIP{PostalCode: "10583"},
 				&annotation.GeolocationIP{},
 			},
 		},
@@ -82,7 +82,7 @@ func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
 			geo: &annotation.GeolocationIP{},
 			ip:  "127.0.0.1",
 			url: "/10583",
-			res: &annotation.GeolocationIP{Postal_code: "10583"},
+			res: &annotation.GeolocationIP{PostalCode: "10583"},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

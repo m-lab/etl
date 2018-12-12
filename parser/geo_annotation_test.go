@@ -38,7 +38,7 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 			url:       "/src",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:          "127.0.0.1",
-				Local_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
+				Local_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -47,7 +47,7 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 			url:       "/dest",
 			res: schema.Web100ConnectionSpecification{
 				Remote_ip:          "127.0.0.1",
-				Remote_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
+				Remote_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -56,9 +56,9 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 			url:       "/both",
 			res: schema.Web100ConnectionSpecification{
 				Local_ip:           "127.0.0.1",
-				Local_geolocation:  annotation.GeolocationIP{Postal_code: "10583"},
+				Local_geolocation:  annotation.GeolocationIP{PostalCode: "10583"},
 				Remote_ip:          "127.0.0.2",
-				Remote_geolocation: annotation.GeolocationIP{Postal_code: "10584"},
+				Remote_geolocation: annotation.GeolocationIP{PostalCode: "10584"},
 			},
 		},
 	}
@@ -94,7 +94,7 @@ func TestAddGeoDataPTConnSpec(t *testing.T) {
 			url:       "/src",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
-				Server_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
+				Server_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -103,7 +103,7 @@ func TestAddGeoDataPTConnSpec(t *testing.T) {
 			url:       "/dest",
 			res: schema.MLabConnectionSpecification{
 				Client_ip:          "127.0.0.1",
-				Client_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
+				Client_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -112,9 +112,9 @@ func TestAddGeoDataPTConnSpec(t *testing.T) {
 			url:       "/both",
 			res: schema.MLabConnectionSpecification{
 				Server_ip:          "127.0.0.1",
-				Server_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
+				Server_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
 				Client_ip:          "127.0.0.2",
-				Client_geolocation: annotation.GeolocationIP{Postal_code: "10584"},
+				Client_geolocation: annotation.GeolocationIP{PostalCode: "10584"},
 			},
 		},
 	}
@@ -149,9 +149,9 @@ func TestAddGeoDataPTHopBatchBadIPv6(t *testing.T) {
 			res: []*schema.ParisTracerouteHop{
 				&schema.ParisTracerouteHop{
 					Src_ip:           "fe80::301f:d5b0:3fb7:3a00",
-					Src_geolocation:  annotation.GeolocationIP{Area_code: 10583},
+					Src_geolocation:  annotation.GeolocationIP{AreaCode: 10583},
 					Dest_ip:          "2620:0:1003:415:b33e:9d6a:81bf:87a1",
-					Dest_geolocation: annotation.GeolocationIP{Area_code: 10584},
+					Dest_geolocation: annotation.GeolocationIP{AreaCode: 10584},
 				},
 			},
 		},
@@ -194,9 +194,9 @@ func TestAddGeoDataPTHopBatch(t *testing.T) {
 			res: []*schema.ParisTracerouteHop{
 				&schema.ParisTracerouteHop{
 					Src_ip:           "127.0.0.1",
-					Src_geolocation:  annotation.GeolocationIP{Area_code: 914},
+					Src_geolocation:  annotation.GeolocationIP{AreaCode: 914},
 					Dest_ip:          "1.0.0.127",
-					Dest_geolocation: annotation.GeolocationIP{Area_code: 212},
+					Dest_geolocation: annotation.GeolocationIP{AreaCode: 212},
 				},
 			},
 		},
@@ -308,7 +308,7 @@ func TestAddGeoDataPTHop(t *testing.T) {
 			url:       "/src",
 			res: schema.ParisTracerouteHop{
 				Src_ip:          "127.0.0.1",
-				Src_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
+				Src_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -317,7 +317,7 @@ func TestAddGeoDataPTHop(t *testing.T) {
 			url:       "/dest",
 			res: schema.ParisTracerouteHop{
 				Dest_ip:          "127.0.0.1",
-				Dest_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
+				Dest_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 		{
@@ -326,9 +326,9 @@ func TestAddGeoDataPTHop(t *testing.T) {
 			url:       "/both",
 			res: schema.ParisTracerouteHop{
 				Src_ip:           "127.0.0.1",
-				Src_geolocation:  annotation.GeolocationIP{Postal_code: "10583"},
+				Src_geolocation:  annotation.GeolocationIP{PostalCode: "10583"},
 				Dest_ip:          "127.0.0.2",
-				Dest_geolocation: annotation.GeolocationIP{Postal_code: "10583"},
+				Dest_geolocation: annotation.GeolocationIP{PostalCode: "10583"},
 			},
 		},
 	}
