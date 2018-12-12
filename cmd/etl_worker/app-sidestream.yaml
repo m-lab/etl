@@ -45,4 +45,3 @@ env_variables:
   MAX_WORKERS: 20
   BIGQUERY_PROJECT: '${INJECTED_PROJECT}'  # Overrides GCLOUD_PROJECT
   # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
-  ANNOTATE_IP: 'true'
