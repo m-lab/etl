@@ -232,7 +232,6 @@ func BatchQueryAnnotationService(url string, data []api.RequestData) ([]byte, er
 func BatchParseJSONGeoDataResponse(jsonBuffer []byte) (map[string]api.GeoData, error) {
 	parsedJSON := make(map[string]api.GeoData)
 	err := json.Unmarshal(jsonBuffer, &parsedJSON)
-	log.Println(parsedJSON)
 	if err != nil {
 		return nil, err
 	}
