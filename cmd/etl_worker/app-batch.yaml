@@ -49,6 +49,5 @@ env_variables:
   MAX_WORKERS: 15
   BIGQUERY_PROJECT: '${INJECTED_PROJECT}'  # Overrides GCLOUD_PROJECT
   # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
-  ANNOTATE_IP: 'true'
   NDT_OMIT_DELTAS: 'true'
   # TODO add custom service-account, instead of using default credentials.
