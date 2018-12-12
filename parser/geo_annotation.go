@@ -206,9 +206,11 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 	structToCopy := reflect.ValueOf(sourceStruct).Elem()
 	typeOfStruct := structToCopy.Type()
 	for i := 0; i < typeOfStruct.NumField(); i++ {
-		v := structToCopy.Field(i).Interface()
+		f := structToCopy.Field(i)
+		v := f.Interface()
 		switch t := v.(type) {
 		case string:
+			// TODO - are these still needed?  Does the omitempty cover it?
 			if t == "" {
 				continue
 			}
@@ -217,7 +219,15 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 				continue
 			}
 		}
-		destinationMap[strings.ToLower(typeOfStruct.Field(i).Name)] = v
+		jsonTag, ok := typeOfStruct.Field(i).Tag.Lookup("json")
+		name := strings.ToLower(typeOfStruct.Field(i).Name)
+		if ok {
+			tags := strings.Split(jsonTag, ",")
+			if len(tags) > 0 && tags[0] != "" {
+				name = tags[0]
+			}
+		}
+		destinationMap[strings.ToLower(name)] = v
 	}
 }
 
