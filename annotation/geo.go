@@ -67,7 +67,6 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.Geolo
 	for i := range normalized {
 		data, ok := resp.Annotations[normalized[i]]
 		if !ok || data.Geo == nil {
-			// TODO(gfr) These should be warning, else we have error > request
 			metrics.AnnotationWarningCount.With(prometheus.
 				Labels{"source": "Missing or empty data for IP Address!!!"}).Inc()
 			continue
