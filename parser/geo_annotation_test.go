@@ -72,8 +72,6 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, responseJSON)
-		// `{"127.0.0.1" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
-		//`,"127.0.0.2" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url

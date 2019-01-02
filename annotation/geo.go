@@ -61,7 +61,8 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.Geolo
 	resp, err := v2.GetAnnotations(context.Background(), BatchURL, timestamp, normalized)
 	if err != nil {
 		log.Println(err)
-		// TODO
+		// TODO should ensure that there aren't too many error types.
+		metrics.AnnotationErrorCount.With(prometheus.Labels{"source": err.Error()}).Inc()
 	}
 
 	for i := range normalized {
