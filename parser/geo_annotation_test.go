@@ -1,5 +1,7 @@
 package parser_test
 
+// NOTE: Only the new V2 batch API is now tested.
+
 import (
 	"fmt"
 	"io/ioutil"
@@ -12,6 +14,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"github.com/go-test/deep"
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/annotation"
 	p "github.com/m-lab/etl/parser"
@@ -63,15 +66,18 @@ func TestAddGeoDataSSConnSpec(t *testing.T) {
 			},
 		},
 	}
+	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
+	                  "Annotations":{"127.0.0.1":{"Geo":{"postal_code":"10583"}},
+	                                 "127.0.0.2":{"Geo":{"postal_code":"10584"}}}}`
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
-			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
+		fmt.Fprint(w, responseJSON)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
 		p.AddGeoDataSSConnSpec(&test.conspec, test.timestamp)
-		if !reflect.DeepEqual(test.conspec, test.res) {
-			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
+		if diff := deep.Equal(test.res, test.conspec); diff != nil {
+			t.Error(test.url, diff)
 		}
 	}
 }
@@ -119,15 +125,17 @@ func TestAddGeoDataPTConnSpec(t *testing.T) {
 			},
 		},
 	}
+	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
+	                  "Annotations":{"127.0.0.1":{"Geo":{"postal_code":"10583"}},
+	                                 "127.0.0.2":{"Geo":{"postal_code":"10584"}}}}`
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"127.0.0.10" : {"Geo":{"postal_code":"10583"},"ASN":{}}`+
-			`,"127.0.0.20" : {"Geo":{"postal_code":"10584"},"ASN":{}}}`)
+		fmt.Fprint(w, responseJSON)
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
 		p.AddGeoDataPTConnSpec(&test.conspec, test.timestamp)
-		if !reflect.DeepEqual(test.conspec, test.res) {
-			t.Errorf("Expected %v, got %v for test %s", test.res, test.conspec, test.url)
+		if diff := deep.Equal(test.conspec, test.res); diff != nil {
+			t.Error(test.url, diff)
 		}
 	}
 }
@@ -476,8 +484,8 @@ func TestCopyStructToMap(t *testing.T) {
 	}
 	for _, test := range tests {
 		p.CopyStructToMap(test.source, test.dest)
-		if !reflect.DeepEqual(test.dest, test.res) {
-			t.Errorf("Expected %+v, got %+v for data: %+v\n", test.res, test.dest, test.source)
+		if diff := deep.Equal(test.dest, test.res); diff != nil {
+			t.Error(diff)
 		}
 	}
 
@@ -535,8 +543,8 @@ func TestGetAndInsertTwoSidedGeoIntoNDTConnSpec(t *testing.T) {
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL + test.url
 		p.GetAndInsertTwoSidedGeoIntoNDTConnSpec(test.spec, test.timestamp)
-		if !reflect.DeepEqual(test.spec, test.res) {
-			t.Errorf("Expected %+v, got %+v from data %s", test.res, test.spec, test.url)
+		if diff := deep.Equal(test.spec, test.res); diff != nil {
+			t.Error(test.url, diff)
 		}
 	}
 }
