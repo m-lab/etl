@@ -615,6 +615,7 @@ func CountPanics(r interface{}, tag string) {
 		}
 		log.Println("Adding metrics for panic:", err)
 		PanicCount.WithLabelValues(tag).Inc()
+		debug.PrintStack()
 		panic(r)
 	}
 }
@@ -647,7 +648,7 @@ func PanicToErr(err error, r interface{}, tag string) error {
 		}
 		log.Println("Recovered from panic:", err)
 		PanicCount.WithLabelValues(tag).Inc()
-		fmt.Printf("%s\n", debug.Stack())
+		debug.PrintStack()
 	}
 	return err
 }
