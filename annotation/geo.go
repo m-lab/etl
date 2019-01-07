@@ -58,7 +58,9 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.Geolo
 				Labels{"source": "NormalizeIPv6 Error"}).Inc()
 		}
 	}
-	resp, err := v2.GetAnnotations(context.Background(), BatchURL, timestamp, normalized)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	resp, err := v2.GetAnnotations(ctx, BatchURL, timestamp, normalized)
 	if err != nil {
 		log.Println(err)
 		// TODO should ensure that there aren't too many error types.
