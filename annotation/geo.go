@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -62,9 +64,11 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.Geolo
 	defer cancel()
 	resp, err := v2.GetAnnotations(ctx, BatchURL, timestamp, normalized)
 	if err != nil {
+		// There are many error types returned here, so we log the error, but use the code location
+		// for the metric.
 		log.Println(err)
-		// TODO should ensure that there aren't too many error types.
-		metrics.AnnotationErrorCount.With(prometheus.Labels{"source": err.Error()}).Inc()
+		function, _, line, _ := runtime.Caller(0)
+		metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(function, ":", line)}).Inc()
 		return
 	}
 
