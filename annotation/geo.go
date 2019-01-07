@@ -67,8 +67,8 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.Geolo
 		// There are many error types returned here, so we log the error, but use the code location
 		// for the metric.
 		log.Println(err)
-		function, _, line, _ := runtime.Caller(0)
-		metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(function, ":", line)}).Inc()
+		_, file, line, _ := runtime.Caller(0)
+		metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(file, ":", line)}).Inc()
 		return
 	}
 
