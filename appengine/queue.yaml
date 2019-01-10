@@ -234,7 +234,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-14
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -244,7 +244,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-15
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
