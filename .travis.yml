@@ -161,12 +161,25 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == cf-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
+## Task Queues
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && gcloud app deploy --project=mlab-sandbox $TRAVIS_BUILD_DIR/appengine/queue.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == tq-sandbox-* ||
+               $TRAVIS_BRANCH == ndt-sandbox-* ||
+               $TRAVIS_BRANCH == batch-sandbox-* ||
+               $TRAVIS_BRANCH == sandbox-*
+
 ## Service: etl-batch-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox batch nodryrun
-    && gcloud app deploy --project=mlab-sandbox $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
   skip_cleanup: true
@@ -195,7 +208,6 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
-    && gcloud app deploy --project=mlab-sandbox $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
   skip_cleanup: true
