@@ -255,7 +255,7 @@ queue:
 
 - name: etl-sidestream-batch-0
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -268,7 +268,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-1
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -281,7 +281,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-2
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -294,7 +294,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-3
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -307,7 +307,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-4
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -320,7 +320,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-5
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -333,7 +333,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-6
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -346,7 +346,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-7
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -359,7 +359,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-8
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -372,7 +372,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-9
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -385,7 +385,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-10
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -398,7 +398,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-11
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -411,7 +411,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-12
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -424,7 +424,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-13
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -437,7 +437,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-14
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
@@ -450,7 +450,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-sidestream-batch-15
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 10
