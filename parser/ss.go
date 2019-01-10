@@ -183,8 +183,8 @@ func PackDataIntoSchema(ssValue map[string]string, logTime time.Time, testName s
 		Remote_port: int64(remotePort),
 	}
 
-	// TODO: Move this annotation
-	//AddGeoDataSSConnSpec(conn_spec, logTime)
+	// NOTE: Annotation was previously done here, using AddGeoDataSS...(), but it now done
+	// in ss.Annotate, prior to inserter.PutAsync
 	snap, err := PopulateSnap(ssValue)
 	if err != nil {
 		return schema.SS{}, err
