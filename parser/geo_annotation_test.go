@@ -23,65 +23,6 @@ import (
 
 var epoch time.Time = time.Unix(0, 0)
 
-func TestAddGeoDataSSConnSpec(t *testing.T) {
-	tests := []struct {
-		conspec   schema.Web100ConnectionSpecification
-		timestamp time.Time
-		url       string
-		res       schema.Web100ConnectionSpecification
-	}{
-		{
-			conspec:   schema.Web100ConnectionSpecification{},
-			timestamp: epoch,
-			url:       "/notCalled",
-			res:       schema.Web100ConnectionSpecification{},
-		},
-		{
-			conspec:   schema.Web100ConnectionSpecification{Local_ip: "127.0.0.1"},
-			timestamp: epoch,
-			url:       "/src",
-			res: schema.Web100ConnectionSpecification{
-				Local_ip:          "127.0.0.1",
-				Local_geolocation: api.GeolocationIP{PostalCode: "10583"},
-			},
-		},
-		{
-			conspec:   schema.Web100ConnectionSpecification{Remote_ip: "127.0.0.1"},
-			timestamp: epoch,
-			url:       "/dest",
-			res: schema.Web100ConnectionSpecification{
-				Remote_ip:          "127.0.0.1",
-				Remote_geolocation: api.GeolocationIP{PostalCode: "10583"},
-			},
-		},
-		{
-			conspec:   schema.Web100ConnectionSpecification{Local_ip: "127.0.0.1", Remote_ip: "127.0.0.2"},
-			timestamp: epoch,
-			url:       "/both",
-			res: schema.Web100ConnectionSpecification{
-				Local_ip:           "127.0.0.1",
-				Local_geolocation:  api.GeolocationIP{PostalCode: "10583"},
-				Remote_ip:          "127.0.0.2",
-				Remote_geolocation: api.GeolocationIP{PostalCode: "10584"},
-			},
-		},
-	}
-	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-	                  "Annotations":{"127.0.0.1":{"Geo":{"postal_code":"10583"}},
-	                                 "127.0.0.2":{"Geo":{"postal_code":"10584"}}}}`
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, responseJSON)
-	}))
-	for _, test := range tests {
-		annotation.BatchURL = ts.URL + test.url
-		p.AddGeoDataSSConnSpec(&test.conspec, test.timestamp)
-		if diff := deep.Equal(test.res, test.conspec); diff != nil {
-			t.Error(test.url, diff)
-		}
-	}
-}
-
 func TestAddGeoDataPTConnSpec(t *testing.T) {
 	tests := []struct {
 		conspec   schema.MLabConnectionSpecification
