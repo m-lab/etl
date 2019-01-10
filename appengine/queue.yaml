@@ -93,7 +93,7 @@ queue:
 #
 - name: etl-ndt-batch-0
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -104,7 +104,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-1
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -114,7 +114,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-2
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -124,7 +124,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-3
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -134,7 +134,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-4
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -144,7 +144,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-5
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -154,7 +154,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-6
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -164,7 +164,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-7
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -174,7 +174,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-8
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -184,7 +184,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-9
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -194,7 +194,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-10
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -204,7 +204,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-11
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -214,7 +214,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-12
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -224,7 +224,7 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-13
   target: etl-batch-parser
-  rate: 5/s
+  rate: 10/s
   bucket_size: 10
   max_concurrent_requests: 150
   retry_parameters:
@@ -258,7 +258,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -271,7 +271,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -284,7 +284,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -297,7 +297,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -310,7 +310,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -323,7 +323,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -336,7 +336,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -349,7 +349,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -362,7 +362,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -375,7 +375,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -388,7 +388,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -401,7 +401,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -414,7 +414,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -427,7 +427,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -440,7 +440,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
@@ -453,7 +453,7 @@ queue:
   rate: 5/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
-  max_concurrent_requests: 50
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     # min and max are same, so that queue rate only diminishes as tasks are drained
