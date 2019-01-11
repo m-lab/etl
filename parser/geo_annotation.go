@@ -17,29 +17,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// AddGeoDataSSConnSpec takes a pointer to a
-// Web100ConnectionSpecification struct and a timestamp. With these,
-// it will fetch the appropriate geo data and add it to the hop struct
-// referenced by the pointer.
-func AddGeoDataSSConnSpec(spec *schema.Web100ConnectionSpecification, timestamp time.Time) {
-	if spec == nil {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "SS ConnSpec was nil!!!"}).Inc()
-		return
-	}
-	// Time the response
-	timerStart := time.Now()
-	defer func(tStart time.Time) {
-		metrics.AnnotationTimeSummary.
-			With(prometheus.Labels{"test_type": "SS"}).
-			Observe(float64(time.Since(tStart).Nanoseconds()))
-	}(timerStart)
-
-	ipSlice := []string{spec.Local_ip, spec.Remote_ip}
-	geoSlice := []*api.GeolocationIP{&spec.Local_geolocation, &spec.Remote_geolocation}
-	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
-}
-
 // AddGeoDataPTConnSpec takes a pointer to a
 // MLabConnectionSpecification struct and a timestamp. With these, it
 // will fetch the appropriate geo data and add it to the hop struct
