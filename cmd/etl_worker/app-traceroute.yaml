@@ -14,7 +14,8 @@ resources:
   # Actual memory available is exposed via GAE_MEMORY_MB environment variable.
   # even though the parser has extremely limited RAM requirements, the
   # minimum RAM assignable to 2 CPUs is around 1.5GB
-  memory_gb: 1.5
+  # We see some OOMs at 3 GB (in etl-batch-parser), so let's try 6
+  memory_gb: 6
 
 automatic_scaling:
   # We expect fairly steady load, so a modest minimum will rarely cost us anything.
