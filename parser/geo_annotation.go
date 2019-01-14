@@ -1,12 +1,17 @@
 package parser
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
+	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/web100"
 
@@ -213,35 +218,42 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 // GetAndInsertTwoSidedGeoIntoNDTConnSpec takes a timestamp and an
 // NDT connection spec. It will either insert the data into the
 // connection spec or silently fail.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
-// in ss.Annotate prior to inserter.PutAsync.
+// TODO - should make a large batch request for an entire insert buffer.
+// See sidestream implementation for example.
 func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// TODO: Make metrics for sok and cok failures. And double check metrics for cleanliness.
 	cip, cok := spec.GetString([]string{"client_ip"})
 	sip, sok := spec.GetString([]string{"server_ip"})
-	reqData := []api.RequestData{}
+	reqData := make([]string, 2)
 	if cok {
 		cip, _ = web100.NormalizeIPv6(cip)
-		reqData = append(reqData, api.RequestData{IP: cip, Timestamp: timestamp})
+		reqData = append(reqData, cip)
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
 			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
 		sip, _ = web100.NormalizeIPv6(sip)
-		reqData = append(reqData, api.RequestData{IP: sip, Timestamp: timestamp})
+		reqData = append(reqData, sip)
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
 			Labels{"source": "Missing server side IP."}).Inc()
 	}
 	if cok || sok {
-		annotationDataMap := annotation.GetBatchGeoData(annotation.BatchURL, reqData)
-		// TODO: Revisit decision to use base36 for
-		// encoding, rather than base64. (It had to do with
-		// library support.)
-		timeString := strconv.FormatInt(timestamp.Unix(), 36)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		resp, err := v2.GetAnnotations(ctx, annotation.BatchURL, timestamp, reqData)
+		if err != nil {
+			// There are many error types returned here, so we log the error, but use the code location
+			// for the metric.
+			log.Println(err)
+			_, file, line, _ := runtime.Caller(0)
+			metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(file, ":", line)}).Inc()
+			return
+		}
+
 		if cok {
-			if data, ok := annotationDataMap[cip+timeString]; ok && data.Geo != nil {
+			if data, ok := resp.Annotations[cip]; ok && data.Geo != nil {
 				CopyStructToMap(data.Geo, spec.Get("client_geolocation"))
 			} else {
 				metrics.AnnotationErrorCount.With(prometheus.
@@ -249,7 +261,7 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 			}
 		}
 		if sok {
-			if data, ok := annotationDataMap[sip+timeString]; ok && data.Geo != nil {
+			if data, ok := resp.Annotations[sip]; ok && data.Geo != nil {
 				CopyStructToMap(data.Geo, spec.Get("server_geolocation"))
 			} else {
 				metrics.AnnotationErrorCount.With(prometheus.

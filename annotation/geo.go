@@ -166,11 +166,13 @@ func ParseJSONGeoDataResponse(jsonBuffer []byte) (*api.GeoData, error) {
 // ip-timestamp strings to GeoData structs, or a nil map if it
 // encounters any error and cannot get the data for any reason
 // TODO - dedup common code in GetGeoData
+// TODO Deprecated - update all clients to use FetchGeoAnnotations
 func GetBatchGeoData(url string, data []api.RequestData) map[string]api.GeoData {
 	// Query the service and grab the response safely
 	// All errors are recorded to metrics, so OK to ignore them here.
 	annotatorResponse, err := BatchQueryAnnotationService(url, data)
 	if err != nil {
+		// This is now very spammy, since we added ServiceUnavailable status.
 		log.Println("BatchQueryAnnotationService Error:", err)
 		return nil
 	}
