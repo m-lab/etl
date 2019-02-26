@@ -68,7 +68,7 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 	switch buf.rows[0].(type) {
 	case *schema.SS:
 		// Just use the logtime of the first row.
-		logTime = time.Unix(buf.rows[0].(*schema.SS).Web100_log_entry.Log_time, 0)
+		logTime = time.Unix(buf.rows[0].(*schema.SS).Web100_log_entry.LogTime, 0)
 		for i := range buf.rows {
 			row := buf.rows[i].(*schema.SS)
 			connSpec := &row.Web100_log_entry.Connection_spec
