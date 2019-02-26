@@ -102,12 +102,13 @@ func TestInserter(t *testing.T) {
 	if len(ins.data) < 1 {
 		t.Fatal("Should have at least one inserted row")
 	}
-	inserted := ins.data[0].(map[string]bigquery.Value)
-	if time.Unix(0, inserted["parse_time"].(int64)).After(time.Now()) {
-		t.Error("Should have inserted parse_time", inserted["parse_time"])
+	inserted := ins.data[0].(pbparser.InfoWrapper)
+	row, _, _ := inserted.Save() // ValueSaver interface.
+	if time.Unix(0, row["parse_time"].(int64)).After(time.Now()) {
+		t.Error("Should have inserted parse_time", row["parse_time"])
 	}
-	if inserted["task_filename"].(string) != filename {
-		t.Error("Should have correct filename", filename, "!=", inserted["task_filename"])
+	if row["task_filename"].(string) != filename {
+		t.Error("Should have correct filename", filename, "!=", row["task_filename"])
 	}
 }
 

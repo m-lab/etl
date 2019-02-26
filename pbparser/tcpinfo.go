@@ -152,12 +152,14 @@ func NewByteReader(raw []byte) io.ReadCloser {
 	return pipeR
 }
 
-// ParseAndInsert extracts each sidestream record from the rawContent and inserts each into a separate row.
+// ParseAndInsert extracts protos from the rawContent, and inserts a TCPInfo record for each row.
+// TODO - as for NDT, we should create a single row with an array of snapshots.
 func (tip *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	// TODO: for common metric states with constant labels, define global constants.
 	metrics.WorkerState.WithLabelValues(tip.TableName(), "tcpinfo").Inc()
 	defer metrics.WorkerState.WithLabelValues(tip.TableName(), "tcpinfo").Dec()
 
+	// TODO - should benchmark this, vs using the external binary.
 	decomp, err := zstd.Decompress(nil, rawContent)
 	rdr := bytes.NewReader(decomp)
 
@@ -176,6 +178,7 @@ func (tip *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testNam
 		if meta["filename"] != nil {
 			taskFilename = meta["filename"].(string)
 		}
+		// TODO - we don't seem to see the TestID fields in the output
 		row := InfoWrapper{TCPDiagnosticsProto: protos[i], TaskFilename: taskFilename, TestID: testName}
 		// TODO set parser_version
 		// Add row to buffer, possibly flushing buffer if it is full.
