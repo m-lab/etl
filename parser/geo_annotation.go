@@ -1,12 +1,17 @@
 package parser
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
+	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/web100"
 
@@ -21,6 +26,8 @@ import (
 // MLabConnectionSpecification struct and a timestamp. With these, it
 // will fetch the appropriate geo data and add it to the hop struct
 // referenced by the pointer.
+// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
 	if spec == nil {
 		metrics.AnnotationErrorCount.With(prometheus.
@@ -42,6 +49,8 @@ func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp ti
 // AddGeoDataPTHopBatch takes a slice of pointers to
 // schema.ParisTracerouteHops and will annotate all of them or fail
 // silently. It sends them all in a single remote request.
+// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time) {
 	// Time the response
 	timerStart := time.Now()
@@ -58,6 +67,8 @@ func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time
 // AnnotatePTHops takes a slice of hop pointers, the annotation data
 // mapping ip addresses to geo data and a timestamp. It will then use
 // these to attach the appropriate geo data to the PT hops.
+// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// in ss.Annotate prior to inserter.PutAsync.
 func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]api.GeoData, timestamp time.Time) {
 	if annotationData == nil {
 		return
@@ -123,6 +134,8 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 // AddGeoDataPTHop takes a pointer to a ParisTracerouteHop and a
 // timestamp. With these, it will fetch the appropriate geo data and
 // add it to the hop struct referenced by the pointer.
+// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	if hop == nil {
 		metrics.AnnotationErrorCount.With(prometheus.
@@ -154,6 +167,8 @@ func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 // annotates the connection spec with geo data associated with each IP
 // Address. It will either sucessfully add the geo data or fail
 // silently and make no changes.
+// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// Time the response
 	timerStart := time.Now()
@@ -203,33 +218,42 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 // GetAndInsertTwoSidedGeoIntoNDTConnSpec takes a timestamp and an
 // NDT connection spec. It will either insert the data into the
 // connection spec or silently fail.
+// TODO - should make a large batch request for an entire insert buffer.
+// See sidestream implementation for example.
 func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// TODO: Make metrics for sok and cok failures. And double check metrics for cleanliness.
 	cip, cok := spec.GetString([]string{"client_ip"})
 	sip, sok := spec.GetString([]string{"server_ip"})
-	reqData := []api.RequestData{}
+	reqData := make([]string, 2)
 	if cok {
 		cip, _ = web100.NormalizeIPv6(cip)
-		reqData = append(reqData, api.RequestData{IP: cip, Timestamp: timestamp})
+		reqData = append(reqData, cip)
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
 			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
 		sip, _ = web100.NormalizeIPv6(sip)
-		reqData = append(reqData, api.RequestData{IP: sip, Timestamp: timestamp})
+		reqData = append(reqData, sip)
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
 			Labels{"source": "Missing server side IP."}).Inc()
 	}
 	if cok || sok {
-		annotationDataMap := annotation.GetBatchGeoData(annotation.BatchURL, reqData)
-		// TODO: Revisit decision to use base36 for
-		// encoding, rather than base64. (It had to do with
-		// library support.)
-		timeString := strconv.FormatInt(timestamp.Unix(), 36)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		resp, err := v2.GetAnnotations(ctx, annotation.BatchURL, timestamp, reqData)
+		if err != nil {
+			// There are many error types returned here, so we log the error, but use the code location
+			// for the metric.
+			log.Println(err)
+			_, file, line, _ := runtime.Caller(0)
+			metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(file, ":", line)}).Inc()
+			return
+		}
+
 		if cok {
-			if data, ok := annotationDataMap[cip+timeString]; ok && data.Geo != nil {
+			if data, ok := resp.Annotations[cip]; ok && data.Geo != nil {
 				CopyStructToMap(data.Geo, spec.Get("client_geolocation"))
 			} else {
 				metrics.AnnotationErrorCount.With(prometheus.
@@ -237,7 +261,7 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 			}
 		}
 		if sok {
-			if data, ok := annotationDataMap[sip+timeString]; ok && data.Geo != nil {
+			if data, ok := resp.Annotations[sip]; ok && data.Geo != nil {
 				CopyStructToMap(data.Geo, spec.Get("server_geolocation"))
 			} else {
 				metrics.AnnotationErrorCount.With(prometheus.
