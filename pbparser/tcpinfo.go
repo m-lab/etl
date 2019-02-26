@@ -20,6 +20,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -62,7 +63,7 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 	}
 
 	ipSlice := make([]string, 2*len(buf.rows))
-	geoSlice := make([]*annotation.GeolocationIP, 2*len(buf.rows))
+	geoSlice := make([]*api.GeolocationIP, 2*len(buf.rows))
 	var logTime time.Time
 	switch buf.rows[0].(type) {
 	case *schema.SS:
