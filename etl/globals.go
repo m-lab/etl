@@ -262,8 +262,8 @@ func (dt DataType) BigqueryProject() string {
 	}
 	project = os.Getenv("GCLOUD_PROJECT")
 	// For production, all datatypes except SS write to tables in measurement-lab.
-	if project == "mlab-oti" && dt != TCPINFO {
-		return "measurement-lab"
+	if project == "measurement-lab" && dt == TCPINFO {
+		return "mlab-oti"
 	}
 	return project
 }
