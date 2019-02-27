@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/m-lab/go/prometheusx"
+
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -21,7 +23,7 @@ import (
 
 	// Enable profiling. For more background and usage information, see:
 	//   https://blog.golang.org/profiling-go-programs
-	"net/http/pprof"
+
 	// Enable exported debug vars.  See https://golang.org/pkg/expvar/
 	_ "expvar"
 )
@@ -264,22 +266,8 @@ func setMaxInFlight() {
 }
 
 func main() {
-	// Define a custom serve mux for prometheus to listen on a separate port.
-	// We listen on a separate port so we can forward this port on the host VM.
-	// We cannot forward port 8080 because it is used by AppEngine.
-	mux := http.NewServeMux()
-	// Assign the default prometheus handler to the standard exporter path.
-	mux.Handle("/metrics", promhttp.Handler())
-	// Assign the pprof handling paths to the external port to access individual
-	// instances.
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	mux.HandleFunc("/", Status)
-	mux.HandleFunc("/status", Status)
-	go http.ListenAndServe(":9090", mux)
+	// Expose prometheus metrics on a separate port using a separate server.
+	prometheusx.MustStartPrometheus(":9090")
 
 	http.HandleFunc("/", Status)
 	http.HandleFunc("/status", Status)
