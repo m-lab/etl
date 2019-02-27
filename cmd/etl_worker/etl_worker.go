@@ -23,6 +23,7 @@ import (
 
 	// Enable profiling. For more background and usage information, see:
 	//   https://blog.golang.org/profiling-go-programs
+	_ "net/http/pprof"
 
 	// Enable exported debug vars.  See https://golang.org/pkg/expvar/
 	_ "expvar"
