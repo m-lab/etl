@@ -112,7 +112,7 @@ func TestInserter(t *testing.T) {
 	}
 }
 
-func TestTask(t *testing.T) {
+func xTestTask(t *testing.T) {
 	os.Setenv("GCLOUD_PROJECT", "mlab-sandbox")
 	fn := `gs://dropbox-mlab-sandbox/fast-sidestream/2018/08/02/20180802T195219.460Z-mlab4-lga0t-fast-sidestream.tgz`
 	data, err := etl.ValidateTestPath(fn)
