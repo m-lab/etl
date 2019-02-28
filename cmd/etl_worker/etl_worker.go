@@ -267,7 +267,7 @@ func setMaxInFlight() {
 }
 
 func main() {
-	// Expose prometheus metrics on a separate port using a separate server.
+	// Expose prometheus and pprof metrics on a separate port.
 	prometheusx.MustStartPrometheus(":9090")
 
 	http.HandleFunc("/", Status)
