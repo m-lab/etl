@@ -26,6 +26,9 @@ before_install:
 - npm install --verbose
 - popd; popd
 
+# Install zstd tool for unit tests
+- bash <(curl -fsSL https://raw.githubusercontent.com/horta/zstd.install/master/install)
+
 # Coverage tools
 - go get github.com/mattn/goveralls
 - go get github.com/wadey/gocovmerge
