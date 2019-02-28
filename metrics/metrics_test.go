@@ -7,6 +7,8 @@ import (
 	"runtime/debug"
 	"testing"
 
+	"github.com/m-lab/go/prometheusx"
+
 	"github.com/m-lab/etl/metrics"
 )
 
@@ -70,4 +72,40 @@ func TestCountPanics(t *testing.T) {
 	}()
 
 	rePanic()
+}
+
+func TestMetrics(t *testing.T) {
+	// Currently just lints. There are too many lint errors for me to feel
+	// comfortable fixing everything without further discussion.
+	//
+	// TODO: turn the lint warnings into errors and resolve all the errors.
+	metrics.AnnotationErrorCount.WithLabelValues("x")
+	metrics.AnnotationTimeSummary.WithLabelValues("x")
+	metrics.AnnotationWarningCount.WithLabelValues("x")
+	metrics.BackendFailureCount.WithLabelValues("x", "x")
+	metrics.DeltaNumFieldsHistogram.WithLabelValues("x")
+	metrics.DurationHistogram.WithLabelValues("x", "x")
+	metrics.EntryFieldCountHistogram.WithLabelValues("x")
+	metrics.ErrorCount.WithLabelValues("x", "x", "x")
+	metrics.FileCount.WithLabelValues("x", "x")
+	metrics.FileSizeHistogram.WithLabelValues("x", "x", "x")
+	metrics.GCSRetryCount.WithLabelValues("x", "x", "x", "x")
+	metrics.InsertionHistogram.WithLabelValues("x", "x")
+	metrics.PanicCount.WithLabelValues("x")
+	metrics.PTBitsAwayFromDestV4.WithLabelValues("x")
+	metrics.PTBitsAwayFromDestV6.WithLabelValues("x")
+	metrics.PTHopCount.WithLabelValues("x", "x", "x")
+	metrics.PTMoreHopsAfterDest.WithLabelValues("x")
+	metrics.PTNotReachDestCount.WithLabelValues("x")
+	metrics.PTPollutedCount.WithLabelValues("x")
+	metrics.PTTestCount.WithLabelValues("x")
+	metrics.RowSizeHistogram.WithLabelValues("x")
+	metrics.TaskCount.WithLabelValues("x", "x", "x")
+	metrics.TestCount.WithLabelValues("x", "x", "x")
+	metrics.WarningCount.WithLabelValues("x", "x", "x")
+	metrics.WorkerCount.WithLabelValues("x")
+	metrics.WorkerState.WithLabelValues("x", "x")
+	if !prometheusx.LintMetrics(nil) {
+		t.Log("There are lint errors in the prometheus metrics.")
+	}
 }
