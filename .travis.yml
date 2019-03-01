@@ -180,6 +180,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox batch nodryrun
+    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
   skip_cleanup: true
@@ -230,6 +231,7 @@ deploy:
     condition: $TRAVIS_BRANCH == ss-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
 ## Service: etl-fast-ss-parser -- AppEngine Flexible Environment.
+## TODO - for now only deploy on fast tag, not on general tag.
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
@@ -238,7 +240,7 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == fast-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+    condition: $TRAVIS_BRANCH == fast-sandbox-*
 
 ## Service: etl-traceroute-parser -- AppEngine Flexible Environment.
 - provider: script
