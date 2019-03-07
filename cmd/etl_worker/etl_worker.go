@@ -139,6 +139,16 @@ func worker(rwr http.ResponseWriter, rq *http.Request) {
 			log.Printf("Invalid execution count string: %s\n", executionCountStr)
 		}
 	}
+	etaUnixMicroStr := rq.Header.Get("X-AppEngine-TaskETA")
+	etaUnixMicro := int64(0)
+	if etaUnixMicroStr != "" {
+		etaUnixMicro, err = strconv.ParseInt(etaUnixMicroStr, 0, 64)
+		if err != nil {
+			log.Printf("Invalid eta string: %s\n", etaUnixMicroStr)
+		}
+	}
+	etaTime := time.Unix(etaUnixMicro/1000000, 0) // second granularity is sufficient.
+	age := time.Since(etaTime)
 
 	rq.ParseForm()
 	// Log request data.
@@ -147,12 +157,12 @@ func worker(rwr http.ResponseWriter, rq *http.Request) {
 	}
 
 	rawFileName := rq.FormValue("filename")
-	status, msg := subworker(rawFileName, executionCount, retryCount)
+	status, msg := subworker(rawFileName, executionCount, retryCount, age)
 	rwr.WriteHeader(status)
 	fmt.Fprintf(rwr, msg)
 }
 
-func subworker(rawFileName string, executionCount, retryCount int) (status int, msg string) {
+func subworker(rawFileName string, executionCount, retryCount int, age time.Duration) (status int, msg string) {
 	// TODO(dev) Check how many times a request has already been attempted.
 
 	var err error
@@ -165,8 +175,8 @@ func subworker(rawFileName string, executionCount, retryCount int) (status int, 
 	}
 
 	// TODO(dev): log the originating task queue name from headers.
-	log.Printf("Received filename: %q  Retries: %d, Executions: %d\n",
-		fn, retryCount, executionCount)
+	log.Printf("Received filename: %q  Retries: %d, Executions: %d, Age: %5.2f hours\n",
+		fn, retryCount, executionCount, age.Hours())
 
 	data, err := etl.ValidateTestPath(fn)
 	if err != nil {
