@@ -7,9 +7,8 @@ import (
 	"runtime/debug"
 	"testing"
 
-	"github.com/m-lab/go/prometheusx"
-
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/go/prometheusx/promtest"
 )
 
 func panicAndRecover() (err error) {
@@ -105,7 +104,7 @@ func TestMetrics(t *testing.T) {
 	metrics.WarningCount.WithLabelValues("x", "x", "x")
 	metrics.WorkerCount.WithLabelValues("x")
 	metrics.WorkerState.WithLabelValues("x", "x")
-	if !prometheusx.LintMetrics(nil) {
+	if !promtest.LintMetrics(nil) {
 		t.Log("There are lint errors in the prometheus metrics.")
 	}
 }
