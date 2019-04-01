@@ -188,7 +188,7 @@ func TestParseJSONGeoDataResponse(t *testing.T) {
 	}{
 		{
 			testBuffer:  []byte(`{"Geo":null,"ASN":null}`),
-			resultData:  &api.GeoData{Geo: nil, ASN: nil},
+			resultData:  &api.GeoData{Geo: nil, Network: nil},
 			resultError: nil,
 		},
 		{
@@ -229,7 +229,7 @@ func TestGetBatchGeoData(t *testing.T) {
 		},
 		{
 			url: "/goodJson",
-			res: map[string]api.GeoData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
+			res: map[string]api.GeoData{"127.0.0.1xyz": {Geo: nil, Network: nil}},
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -303,7 +303,7 @@ func TestBatchParseJSONGeoDataResponse(t *testing.T) {
 			// addresses. The xyz could be a base36
 			// encoded timestamp.
 			testBuffer:  []byte(`{"127.0.0.1xyz": {"Geo":null,"ASN":null}}`),
-			resultData:  map[string]api.GeoData{"127.0.0.1xyz": {Geo: nil, ASN: nil}},
+			resultData:  map[string]api.GeoData{"127.0.0.1xyz": {Geo: nil, Network: nil}},
 			resultError: nil,
 		},
 		{

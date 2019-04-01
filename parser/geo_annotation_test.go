@@ -190,7 +190,7 @@ func TestAnnotatePTHops(t *testing.T) {
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
 			annotationData: map[string]api.GeoData{"127.0.0.10": api.GeoData{
-				Geo: &api.GeolocationIP{}, ASN: nil}},
+				Geo: &api.GeolocationIP{}, Network: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1",
 				Src_geolocation: api.GeolocationIP{}}},
@@ -198,7 +198,7 @@ func TestAnnotatePTHops(t *testing.T) {
 		{
 			hops: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127"}},
 			annotationData: map[string]api.GeoData{"1.0.0.1270": api.GeoData{
-				Geo: &api.GeolocationIP{}, ASN: nil}},
+				Geo: &api.GeolocationIP{}, Network: nil}},
 			timestamp: epoch,
 			res: []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Dest_ip: "1.0.0.127",
 				Dest_geolocation: api.GeolocationIP{}}},
