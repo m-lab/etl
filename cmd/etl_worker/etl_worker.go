@@ -139,15 +139,15 @@ func worker(rwr http.ResponseWriter, rq *http.Request) {
 			log.Printf("Invalid execution count string: %s\n", executionCountStr)
 		}
 	}
-	etaUnixMicroStr := rq.Header.Get("X-AppEngine-TaskETA")
-	etaUnixMicro := int64(0)
-	if etaUnixMicroStr != "" {
-		etaUnixMicro, err = strconv.ParseInt(etaUnixMicroStr, 0, 64)
+	etaUnixStr := rq.Header.Get("X-AppEngine-TaskETA")
+	etaUnixSeconds := float64(0)
+	if etaUnixStr != "" {
+		etaUnixSeconds, err = strconv.ParseFloat(etaUnixStr, 64)
 		if err != nil {
-			log.Printf("Invalid eta string: %s\n", etaUnixMicroStr)
+			log.Printf("Invalid eta string: %s\n", etaUnixStr)
 		}
 	}
-	etaTime := time.Unix(etaUnixMicro/1000000, 0) // second granularity is sufficient.
+	etaTime := time.Unix(int64(etaUnixSeconds), 0) // second granularity is sufficient.
 	age := time.Since(etaTime)
 
 	rq.ParseForm()
