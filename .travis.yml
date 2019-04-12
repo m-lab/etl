@@ -364,14 +364,11 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
-    && INJECTED_PROJECT=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
-    && INJECTED_PROJECT=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
-    && INJECTED_PROJECT=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/appengine/queue_pusher
@@ -403,8 +400,7 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
-    && INJECTED_PROJECT=measurement-lab
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
   skip_cleanup: true
   on:
