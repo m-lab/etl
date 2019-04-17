@@ -580,9 +580,11 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	results["connection_spec"] = connSpec
 
 	n.fixValues(results)
+
 	// TODO(yachang): check whether client_ip or server_ip in connSpec are empty
 	// before trying to add GeoLocation to connSpec.
 	AddGeoDataNDTConnSpec(connSpec, test.info.Timestamp)
+
 	// TODO fix InsertRow so that we can distinguish errors from prior rows.
 	metrics.EntryFieldCountHistogram.WithLabelValues(n.TableName()).
 		Observe(float64(deltaFieldCount))
@@ -628,16 +630,19 @@ func (n *NDTParser) fixValues(r schema.Web100ValueMap) {
 		delete(connSpec, "client_hostname")
 	}
 
-	// If there is no meta file then the server hostname will not be set.
-	// We must check for presence and an empty value.
-	hn, ok := connSpec["server_hostname"]
-	if !ok || hn == "" {
-		data, err := etl.ValidateTestPath(n.taskFileName)
-		if err != nil {
-			// The current filename is ambiguous, but the timestamp should help.
-			log.Printf("WARNING: taskFileName is unexpectedly invalid: %s %s: %q",
-				n.taskFileName, n.timestamp, err)
-		} else {
+	data, err := etl.ValidateTestPath(n.taskFileName)
+	if err != nil {
+		// The current filename is ambiguous, but the timestamp should help.
+		log.Printf("WARNING: taskFileName is unexpectedly invalid: %s %s: %q",
+			n.taskFileName, n.timestamp, err)
+	} else {
+		// TODO - this is a rather hacky place to put this.
+		connSpec.Get("server").SetString("iata_code", strings.ToUpper(data.Pod[0:3]))
+
+		// If there is no meta file then the server hostname will not be set.
+		// We must check for presence and an empty value.
+		hn, ok := connSpec["server_hostname"]
+		if !ok || hn == "" {
 			connSpec.SetString("server_hostname", fmt.Sprintf(
 				"%s.%s.%s", data.Host, data.Pod, etl.MlabDomain))
 		}
