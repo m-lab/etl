@@ -479,13 +479,19 @@ func TestGetAndInsertTwoSidedGeoIntoNDTConnSpec(t *testing.T) {
 				geos["postal_code"] = "10584"
 				geos["latitude"] = float64(41.0051)
 				geos["longitude"] = float64(73.7846)
+
+				cn := spec.Get("client").Get("network")
+				cn["asn"] = int64(123)
+				sn := spec.Get("server").Get("network")
+				sn["asn"] = int64(456)
+
 				return spec
 			}(),
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"AnnotatorDate": "2018-12-05T00:00:00Z", "Annotations": {"127.0.0.1" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"ASN":{}}`+
-			`,"1.0.0.127" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"ASN":{}}}}`)
+		fmt.Fprint(w, `{"AnnotatorDate": "2018-12-05T00:00:00Z", "Annotations": {"127.0.0.1" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10583,"postal_code":"10583","latitude":41.0051,"longitude":73.7846},"Network":{"Systems":[{"ASNs":[123]}]}}`+
+			`,"1.0.0.127" : {"Geo":{"continent_code":"","country_code":"US","country_code3":"USA","country_name":"United States of America","region":"NY","metro_code":0,"city":"Scarsdale","area_code":10584,"postal_code":"10584","latitude":41.0051,"longitude":73.7846},"Network":{"Systems":[{"ASNs":[456]}]}}}}`)
 	}))
 	defer ts.Close()
 	for _, test := range tests {
