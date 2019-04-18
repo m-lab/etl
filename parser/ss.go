@@ -12,7 +12,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -57,20 +56,34 @@ func (buf *RowBuffer) Annotate(tableBase string) {
 	}
 
 	ipSlice := make([]string, 2*len(buf.rows))
-	geoSlice := make([]*api.GeolocationIP, 2*len(buf.rows))
 	for i := range buf.rows {
 		row := buf.rows[i].(*schema.SS)
 		connSpec := &row.Web100_log_entry.Connection_spec
 		ipSlice[i+i] = connSpec.Local_ip
-		geoSlice[i+i] = &connSpec.Local_geolocation
 		ipSlice[i+i+1] = connSpec.Remote_ip
-		geoSlice[i+i+1] = &connSpec.Remote_geolocation
 	}
 	// Just use the logtime of the first row.
 	logTime := time.Unix(buf.rows[0].(*schema.SS).Web100_log_entry.LogTime, 0)
 	start := time.Now()
 	// TODO - are there any errors we should process from Fetch?
-	annotation.FetchGeoAnnotations(ipSlice, logTime, geoSlice)
+	annSlice := annotation.FetchAllAnnotations(ipSlice, logTime)
+	if annSlice != nil {
+		for i := range buf.rows {
+			row := buf.rows[i].(*schema.SS)
+			connSpec := &row.Web100_log_entry.Connection_spec
+			local := annSlice[i+i]
+			if local != nil {
+				connSpec.Local_geolocation = *local.Geo
+				// TODO Handle ASN
+			}
+			remote := annSlice[i+i+1]
+			if remote != nil {
+				connSpec.Remote_geolocation = *remote.Geo
+				// TODO Handle ASN
+			}
+		}
+	}
+
 	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": "SS"}).Observe(float64(time.Since(start).Nanoseconds()))
 }
 

@@ -26,7 +26,7 @@ import (
 // MLabConnectionSpecification struct and a timestamp. With these, it
 // will fetch the appropriate geo data and add it to the hop struct
 // referenced by the pointer.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// DEPRECATED.  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
 	if spec == nil {
@@ -43,13 +43,13 @@ func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp ti
 	}(timerStart)
 	ipSlice := []string{spec.Server_ip, spec.Client_ip}
 	geoSlice := []*api.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
-	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
+	annotation.AddGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
 // AddGeoDataPTHopBatch takes a slice of pointers to
 // schema.ParisTracerouteHops and will annotate all of them or fail
 // silently. It sends them all in a single remote request.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// DEPRECATED.  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time) {
 	// Time the response
@@ -67,7 +67,7 @@ func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time
 // AnnotatePTHops takes a slice of hop pointers, the annotation data
 // mapping ip addresses to geo data and a timestamp. It will then use
 // these to attach the appropriate geo data to the PT hops.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// DEPRECATED.  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]api.GeoData, timestamp time.Time) {
 	if annotationData == nil {
@@ -134,7 +134,7 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 // AddGeoDataPTHop takes a pointer to a ParisTracerouteHop and a
 // timestamp. With these, it will fetch the appropriate geo data and
 // add it to the hop struct referenced by the pointer.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// DEPRECATED.  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	if hop == nil {
@@ -167,7 +167,7 @@ func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 // annotates the connection spec with geo data associated with each IP
 // Address. It will either sucessfully add the geo data or fail
 // silently and make no changes.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// DEPRECATED.  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// Time the response
@@ -286,7 +286,6 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 						log.Println(err)
 					} else {
 						spec.Get("server").Get("network")["asn"] = asn
-						// TODO add the server.iata field.
 					}
 				}
 			} else {

@@ -24,7 +24,7 @@ func init() {
 
 var epoch time.Time = time.Unix(0, 0)
 
-func TestFetchGeoAnnotations(t *testing.T) {
+func TestAddGeoAnnotations(t *testing.T) {
 	tests := []struct {
 		ips       []string
 		timestamp time.Time
@@ -60,7 +60,7 @@ func TestFetchGeoAnnotations(t *testing.T) {
 	}))
 	for _, test := range tests {
 		annotation.BatchURL = ts.URL
-		annotation.FetchGeoAnnotations(test.ips, test.timestamp, test.geoDest)
+		annotation.AddGeoAnnotations(test.ips, test.timestamp, test.geoDest)
 		if diff := deep.Equal(test.geoDest, test.res); diff != nil {
 			t.Error(diff)
 		}
