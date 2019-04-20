@@ -195,6 +195,8 @@ func EmptyConnectionSpec() Web100ValueMap {
 	return Web100ValueMap{
 		"client_geolocation": EmptyGeolocation(),
 		"server_geolocation": EmptyGeolocation(),
+		"client":             Web100ValueMap{"network": make(Web100ValueMap, 2)},
+		"server":             Web100ValueMap{"network": make(Web100ValueMap, 2)},
 	}
 }
 

@@ -26,7 +26,7 @@ import (
 // MLabConnectionSpecification struct and a timestamp. With these, it
 // will fetch the appropriate geo data and add it to the hop struct
 // referenced by the pointer.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// Deprecated:  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp time.Time) {
 	if spec == nil {
@@ -43,13 +43,13 @@ func AddGeoDataPTConnSpec(spec *schema.MLabConnectionSpecification, timestamp ti
 	}(timerStart)
 	ipSlice := []string{spec.Server_ip, spec.Client_ip}
 	geoSlice := []*api.GeolocationIP{&spec.Server_geolocation, &spec.Client_geolocation}
-	annotation.FetchGeoAnnotations(ipSlice, timestamp, geoSlice)
+	annotation.AddGeoAnnotations(ipSlice, timestamp, geoSlice)
 }
 
 // AddGeoDataPTHopBatch takes a slice of pointers to
 // schema.ParisTracerouteHops and will annotate all of them or fail
 // silently. It sends them all in a single remote request.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// Deprecated:  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time) {
 	// Time the response
@@ -67,7 +67,7 @@ func AddGeoDataPTHopBatch(hops []*schema.ParisTracerouteHop, timestamp time.Time
 // AnnotatePTHops takes a slice of hop pointers, the annotation data
 // mapping ip addresses to geo data and a timestamp. It will then use
 // these to attach the appropriate geo data to the PT hops.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// Deprecated:  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AnnotatePTHops(hops []*schema.ParisTracerouteHop, annotationData map[string]api.GeoData, timestamp time.Time) {
 	if annotationData == nil {
@@ -134,7 +134,7 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 // AddGeoDataPTHop takes a pointer to a ParisTracerouteHop and a
 // timestamp. With these, it will fetch the appropriate geo data and
 // add it to the hop struct referenced by the pointer.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// Deprecated:  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 	if hop == nil {
@@ -167,7 +167,7 @@ func AddGeoDataPTHop(hop *schema.ParisTracerouteHop, timestamp time.Time) {
 // annotates the connection spec with geo data associated with each IP
 // Address. It will either sucessfully add the geo data or fail
 // silently and make no changes.
-// DEPRECATED.  Should use batch annotation, with FetchAnnotations, as is done for SS
+// Deprecated:  Should use batch annotation, with FetchAllAnnotations, as is done for SS
 // in ss.Annotate prior to inserter.PutAsync.
 func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	// Time the response
@@ -181,7 +181,7 @@ func AddGeoDataNDTConnSpec(spec schema.Web100ValueMap, timestamp time.Time) {
 	GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec, timestamp)
 }
 
-// CopyStructToMap takes a POINTER to an arbitrary struct and copies
+// CopyStructToMap takes a POINTER to an arbitrary SIMPLE struct and copies
 // it's fields into a value map. It will also make fields entirely
 // lower case, for convienece when working with exported structs. Also,
 // NEVER pass in something that is not a pointer to a struct, as this
@@ -241,20 +241,37 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 	}
 	if cok || sok {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		deadline, _ := ctx.Deadline()
 		defer cancel()
 		resp, err := v2.GetAnnotations(ctx, annotation.BatchURL, timestamp, reqData)
 		if err != nil {
-			// There are many error types returned here, so we log the error, but use the code location
-			// for the metric.
-			log.Println(err)
-			_, file, line, _ := runtime.Caller(0)
-			metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(file, ":", line)}).Inc()
+			if err.Error() == "context canceled" {
+				// These are NOT timeouts, and the ctx.Err() is nil.
+				timeRemaining := deadline.Sub(time.Now())
+				log.Println("context canceled, time remaining =", timeRemaining, " ctx err:", ctx.Err())
+				_, file, line, _ := runtime.Caller(0)
+				metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprintf("context canceled %s:%d", file, line)}).Inc()
+			} else {
+				// There are many error types returned here, so we log the error, but use the code location
+				// for the metric.
+				log.Println(err)
+				_, file, line, _ := runtime.Caller(0)
+				metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(file, ":", line)}).Inc()
+			}
 			return
 		}
 
 		if cok {
 			if data, ok := resp.Annotations[cip]; ok && data.Geo != nil {
 				CopyStructToMap(data.Geo, spec.Get("client_geolocation"))
+				if data.Network != nil {
+					asn, err := data.Network.BestASN()
+					if err != nil {
+						log.Println(err)
+					} else {
+						spec.Get("client").Get("network")["asn"] = asn
+					}
+				}
 			} else {
 				metrics.AnnotationErrorCount.With(prometheus.
 					Labels{"source": "Couldn't get geo data for the client side."}).Inc()
@@ -263,6 +280,14 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 		if sok {
 			if data, ok := resp.Annotations[sip]; ok && data.Geo != nil {
 				CopyStructToMap(data.Geo, spec.Get("server_geolocation"))
+				if data.Network != nil {
+					asn, err := data.Network.BestASN()
+					if err != nil {
+						log.Println(err)
+					} else {
+						spec.Get("server").Get("network")["asn"] = asn
+					}
+				}
 			} else {
 				metrics.AnnotationErrorCount.With(prometheus.
 					Labels{"source": "Couldn't get geo data for the server side."}).Inc()

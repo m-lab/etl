@@ -2,6 +2,7 @@ package annotation_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -12,8 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-test/deep"
+
 	"github.com/m-lab/annotation-service/api"
+	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/annotation"
 )
 
@@ -24,7 +28,7 @@ func init() {
 
 var epoch time.Time = time.Unix(0, 0)
 
-func TestFetchGeoAnnotations(t *testing.T) {
+func TestAddGeoAnnotations(t *testing.T) {
 	tests := []struct {
 		ips       []string
 		timestamp time.Time
@@ -58,11 +62,64 @@ func TestFetchGeoAnnotations(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, responseJSON)
 	}))
+	annotation.BatchURL = ts.URL
+	defer ts.Close()
+
 	for _, test := range tests {
-		annotation.BatchURL = ts.URL
-		annotation.FetchGeoAnnotations(test.ips, test.timestamp, test.geoDest)
+		annotation.AddGeoAnnotations(test.ips, test.timestamp, test.geoDest)
 		if diff := deep.Equal(test.geoDest, test.res); diff != nil {
 			t.Error(diff)
+		}
+	}
+}
+
+func TestFetchAllAnnotations(t *testing.T) {
+	tests := []struct {
+		ips          []string
+		requestTime  time.Time
+		responseTime time.Time
+		annMap       map[string]*api.GeoData
+		res          []*api.GeoData
+	}{
+		{
+			ips:          []string{"", "127.0.0.5", "2.2.2.2"},
+			requestTime:  epoch,
+			responseTime: time.Date(2018, 12, 05, 0, 0, 0, 0, time.UTC),
+			annMap: map[string]*api.GeoData{
+				"127.0.0.5": &api.GeoData{
+					Geo:     &api.GeolocationIP{PostalCode: "10598"},
+					Network: &api.ASData{Systems: []api.System{api.System{ASNs: []uint32{12345}}}}},
+				"2.2.2.2": &api.GeoData{
+					Geo:     &api.GeolocationIP{PostalCode: "10011"},
+					Network: &api.ASData{Systems: []api.System{api.System{ASNs: []uint32{123, 456}}}}},
+			},
+			//Network":{"Systems":[{"ASNs":[123]}
+			res: []*api.GeoData{
+				nil,
+				&api.GeoData{
+					Geo:     &api.GeolocationIP{PostalCode: "10598"},
+					Network: &api.ASData{Systems: []api.System{api.System{ASNs: []uint32{12345}}}}},
+				&api.GeoData{
+					Geo:     &api.GeolocationIP{PostalCode: "10011"},
+					Network: &api.ASData{Systems: []api.System{api.System{ASNs: []uint32{123, 456}}}}},
+			},
+		},
+	}
+	var responseJSON string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, responseJSON)
+	}))
+	annotation.BatchURL = ts.URL
+	defer ts.Close()
+
+	for _, test := range tests {
+		response := v2.Response{AnnotatorDate: test.responseTime, Annotations: test.annMap}
+		//spew.Dump(response)
+		responseBytes, _ := json.Marshal(response)
+		responseJSON = string(responseBytes)
+		ann := annotation.FetchAllAnnotations(test.ips, test.requestTime)
+		if diff := deep.Equal(ann, test.res); diff != nil {
+			t.Error(diff, spew.Sdump(ann), spew.Sdump(test.res))
 		}
 	}
 }
