@@ -111,7 +111,13 @@ func (fn *DataPath) GetDataType() DataType {
 
 // TableBase returns the base bigquery table name associated with the DataPath data type.
 func (fn *DataPath) TableBase() string {
-	return fn.GetDataType().Table()
+	return fn.GetDataType().TableConfig().Table
+}
+
+// TableConfig returns the appropriate TableConfig for the DataPath
+func (fn *DataPath) TableConfig() TableConfig {
+	dt := fn.GetDataType()
+	return dt.TableConfig()
 }
 
 // IsBatchService return true if this is a batch service.
@@ -166,18 +172,50 @@ func NumberBitsDifferent(first string, second string) (int, int) {
 
 //=====================================================================
 
+// TableConfig holds the information needed to create insert buffer for a worker.
+//  TODO: These methods to compute the appropriate project and dataset are ugly.
+//  In not to distant future we need a better solution.
+//  See https://github.com/m-lab/etl/issues/519
+
+type TableConfig struct {
+	Dataset    string
+	Table      string
+	BufferSize int
+	IsBatch    bool
+}
+
 // DataType identifies the type of data handled by a parser.
 type DataType string
 
-// BQBufferSize returns the appropriate BQ insert buffer size.
-func (dt DataType) BQBufferSize() int {
-	// Special case for NDT when omitting deltas.
-	if dt == NDT {
-		if OmitDeltas {
-			return dataTypeToBQBufferSize[NDT_OMIT_DELTAS]
-		}
+// TableConfig returns the appropriate TableConfig for the DataType
+func (dt DataType) TableConfig() TableConfig {
+	tc := dailyConfigs[dt]
+	if IsBatchService() {
+		tc = batchConfigs[dt]
 	}
-	return dataTypeToBQBufferSize[dt]
+	dataset := os.Getenv("BIGQUERY_DATASET")
+	if dataset != "" {
+		tc.Dataset = dataset
+	}
+	return tc
+}
+
+var batchConfigs = map[DataType]TableConfig{
+	NDT:             TableConfig{"ndt_batch", "web100", 10, true},
+	NDT_OMIT_DELTAS: TableConfig{"ndt_batch", "web100", 50, true},
+	SS:              TableConfig{"sidestream_batch", "web100", 500, true},
+	PT:              TableConfig{"traceroute_batch", "web100", 300, true},
+	SW:              TableConfig{"switch_batch", "web100", 100, true},
+	INVALID:         TableConfig{},
+}
+
+var dailyConfigs = map[DataType]TableConfig{
+	NDT:             TableConfig{"ndt", "web100", 10, false},
+	NDT_OMIT_DELTAS: TableConfig{"ndt", "web100", 50, false},
+	SS:              TableConfig{"sidestream", "web100", 500, false},
+	PT:              TableConfig{"traceroute", "web100", 300, false},
+	SW:              TableConfig{"switch", "web100", 100, false},
+	INVALID:         TableConfig{},
 }
 
 const (
@@ -198,40 +236,7 @@ var (
 		"paris-traceroute": PT,
 		"switch":           SW,
 	}
-
-	// DataTypeToTable maps from data type to BigQuery table name.
-	// TODO - this should be loaded from a config.
-	dataTypeToTable = map[DataType]string{
-		NDT:     "ndt",
-		SS:      "sidestream",
-		PT:      "traceroute",
-		SW:      "switch",
-		INVALID: "invalid",
-	}
-
-	// Map from data type to number of buffer size for BQ insertion.
-	// TODO - this should be loaded from a config.
-	dataTypeToBQBufferSize = map[DataType]int{
-		NDT:             10,
-		NDT_OMIT_DELTAS: 50,
-		SS:              500, // Average json size is 2.5K
-		PT:              300,
-		SW:              100,
-		INVALID:         0,
-	}
-	// There is also a mapping of data types to queue names in
-	// queue_pusher.go
 )
-
-/*******************************************************************************
-*  TODO: These methods to compute the appropriate project and dataset are ugly.
-*  In not to distant future we need a better solution.
-*  See https://github.com/m-lab/etl/issues/519
-********************************************************************************/
-// Translate gs dir to BQ tablename.
-func DirToTablename(dir string) string {
-	return dataTypeToTable[dirToDataType[dir]]
-}
 
 // BigqueryProject returns the appropriate project.
 func (dt DataType) BigqueryProject() string {
@@ -240,25 +245,6 @@ func (dt DataType) BigqueryProject() string {
 		return project
 	}
 	return os.Getenv("GCLOUD_PROJECT")
-}
-
-// Dataset returns the appropriate dataset to use.
-// This is a bit of a hack, but works for our current needs.
-func (dt DataType) Dataset() string {
-	dataset := os.Getenv("BIGQUERY_DATASET")
-	if dataset != "" {
-		return dataset
-	}
-	if IsBatchService() {
-		return "batch"
-	}
-
-	return "base_tables"
-}
-
-// Table returns the appropriate table to use.
-func (dt DataType) Table() string {
-	return dataTypeToTable[dt]
 }
 
 // GetFilename converts request received from the queue into a filename.

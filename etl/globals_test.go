@@ -142,19 +142,19 @@ func TestDataset(t *testing.T) {
 		isBatch bool
 		want    string
 	}{
-		{etl.NDT, true, "batch"},
-		{etl.NDT, false, "base_tables"},
-		{etl.PT, true, "batch"},
-		{etl.PT, false, "base_tables"},
-		{etl.SS, true, "batch"},
-		{etl.SS, false, "base_tables"},
+		{etl.NDT, true, "ndt_batch"},
+		{etl.NDT, false, "ndt"},
+		{etl.PT, true, "traceroute_batch"},
+		{etl.PT, false, "traceroute"},
+		{etl.SS, true, "sidestream_batch"},
+		{etl.SS, false, "sidestream"},
 	}
 
 	// Project shouldn't matter, so test different values to confirm.
 	os.Setenv("GCLOUD_PROJECT", "mlab-sandbox")
 	for _, test := range tests {
 		etl.IsBatch = test.isBatch
-		got := test.dt.Dataset()
+		got := test.dt.TableConfig().Dataset
 		if got != test.want {
 			t.Errorf("for %s want: %s, got: %s.", test.dt, test.want, got)
 		}
@@ -162,7 +162,7 @@ func TestDataset(t *testing.T) {
 	os.Setenv("GCLOUD_PROJECT", "mlab-oti")
 	for _, test := range tests {
 		etl.IsBatch = test.isBatch
-		got := test.dt.Dataset()
+		got := test.dt.TableConfig().Dataset
 		if got != test.want {
 			t.Errorf("for %s want: %s, got: %s.", test.dt, test.want, got)
 		}
@@ -185,7 +185,7 @@ func TestDataset(t *testing.T) {
 	os.Setenv("BIGQUERY_DATASET", "override")
 	for _, test := range override_tests {
 		etl.IsBatch = test.isBatch
-		got := test.dt.Dataset()
+		got := test.dt.TableConfig().Dataset
 		if got != test.want {
 			t.Errorf("for %s want: %s, got: %s.", test.dt, test.want, got)
 		}
@@ -288,11 +288,5 @@ func TestGetFilename(t *testing.T) {
 				t.Errorf("GetFilename() = %v, want %v", got, tt.want)
 			}
 		})
-	}
-}
-
-func TestDirToTablename(t *testing.T) {
-	if etl.DirToTablename("paris-traceroute") != "traceroute" {
-		t.Errorf("DirToTablename() failed to translate PT dir name correctly.")
 	}
 }

@@ -63,13 +63,14 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 	}
 
 	bqProject := dt.BigqueryProject()
-	dataset := dt.Dataset()
-	table := dt.Table()
+	tableConfig := dt.TableConfig()
+	dataset := tableConfig.Dataset
+	table := tableConfig.Table
 
 	return NewBQInserter(
 		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: suffix,
 			PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
-			BufferSize: dt.BQBufferSize()},
+			BufferSize: tableConfig.BufferSize},
 		nil)
 }
 

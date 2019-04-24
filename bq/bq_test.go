@@ -119,8 +119,9 @@ func TestInsertConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if in.Dataset() != "base_tables" {
-		t.Errorf("Want base_tables, got %s", in.Dataset())
+	want := "sidestream"
+	if in.Dataset() != want {
+		t.Errorf("Want %s, got %s", want, in.Dataset())
 	}
 	if in.Project() != "mlab-oti" {
 		t.Errorf("Want mlab-oti, got %s", in.Project())
@@ -130,8 +131,9 @@ func TestInsertConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if in.Dataset() != "base_tables" {
-		t.Errorf("Want base_tables, got %s", in.Dataset())
+	want = "ndt"
+	if in.Dataset() != want {
+		t.Errorf("Want %s, got %s", want, in.Dataset())
 	}
 	if in.Project() != "mlab-oti" {
 		t.Errorf("Want mlab-oti, got %s", in.Project())

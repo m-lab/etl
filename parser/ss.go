@@ -96,7 +96,7 @@ type SSParser struct {
 
 // NewSSParser creates a new sidestream parser.
 func NewSSParser(ins etl.Inserter) *SSParser {
-	bufSize := etl.SS.BQBufferSize()
+	bufSize := etl.SS.TableConfig().BufferSize
 	buf := RowBuffer{bufSize, make([]interface{}, 0, bufSize)}
 	return &SSParser{ins, ins, buf}
 }
