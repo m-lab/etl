@@ -16,6 +16,8 @@
 # possible.
 
 language: go
+go:
+ - 1.12
 
 before_install:
 - sudo apt-get install -y jq  # Dependency for sync_tables_with_schema.sh.
