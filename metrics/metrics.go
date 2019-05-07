@@ -55,7 +55,7 @@ var (
 	AnnotationErrorCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_annotator_Error_Count",
-			Help: "The current number of errors encountered while attempting to add geo data.",
+			Help: "The current number of errors encountered while attempting to add annotation data.",
 		}, []string{"source"})
 
 	// AnnotationWarningCount measures the number of annotation warnings
@@ -66,8 +66,20 @@ var (
 	AnnotationWarningCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_annotator_Warning_Count",
-			Help: "The current number of Warnings encountered while attempting to add geo data.",
+			Help: "The current number of Warnings encountered while attempting to add annotation data.",
 		}, []string{"source"})
+
+	// AnnotationMissingCount measures the number of IPs with missing annotation.
+	// The type could be "asn", "geo", or "both".
+	// Provides metrics:
+	//    etl_annotator_Missing_Count
+	// Example usage:
+	//    metrics.AnnotationMarningCount.Inc()
+	AnnotationMissingCount = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_annotator_Missing_Count",
+			Help: "The current number of IPs with missing annotation data.",
+		}, []string{"type"})
 
 	// PanicCount counts the number of panics encountered in the pipeline.
 	//
