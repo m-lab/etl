@@ -54,16 +54,21 @@ func getAnnotations(ctx context.Context, timestamp time.Time, ips []string) ([]s
 		}
 	}
 	resp, err := v2.GetAnnotations(ctx, BatchURL, timestamp, normalized)
-	for _, anno := range resp.Annotations {
-		if anno.Network != nil && len(anno.Network.Systems) > 0 && len(anno.Network.Systems[0].ASNs) > 0 && anno.Network.Systems[0].ASNs[0] != 0 {
-			if anno.Geo.Latitude == 0 || anno.Geo.Longitude == 0 {
-				metrics.AnnotationMissingCount.WithLabelValues("geo").Inc()
+	if resp != nil {
+		for _, anno := range resp.Annotations {
+			if anno == nil {
+				break
 			}
-		} else {
-			if anno.Geo.Latitude == 0 || anno.Geo.Longitude == 0 {
-				metrics.AnnotationMissingCount.WithLabelValues("both").Inc()
+			if anno.Network != nil && len(anno.Network.Systems) > 0 && len(anno.Network.Systems[0].ASNs) > 0 && anno.Network.Systems[0].ASNs[0] != 0 {
+				if anno.Geo.Latitude == 0 || anno.Geo.Longitude == 0 {
+					metrics.AnnotationMissingCount.WithLabelValues("geo").Inc()
+				}
 			} else {
-				metrics.AnnotationMissingCount.WithLabelValues("asn").Inc()
+				if anno.Geo.Latitude == 0 || anno.Geo.Longitude == 0 {
+					metrics.AnnotationMissingCount.WithLabelValues("both").Inc()
+				} else {
+					metrics.AnnotationMissingCount.WithLabelValues("asn").Inc()
+				}
 			}
 		}
 	}
