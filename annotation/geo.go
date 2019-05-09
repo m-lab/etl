@@ -60,14 +60,14 @@ func getAnnotations(ctx context.Context, timestamp time.Time, ips []string) ([]s
 		// for the metric.
 		_, file, line, _ := runtime.Caller(2)
 		metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(file, ":", line)}).Inc()
-		metrics.AnnotationMissingCount.WithLabelValues("both").Add(float64(len(ips)))
+		metrics.AnnotationMissingCount.WithLabelValues("rpc error").Add(float64(len(ips)))
 		return normalized, nil, err
 	}
 
 	if resp != nil {
 		for _, anno := range resp.Annotations {
 			if anno == nil {
-				metrics.AnnotationMissingCount.WithLabelValues("both").Inc()
+				metrics.AnnotationMissingCount.WithLabelValues("nil entry").Inc()
 				continue
 			}
 			if anno.Network != nil && len(anno.Network.Systems) > 0 && len(anno.Network.Systems[0].ASNs) > 0 && anno.Network.Systems[0].ASNs[0] != 0 {

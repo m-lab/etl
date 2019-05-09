@@ -70,14 +70,14 @@ var (
 		}, []string{"source"})
 
 	// AnnotationMissingCount measures the number of IPs with missing annotation.
-	// The type could be "asn", "geo", or "both".
+	// The type could be "rpc error", "nil entry", "asn", "geo", or "both".
 	// Provides metrics:
-	//    etl_annotator_Missing_Count
+	//    etl_annotator_missing_total
 	// Example usage:
-	//    metrics.AnnotationMarningCount.Inc()
+	//    metrics.AnnotationMissingCount.WithLabelValues("nil entry").Inc()
 	AnnotationMissingCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "etl_annotator_missing_count_total",
+			Name: "etl_annotation_missing_total",
 			Help: "The current number of IPs with missing annotation data.",
 		}, []string{"type"})
 
