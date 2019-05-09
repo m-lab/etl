@@ -54,10 +54,21 @@ func getAnnotations(ctx context.Context, timestamp time.Time, ips []string) ([]s
 		}
 	}
 	resp, err := v2.GetAnnotations(ctx, BatchURL, timestamp, normalized)
+	if err != nil {
+		log.Println(err)
+		// There are many error types returned here, so we log the error, but use the caller location
+		// for the metric.
+		_, file, line, _ := runtime.Caller(2)
+		metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(file, ":", line)}).Inc()
+		metrics.AnnotationMissingCount.WithLabelValues("both").Add(float64(len(ips)))
+		return normalized, nil, err
+	}
+
 	if resp != nil {
 		for _, anno := range resp.Annotations {
 			if anno == nil {
-				break
+				metrics.AnnotationMissingCount.WithLabelValues("both").Inc()
+				continue
 			}
 			if anno.Network != nil && len(anno.Network.Systems) > 0 && len(anno.Network.Systems[0].ASNs) > 0 && anno.Network.Systems[0].ASNs[0] != 0 {
 				if anno.Geo.Latitude == 0 || anno.Geo.Longitude == 0 {
@@ -71,14 +82,6 @@ func getAnnotations(ctx context.Context, timestamp time.Time, ips []string) ([]s
 				}
 			}
 		}
-	}
-	if err != nil {
-		log.Println(err)
-		// There are many error types returned here, so we log the error, but use the caller location
-		// for the metric.
-		_, file, line, _ := runtime.Caller(2)
-		metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(file, ":", line)}).Inc()
-		return normalized, nil, err
 	}
 
 	return normalized, resp, err

@@ -77,7 +77,7 @@ var (
 	//    metrics.AnnotationMarningCount.Inc()
 	AnnotationMissingCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "etl_annotator_Missing_Count",
+			Name: "etl_annotator_missing_count_total",
 			Help: "The current number of IPs with missing annotation data.",
 		}, []string{"type"})
 
