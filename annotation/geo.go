@@ -36,6 +36,36 @@ var BaseURL = AnnotatorURL + "/annotate?"
 // BatchURL provides the base URL for batch annotation requests
 var BatchURL = AnnotatorURL + "/batch_annotate"
 
+// trackMissingResponses generates metrics for missing annotations.
+func trackMissingResponses(anno *api.GeoData) {
+	if anno == nil {
+		metrics.AnnotationMissingCount.WithLabelValues("nil-response").Inc()
+		return
+	}
+
+	netOk := anno.Network != nil && len(anno.Network.Systems) > 0 && len(anno.Network.Systems[0].ASNs) > 0 && anno.Network.Systems[0].ASNs[0] != 0
+	geoOk := anno.Geo != nil && anno.Geo.Latitude != 0 && anno.Geo.Longitude != 0
+
+	if netOk && geoOk {
+		return
+	}
+	if netOk {
+		if anno.Geo == nil {
+			metrics.AnnotationMissingCount.WithLabelValues("nil-geo").Inc()
+		} else {
+			metrics.AnnotationMissingCount.WithLabelValues("empty-geo").Inc()
+		}
+	} else if geoOk {
+		if anno.Network == nil {
+			metrics.AnnotationMissingCount.WithLabelValues("nil-asn").Inc()
+		} else {
+			metrics.AnnotationMissingCount.WithLabelValues("empty-asn").Inc()
+		}
+	} else {
+		metrics.AnnotationMissingCount.WithLabelValues("both").Inc()
+	}
+}
+
 func getAnnotations(ctx context.Context, timestamp time.Time, ips []string) ([]string, *v2.Response, error) {
 	normalized := make([]string, len(ips))
 	for i := range ips {
@@ -66,21 +96,7 @@ func getAnnotations(ctx context.Context, timestamp time.Time, ips []string) ([]s
 
 	if resp != nil {
 		for _, anno := range resp.Annotations {
-			if anno == nil {
-				metrics.AnnotationMissingCount.WithLabelValues("nil entry").Inc()
-				continue
-			}
-			if anno.Network != nil && len(anno.Network.Systems) > 0 && len(anno.Network.Systems[0].ASNs) > 0 && anno.Network.Systems[0].ASNs[0] != 0 {
-				if anno.Geo.Latitude == 0 || anno.Geo.Longitude == 0 {
-					metrics.AnnotationMissingCount.WithLabelValues("geo").Inc()
-				}
-			} else {
-				if anno.Geo.Latitude == 0 || anno.Geo.Longitude == 0 {
-					metrics.AnnotationMissingCount.WithLabelValues("both").Inc()
-				} else {
-					metrics.AnnotationMissingCount.WithLabelValues("asn").Inc()
-				}
-			}
+			trackMissingResponses(anno)
 		}
 	}
 
