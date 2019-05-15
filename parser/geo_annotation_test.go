@@ -234,7 +234,7 @@ func TestCreateRequestDataFromPTHops(t *testing.T) {
 			hops:      []*schema.ParisTracerouteHop{&schema.ParisTracerouteHop{Src_ip: "127.0.0.1"}},
 			timestamp: epoch,
 			res: []api.RequestData{
-				api.RequestData{IP: "1.0.0.127", IPFormat: 0, Timestamp: epoch}},
+				api.RequestData{IP: "127.0.0.1", IPFormat: 0, Timestamp: epoch}},
 		},
 	}
 	for _, test := range tests {
