@@ -193,17 +193,38 @@ type SS struct {
 
 // Implement parser.Annotatable
 
+// GetClientIP returns the client (remote) IP for annotation.  See parser.Annotatable
 func (ss *SS) GetClientIP() string {
 	return ss.Web100_log_entry.Connection_spec.Remote_ip
 }
-func (ss *SS) AnnotateClient(*api.GeoData) error {
+
+// GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
+func (ss *SS) GetServerIP() string {
+	return ss.Web100_log_entry.Connection_spec.Local_ip
+}
+
+// AnnotateClient adds the client annotations. See parser.Annotatable
+func (ss *SS) AnnotateClient(remote *api.GeoData) error {
+	connSpec := &ss.Web100_log_entry.Connection_spec
+	if remote != nil {
+		connSpec.Remote_geolocation = *remote.Geo
+		// TODO Handle ASN
+
+	}
 	return nil
 }
 
-func (ss *SS) AnnotateServer() error {
+// AnnotateServer adds the server annotations. See parser.Annotatable
+func (ss *SS) AnnotateServer(local *api.GeoData) error {
+	connSpec := &ss.Web100_log_entry.Connection_spec
+	if local != nil {
+		connSpec.Local_geolocation = *local.Geo
+		// TODO Handle ASN
+	}
 	return nil
 }
 
+// GetLogTime returns the timestamp that should be used for annotation.
 func (ss *SS) GetLogTime() time.Time {
 	// TODO - this is wrong.
 	return time.Unix(ss.Web100_log_entry.Snap.StartTimeStamp, 0)
