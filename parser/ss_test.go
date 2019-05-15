@@ -101,7 +101,7 @@ func TestSSInserter(t *testing.T) {
 	if len(ins.data) < 1 {
 		t.Fatal("Should have at least one inserted row")
 	}
-	inserted := ins.data[0].(*schema.SS)
+	inserted := ins.data[0].(schema.SS)
 	if inserted.ParseTime.After(time.Now()) {
 		t.Error("Should have inserted parse_time")
 	}
@@ -138,10 +138,10 @@ func TestSSAnnotation(t *testing.T) {
 		}
 		callCount++
 	}))
-	batchURL := annotation.BatchURL
+	prevBatchURL := annotation.BatchURL
 	annotation.BatchURL = ts.URL
 	defer func() {
-		annotation.BatchURL = batchURL
+		annotation.BatchURL = prevBatchURL
 		ts.Close()
 	}()
 
