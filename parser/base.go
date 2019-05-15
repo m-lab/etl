@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -8,7 +9,6 @@ import (
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/tcp-info/snapshot"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -17,10 +17,11 @@ import (
 /********** This block of code is redundant with SSParser and should be refactored ********/
 
 type Annotatable interface {
-	GetClientIP() string
 	GetLogTime() time.Time
+	GetClientIP() string
+	GetServerIP() string
 	AnnotateClient(*api.GeoData) error
-	AnnotateServer() error
+	AnnotateServer(*api.GeoData) error
 }
 
 type BaseRowBuffer struct {
@@ -46,6 +47,38 @@ func (buf *BaseRowBuffer) TakeRows() []interface{} {
 	return res
 }
 
+var ErrAnnotationError = errors.New("Annotation error")
+
+// TODO update this to use local cache of high quality annotations.
+func (buf *BaseRowBuffer) annotateServers() error {
+	ipSlice := make([]string, len(buf.rows))
+	logTime := time.Time{}
+	for i := range buf.rows {
+		r, ok := buf.rows[i].(Annotatable)
+		if !ok {
+			log.Println("Rows should be Annotatable")
+		}
+		ipSlice[i] = r.GetServerIP()
+		if (logTime == time.Time{}) {
+			logTime = r.GetLogTime()
+		}
+	}
+
+	annSlice := annotation.FetchAllAnnotations(ipSlice, logTime)
+	if annSlice == nil || len(annSlice) != len(ipSlice) {
+		return ErrAnnotationError
+	}
+
+	for i := range buf.rows {
+		r, ok := buf.rows[i].(Annotatable)
+		if ok {
+			r.AnnotateServer(annSlice[i])
+		}
+	}
+
+	return nil
+}
+
 func (buf *BaseRowBuffer) annotateClients() error {
 	ipSlice := make([]string, len(buf.rows))
 	logTime := time.Time{}
@@ -61,9 +94,8 @@ func (buf *BaseRowBuffer) annotateClients() error {
 	}
 
 	annSlice := annotation.FetchAllAnnotations(ipSlice, logTime)
-	// TODO - are there any errors we should process from Fetch?
 	if annSlice == nil || len(annSlice) != len(ipSlice) {
-		return nil // TODO return error
+		return ErrAnnotationError
 	}
 
 	for i := range buf.rows {
@@ -76,30 +108,32 @@ func (buf *BaseRowBuffer) annotateClients() error {
 	return nil
 }
 
-func (buf *BaseRowBuffer) annotateServers() error {
-	return nil
-}
-
 // Annotate fetches annotations for all rows in the buffer.
 // Not thread-safe.  Should only be called by owning thread.
 // TODO should convert this to operate on the rows, instead of the buffer.
 // Then we can do it after TakeRows().
-func (buf *BaseRowBuffer) Annotate(tableBase string) {
+func (buf *BaseRowBuffer) Annotate(tableBase string) error {
 	metrics.WorkerState.WithLabelValues(tableBase, "annotate").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableBase, "annotate").Dec()
 	if len(buf.rows) == 0 {
-		return
+		log.Println("No rows")
+		return nil
 	}
 	start := time.Now()
 
+	// TODO Consider doing these in parallel?
 	err := buf.annotateClients()
 	if err != nil {
-		// TODO return error?
+		return err
 	}
 
-	buf.annotateServers()
+	err = buf.annotateServers()
+	if err != nil {
+		return err
+	}
 
 	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": tableBase}).Observe(float64(time.Since(start).Nanoseconds()))
+	return nil
 }
 
 // Base provides common parser functionality.
@@ -110,8 +144,7 @@ type Base struct {
 }
 
 // NewBase creates a new sidestream parser.
-func NewBase(ins etl.Inserter) *Base {
-	bufSize := etl.TCPINFO.BQBufferSize()
+func NewBase(ins etl.Inserter, bufSize int) *Base {
 	buf := BaseRowBuffer{bufSize, make([]interface{}, 0, bufSize)}
 	return &Base{ins, ins, buf}
 }
@@ -124,16 +157,5 @@ func (pb *Base) TaskError() error {
 // Flush flushes any pending rows.
 func (pb *Base) Flush() error {
 	pb.Put(pb.TakeRows())
-	return pb.Flush()
-}
-
-/** End of redundant boilerplate ***********************************/
-
-type TCPRow struct {
-	UUID          string    // Top level just because
-	TestTime      time.Time // Must be top level for partitioning
-	TaskFileName  string    // The tar file containing this test.
-	ParseTime     time.Time
-	ParserVersion string
-	Snapshots     []*snapshot.Snapshot
+	return pb.Inserter.Flush()
 }
