@@ -4,8 +4,6 @@ import (
 	"log"
 	"time"
 
-	"cloud.google.com/go/bigquery"
-
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
@@ -19,15 +17,15 @@ import (
 /********** This block of code is redundant with SSParser and should be refactored ********/
 
 type Annotatable interface {
-	GetClient() string
-	AnnotateClient(*api.GeoData)
-	AnnotateServer()
-	LogTime() time.Time
+	GetClientIP() string
+	GetLogTime() time.Time
+	AnnotateClient(*api.GeoData) error
+	AnnotateServer() error
 }
 
 type BaseRowBuffer struct {
 	bufferSize int
-	rows       []Annotatable
+	rows       []interface{} // Actually these are Annotatable, but we cast them later.
 }
 
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
@@ -42,19 +40,26 @@ func (buf *BaseRowBuffer) AddRow(row Annotatable) error {
 
 // TakeRows returns all rows in the buffer, and clears the buffer.
 // Not thread-safe.  Should only be called by owning thread.
-func (buf *BaseRowBuffer) TakeRows() []Annotatable {
+func (buf *BaseRowBuffer) TakeRows() []interface{} {
 	res := buf.rows
-	buf.rows = make([]Annotatable, 0, buf.bufferSize)
+	buf.rows = make([]interface{}, 0, buf.bufferSize)
 	return res
 }
 
 func (buf *BaseRowBuffer) annotateClients() error {
 	ipSlice := make([]string, len(buf.rows))
+	logTime := time.Time{}
 	for i := range buf.rows {
-		ipSlice[i] = buf.rows[i].GetClient()
+		r, ok := buf.rows[i].(Annotatable)
+		if !ok {
+			log.Println("Rows should be Annotatable")
+		}
+		ipSlice[i] = r.GetClientIP()
+		if (logTime == time.Time{}) {
+			logTime = r.GetLogTime()
+		}
 	}
 
-	logTime := buf.rows[0].LogTime()
 	annSlice := annotation.FetchAllAnnotations(ipSlice, logTime)
 	// TODO - are there any errors we should process from Fetch?
 	if annSlice == nil || len(annSlice) != len(ipSlice) {
@@ -62,7 +67,10 @@ func (buf *BaseRowBuffer) annotateClients() error {
 	}
 
 	for i := range buf.rows {
-		buf.rows[i].AnnotateClient(annSlice[i])
+		r, ok := buf.rows[i].(Annotatable)
+		if ok {
+			r.AnnotateClient(annSlice[i])
+		}
 	}
 
 	return nil
@@ -74,6 +82,8 @@ func (buf *BaseRowBuffer) annotateServers() error {
 
 // Annotate fetches annotations for all rows in the buffer.
 // Not thread-safe.  Should only be called by owning thread.
+// TODO should convert this to operate on the rows, instead of the buffer.
+// Then we can do it after TakeRows().
 func (buf *BaseRowBuffer) Annotate(tableBase string) {
 	metrics.WorkerState.WithLabelValues(tableBase, "annotate").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableBase, "annotate").Dec()
@@ -89,13 +99,12 @@ func (buf *BaseRowBuffer) Annotate(tableBase string) {
 
 	buf.annotateServers()
 
-	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": "SS"}).Observe(float64(time.Since(start).Nanoseconds()))
+	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": tableBase}).Observe(float64(time.Since(start).Nanoseconds()))
 }
 
 // Base provides common parser functionality.
 type Base struct {
-	// TODO - maybe make this embedded
-	inserter etl.Inserter
+	etl.Inserter
 	etl.RowStats
 	BaseRowBuffer
 }
@@ -103,7 +112,7 @@ type Base struct {
 // NewBase creates a new sidestream parser.
 func NewBase(ins etl.Inserter) *Base {
 	bufSize := etl.TCPINFO.BQBufferSize()
-	buf := BaseRowBuffer{bufSize, make([]Annotatable, 0, bufSize)}
+	buf := BaseRowBuffer{bufSize, make([]interface{}, 0, bufSize)}
 	return &Base{ins, ins, buf}
 }
 
@@ -112,21 +121,10 @@ func (pb *Base) TaskError() error {
 	return nil
 }
 
-// TableName of the table that this Parser inserts into.
-func (pb *Base) TableName() string {
-	return pb.inserter.TableBase()
-}
-
-// FullTableName of the BQ table that the uploader pushes to,
-// including $YYYYMMNN, or _YYYYMMNN
-func (pb *Base) FullTableName() string {
-	return pb.inserter.FullTableName()
-}
-
 // Flush flushes any pending rows.
 func (pb *Base) Flush() error {
-	pb.inserter.Put(pb.TakeRows())
-	return pb.inserter.Flush()
+	pb.Put(pb.TakeRows())
+	return pb.Flush()
 }
 
 /** End of redundant boilerplate ***********************************/
@@ -138,54 +136,4 @@ type TCPRow struct {
 	ParseTime     time.Time
 	ParserVersion string
 	Snapshots     []*snapshot.Snapshot
-}
-
-func (tcp *TCPRow) GetClient() string {
-	return ""
-}
-func (tcp *TCPRow) AnnotateClient(*api.GeoData) {
-
-}
-func (tcp *TCPRow) AnnotateServer() {
-
-}
-func (tcp *TCPRow) LogTime() time.Time {
-	return time.Now()
-}
-
-type TCPInfoParser struct {
-	Base
-}
-
-// ParseAndInsert parses an entire TCPInfo record (all snapshots) and inserts it into bigquery.
-func (tcp *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
-	// TODO: for common metric states with constant labels, define global constants.
-	metrics.WorkerState.WithLabelValues(tcp.TableName(), "ss").Inc()
-	defer metrics.WorkerState.WithLabelValues(tcp.TableName(), "ss").Dec()
-
-	// TODO validate IP addresses?
-	test := TCPRow{}
-	test.ParseTime = time.Now() // for map, use string(time.Now().MarshalText())
-	test.ParserVersion = Version()
-	if meta["filename"] != nil {
-		test.TaskFileName = meta["filename"].(string)
-	}
-	// Add row to buffer, possibly flushing buffer if it is full.
-	err := tcp.AddRow(&test)
-	if err == etl.ErrBufferFull {
-		// Flush asynchronously, to improve throughput.
-		tcp.Annotate(tcp.inserter.TableBase())
-		tcp.inserter.PutAsync(tcp.TakeRows())
-		err = tcp.AddRow(&test)
-	}
-	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
-			tcp.TableName(), "ss", "insert-err").Inc()
-		metrics.TestCount.WithLabelValues(
-			tcp.TableName(), "ss", "insert-err").Inc()
-		log.Printf("insert-err: %v\n", err)
-	}
-	metrics.TestCount.WithLabelValues(tcp.TableName(), "tcpinfo", "ok").Inc()
-
-	return nil
 }
