@@ -190,3 +190,21 @@ type SS struct {
 	Type             int64          `json:"type,int64"`
 	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`
 }
+
+// Implement parser.Annotatable
+
+func (ss *SS) GetClientIP() string {
+	return ss.Web100_log_entry.Connection_spec.Remote_ip
+}
+func (ss *SS) AnnotateClient(*api.GeoData) error {
+	return nil
+}
+
+func (ss *SS) AnnotateServer() error {
+	return nil
+}
+
+func (ss *SS) GetLogTime() time.Time {
+	// TODO - this is wrong.
+	return time.Unix(ss.Web100_log_entry.Snap.StartTimeStamp, 0)
+}
