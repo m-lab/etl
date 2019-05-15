@@ -109,7 +109,8 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 		}
 		if hop.Src_ip != "" {
 			hop.Src_ip, _ = web100.NormalizeIPv6(hop.Src_ip)
-			hopMap[hop.Src_ip] = api.RequestData{hop.Src_ip, 0, timestamp}
+			hopMap[hop.Src_ip] = api.RequestData{
+				IP: hop.Src_ip, IPFormat: 0, Timestamp: timestamp}
 		} else {
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()
@@ -117,7 +118,8 @@ func CreateRequestDataFromPTHops(hops []*schema.ParisTracerouteHop, timestamp ti
 
 		if hop.Dest_ip != "" {
 			hop.Dest_ip, _ = web100.NormalizeIPv6(hop.Dest_ip)
-			hopMap[hop.Dest_ip] = api.RequestData{hop.Dest_ip, 0, timestamp}
+			hopMap[hop.Dest_ip] = api.RequestData{
+				IP: hop.Dest_ip, IPFormat: 0, Timestamp: timestamp}
 		} else {
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "PT Hop was missing an IP!!!"}).Inc()

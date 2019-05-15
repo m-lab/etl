@@ -33,7 +33,8 @@ func TestJSONParsing(t *testing.T) {
 	// This creates a real inserter, with a fake uploader, for local testing.
 	uploader := fake.FakeUploader{}
 	ins, err := bq.NewBQInserter(etl.InserterParams{
-		"mlab-sandbox", "dataset", "disco_test", "", 3, 10 * time.Second, time.Second}, &uploader)
+		Project: "mlab-sandbox", Dataset: "dataset", Table: "disco_test", Suffix: "",
+		BufferSize: 3, PutTimeout: 10 * time.Second, MaxRetryDelay: time.Second}, &uploader)
 	if err != nil {
 		t.Fatal(err)
 	}
