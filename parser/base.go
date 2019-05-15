@@ -2,7 +2,6 @@ package parser
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
@@ -11,10 +10,6 @@ import (
 	"github.com/m-lab/etl/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-// Parser for parsing sidestream tests.
-
-/********** This block of code is redundant with SSParser and should be refactored ********/
 
 type Annotatable interface {
 	GetLogTime() time.Time
@@ -31,7 +26,7 @@ type BaseRowBuffer struct {
 
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
 // Not thread-safe.  Should only be called by owning thread.
-func (buf *BaseRowBuffer) AddRow(row Annotatable) error {
+func (buf *BaseRowBuffer) AddRow(row interface{}) error {
 	for len(buf.rows) >= buf.bufferSize-1 {
 		return etl.ErrBufferFull
 	}
@@ -47,7 +42,10 @@ func (buf *BaseRowBuffer) TakeRows() []interface{} {
 	return res
 }
 
-var ErrAnnotationError = errors.New("Annotation error")
+var (
+	ErrAnnotationError = errors.New("Annotation error")
+	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
+)
 
 // TODO update this to use local cache of high quality annotations.
 func (buf *BaseRowBuffer) annotateServers() error {
@@ -56,7 +54,7 @@ func (buf *BaseRowBuffer) annotateServers() error {
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
 		if !ok {
-			log.Println("Rows should be Annotatable")
+			return ErrNotAnnotatable
 		}
 		ipSlice[i] = r.GetServerIP()
 		if (logTime == time.Time{}) {
@@ -85,7 +83,7 @@ func (buf *BaseRowBuffer) annotateClients() error {
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
 		if !ok {
-			log.Println("Rows should be Annotatable")
+			return ErrNotAnnotatable
 		}
 		ipSlice[i] = r.GetClientIP()
 		if (logTime == time.Time{}) {
@@ -116,7 +114,6 @@ func (buf *BaseRowBuffer) Annotate(tableBase string) error {
 	metrics.WorkerState.WithLabelValues(tableBase, "annotate").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableBase, "annotate").Dec()
 	if len(buf.rows) == 0 {
-		log.Println("No rows")
 		return nil
 	}
 	start := time.Now()

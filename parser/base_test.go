@@ -22,6 +22,8 @@ type Row struct {
 	serverAnn *api.GeoData
 }
 
+type BadRow struct{}
+
 func (row *Row) GetClientIP() string {
 	return row.client
 }
@@ -66,8 +68,12 @@ func TestBase(t *testing.T) {
 		}
 		callCount++
 	}))
+	batchURL := annotation.BatchURL
 	annotation.BatchURL = ts.URL
-	defer ts.Close()
+	defer func() {
+		annotation.BatchURL = batchURL
+		ts.Close()
+	}()
 
 	b := parser.NewBase(ins, 10)
 
@@ -96,5 +102,14 @@ func TestBase(t *testing.T) {
 	}
 	if inserted.serverAnn == nil || inserted.serverAnn.Geo.PostalCode != "10584" {
 		t.Error("Failed server annotation")
+	}
+
+	err = b.AddRow(&BadRow{})
+	if err != nil {
+		t.Error(err)
+	}
+	err = b.Annotate("foobar")
+	if err != parser.ErrNotAnnotatable {
+		t.Error("Should return ErrNotAnnotatable", err)
 	}
 }
