@@ -188,7 +188,7 @@ const (
 	SS              = DataType("sidestream")
 	PT              = DataType("traceroute")
 	SW              = DataType("switch")
-	TCPINFO         = DataType("tcp-info")
+	TCPINFO         = DataType("tcpinfo")
 	INVALID         = DataType("invalid")
 )
 
@@ -200,7 +200,7 @@ var (
 		"sidestream":       SS,
 		"paris-traceroute": PT,
 		"switch":           SW,
-		"tcp-info":         TCPINFO,
+		"tcpinfo":          TCPINFO,
 	}
 
 	// DataTypeToTable maps from data type to BigQuery table name.
