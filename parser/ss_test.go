@@ -3,6 +3,7 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,15 @@ import (
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
+// Compile time check that struct implements Annotatable.
+func assertSSIsAnnotatable(ss schema.SS) {
+	func(in parser.Annotatable) {}(&ss)
+}
 
 func TestExtractLogtimeFromFilename(t *testing.T) {
 	log_time, _ := parser.ExtractLogtimeFromFilename("20170315T01:00:00Z_173.205.3.39_0.web100")
@@ -113,18 +123,18 @@ func TestSSAnnotation(t *testing.T) {
 	ins := &inMemoryInserter{}
 
 	// Set up fake annotation service
-	r1 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-	                  "Annotations":{"1.2.3.4":{"Geo":{"postal_code":"10583"}}}}`
-	r2 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-					  "Annotations":{"4.3.2.1":{"Geo":{"postal_code":"10584"}}}}`
+	remote := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
+	                  "Annotations":{"5.228.253.100":{"Geo":{"postal_code":"10583"}}}}`
+	local := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
+					  "Annotations":{"213.248.112.75":{"Geo":{"postal_code":"10584"}}}}`
 
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// HACKY - depends on order in which client and server are annotated
 		if callCount == 0 {
-			fmt.Fprint(w, r1)
+			fmt.Fprint(w, remote)
 		} else {
-			fmt.Fprint(w, r2)
+			fmt.Fprint(w, local)
 		}
 		callCount++
 	}))
@@ -156,7 +166,7 @@ func TestSSAnnotation(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = b.Annotate("foobar")
+	err = b.Annotate("metric-label")
 	if err != nil {
 		t.Error(err)
 	}
@@ -172,5 +182,10 @@ func TestSSAnnotation(t *testing.T) {
 		t.Fatal("Should have at least one inserted row")
 	}
 	inserted := ins.data[0].(*schema.SS)
-	t.Errorf("Failed client annotation %+v\n", inserted)
+	if inserted.Web100_log_entry.Connection_spec.Remote_geolocation.PostalCode != "10583" {
+		t.Errorf("Failed client annotation %+v\n", inserted)
+	}
+	if inserted.Web100_log_entry.Connection_spec.Local_geolocation.PostalCode != "10584" {
+		t.Errorf("Failed server annotation %+v\n", inserted)
+	}
 }

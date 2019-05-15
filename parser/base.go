@@ -2,6 +2,7 @@ package parser
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
@@ -64,6 +65,7 @@ func (buf *BaseRowBuffer) annotateServers() error {
 
 	annSlice := annotation.FetchAllAnnotations(ipSlice, logTime)
 	if annSlice == nil || len(annSlice) != len(ipSlice) {
+		log.Println(len(annSlice), len(ipSlice))
 		return ErrAnnotationError
 	}
 
@@ -93,6 +95,7 @@ func (buf *BaseRowBuffer) annotateClients() error {
 
 	annSlice := annotation.FetchAllAnnotations(ipSlice, logTime)
 	if annSlice == nil || len(annSlice) != len(ipSlice) {
+		log.Println(len(annSlice), len(ipSlice))
 		return ErrAnnotationError
 	}
 

@@ -3,6 +3,7 @@
 package schema
 
 import (
+	"log"
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
@@ -195,11 +196,13 @@ type SS struct {
 
 // GetClientIP returns the client (remote) IP for annotation.  See parser.Annotatable
 func (ss *SS) GetClientIP() string {
+	log.Println(ss.Web100_log_entry.Connection_spec.Remote_ip)
 	return ss.Web100_log_entry.Connection_spec.Remote_ip
 }
 
 // GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
 func (ss *SS) GetServerIP() string {
+	log.Println(ss.Web100_log_entry.Connection_spec.Local_ip)
 	return ss.Web100_log_entry.Connection_spec.Local_ip
 }
 
@@ -226,6 +229,5 @@ func (ss *SS) AnnotateServer(local *api.GeoData) error {
 
 // GetLogTime returns the timestamp that should be used for annotation.
 func (ss *SS) GetLogTime() time.Time {
-	// TODO - this is wrong.
-	return time.Unix(ss.Web100_log_entry.Snap.StartTimeStamp, 0)
+	return time.Unix(0, 1000000*ss.Web100_log_entry.Snap.StartTimeStamp)
 }
