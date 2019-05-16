@@ -81,7 +81,7 @@ func TestBase(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = b.Annotate("foobar")
+	err = b.Annotate("tablename")
 	if err != nil {
 		t.Error(err)
 	}

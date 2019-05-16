@@ -110,9 +110,9 @@ func (buf *BaseRowBuffer) annotateClients() error {
 // Not thread-safe.  Should only be called by owning thread.
 // TODO should convert this to operate on the rows, instead of the buffer.
 // Then we can do it after TakeRows().
-func (buf *BaseRowBuffer) Annotate(tableBase string) error {
-	metrics.WorkerState.WithLabelValues(tableBase, "annotate").Inc()
-	defer metrics.WorkerState.WithLabelValues(tableBase, "annotate").Dec()
+func (buf *BaseRowBuffer) Annotate(metricLabel string) error {
+	metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Inc()
+	defer metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Dec()
 	if len(buf.rows) == 0 {
 		return nil
 	}
@@ -129,21 +129,20 @@ func (buf *BaseRowBuffer) Annotate(tableBase string) error {
 		return err
 	}
 
-	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": tableBase}).Observe(float64(time.Since(start).Nanoseconds()))
+	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": metricLabel}).Observe(float64(time.Since(start).Nanoseconds()))
 	return nil
 }
 
 // Base provides common parser functionality.
 type Base struct {
 	etl.Inserter
-	etl.RowStats
 	BaseRowBuffer
 }
 
 // NewBase creates a new sidestream parser.
 func NewBase(ins etl.Inserter, bufSize int) *Base {
 	buf := BaseRowBuffer{bufSize, make([]interface{}, 0, bufSize)}
-	return &Base{ins, ins, buf}
+	return &Base{ins, buf}
 }
 
 // TaskError return the task level error, based on failed rows, or any other criteria.
@@ -152,6 +151,7 @@ func (pb *Base) TaskError() error {
 }
 
 // Flush flushes any pending rows.
+// Caller should generally call Annotate first.
 func (pb *Base) Flush() error {
 	pb.Put(pb.TakeRows())
 	return pb.Inserter.Flush()
