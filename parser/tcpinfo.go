@@ -103,7 +103,6 @@ func (p *TCPInfoParser) TableName() string {
 
 // Flush flushes any pending rows.
 func (p *TCPInfoParser) Flush() error {
-	log.Println("Flushing")
 	p.Put(p.TakeRows())
 	return p.Inserter.Flush()
 }
@@ -122,6 +121,7 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 			return err
 		}
 	}
+
 	// This contains metadata and all snapshots from a single connection.
 	rdr := bytes.NewReader(rawContent)
 	ar := netlink.NewArchiveReader(rdr)
@@ -129,6 +129,7 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	var err error
 	var rec *netlink.ArchivalRecord
 	snaps := make([]*snapshot.Snapshot, 0, 2000)
+	snapMeta := netlink.Metadata{}
 	for rec, err = ar.Next(); err != io.EOF; rec, err = ar.Next() {
 		if err != nil {
 			break
@@ -138,7 +139,14 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 			err = decodeErr
 			break
 		}
-		snaps = append(snaps, snap)
+		if snap.Metadata != nil {
+			// TODO - do something with this.
+			snapMeta = *snap.Metadata
+
+		}
+		if snap.Observed != 0 {
+			snaps = append(snaps, snap)
+		}
 	}
 
 	if err != io.EOF {
@@ -150,13 +158,14 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	}
 
 	if len(snaps) < 1 {
-		log.Println("No snapshots")
 		return nil // no rows
 	}
 
 	row := TCPRow{}
 	row.Snapshots = snaps
 	row.FinalSnapshot = snaps[len(snaps)-1]
+	row.UUID = snapMeta.UUID
+	row.TestTime = snapMeta.StartTime
 
 	row.ParseInfo = &ParseInfo{ParseTime: time.Now(), ParserVersion: Version()}
 
@@ -166,7 +175,6 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 
 	insertErr := p.AddRow(&row)
 	if insertErr != nil {
-		log.Println(err)
 		p.Annotate(p.TableName())
 		p.Flush()
 	}

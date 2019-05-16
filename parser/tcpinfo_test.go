@@ -3,9 +3,11 @@ package parser_test
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -34,18 +36,17 @@ func TestDump(t *testing.T) {
 	fmt.Print(pp)
 }
 
-func localETLSource(t *testing.T, fn string) (*storage.ETLSource, error) {
+func localETLSource(fn string) (*storage.ETLSource, error) {
 	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
 		strings.HasSuffix(fn, ".tar.gz")) {
 		return nil, errors.New("not tar or tgz: " + fn)
 	}
 
-	t.Log(fn)
 	var rdr io.ReadCloser
 	var raw io.ReadCloser
 	raw, err := os.Open(fn)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	// Handle .tar.gz, .tgz files.
 	if strings.HasSuffix(strings.ToLower(fn), "gz") {
@@ -54,7 +55,6 @@ func localETLSource(t *testing.T, fn string) (*storage.ETLSource, error) {
 			raw.Close()
 			return nil, err
 		}
-		t.Log("gzip")
 	} else {
 		rdr = raw
 	}
@@ -70,7 +70,7 @@ func TestTCPParser(t *testing.T) {
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 
-	src, err := localETLSource(t, filename)
+	src, err := localETLSource(filename)
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
 	}
@@ -79,7 +79,9 @@ func TestTCPParser(t *testing.T) {
 	p := parser.NewTCPInfoParser(ins)
 	task := task.NewTask(filename, src, p)
 
+	startDecode := time.Now()
 	n, err := task.ProcessAllTests()
+	decodeTime := time.Since(startDecode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,5 +109,64 @@ func TestTCPParser(t *testing.T) {
 
 	if inserted.ParseInfo.ParserVersion != "local development" {
 		t.Error("ParserVersion not properly set", inserted.ParseInfo.ParserVersion)
+	}
+
+	startMarshal := time.Now()
+	jsonBytes, err := json.Marshal(ins.data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	marshalTime := time.Since(startMarshal)
+	t.Log("json is", len(jsonBytes)/n, " bytes per file")
+
+	largest := 0
+	snaps := 0
+	duration := time.Duration(0)
+	sumSnaps := int64(0)
+	for _, r := range ins.data {
+		jsonBytes, _ := json.Marshal(r)
+		row, _ := r.(*parser.TCPRow)
+		sumSnaps += int64(len(row.Snapshots))
+		if len(jsonBytes) > largest {
+			largest = len(jsonBytes)
+			snaps = len(row.Snapshots)
+			duration = row.FinalSnapshot.Timestamp.Sub(row.Snapshots[0].Timestamp)
+		}
+	}
+	t.Log("Largest is", largest, "bytes in", snaps, "snapshots, over", duration, "with", largest/snaps, "json bytes/snap")
+	t.Log("Total of", sumSnaps, "snapshots decoded and marshalled")
+	t.Log("Average", decodeTime.Nanoseconds()/sumSnaps, "nsec/snap to decode", marshalTime.Nanoseconds()/sumSnaps, "nsec/snap to marshal")
+
+	row, _ := ins.data[0].(*parser.TCPRow)
+	snapJson, _ := json.Marshal(row.FinalSnapshot)
+	log.Println(string(snapJson))
+
+	if duration > 20*time.Second {
+		t.Error("Incorrect duration calculation", duration)
+	}
+}
+
+func BenchmarkTCPParser(b *testing.B) {
+	os.Setenv("RELEASE_TAG", "foobar")
+	// parser.InitParserVersionForTest()
+
+	ins := &inMemoryInserter{}
+	p := parser.NewTCPInfoParser(ins)
+
+	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	n := 0
+	for i := 0; i < b.N; i += n {
+
+		src, err := localETLSource(filename)
+		if err != nil {
+			b.Fatalf("cannot read testdata.")
+		}
+
+		task := task.NewTask(filename, src, p)
+
+		n, err = task.ProcessAllTests()
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
