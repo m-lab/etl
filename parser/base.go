@@ -140,9 +140,9 @@ type Base struct {
 }
 
 // NewBase creates a new sidestream parser.
-func NewBase(ins etl.Inserter, bufSize int) *Base {
+func NewBase(ins etl.Inserter, bufSize int) Base {
 	buf := BaseRowBuffer{bufSize, make([]interface{}, 0, bufSize)}
-	return &Base{ins, buf}
+	return Base{ins, buf}
 }
 
 // TaskError return the task level error, based on failed rows, or any other criteria.
@@ -153,6 +153,7 @@ func (pb *Base) TaskError() error {
 // Flush flushes any pending rows.
 // Caller should generally call Annotate first.
 func (pb *Base) Flush() error {
+	// TODO make this async.
 	pb.Put(pb.TakeRows())
 	return pb.Inserter.Flush()
 }
