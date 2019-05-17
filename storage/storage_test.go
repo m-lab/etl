@@ -8,6 +8,9 @@ import (
 )
 
 func TestGetObject(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping tests that access GCS")
+	}
 	obj, err := getObject(client, "m-lab-sandbox", "testfile", 10*time.Second)
 	if err != nil {
 		t.Fatal(err)
@@ -16,6 +19,9 @@ func TestGetObject(t *testing.T) {
 }
 
 func TestNewTarReader(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping tests that access GCS")
+	}
 	src, err := NewETLSource(client, "gs://m-lab-sandbox/test.tar")
 	if err != nil {
 		t.Fatal(err)
@@ -35,6 +41,9 @@ func TestNewTarReader(t *testing.T) {
 }
 
 func TestNewTarReaderGzip(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping tests that access GCS")
+	}
 	src, err := NewETLSource(client, "gs://m-lab-sandbox/test.tgz")
 	if err != nil {
 		t.Fatal(err)
