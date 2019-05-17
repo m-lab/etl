@@ -42,11 +42,16 @@ before_install:
 - source "${HOME}/google-cloud-sdk/path.bash.inc"
 
 # Install test credentials.
-# Note that anyone with github ACLs to push to a branch can hack .travis.yml
-# and discover these credentials in the travis logs.
-- if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
-  echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key ;
-  gcloud auth activate-service-account --key-file=travis-testing.key ;
+# The service account variables are uploaded to travis by running,
+# from root of repo directory:
+#  travis/setup_service_accounts_for_travis.sh
+#
+# All of the gcloud library calls will detect the GOOGLE_APPLICATION_CREDENTIALS
+# environment variable, and use that file for authentication.
+- if [[ -n "$SERVICE_ACCOUNT_mlab_testing" ]] ; then
+  echo "$SERVICE_ACCOUNT_mlab_testing" > $TRAVIS_BUILD_DIR/creds.json ;
+  export GOOGLE_APPLICATION_CREDENTIALS=$TRAVIS_BUILD_DIR/creds.json ;
+  travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_testing ;
   fi
 
 install:
@@ -73,7 +78,7 @@ script:
 - go test ./... -v -coverpkg=./... -coverprofile=_coverage.cov -short
 
 
-- if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
+- if [[ -n "$SERVICE_ACCOUNT_mlab_testing" ]] ; then
     go test ./... -v -coverpkg=./... -coverprofile=_coverage.cov -tags=integration ;
   fi
 
