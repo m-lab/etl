@@ -70,10 +70,15 @@ script:
 - go get -t ./...
 - go vet ./...
 - go build ./...
-- go test ./... -v -coverpkg=./... -coverprofile=_coverage.cov -tags=integration
+- go test ./... -v -coverpkg=./... -coverprofile=_coverage.cov -short
+
+
+- if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
+    go test ./... -v -coverpkg=./... -coverprofile=_coverage.cov -tags=integration
+  fi
 
 # Coveralls
-# Upload coverage information for unit tests.
+# Upload coverage information for unit and integration tests.
 - $HOME/gopath/bin/goveralls -coverprofile=_coverage.cov -service=travis-ci
 
 # Clean build and prepare for deployment
