@@ -13,11 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/etl/storage"
-	"github.com/m-lab/etl/task"
-
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/etl/task"
 	"github.com/m-lab/go/bqx"
 )
 

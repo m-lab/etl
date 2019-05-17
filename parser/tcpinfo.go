@@ -1,5 +1,22 @@
 package parser
 
+/* CPU profile highlights (from TestTCPParser -count=100)
+0.17s  0.38%  0.38%     23.24s 51.82%  encoding/json.Marshal
+0.01s 0.022%  7.36%     22.18s 49.45%  encoding/json.sliceEncoder.encode
+0.02s 0.045% 48.12%      1.87s  4.17%  github.com/m-lab/tcp-info/inetdiag.(*ipType).MarshalJSON
+
+0.02s 0.045%  7.42%     13.06s 29.12%  encoding/json.Unmarshal
+
+0.02s 0.045%  9.01%      5.18s 11.55%  runtime.systemstack
+1.07s  2.39% 11.39%      4.50s 10.03%  runtime.mallocgc
+
+Notes:
+  1. Majority of time is spent in JSON marshaling.  This is good!
+  2. ipType marshalling takes a disproportionate fraction of the time, as do other custom marshalers.
+  3. Decoding the JSON from the ArchivalRecords takes 30% of the time.
+  4. The zstd decoding is likely outside the profiling.
+*/
+
 import (
 	"bytes"
 	"errors"
@@ -112,7 +129,8 @@ func (p *TCPInfoParser) IsParsable(testName string, data []byte) (string, bool) 
 	return "tcpinfo", true
 }
 
-// ParseAndInsert extracts each ArchivalRecord from the rawContent and inserts each into a separate row.
+// ParseAndInsert extracts all ArchivalRecords from the rawContent and inserts into a single row.
+// Approximately 15 usec/snapshot.
 func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	if strings.HasSuffix(testName, "zst") {
 		var err error
