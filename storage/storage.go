@@ -258,7 +258,8 @@ func GetStorageClient(writeAccess bool) (*http.Client, error) {
 	}
 
 	// Use a short timeout, so we get an error quickly if there is a problem.
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	client, err := google.DefaultClient(ctx, scope)
 	if err != nil {
 		return nil, err
@@ -280,7 +281,8 @@ func getObject(client *http.Client, bucket string, fn string, timeout time.Durat
 
 	// Lightweight - only setting up the local object.
 	call := service.Objects.Get(bucket, fn)
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 	call = call.Context(ctx)
 
 	// Heavyweight.

@@ -60,7 +60,7 @@ func localETLSource(fn string) (*storage.ETLSource, error) {
 	tarReader := tar.NewReader(rdr)
 
 	timeout := 16 * time.Millisecond
-	return &storage.ETLSource{tarReader, raw, timeout, "test"}, nil
+	return &storage.ETLSource{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
 }
 
 func TestTCPParser(t *testing.T) {

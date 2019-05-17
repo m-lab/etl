@@ -117,7 +117,8 @@ func GetClient(project string) (*bigquery.Client, error) {
 	// If we call defer cancel(), then the client later fails with cancelled context.
 	// So apparently the client holds on to the context, but doesn't care if it
 	// expires.
-	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 	return bigquery.NewClient(ctx, project)
 }
 
