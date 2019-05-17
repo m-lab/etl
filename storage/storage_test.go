@@ -7,11 +7,15 @@ import (
 	"time"
 )
 
+var testBucket = "mlab-testing.appspot.com"
+var tarFile = "gs://" + testBucket + "/test.tar"
+var tgzFile = "gs://" + testBucket + "/test.tgz"
+
 func TestGetObject(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping tests that access GCS")
 	}
-	obj, err := getObject(client, "m-lab-sandbox", "testfile", 10*time.Second)
+	obj, err := getObject(client, testBucket, "testfile", 10*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +26,7 @@ func TestNewTarReader(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping tests that access GCS")
 	}
-	src, err := NewETLSource(client, "gs://m-lab-sandbox/test.tar")
+	src, err := NewETLSource(client, tarFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +48,7 @@ func TestNewTarReaderGzip(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping tests that access GCS")
 	}
-	src, err := NewETLSource(client, "gs://m-lab-sandbox/test.tgz")
+	src, err := NewETLSource(client, tgzFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +79,7 @@ func init() {
 
 func BenchmarkNewTarReader(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		src, err := NewETLSource(client, "gs://m-lab-sandbox/test.tar")
+		src, err := NewETLSource(client, tarFile)
 		if err == nil {
 			src.Close()
 		}
@@ -84,7 +88,7 @@ func BenchmarkNewTarReader(b *testing.B) {
 
 func BenchmarkNewTarReaderGzip(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		src, err := NewETLSource(client, "gs://m-lab-sandbox/test.tgz")
+		src, err := NewETLSource(client, tgzFile)
 		if err == nil {
 			src.Close()
 		}
