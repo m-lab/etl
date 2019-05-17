@@ -18,7 +18,7 @@ func init() {
 var gParserVersion string
 
 // initParserVersion initializes the gParserVersion variable for use by all parsers.
-func initParserVersion() {
+func initParserVersion() string {
 	release, ok := os.LookupEnv("RELEASE_TAG")
 	if ok && release != "empty_tag" {
 		gParserVersion = "https://github.com/m-lab/etl/tree/" + release
@@ -30,6 +30,7 @@ func initParserVersion() {
 			gParserVersion = "local development"
 		}
 	}
+	return gParserVersion
 }
 
 // Version returns the parser version used by parsers to annotate data rows.
