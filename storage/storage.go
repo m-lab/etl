@@ -257,10 +257,9 @@ func GetStorageClient(writeAccess bool) (*http.Client, error) {
 		scope = storage.DevstorageReadOnlyScope
 	}
 
-	// Use a short timeout, so we get an error quickly if there is a problem.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	client, err := google.DefaultClient(ctx, scope)
+	// This cannot include a defer cancel, as the client then doesn't work after
+        // the cancel.
+	client, err := google.DefaultClient(context.Background(), scope)
 	if err != nil {
 		return nil, err
 	}
