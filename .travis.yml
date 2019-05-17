@@ -19,9 +19,10 @@ language: go
 go:
  - 1.12
 
-before_install:
-- sudo apt-get update && sudo apt-get install -y zstd # Dependency for unit tests using ArchivalRecord files.
+dist: xenial  # So zstd install works?
+sudo: true
 
+before_install:
 - sudo apt-get install -y jq  # Dependency for sync_tables_with_schema.sh.
 # Install javascript libraries
 - pushd $TRAVIS_BUILD_DIR/functions
@@ -47,6 +48,9 @@ before_install:
   echo $TEST_SERVICE_ACCOUNT_mlab_testing | base64 -d > travis-testing.key ;
   gcloud auth activate-service-account --key-file=travis-testing.key ;
   fi
+
+install:
+- sudo apt-get update && sudo apt-get install -y zstd # Dependency for unit tests using ArchivalRecord files.
 
 # These directories will be cached on successful "script" builds, and restored,
 # if available, to save time on future builds.
