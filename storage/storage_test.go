@@ -15,7 +15,7 @@ func TestGetObject(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping tests that access GCS")
 	}
-	obj, err := getObject(client, testBucket, "testfile", 10*time.Second)
+	obj, err := getObject(client, testBucket, "testfile", 60*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
