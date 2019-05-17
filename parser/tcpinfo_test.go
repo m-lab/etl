@@ -65,7 +65,7 @@ func localETLSource(fn string) (*storage.ETLSource, error) {
 
 func TestTCPParser(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
-	// parser.InitParserVersionForTest()
+	parserVersion := parser.InitParserVersionForTest()
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 
@@ -106,7 +106,7 @@ func TestTCPParser(t *testing.T) {
 		t.Error("Should have correct filename", filename, "!=", inserted.ParseInfo.TaskFileName)
 	}
 
-	if inserted.ParseInfo.ParserVersion != "local development" {
+	if inserted.ParseInfo.ParserVersion != parserVersion {
 		t.Error("ParserVersion not properly set", inserted.ParseInfo.ParserVersion)
 	}
 
@@ -147,7 +147,7 @@ func TestTCPParser(t *testing.T) {
 
 func BenchmarkTCPParser(b *testing.B) {
 	os.Setenv("RELEASE_TAG", "foobar")
-	// parser.InitParserVersionForTest()
+	parser.InitParserVersionForTest()
 
 	ins := &inMemoryInserter{}
 	p := parser.NewTCPInfoParser(ins)
