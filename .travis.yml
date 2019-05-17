@@ -66,46 +66,14 @@ script:
 - npm test
 - popd; popd
 
-# To start the Go tests, run all the non-integration tests.
-# Currently skipping storage tests, because they depend on GCS, and there is
-# no emulator.
-# TODO - separate storage tests into integration and lightweight.
-- MODULES="annotation appengine/queue_pusher bq etl metrics parser schema task web100"
-- for module in $MODULES; do
-    COVER_PKGS=${COVER_PKGS}./$module/..., ;
-  done
-- COVER_PKGS=${COVER_PKGS::-1}  # Trim the trailing comma
-- EC=0
-# Note that for modules in subdirectories, this replaces separating slashes with _.
-- for module in $MODULES; do
-    go test -v -coverpkg=$COVER_PKGS -coverprofile=${module//\//_}.cov github.com/m-lab/etl/$module ;
-    EC=$[ $EC || $? ] ;
-  done
-- echo "summary status $EC" ;
-- if [[ $EC != 0 ]]; then false; fi ;
-
-
-# Rerun modules with integration tests.  This means that some tests are repeated, but otherwise
-# we lose some coverage.  The corresponding cov files are overwritten, but that is OK since
-# the non-integration tests are repeated.  If we change the unit tests to NOT run when integration
-# test tag is set, then we would need to have separate cov files.
-# Note: we do not run integration tests from forked PRs b/c the SA is unavailable.
-# Note that for modules in subdirectories, this replaces separating slashes with _.
-- if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
-  for module in metrics ; do
-    go test -v -coverpkg=$COVER_PKGS -coverprofile=${module//\//_}.cov github.com/m-lab/etl/$module -tags=integration ;
-    EC=$[ $EC || $? ] ;
-  done ;
-  echo "summary status $EC" ;
-  if [[ $EC != 0 ]]; then false; fi ;
-  fi
+# Vet the Go code, build the code, and run all the tests.
+- go vet ./...
+- go build ./...
+- go test ./... -v -coverpkg=./... -coverprofile=_coverage.cov -tags=integration
 
 # Coveralls
-# Run "unit tests" with coverage.
-
-# Coveralls
-- $HOME/gopath/bin/gocovmerge *.cov > merge.cov
-- $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
+# Upload coverage information for unit tests.
+- $HOME/gopath/bin/goveralls -coverprofile=_coverage.cov -service=travis-ci
 
 # Clean build and prepare for deployment
 - cd $TRAVIS_BUILD_DIR/cmd/etl_worker &&
