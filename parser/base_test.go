@@ -46,6 +46,10 @@ func (row *Row) GetLogTime() time.Time {
 	return time.Now()
 }
 
+func assertAnnotatable(r *Row) {
+	func(parser.Annotatable) {}(r)
+}
+
 func TestBase(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
