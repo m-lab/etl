@@ -29,9 +29,9 @@ type Annotatable interface {
 	AnnotateServer(*api.Annotations) error
 }
 
-// BaseRowBuffer provides all basic functionality generally needed for buffering, annotating, and inserting
+// RowBuffer provides all basic functionality generally needed for buffering, annotating, and inserting
 // rows that implement Annotatable.
-type BaseRowBuffer struct {
+type RowBuffer struct {
 	bufferSize int
 	rows       []interface{} // Actually these are Annotatable, but we cast them later.
 	ann        v2as.Annotator
@@ -39,7 +39,7 @@ type BaseRowBuffer struct {
 
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
 // Not thread-safe.  Should only be called by owning thread.
-func (buf *BaseRowBuffer) AddRow(row interface{}) error {
+func (buf *RowBuffer) AddRow(row interface{}) error {
 	for len(buf.rows) >= buf.bufferSize-1 {
 		return etl.ErrBufferFull
 	}
@@ -49,14 +49,14 @@ func (buf *BaseRowBuffer) AddRow(row interface{}) error {
 
 // TakeRows returns all rows in the buffer, and clears the buffer.
 // Not thread-safe.  Should only be called by owning thread.
-func (buf *BaseRowBuffer) TakeRows() []interface{} {
+func (buf *RowBuffer) TakeRows() []interface{} {
 	res := buf.rows
 	buf.rows = make([]interface{}, 0, buf.bufferSize)
 	return res
 }
 
 // TODO update this to use local cache of high quality annotations.
-func (buf *BaseRowBuffer) annotateServers() error {
+func (buf *RowBuffer) annotateServers() error {
 	ipSlice := make([]string, len(buf.rows))
 	logTime := time.Time{}
 	for i := range buf.rows {
@@ -90,7 +90,7 @@ func (buf *BaseRowBuffer) annotateServers() error {
 	return nil
 }
 
-func (buf *BaseRowBuffer) annotateClients() error {
+func (buf *RowBuffer) annotateClients() error {
 	ipSlice := make([]string, 0, 2*len(buf.rows)) // This may be inadequate, but its a reasonable start.
 	logTime := time.Time{}
 	for i := range buf.rows {
@@ -128,7 +128,7 @@ func (buf *BaseRowBuffer) annotateClients() error {
 // Not thread-safe.  Should only be called by owning thread.
 // TODO should convert this to operate on the rows, instead of the buffer.
 // Then we can do it after TakeRows().
-func (buf *BaseRowBuffer) Annotate(metricLabel string) error {
+func (buf *RowBuffer) Annotate(metricLabel string) error {
 	metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Inc()
 	defer metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Dec()
 	if len(buf.rows) == 0 {
@@ -155,12 +155,12 @@ func (buf *BaseRowBuffer) Annotate(metricLabel string) error {
 // Base provides common parser functionality.
 type Base struct {
 	etl.Inserter
-	BaseRowBuffer
+	RowBuffer
 }
 
 // NewBase creates a new sidestream parser.
 func NewBase(ins etl.Inserter, bufSize int, ann v2as.Annotator) *Base {
-	buf := BaseRowBuffer{bufSize, make([]interface{}, 0, bufSize), ann}
+	buf := RowBuffer{bufSize, make([]interface{}, 0, bufSize), ann}
 	return &Base{ins, buf}
 }
 

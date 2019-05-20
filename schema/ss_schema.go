@@ -3,6 +3,7 @@
 package schema
 
 import (
+	"log"
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
@@ -189,4 +190,44 @@ type SS struct {
 
 	Type             int64          `json:"type,int64"`
 	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`
+}
+
+// Implement parser.Annotatable
+
+// GetClientIP returns the client (remote) IP for annotation.  See parser.Annotatable
+func (ss *SS) GetClientIP() string {
+	log.Println(ss.Web100_log_entry.Connection_spec.Remote_ip)
+	return ss.Web100_log_entry.Connection_spec.Remote_ip
+}
+
+// GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
+func (ss *SS) GetServerIP() string {
+	log.Println(ss.Web100_log_entry.Connection_spec.Local_ip)
+	return ss.Web100_log_entry.Connection_spec.Local_ip
+}
+
+// AnnotateClient adds the client annotations. See parser.Annotatable
+func (ss *SS) AnnotateClient(remote *api.GeoData) error {
+	connSpec := &ss.Web100_log_entry.Connection_spec
+	if remote != nil {
+		connSpec.Remote_geolocation = *remote.Geo
+		// TODO Handle ASN
+
+	}
+	return nil
+}
+
+// AnnotateServer adds the server annotations. See parser.Annotatable
+func (ss *SS) AnnotateServer(local *api.GeoData) error {
+	connSpec := &ss.Web100_log_entry.Connection_spec
+	if local != nil {
+		connSpec.Local_geolocation = *local.Geo
+		// TODO Handle ASN
+	}
+	return nil
+}
+
+// GetLogTime returns the timestamp that should be used for annotation.
+func (ss *SS) GetLogTime() time.Time {
+	return time.Unix(0, 1000000*ss.Web100_log_entry.Snap.StartTimeStamp)
 }

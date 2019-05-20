@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 )
@@ -68,7 +70,7 @@ func TestSSInserter(t *testing.T) {
 	parser.InitParserVersionForTest()
 
 	ins := &inMemoryInserter{}
-	n := parser.NewSSParser(ins)
+	n := parser.NewSSParser(ins, v2as.GetAnnotator(annotation.BatchURL))
 	filename := "testdata/20170203T00:00:00Z_ALL0.web100"
 	rawData, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -88,7 +90,7 @@ func TestSSInserter(t *testing.T) {
 	if len(ins.data) < 1 {
 		t.Fatal("Should have at least one inserted row")
 	}
-	inserted := ins.data[0].(*schema.SS)
+	inserted := ins.data[0].(schema.SS)
 	if inserted.ParseTime.After(time.Now()) {
 		t.Error("Should have inserted parse_time")
 	}
