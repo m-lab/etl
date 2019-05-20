@@ -1,27 +1,40 @@
 package parser
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
-	"github.com/m-lab/etl/annotation"
+	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Errors that may be returned by BaseRowBuffer functions.
+var (
+	ErrAnnotationError = errors.New("Annotation error")
+	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
+)
+
+// Annotatable interface enables integration of annotation into a parser.
+// The row type should implement the interface, and the annotations will be added
+// prior to insertion.
 type Annotatable interface {
 	GetLogTime() time.Time
-	GetClientIP() string
+	GetClientIPs() []string // This is a slice to support mutliple hops in traceroute data.
 	GetServerIP() string
-	AnnotateClient(*api.GeoData) error
-	AnnotateServer(*api.GeoData) error
+	AnnotateClients(map[string]*api.Annotations) error
+	AnnotateServer(*api.Annotations) error
 }
 
+// BaseRowBuffer provides all basic functionality generally needed for buffering, annotating, and inserting
+// rows that implement Annotatable.
 type BaseRowBuffer struct {
 	bufferSize int
 	rows       []interface{} // Actually these are Annotatable, but we cast them later.
+	ann        v2as.Annotator
 }
 
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
@@ -42,11 +55,6 @@ func (buf *BaseRowBuffer) TakeRows() []interface{} {
 	return res
 }
 
-var (
-	ErrAnnotationError = errors.New("Annotation error")
-	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
-)
-
 // TODO update this to use local cache of high quality annotations.
 func (buf *BaseRowBuffer) annotateServers() error {
 	ipSlice := make([]string, len(buf.rows))
@@ -62,15 +70,20 @@ func (buf *BaseRowBuffer) annotateServers() error {
 		}
 	}
 
-	annSlice := annotation.FetchAllAnnotations(ipSlice, logTime)
-	if annSlice == nil || len(annSlice) != len(ipSlice) {
+	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice)
+	if err != nil {
+		return err
+	}
+	annMap := response.Annotations
+	if annMap == nil {
 		return ErrAnnotationError
 	}
 
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
 		if ok {
-			r.AnnotateServer(annSlice[i])
+			// TODO - check whether it exists?
+			r.AnnotateServer(annMap[ipSlice[i]])
 		}
 	}
 
@@ -78,28 +91,33 @@ func (buf *BaseRowBuffer) annotateServers() error {
 }
 
 func (buf *BaseRowBuffer) annotateClients() error {
-	ipSlice := make([]string, len(buf.rows))
+	ipSlice := make([]string, 0, 2*len(buf.rows)) // This may be inadequate, but its a reasonable start.
 	logTime := time.Time{}
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
 		if !ok {
 			return ErrNotAnnotatable
 		}
-		ipSlice[i] = r.GetClientIP()
+		ipSlice = append(ipSlice, r.GetClientIPs()...)
 		if (logTime == time.Time{}) {
 			logTime = r.GetLogTime()
 		}
 	}
 
-	annSlice := annotation.FetchAllAnnotations(ipSlice, logTime)
-	if annSlice == nil || len(annSlice) != len(ipSlice) {
+	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice)
+	if err != nil {
+		return err
+	}
+	annMap := response.Annotations
+	if annMap == nil {
 		return ErrAnnotationError
 	}
 
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
 		if ok {
-			r.AnnotateClient(annSlice[i])
+			// TODO - check whether it exists?
+			r.AnnotateClients(annMap)
 		}
 	}
 
@@ -117,19 +135,20 @@ func (buf *BaseRowBuffer) Annotate(metricLabel string) error {
 		return nil
 	}
 	start := time.Now()
+	defer metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": metricLabel}).Observe(float64(time.Since(start).Nanoseconds()))
 
 	// TODO Consider doing these in parallel?
-	err := buf.annotateClients()
-	if err != nil {
-		return err
+	clientErr := buf.annotateClients()
+	serverErr := buf.annotateServers()
+
+	if clientErr != nil {
+		return clientErr
 	}
 
-	err = buf.annotateServers()
-	if err != nil {
-		return err
+	if serverErr != nil {
+		return serverErr
 	}
 
-	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": metricLabel}).Observe(float64(time.Since(start).Nanoseconds()))
 	return nil
 }
 
@@ -140,8 +159,8 @@ type Base struct {
 }
 
 // NewBase creates a new sidestream parser.
-func NewBase(ins etl.Inserter, bufSize int) *Base {
-	buf := BaseRowBuffer{bufSize, make([]interface{}, 0, bufSize)}
+func NewBase(ins etl.Inserter, bufSize int, ann v2as.Annotator) *Base {
+	buf := BaseRowBuffer{bufSize, make([]interface{}, 0, bufSize), ann}
 	return &Base{ins, buf}
 }
 

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
-	"github.com/m-lab/etl/annotation"
+	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/parser"
 )
 
@@ -18,22 +18,22 @@ import (
 type Row struct {
 	client    string
 	server    string
-	clientAnn *api.GeoData
-	serverAnn *api.GeoData
+	clientAnn *api.Annotations
+	serverAnn *api.Annotations
 }
 
 type BadRow struct{}
 
-func (row *Row) GetClientIP() string {
-	return row.client
+func (row *Row) GetClientIPs() []string {
+	return []string{row.client}
 }
 
 func (row *Row) GetServerIP() string {
 	return row.server
 }
 
-func (row *Row) AnnotateClient(remote *api.GeoData) error {
-	row.clientAnn = remote
+func (row *Row) AnnotateClients(remote map[string]*api.Annotations) error {
+	row.clientAnn = remote[row.GetClientIPs()[0]]
 	return nil
 }
 
@@ -68,14 +68,11 @@ func TestBase(t *testing.T) {
 		}
 		callCount++
 	}))
-	batchURL := annotation.BatchURL
-	annotation.BatchURL = ts.URL
 	defer func() {
-		annotation.BatchURL = batchURL
 		ts.Close()
 	}()
 
-	b := parser.NewBase(ins, 10)
+	b := parser.NewBase(ins, 10, v2as.GetAnnotator(ts.URL))
 
 	err := b.AddRow(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 	if err != nil {
@@ -111,5 +108,54 @@ func TestBase(t *testing.T) {
 	err = b.Annotate("foobar")
 	if err != parser.ErrNotAnnotatable {
 		t.Error("Should return ErrNotAnnotatable", err)
+	}
+}
+
+func TestEmptyAnnotations(t *testing.T) {
+	os.Setenv("RELEASE_TAG", "foobar")
+	parser.InitParserVersionForTest()
+
+	ins := &inMemoryInserter{}
+
+	// Set up fake annotation service
+	emptyResponse := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
+					  "Annotations":{}}`
+
+	callCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, emptyResponse)
+		callCount++
+	}))
+	defer func() {
+		ts.Close()
+	}()
+
+	b := parser.NewBase(ins, 10, v2as.GetAnnotator(ts.URL))
+
+	err := b.AddRow(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
+	if err != nil {
+		t.Error(err)
+	}
+	err = b.Annotate("tablename")
+	if err != nil {
+		t.Error(err)
+	}
+	if callCount != 2 {
+		t.Error("Callcount should be 2:", callCount)
+	}
+	b.Flush()
+	if ins.Committed() != 1 {
+		t.Fatalf("Expected %d, Got %d.", 1, ins.Committed())
+	}
+
+	if len(ins.data) != 1 {
+		t.Fatal("Should have at one inserted row")
+	}
+	inserted := ins.data[0].(*Row)
+	if inserted.clientAnn != nil {
+		t.Error("clientAnn should be nil:", inserted.clientAnn)
+	}
+	if inserted.serverAnn != nil {
+		t.Error("serverAnn should be nil:", inserted.serverAnn)
 	}
 }
