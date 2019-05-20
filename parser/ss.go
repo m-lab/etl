@@ -22,13 +22,13 @@ import (
 
 // SSParser provides a parser implementation for SideStream data.
 type SSParser struct {
-	*Base
+	Base
 }
 
 // NewSSParser creates a new sidestream parser.
 func NewSSParser(ins etl.Inserter) *SSParser {
 	bufSize := etl.SS.BQBufferSize()
-	return &SSParser{NewBase(ins, bufSize)}
+	return &SSParser{*NewBase(ins, bufSize)}
 }
 
 // ExtractLogtimeFromFilename extracts the log time.
