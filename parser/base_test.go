@@ -106,12 +106,8 @@ func TestBase(t *testing.T) {
 	}
 
 	err = b.AddRow(&BadRow{})
-	if err != nil {
-		t.Error(err)
-	}
-	err = b.Annotate("foobar")
-	if err != parser.ErrNotAnnotatable {
-		t.Error("Should return ErrNotAnnotatable", err)
+	if err == nil {
+		t.Error("Should return ErrNotAnnotatable")
 	}
 }
 

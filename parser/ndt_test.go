@@ -3,8 +3,11 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -62,9 +65,22 @@ func TestValidation(t *testing.T) {
 func TestNDTParser(t *testing.T) {
 	// Load test data.
 	ins := newInMemoryInserter()
-	n := parser.NewNDTParser(ins)
+
+	// Completely fake annotation data.
+	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
+		"Annotations":{
+				   "45.56.98.222":{"Geo":{"postal_code":"45569"}, "Network":{"Systems":[{"ASNs":[123]}]}},
+				   "213.208.152.37":{"Geo":{"postal_code":"21320"}, "Network":{"Systems":[{"ASNs":[456]}]}}
+				   }}`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, responseJSON)
+	}))
+	defer ts.Close()
+
+	n := parser.NewNDTParser(ins, v2as.GetAnnotator(ts.URL))
 
 	// TODO(prod) - why are so many of the tests to this endpoint and a few others?
+	// A: because this is EB, which runs all the health tests.
 	s2cName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:44160.s2c_snaplog`
 	s2cData, err := ioutil.ReadFile(`testdata/` + s2cName)
 	if err != nil {
@@ -91,21 +107,42 @@ func TestNDTParser(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
+
+	c2sName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:48716.c2s_snaplog`
+	c2sData, err := ioutil.ReadFile(`testdata/` + c2sName)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	err = n.ParseAndInsert(meta, c2sName+".gz", c2sData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
 	// Nothing should happen (with this parser) until new test group or Flush.
 	if ins.Accepted() != 0 {
 		t.Fatalf("Data processed prematurely.")
 	}
 
-	n.Flush()
-	if ins.Accepted() != 1 {
-		t.Fatalf(fmt.Sprintf("Failed to insert snaplog data. %d", ins.Accepted()))
+	err = n.Flush()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if ins.Accepted() != 2 {
+		t.Fatalf("Failed to insert snaplog data.")
 	}
 
 	// Extract the values saved to the inserter.
-	actualValues := ins.data[0].(schema.Web100ValueMap)
+	actualValues := ins.data[0].(parser.NDTTest).Web100ValueMap
 	expectedValues := schema.Web100ValueMap{
 		"connection_spec": schema.Web100ValueMap{
 			"server_hostname": "mlab3.vie01.measurement-lab.org",
+			"client": schema.Web100ValueMap{
+				"network": schema.Web100ValueMap{"asn": int64(123)},
+			},
+			"server": schema.Web100ValueMap{
+				"network": schema.Web100ValueMap{"asn": int64(456)},
+			},
 		},
 		"web100_log_entry": schema.Web100ValueMap{
 			"version": "2.5.27 201001301335 net100",
@@ -124,21 +161,6 @@ func TestNDTParser(t *testing.T) {
 	if !compare(t, actualValues, expectedValues) {
 		t.Errorf("Missing expected values:")
 		t.Errorf(pretty.Sprint(expectedValues))
-	}
-
-	c2sName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:48716.c2s_snaplog`
-	c2sData, err := ioutil.ReadFile(`testdata/` + c2sName)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	err = n.ParseAndInsert(meta, c2sName+".gz", c2sData)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	n.Flush()
-	if ins.Accepted() != 2 {
-		t.Fatalf("Failed to insert snaplog data.")
 	}
 }
 
