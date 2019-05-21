@@ -804,6 +804,7 @@ func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 			}
 		}
 	} else {
+		log.Println("Missing annotation for", ip)
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "NDTTest missing annotations for client IP"}).Inc()
 		return ErrAnnotationError
