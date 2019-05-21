@@ -1,5 +1,18 @@
 package parser
 
+/******************************************************************************
+ NDTParser has some unique features (among current parsers)
+ 1. It groups c2s, s2c and meta tests so and processes them together.
+ 2. It uses map[string]bigquery.Value for rows.
+ 3. It uses the Web100 file format to discover the field names and
+   populate the snapshots.
+
+ This version uses the new Base parser to handle row buffering,
+ annotation, and insertion.  The implementation of the Annotatable
+ interface is a bit clunky because it has to traverse the map hierarchy.
+
+******************************************************************************/
+
 import (
 	"errors"
 	"fmt"
