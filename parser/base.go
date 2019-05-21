@@ -3,6 +3,7 @@ package parser
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
@@ -81,13 +82,14 @@ func (buf *RowBuffer) annotateServers() error {
 
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
-		if ok {
-			// TODO - check whether it exists?
+		if !ok {
+			err = ErrNotAnnotatable
+		} else {
 			r.AnnotateServer(annMap[ipSlice[i]])
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (buf *RowBuffer) annotateClients() error {
@@ -115,13 +117,14 @@ func (buf *RowBuffer) annotateClients() error {
 
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
-		if ok {
-			// TODO - check whether it exists?
+		if !ok {
+			err = ErrNotAnnotatable
+		} else {
 			r.AnnotateClients(annMap)
 		}
 	}
 
-	return nil
+	return err
 }
 
 // Annotate fetches annotations for all rows in the buffer.
@@ -129,6 +132,7 @@ func (buf *RowBuffer) annotateClients() error {
 // TODO should convert this to operate on the rows, instead of the buffer.
 // Then we can do it after TakeRows().
 func (buf *RowBuffer) Annotate(metricLabel string) error {
+	log.Println("Annotating")
 	metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Inc()
 	defer metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Dec()
 	if len(buf.rows) == 0 {
