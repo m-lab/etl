@@ -14,6 +14,15 @@ import (
 // Web100ValueMap implements the web100.Saver interface for recording web100 values.
 type Web100ValueMap map[string]bigquery.Value
 
+// Save implements the bigquery.ValueSaver interface
+func (s Web100ValueMap) Save() (row map[string]bigquery.Value, insertID string, err error) {
+	return s, "", nil
+}
+
+func assertSaver(ms Web100ValueMap) {
+	func(bigquery.ValueSaver) {}(ms)
+}
+
 // Returns the contained map, or nil if it doesn't exist.
 func (vm Web100ValueMap) Get(name string) Web100ValueMap {
 	wl, ok := vm[name]
