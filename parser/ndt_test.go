@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -103,7 +102,7 @@ func TestNDTParser(t *testing.T) {
 	}
 
 	// Extract the values saved to the inserter.
-	actualValues := ins.data[0].(*bq.MapSaver).Values
+	actualValues := ins.data[0].(schema.Web100ValueMap)
 	expectedValues := schema.Web100ValueMap{
 		"connection_spec": schema.Web100ValueMap{
 			"server_hostname": "mlab3.vie01.measurement-lab.org",

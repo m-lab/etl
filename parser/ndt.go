@@ -12,7 +12,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
@@ -595,7 +594,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 
 	// TODO - estimate the size of the json (or fields) to allow more rows per request,
 	// but avoid going over the 10MB limit.
-	err = n.inserter.InsertRow(&bq.MapSaver{Values: results})
+	err = n.inserter.InsertRow(results)
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, "insert-err").Inc()
