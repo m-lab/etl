@@ -282,11 +282,12 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if meta["filename"] != nil {
 			ssTest.TaskFileName = meta["filename"].(string)
 		}
+
 		// Add row to buffer, possibly flushing buffer if it is full.
-		err = ss.AddRow(ssTest)
+		err = ss.AddRow(&ssTest)
 		if err == etl.ErrBufferFull {
-			// Flush asynchronously, to improve throughput.
 			ss.Annotate(ss.TableBase())
+			// Flush asynchronously, to improve throughput.
 			ss.PutAsync(ss.TakeRows())
 			err = ss.AddRow(ssTest)
 		}

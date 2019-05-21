@@ -3,7 +3,7 @@ package parser
 import (
 	"context"
 	"errors"
-	"log"
+	"reflect"
 	"time"
 
 	"github.com/m-lab/annotation-service/api"
@@ -17,6 +17,7 @@ import (
 var (
 	ErrAnnotationError = errors.New("Annotation error")
 	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
+	ErrRowNotPointer   = errors.New("Row should be a pointer type")
 )
 
 // Annotatable interface enables integration of annotation into a parser.
@@ -41,6 +42,9 @@ type RowBuffer struct {
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
 // Not thread-safe.  Should only be called by owning thread.
 func (buf *RowBuffer) AddRow(row interface{}) error {
+	if reflect.TypeOf(row).Kind() != reflect.Ptr {
+		return ErrRowNotPointer
+	}
 	for len(buf.rows) >= buf.bufferSize-1 {
 		return etl.ErrBufferFull
 	}
@@ -132,7 +136,6 @@ func (buf *RowBuffer) annotateClients() error {
 // TODO should convert this to operate on the rows, instead of the buffer.
 // Then we can do it after TakeRows().
 func (buf *RowBuffer) Annotate(metricLabel string) error {
-	log.Println("Annotating")
 	metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Inc()
 	defer metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Dec()
 	if len(buf.rows) == 0 {
