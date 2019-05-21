@@ -5,7 +5,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-test/deep"
 	v2as "github.com/m-lab/annotation-service/api/v2"
@@ -284,6 +286,7 @@ func assertInserter(in etl.Inserter) {
 }
 
 type inMemoryInserter struct {
+	lock      sync.Mutex
 	data      []interface{}
 	committed int
 	failed    int
@@ -291,29 +294,42 @@ type inMemoryInserter struct {
 
 func newInMemoryInserter() *inMemoryInserter {
 	data := make([]interface{}, 0)
-	return &inMemoryInserter{data, 0, 0}
+	return &inMemoryInserter{sync.Mutex{}, data, 0, 0}
 }
 
 func (in *inMemoryInserter) Put(data []interface{}) error {
+	in.lock.Lock()
+	defer in.lock.Unlock()
 	in.data = append(in.data, data...)
 	in.committed = len(in.data)
 	return nil
 }
 
 func (in *inMemoryInserter) PutAsync(data []interface{}) {
-	in.data = append(in.data, data...)
-	in.committed = len(in.data)
+	in.lock.Lock()
+	go func() {
+		time.Sleep(time.Millisecond)
+		in.data = append(in.data, data...)
+		in.committed = len(in.data)
+		in.lock.Unlock()
+	}()
 }
 
 func (in *inMemoryInserter) InsertRow(data interface{}) error {
+	in.lock.Lock()
+	defer in.lock.Unlock()
 	in.data = append(in.data, data)
 	return nil
 }
 func (in *inMemoryInserter) InsertRows(data []interface{}) error {
+	in.lock.Lock()
+	defer in.lock.Unlock()
 	in.data = append(in.data, data...)
 	return nil
 }
 func (in *inMemoryInserter) Flush() error {
+	in.lock.Lock()
+	defer in.lock.Unlock()
 	in.committed = len(in.data)
 	return nil
 }

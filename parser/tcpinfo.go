@@ -118,7 +118,7 @@ func (p *TCPInfoParser) TableName() string {
 	return p.TableBase()
 }
 
-// Flush flushes any pending rows.
+// Flush synchronously flushes any pending rows.
 func (p *TCPInfoParser) Flush() error {
 	p.Put(p.TakeRows())
 	return p.Inserter.Flush()
@@ -191,13 +191,15 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 		row.ParseInfo.TaskFileName = meta["filename"].(string)
 	}
 
-	insertErr := p.AddRow(&row)
-	if insertErr != nil {
+	err = p.AddRow(&row)
+	if err == etl.ErrBufferFull {
+		// Flush asynchronously, to improve throughput.
 		p.Annotate(p.TableName())
-		p.Flush()
+		p.PutAsync(p.TakeRows())
+		err = p.AddRow(&row)
 	}
 
-	return nil
+	return err
 }
 
 func NewTCPInfoParser(ins etl.Inserter) *TCPInfoParser {

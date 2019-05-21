@@ -88,8 +88,8 @@ func TestTCPParser(t *testing.T) {
 		t.Error("Processed", n)
 	}
 
-	if ins.Committed() != 344 {
-		t.Errorf("Expected %d, Got %d.", 6, ins.Committed())
+	if ins.Committed() != 362 {
+		t.Errorf("Expected %d, Got %d.", 362, ins.Committed())
 	}
 
 	if len(ins.data) < 1 {
