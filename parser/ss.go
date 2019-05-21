@@ -94,20 +94,9 @@ func ParseKHeader(header string) ([]string, error) {
 	return varNames, nil
 }
 
-// TaskError return the task level error, based on failed rows, or any other criteria.
-func (ss *SSParser) TaskError() error {
-	return nil
-}
-
 // TableName of the table that this Parser inserts into.
 func (ss *SSParser) TableName() string {
 	return ss.TableBase()
-}
-
-// Flush flushes any pending rows.
-func (ss *SSParser) Flush() error {
-	ss.Put(ss.TakeRows())
-	return ss.Inserter.Flush()
 }
 
 // PackDataIntoSchema packs data into sidestream BigQeury schema and buffers it.

@@ -3,13 +3,15 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/bigquery"
 	v2as "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 )
@@ -70,7 +72,17 @@ func TestSSInserter(t *testing.T) {
 	parser.InitParserVersionForTest()
 
 	ins := &inMemoryInserter{}
-	n := parser.NewSSParser(ins, v2as.GetAnnotator(annotation.BatchURL))
+	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
+		"Annotations":{"5.228.253.100":{"Geo":{"postal_code":"52282"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "178.141.112.12":{"Geo":{"postal_code":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}}
+				   }}`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println("GetAnnotations")
+		fmt.Fprint(w, responseJSON)
+	}))
+	defer ts.Close()
+
+	n := parser.NewSSParser(ins, v2as.GetAnnotator(ts.URL))
 	filename := "testdata/20170203T00:00:00Z_ALL0.web100"
 	rawData, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -82,13 +94,27 @@ func TestSSInserter(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	n.Flush()
+	err = n.Annotate(n.TableName())
+	if err != nil {
+		t.Error(err)
+	}
+	err = n.Flush()
+	if err != nil {
+		t.Error(err)
+	}
 	if ins.Committed() != 6 {
 		t.Fatalf("Expected %d, Got %d.", 6, ins.Committed())
 	}
 
 	if len(ins.data) < 1 {
 		t.Fatal("Should have at least one inserted row")
+	}
+
+	for _, r := range ins.data {
+		row, _ := r.(schema.SS)
+		if row.Web100_log_entry.Connection_spec.Remote_geolocation.PostalCode == "" {
+			t.Error(row.Web100_log_entry.Connection_spec.Remote_ip, "missing PostalCode")
+		}
 	}
 	inserted := ins.data[0].(schema.SS)
 	if inserted.ParseTime.After(time.Now()) {
