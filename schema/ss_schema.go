@@ -195,7 +195,8 @@ type SS struct {
 
 // GetLogTime returns the timestamp that should be used for annotation.
 func (ss *SS) GetLogTime() time.Time {
-	return time.Unix(0, 1000000*ss.Web100_log_entry.Snap.StartTimeStamp)
+	// StartTimeStamp is in usec.
+	return time.Unix(0, 1000*ss.Web100_log_entry.Snap.StartTimeStamp)
 }
 
 // GetClientIPs returns the client (remote) IP for annotation.  See parser.Annotatable
