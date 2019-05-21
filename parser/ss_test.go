@@ -85,7 +85,7 @@ func TestSSInserter(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	n := parser.NewSSParser(ins, v2as.GetAnnotator(ts.URL))
+	p := parser.NewSSParser(ins, v2as.GetAnnotator(ts.URL))
 	filename := "testdata/20170203T00:00:00Z_ALL0.web100"
 	rawData, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -93,15 +93,15 @@ func TestSSInserter(t *testing.T) {
 	}
 
 	meta := map[string]bigquery.Value{"filename": filename}
-	err = n.ParseAndInsert(meta, filename, rawData)
+	err = p.ParseAndInsert(meta, filename, rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	err = n.Annotate(n.TableName())
+	err = p.Annotate(p.TableName())
 	if err != nil {
 		t.Error(err)
 	}
-	err = n.Flush()
+	err = p.Flush()
 	if err != nil {
 		t.Error(err)
 	}
