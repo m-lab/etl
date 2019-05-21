@@ -229,14 +229,14 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 	reqData := make([]string, 2)
 	if cok {
 		cip, _ = web100.NormalizeIPv6(cip)
-		reqData = append(reqData, cip)
+		reqData[0] = cip
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
 			Labels{"source": "Missing client side IP."}).Inc()
 	}
 	if sok {
 		sip, _ = web100.NormalizeIPv6(sip)
-		reqData = append(reqData, sip)
+		reqData[1] = sip
 	} else {
 		metrics.AnnotationWarningCount.With(prometheus.
 			Labels{"source": "Missing server side IP."}).Inc()
