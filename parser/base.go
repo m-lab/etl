@@ -165,7 +165,7 @@ type Base struct {
 	RowBuffer
 }
 
-// NewBase creates a new sidestream parser.
+// NewBase creates a new parser.Base.  This will generally be embedded in a type specific parser.
 func NewBase(ins etl.Inserter, bufSize int, ann v2as.Annotator) *Base {
 	buf := RowBuffer{bufSize, make([]interface{}, 0, bufSize), ann}
 	return &Base{ins, buf}
