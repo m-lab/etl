@@ -694,3 +694,63 @@ func (n *NDTParser) fixValues(r schema.Web100ValueMap) {
 	}
 
 }
+
+// Implement parser.Annotatable
+type NDTTest schema.Web100ValueMap
+
+// Only valid on top level
+func (ndt NDTTest) getConnSpec() schema.Web100ValueMap {
+	return schema.Web100ValueMap(ndt).GetMap([]string{"connection_spec"})
+}
+
+func (ndt NDTTest) getLogEntry() schema.Web100ValueMap {
+	return schema.Web100ValueMap(ndt).GetMap([]string{"web100_log_entry"})
+}
+
+func (ndt NDTTest) getSnap() schema.Web100ValueMap {
+	return schema.Web100ValueMap(ndt).GetMap([]string{"snap"})
+}
+func (ndt NDTTest) getNestedConnSpec() schema.Web100ValueMap {
+	return schema.Web100ValueMap(ndt).GetMap([]string{"connection_spec"})
+}
+
+// GetLogTime returns the timestamp that should be used for annotation.
+func (ndt NDTTest) GetLogTime() time.Time {
+	return schema.Web100ValueMap(ndt).GetInt64([]string{"LogTime"})
+}
+
+/*
+// GetClientIPs returns the client (remote) IP for annotation.  See parser.Annotatable
+func (ss *SS) GetClientIPs() []string {
+	return []string{ss.Web100_log_entry.Connection_spec.Remote_ip}
+}
+
+// GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
+func (ss *SS) GetServerIP() string {
+	return ss.Web100_log_entry.Connection_spec.Local_ip
+}
+
+// AnnotateClients adds the client annotations. See parser.Annotatable
+func (ss *SS) AnnotateClients(annMap map[string]*api.Annotations) error {
+	connSpec := &ss.Web100_log_entry.Connection_spec
+	if annMap != nil {
+		ann, ok := annMap[connSpec.Remote_ip]
+		if ok && ann.Geo != nil {
+			connSpec.Remote_geolocation = *ann.Geo
+		}
+		// TODO Handle ASN
+	}
+	return nil
+}
+
+// AnnotateServer adds the server annotations. See parser.Annotatable
+func (ss *SS) AnnotateServer(local *api.Annotations) error {
+	connSpec := &ss.Web100_log_entry.Connection_spec
+	if local != nil {
+		// TODO - this should probably be a pointer
+		connSpec.Local_geolocation = *local.Geo
+		// TODO Handle ASN
+	}
+	return nil
+}
+*/
