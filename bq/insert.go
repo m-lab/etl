@@ -126,12 +126,15 @@ func GetClient(project string) (*bigquery.Client, error) {
 // MapSaver is a generic implementation of bq.ValueSaver, based on maps.  This avoids extra
 // conversion steps in the bigquery library (except for the JSON conversion).
 // IMPLEMENTS: bigquery.ValueSaver
-type MapSaver struct {
-	Values map[string]bigquery.Value
+type MapSaver map[string]bigquery.Value
+
+// Save implements the bigquery.ValueSaver interface
+func (s MapSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
+	return s, "", nil
 }
 
-func (s *MapSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
-	return s.Values, "", nil
+func assertSaver(ms MapSaver) {
+	func(bigquery.ValueSaver) {}(ms)
 }
 
 //----------------------------------------------------------------------------

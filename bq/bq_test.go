@@ -27,7 +27,7 @@ func foobar(vs bigquery.ValueSaver) {
 }
 
 func TestMapSaver(t *testing.T) {
-	fns := bq.MapSaver{map[string]bigquery.Value{"filename": "foobar"}}
+	fns := bq.MapSaver{"filename": "foobar"}
 	foobar(&fns)
 }
 
