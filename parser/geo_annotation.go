@@ -227,7 +227,6 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 	cip, cok := spec.GetString([]string{"client_ip"})
 	sip, sok := spec.GetString([]string{"server_ip"})
 	reqData := make([]string, 0, 2)
-	index := 0
 	if cok {
 		cip, _ = web100.NormalizeIPv6(cip)
 		reqData = append(reqData, cip)
