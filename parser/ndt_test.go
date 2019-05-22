@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-test/deep"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
@@ -58,6 +59,42 @@ func TestValidation(t *testing.T) {
 		_, err := parser.ParseNDTFileName("2017/05/09/" + test)
 		if err != nil {
 			t.Error(err)
+		}
+	}
+}
+
+func TestCopyStructToMap(t *testing.T) {
+	tests := []struct {
+		source interface{}
+		dest   map[string]bigquery.Value
+		res    map[string]bigquery.Value
+	}{
+		{
+			source: &struct {
+				A   int64
+				Bee string
+			}{A: 1, Bee: "2"},
+			dest: make(map[string]bigquery.Value),
+			res:  map[string]bigquery.Value{"a": int64(1), "bee": "2"},
+		},
+		{
+			source: &struct {
+				A   int64
+				Bee string
+			}{A: 0, Bee: ""},
+			dest: make(map[string]bigquery.Value),
+			res:  map[string]bigquery.Value{},
+		},
+		{
+			source: &struct{}{},
+			dest:   make(map[string]bigquery.Value),
+			res:    map[string]bigquery.Value{},
+		},
+	}
+	for _, test := range tests {
+		parser.CopyStructToMap(test.source, test.dest)
+		if diff := deep.Equal(test.dest, test.res); diff != nil {
+			t.Error(diff)
 		}
 	}
 }
