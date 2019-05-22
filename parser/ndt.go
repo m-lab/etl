@@ -163,9 +163,9 @@ func NewNDTParser(ins etl.Inserter, annotator ...v2as.Annotator) *NDTParser {
 
 // TaskError returns non-nil if more than 10% of row inserts failed.
 func (n *NDTParser) TaskError() error {
-	if n.Committed() < 10*n.Failed() {
+	if n.Inserter.Committed() < 10*n.Inserter.Failed() {
 		log.Printf("Warning: high row insert errors: %d / %d\n",
-			n.Accepted(), n.Failed())
+			n.Inserter.Accepted(), n.Inserter.Failed())
 		return errors.New("too many insertion failures")
 	}
 	return nil
@@ -612,13 +612,11 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	// but avoid going over the 10MB limit.
 	// Add row to buffer, possibly flushing buffer if it is full.
 	ndtTest := NDTTest{results}
-	err = n.AddRow(ndtTest)
+	err = n.Base.AddRow(ndtTest)
 	if err == etl.ErrBufferFull {
-		err = n.AnnotateAndPutAsync(n.TableBase())
-		if err != nil {
-			log.Println(err)
-		}
-		err = n.AddRow(ndtTest)
+		// Ignore annotation errors.  They are counted and logged elsewhere.
+		n.Base.AnnotateAndPutAsync(n.TableBase())
+		err = n.Base.AddRow(ndtTest)
 	}
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
@@ -757,6 +755,7 @@ func (ndt NDTTest) GetLogTime() time.Time {
 }
 
 // GetClientIPs returns the client (remote) IP for annotation.  See parser.Annotatable
+// This is a bit ugly because of the use of bigquery Value maps.
 func (ndt NDTTest) GetClientIPs() []string {
 	connSpec := ndt.getConnSpec()
 	ip, _ := connSpec.GetString([]string{"client_ip"})
@@ -769,6 +768,7 @@ func (ndt NDTTest) GetClientIPs() []string {
 }
 
 // GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
+// This is a bit ugly because of the use of bigquery Value maps.
 func (ndt NDTTest) GetServerIP() string {
 	connSpec := ndt.getConnSpec()
 	ip, ok := connSpec.GetString([]string{"server_ip"})
@@ -781,6 +781,7 @@ func (ndt NDTTest) GetServerIP() string {
 }
 
 // AnnotateClients adds the client annotations. See parser.Annotatable
+// This is a bit ugly because of the use of bigquery Value maps.
 func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 	spec := ndt.getConnSpec()
 	ip, _ := spec.GetString([]string{"client_ip"})
@@ -821,6 +822,7 @@ func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 }
 
 // AnnotateServer adds the server annotations. See parser.Annotatable
+// This is a bit ugly because of the use of bigquery Value maps.
 func (ndt NDTTest) AnnotateServer(local *api.Annotations) error {
 	if local == nil {
 		metrics.AnnotationErrorCount.With(prometheus.
