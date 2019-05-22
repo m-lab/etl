@@ -26,7 +26,6 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/annotation-service/api"
-	v2 "github.com/m-lab/annotation-service/api/v2"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
@@ -146,11 +145,12 @@ type NDTParser struct {
 }
 
 // NewNDTParser returns a new NDT parser.
-//
-func NewNDTParser(ins etl.Inserter, annotator ...v2.Annotator) *NDTParser {
+// Caller may include an annotator.  If not provided, the default annotator is used.
+// TODO - clean up the vararg annotator hack once it is standard in all parsers.
+func NewNDTParser(ins etl.Inserter, annotator ...v2as.Annotator) *NDTParser {
 	bufSize := etl.NDT.BQBufferSize()
-	var ann v2.Annotator
-	if len(annotator) > 0 {
+	var ann v2as.Annotator
+	if len(annotator) > 0 && annotator[0] != nil {
 		ann = annotator[0]
 	} else {
 		ann = v2as.GetAnnotator(annotation.BatchURL)
@@ -159,7 +159,7 @@ func NewNDTParser(ins etl.Inserter, annotator ...v2.Annotator) *NDTParser {
 	return &NDTParser{Base: *NewBase(ins, bufSize, ann)}
 }
 
-// These functions are also required to complete the etl.Parser interface.
+// These functions implement the etl.Parser interface.
 
 // TaskError returns non-nil if more than 10% of row inserts failed.
 func (n *NDTParser) TaskError() error {
@@ -178,12 +178,8 @@ func (n *NDTParser) Flush() error {
 	if n.timestamp != "" {
 		n.processGroup()
 	}
-	err := n.Annotate(n.TableBase())
-	if err != nil {
-		// log but don't return annotation errors.
-		log.Println(err)
-	}
-	return n.Base.Flush()
+
+	return n.Base.AnnotateAndFlush(n.TableBase())
 }
 
 // TableName returns the base of the bq table inserter target.
@@ -618,10 +614,10 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	ndtTest := NDTTest{results}
 	err = n.AddRow(ndtTest)
 	if err == etl.ErrBufferFull {
-		// TODO - this is confusing for each parser to implement...
-		n.Annotate(n.TableBase())
-		// Flush asynchronously, to improve throughput.
-		n.PutAsync(n.TakeRows())
+		err = n.AnnotateAndPutAsync(n.TableBase())
+		if err != nil {
+			log.Println(err)
+		}
 		err = n.AddRow(ndtTest)
 	}
 	if err != nil {
@@ -636,6 +632,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 }
 
 const (
+	// The are all caps to reflect the linux constant names.
 	WC_ADDRTYPE_IPV4 = 1
 	WC_ADDRTYPE_IPV6 = 2
 	LOCAL_AF_IPV4    = 0
@@ -727,8 +724,7 @@ func (n *NDTParser) fixValues(r schema.Web100ValueMap) {
 // Implement parser.Annotatable
 // These are somewhat ugly, since we have to pull things out of the nested maps and interpret them.
 
-var ErrNotFound = errors.New("Map path not found")
-
+// NDTTest is a wrapper for Web100ValueMap that implements Annotatable.
 type NDTTest struct {
 	schema.Web100ValueMap
 }
@@ -841,9 +837,8 @@ func (ndt NDTTest) AnnotateServer(local *api.Annotations) error {
 			metrics.AnnotationErrorCount.With(prometheus.
 				Labels{"source": "NDTTest BestASN error on server IP."}).Inc()
 			return err
-		} else {
-			spec.Get("server").Get("network")["asn"] = asn
 		}
+		spec.Get("server").Get("network")["asn"] = asn
 	}
 
 	return nil

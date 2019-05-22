@@ -1,5 +1,8 @@
 package parser
 
+// TODO integrate this functionality into the parser.go code.
+// Probably should have Base implement Parser.
+
 import (
 	"context"
 	"errors"
@@ -184,10 +187,31 @@ func (pb *Base) TaskError() error {
 	return nil
 }
 
-// Flush flushes any pending rows.
-// Caller should generally call Annotate first.
+// Flush synchronously flushes any pending rows.
+// Caller should generally call Annotate first, or use AnnotateAndFlush.
 func (pb *Base) Flush() error {
 	rows := pb.TakeRows()
 	pb.Put(rows)
 	return pb.Inserter.Flush()
+}
+
+// AnnotateAndFlush annotates the rows in the buffer, and synchronously
+// pushes them through Inserter.
+func (pb *Base) AnnotateAndFlush(metricLabel string) error {
+	annErr := pb.Annotate(metricLabel)
+	flushErr := pb.Flush()
+
+	if flushErr != nil {
+		return flushErr
+	}
+	return annErr
+}
+
+// AnnotateAndPutAsync annotates the rows in the buffer (synchronously),
+// and asynchronously pushes them to the Inserter.
+func (pb *Base) AnnotateAndPutAsync(metricLabel string) error {
+	annErr := pb.Annotate(metricLabel)
+	rows := pb.TakeRows()
+	pb.PutAsync(rows)
+	return annErr
 }
