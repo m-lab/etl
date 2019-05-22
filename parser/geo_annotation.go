@@ -226,7 +226,7 @@ func GetAndInsertTwoSidedGeoIntoNDTConnSpec(spec schema.Web100ValueMap, timestam
 	// TODO: Make metrics for sok and cok failures. And double check metrics for cleanliness.
 	cip, cok := spec.GetString([]string{"client_ip"})
 	sip, sok := spec.GetString([]string{"server_ip"})
-	reqData := make([]string, 2)
+	reqData := make([]string, 0, 2)
 	if cok {
 		cip, _ = web100.NormalizeIPv6(cip)
 		reqData = append(reqData, cip)
