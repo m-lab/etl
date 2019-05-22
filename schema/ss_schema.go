@@ -224,7 +224,7 @@ func (ss *SS) AnnotateClients(annMap map[string]*api.Annotations) error {
 // AnnotateServer adds the server annotations. See parser.Annotatable
 func (ss *SS) AnnotateServer(local *api.Annotations) error {
 	connSpec := &ss.Web100_log_entry.Connection_spec
-	if local != nil {
+	if local != nil && local.Geo != nil {
 		// TODO - this should probably be a pointer
 		connSpec.Local_geolocation = *local.Geo
 		// TODO Handle ASN
