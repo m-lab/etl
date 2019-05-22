@@ -804,7 +804,19 @@ func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 			}
 		}
 	} else {
+		if ip == "45.56.98.222" {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "NDTTest missing annotations for client IP " + ip}).Inc()
+			return ErrAnnotationError
+		}
+
 		log.Println("Missing annotation for", ip)
+
+		if strings.HasPrefix(ip, "2002:") {
+			metrics.AnnotationErrorCount.With(prometheus.
+				Labels{"source": "NDTTest missing annotations for client IP in 2002:..."}).Inc()
+			return ErrAnnotationError
+		}
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "NDTTest missing annotations for client IP"}).Inc()
 		return ErrAnnotationError
