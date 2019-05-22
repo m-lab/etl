@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -778,6 +779,40 @@ func (ndt NDTTest) GetServerIP() string {
 		return ""
 	}
 	return ip
+}
+
+// CopyStructToMap takes a POINTER to an arbitrary SIMPLE struct and copies
+// it's fields into a value map. It will also make fields entirely
+// lower case, for convienece when working with exported structs. Also,
+// NEVER pass in something that is not a pointer to a struct, as this
+// will cause a panic.
+func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquery.Value) {
+	structToCopy := reflect.ValueOf(sourceStruct).Elem()
+	typeOfStruct := structToCopy.Type()
+	for i := 0; i < typeOfStruct.NumField(); i++ {
+		f := structToCopy.Field(i)
+		v := f.Interface()
+		switch t := v.(type) {
+		case string:
+			// TODO - are these still needed?  Does the omitempty cover it?
+			if t == "" {
+				continue
+			}
+		case int64:
+			if t == 0 {
+				continue
+			}
+		}
+		jsonTag, ok := typeOfStruct.Field(i).Tag.Lookup("json")
+		name := strings.ToLower(typeOfStruct.Field(i).Name)
+		if ok {
+			tags := strings.Split(jsonTag, ",")
+			if len(tags) > 0 && tags[0] != "" {
+				name = tags[0]
+			}
+		}
+		destinationMap[strings.ToLower(name)] = v
+	}
 }
 
 // AnnotateClients adds the client annotations. See parser.Annotatable
