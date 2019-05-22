@@ -66,7 +66,7 @@ func (buf *RowBuffer) TakeRows() []interface{} {
 }
 
 // TODO update this to use local cache of high quality annotations.
-func (buf *RowBuffer) annotateServers() error {
+func (buf *RowBuffer) annotateServers(label string) error {
 	ipSlice := make([]string, 0, len(buf.rows))
 	logTime := time.Time{}
 	for i := range buf.rows {
@@ -86,7 +86,7 @@ func (buf *RowBuffer) annotateServers() error {
 		}
 	}
 
-	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice)
+	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, label)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (buf *RowBuffer) annotateServers() error {
 	return err
 }
 
-func (buf *RowBuffer) annotateClients() error {
+func (buf *RowBuffer) annotateClients(label string) error {
 	ipSlice := make([]string, 0, 2*len(buf.rows)) // This may be inadequate, but its a reasonable start.
 	logTime := time.Time{}
 	for i := range buf.rows {
@@ -121,7 +121,7 @@ func (buf *RowBuffer) annotateClients() error {
 		}
 	}
 
-	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice)
+	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, label)
 	if err != nil {
 		return err
 	}
@@ -156,8 +156,8 @@ func (buf *RowBuffer) Annotate(metricLabel string) error {
 	defer metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": metricLabel}).Observe(float64(time.Since(start).Nanoseconds()))
 
 	// TODO Consider doing these in parallel?
-	clientErr := buf.annotateClients()
-	serverErr := buf.annotateServers()
+	clientErr := buf.annotateClients(metricLabel)
+	serverErr := buf.annotateServers(metricLabel)
 
 	if clientErr != nil {
 		return clientErr
