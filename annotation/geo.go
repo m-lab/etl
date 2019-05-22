@@ -85,7 +85,7 @@ func getAnnotations(ctx context.Context, timestamp time.Time, ips []string) ([]s
 	}
 	resp, err := v2.GetAnnotations(ctx, BatchURL, timestamp, normalized)
 	if err != nil {
-		log.Println(err)
+		log.Output(2, err.Error())
 		// There are many error types returned here, so we log the error, but use the caller location
 		// for the metric.
 		_, file, line, _ := runtime.Caller(2)
@@ -103,15 +103,12 @@ func getAnnotations(ctx context.Context, timestamp time.Time, ips []string) ([]s
 	return normalized, resp, err
 }
 
-// FetchGeoAnnotations adds annotations to provided []*api.GeolocationIP, based on provided ips and timestamp.
-// DEPRECATED because of poor name.  Use AddGeoAnnotations instead.
-var FetchGeoAnnotations = AddGeoAnnotations
-
 // AddGeoAnnotations takes a slice of string ip addresses, a timestamp,
 // and a slice of pointers to corresponding GeolocationIP structs.
 // Slices must be the same length, or the function will immediately return.
 // It calls the batch annotator, using the ip addresses and the timestamp and uses
 // the response to fill in the structs pointed to by the slice of GeolocationIP pointers.
+// Deprecated:  Use Annotatable interface and parser.Base instead.
 func AddGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.GeolocationIP) {
 	if ips == nil || geoDest == nil || len(ips) != len(geoDest) || len(ips) == 0 {
 		return
@@ -140,6 +137,7 @@ func AddGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.Geoloca
 // FetchAllAnnotations takes a slice of strings containing ip addresses, a timestamp.
 // It returns an array of pointers to GeoData structs corresponding to the ip addresses, or
 // nil if there is an error.
+// Deprecated:  Use Annotatable interface and parser.Base instead.
 func FetchAllAnnotations(ips []string, timestamp time.Time) []*api.GeoData {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -248,7 +246,7 @@ func ParseJSONGeoDataResponse(jsonBuffer []byte) (*api.GeoData, error) {
 // ip-timestamp strings to GeoData structs, or a nil map if it
 // encounters any error and cannot get the data for any reason
 // TODO - dedup common code in GetGeoData
-// TODO Deprecated - update all clients to use AddGeoAnnotations.
+// Deprecated:  Use Annotatable interface and parser.Base instead.
 func GetBatchGeoData(url string, data []api.RequestData) map[string]api.GeoData {
 	// Query the service and grab the response safely
 	// All errors are recorded to metrics, so OK to ignore them here.
