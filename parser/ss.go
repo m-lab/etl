@@ -289,7 +289,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			ss.Annotate(ss.TableBase())
 			// Flush asynchronously, to improve throughput.
 			ss.PutAsync(ss.TakeRows())
-			err = ss.AddRow(ssTest)
+			err = ss.AddRow(&ssTest)
 		}
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
