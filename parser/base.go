@@ -1,8 +1,12 @@
 package parser
 
+// TODO integrate this functionality into the parser.go code.
+// Probably should have Base implement Parser.
+
 import (
 	"context"
 	"errors"
+	"log"
 	"reflect"
 	"time"
 
@@ -42,10 +46,11 @@ type RowBuffer struct {
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
 // Not thread-safe.  Should only be called by owning thread.
 func (buf *RowBuffer) AddRow(row interface{}) error {
-	if reflect.TypeOf(row).Kind() != reflect.Ptr {
-		return ErrRowNotPointer
+	if !reflect.TypeOf(row).Implements(reflect.TypeOf((*Annotatable)(nil)).Elem()) {
+		log.Println(reflect.TypeOf(row), "not Annotatable")
+		return ErrNotAnnotatable
 	}
-	for len(buf.rows) >= buf.bufferSize-1 {
+	for len(buf.rows) > buf.bufferSize-1 {
 		return etl.ErrBufferFull
 	}
 	buf.rows = append(buf.rows, row)
@@ -61,21 +66,28 @@ func (buf *RowBuffer) TakeRows() []interface{} {
 }
 
 // TODO update this to use local cache of high quality annotations.
-func (buf *RowBuffer) annotateServers() error {
-	ipSlice := make([]string, len(buf.rows))
+// label is used to label metrics and errors in GetAnnotations
+func (buf *RowBuffer) annotateServers(label string) error {
+	ipSlice := make([]string, 0, len(buf.rows))
 	logTime := time.Time{}
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
 		if !ok {
 			return ErrNotAnnotatable
 		}
-		ipSlice[i] = r.GetServerIP()
+
+		// Only ask for the IP if it is non-empty.
+		ip := r.GetServerIP()
+		if ip != "" {
+			ipSlice = append(ipSlice, ip)
+		}
+
 		if (logTime == time.Time{}) {
 			logTime = r.GetLogTime()
 		}
 	}
 
-	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice)
+	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, label)
 	if err != nil {
 		return err
 	}
@@ -96,7 +108,8 @@ func (buf *RowBuffer) annotateServers() error {
 	return err
 }
 
-func (buf *RowBuffer) annotateClients() error {
+// label is used to label metrics and errors in GetAnnotations
+func (buf *RowBuffer) annotateClients(label string) error {
 	ipSlice := make([]string, 0, 2*len(buf.rows)) // This may be inadequate, but its a reasonable start.
 	logTime := time.Time{}
 	for i := range buf.rows {
@@ -110,7 +123,7 @@ func (buf *RowBuffer) annotateClients() error {
 		}
 	}
 
-	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice)
+	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, label)
 	if err != nil {
 		return err
 	}
@@ -145,8 +158,8 @@ func (buf *RowBuffer) Annotate(metricLabel string) error {
 	defer metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": metricLabel}).Observe(float64(time.Since(start).Nanoseconds()))
 
 	// TODO Consider doing these in parallel?
-	clientErr := buf.annotateClients()
-	serverErr := buf.annotateServers()
+	clientErr := buf.annotateClients(metricLabel)
+	serverErr := buf.annotateServers(metricLabel)
 
 	if clientErr != nil {
 		return clientErr
@@ -176,9 +189,31 @@ func (pb *Base) TaskError() error {
 	return nil
 }
 
-// Flush flushes any pending rows.
-// Caller should generally call Annotate first.
+// Flush synchronously flushes any pending rows.
+// Caller should generally call Annotate first, or use AnnotateAndFlush.
 func (pb *Base) Flush() error {
-	pb.Put(pb.TakeRows())
+	rows := pb.TakeRows()
+	pb.Put(rows)
 	return pb.Inserter.Flush()
+}
+
+// AnnotateAndFlush annotates the rows in the buffer, and synchronously
+// pushes them through Inserter.
+func (pb *Base) AnnotateAndFlush(metricLabel string) error {
+	annErr := pb.Annotate(metricLabel)
+	flushErr := pb.Flush()
+
+	if flushErr != nil {
+		return flushErr
+	}
+	return annErr
+}
+
+// AnnotateAndPutAsync annotates the rows in the buffer (synchronously),
+// and asynchronously pushes them to the Inserter.
+func (pb *Base) AnnotateAndPutAsync(metricLabel string) error {
+	annErr := pb.Annotate(metricLabel)
+	rows := pb.TakeRows()
+	pb.PutAsync(rows)
+	return annErr
 }
