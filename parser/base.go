@@ -50,7 +50,7 @@ func (buf *RowBuffer) AddRow(row interface{}) error {
 		log.Println(reflect.TypeOf(row), "not Annotatable")
 		return ErrNotAnnotatable
 	}
-	for len(buf.rows) >= buf.bufferSize-1 {
+	for len(buf.rows) > buf.bufferSize-1 {
 		return etl.ErrBufferFull
 	}
 	buf.rows = append(buf.rows, row)
