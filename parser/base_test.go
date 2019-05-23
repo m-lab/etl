@@ -106,7 +106,7 @@ func TestBase(t *testing.T) {
 	}
 
 	err = b.AddRow(&BadRow{})
-	if err == parser.ErrNotAnnotatable {
+	if err != parser.ErrNotAnnotatable {
 		t.Error("Should return ErrNotAnnotatable")
 	}
 }
