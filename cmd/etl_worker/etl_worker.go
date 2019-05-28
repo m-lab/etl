@@ -232,6 +232,11 @@ func subworker(rawFileName string, executionCount, retryCount int, age time.Dura
 
 	// Create parser, injecting Inserter
 	p := parser.NewParser(dataType, ins)
+	if p == nil {
+		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "NewInserterError").Inc()
+		log.Printf("Error creating parser for %s", dataType)
+		return http.StatusInternalServerError, fmt.Sprintf(`{"message": "Problem creating parser for %s."}`, dataType)
+	}
 	tsk := task.NewTask(fn, tr, p)
 
 	files, err := tsk.ProcessAllTests()

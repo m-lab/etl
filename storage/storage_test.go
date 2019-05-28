@@ -2,17 +2,26 @@ package storage
 
 import (
 	"io"
-	"net/http"
 	"testing"
 	"time"
+
+	"cloud.google.com/go/storage"
 )
 
-func TestGetObject(t *testing.T) {
-	obj, err := getObject(client, "m-lab-sandbox", "testfile", 10*time.Second)
+func TestGetReader(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping tests that access GCS")
+	}
+	client, err := GetStorageClient(false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	obj.Body.Close()
+	rdr, cancel, err := getReader(client, "m-lab-sandbox", "testfile", 60*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rdr.Close()
+	cancel()
 }
 
 func TestNewTarReader(t *testing.T) {
@@ -54,7 +63,7 @@ func TestNewTarReaderGzip(t *testing.T) {
 }
 
 // Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
-var client *http.Client
+var client *storage.Client
 
 func init() {
 	var err error
