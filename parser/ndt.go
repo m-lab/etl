@@ -728,10 +728,6 @@ type NDTTest struct {
 	schema.Web100ValueMap
 }
 
-func assertAnnotatable(r NDTTest) {
-	func(Annotatable) {}(r)
-}
-
 // Only valid on top level
 func (ndt NDTTest) getConnSpec() schema.Web100ValueMap {
 	return ndt.GetMap([]string{"connection_spec"})
