@@ -245,7 +245,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		if len(typedErr) > 10 && len(typedErr) == in.pending {
 			log.Printf("Insert error: %v\n", err)
 			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "unknown", "insert row error").
+				in.TableBase(), "PutMultiError", "insert row error").
 				Add(float64(len(typedErr)))
 		} else {
 			// Handle each error individually.
@@ -257,7 +257,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 				for _, oneErr := range rowError.Errors {
 					log.Printf("Insert error: %v\n", oneErr)
 					metrics.ErrorCount.WithLabelValues(
-						in.TableBase(), "unknown", "insert row error").Inc()
+						in.TableBase(), "PutMultiError", "insert row error").Inc()
 				}
 			}
 		}
@@ -270,7 +270,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
+			in.TableBase(), "url.Error", "UNHANDLED insert error").Inc()
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
 		in.inserted -= in.pending
@@ -281,7 +281,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
+			in.TableBase(), "googleapi.Error", "UNHANDLED insert error").Inc()
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
 		in.inserted -= in.pending

@@ -3,11 +3,13 @@ package bq_test
 import (
 	"errors"
 	"log"
+	"net/url"
 	"os"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"google.golang.org/api/googleapi"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -336,4 +338,51 @@ func TestQuotaError(t *testing.T) {
 	if len(fakeUploader.Rows) != 2 {
 		t.Errorf("Expected %d rows, got %d\n", 2, len(fakeUploader.Rows))
 	}
+}
+
+// This isn't particularly thorough, but it exercises the various error handling paths
+// to ensure there aren't any panics.
+func TestUpdateMetrics(t *testing.T) {
+	fakeUploader := fake.NewFakeUploader()
+	in, e := bq.NewBQInserter(standardInsertParams(20), fakeUploader)
+	if e != nil {
+		log.Printf("%v\n", e)
+		t.Fatal()
+	}
+	bqi := in.(*bq.BQInserter)
+
+	// These don't have to implement saver as long as Err is being set,
+	// and flush is not autotriggering more than once.
+	var items []interface{}
+	items = append(items, Item{Name: "x1", Count: 17, Foobar: 44})
+	items = append(items, Item{Name: "x2", Count: 12, Foobar: 44})
+
+	fakeUploader.SetErr(make(bigquery.PutMultiError, 2))
+	bqi.InsertRows(items)
+	bqi.Flush()
+	if bqi.Failed() != 2 {
+		t.Error(in)
+	}
+
+	fakeUploader.SetErr(make(bigquery.PutMultiError, 11))
+	bqi.InsertRows(make([]interface{}, 11))
+	bqi.Flush()
+	if bqi.Failed() != 13 {
+		t.Error(in)
+	}
+
+	fakeUploader.SetErr(&url.Error{Err: errors.New("random error")})
+	bqi.InsertRows(make([]interface{}, 1))
+	bqi.Flush()
+	if bqi.Failed() != 14 {
+		t.Error(in)
+	}
+
+	fakeUploader.SetErr(&googleapi.Error{Code: 404})
+	bqi.InsertRows(make([]interface{}, 1))
+	bqi.Flush()
+	if bqi.Failed() != 15 || bqi.Committed() != 0 {
+		t.Error(in)
+	}
+
 }
