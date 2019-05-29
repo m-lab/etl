@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"reflect"
 	"testing"
+
+	"github.com/go-test/deep"
 
 	"github.com/m-lab/etl/etl"
 )
@@ -17,10 +18,11 @@ func init() {
 
 func TestValidateTestPath(t *testing.T) {
 	tests := []struct {
-		name    string
-		path    string
-		want    *etl.DataPath
-		wantErr bool
+		name     string
+		path     string
+		wantType etl.DataType
+		want     *etl.DataPath
+		wantErr  bool
 	}{
 		{
 			name:    "error-bad-uri-prefix",
@@ -39,35 +41,47 @@ func TestValidateTestPath(t *testing.T) {
 		},
 		{
 			name:    "error-bad-date-path",
-			path:    `gs://m-lab-sandbox/ndt/2016/0126/20160126T000000Z-mlab1-prg1-ndt-0007.tar.gz`,
+			path:    `gs://m-lab-sandbox/ndt/2016/0126/20160126T000000Z-mlab1-prg01-ndt-0007.tar.gz`,
 			wantErr: true,
 		},
 		{
-			name: "success-tgz",
-			path: `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz`,
+			name:     "success-tgz",
+			path:     `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz`,
+			wantType: etl.NDT,
 			want: &etl.DataPath{
-				"m-lab-sandbox", "ndt", "2016/01/26", "20160126", "000000", "mlab1", "prg01", "ndt", "0007", ".tgz",
+				"m-lab-sandbox", "", "ndt", "2016/01/26", "20160126", "000000", "", "mlab1", "prg01", "ndt", "0007", "", ".tgz",
 			},
 		},
 		{
-			name: "success-tar",
-			path: `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar`,
+			name:     "success-tar",
+			path:     `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar`,
+			wantType: etl.NDT,
 			want: &etl.DataPath{
-				"m-lab-sandbox", "ndt", "2016/07/14", "20160714", "123456", "mlab1", "lax04", "ndt", "0001", ".tar",
+				"m-lab-sandbox", "", "ndt", "2016/07/14", "20160714", "123456", "", "mlab1", "lax04", "ndt", "0001", "", ".tar",
 			},
 		},
 		{
-			name: "success-tar-gz",
-			path: `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar.gz`,
+			name:     "success-tar-gz",
+			path:     `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar.gz`,
+			wantType: etl.NDT,
 			want: &etl.DataPath{
-				"m-lab-sandbox", "ndt", "2016/07/14", "20160714", "123456", "mlab1", "lax04", "ndt", "0001", ".tar.gz",
+				"m-lab-sandbox", "", "ndt", "2016/07/14", "20160714", "123456", "", "mlab1", "lax04", "ndt", "0001", "", ".tar.gz",
 			},
 		},
 		{
-			name: "success-embargo-tar-gz",
-			path: `gs://embargo-mlab-oti/sidestream/2018/02/27/20180227T000010Z-mlab1-dfw02-sidestream-0000-e.tgz`,
+			name:     "success-embargo-tar-gz",
+			path:     `gs://embargo-mlab-oti/sidestream/2018/02/27/20180227T000010Z-mlab1-dfw02-sidestream-0000-e.tgz`,
+			wantType: etl.SS,
 			want: &etl.DataPath{
-				"embargo-mlab-oti", "sidestream", "2018/02/27", "20180227", "000010", "mlab1", "dfw02", "sidestream", "0000", ".tgz",
+				"embargo-mlab-oti", "", "sidestream", "2018/02/27", "20180227", "000010", "", "mlab1", "dfw02", "sidestream", "0000", "-e", ".tgz",
+			},
+		},
+		{
+			name:     "pusher-tcpinfo-tgz",
+			path:     `gs://pusher-mlab-staging/ndt/tcpinfo/2019/05/25/20190525T020001.697396Z-tcpinfo-mlab4-ord01-ndt.tgz`,
+			wantType: etl.TCPINFO,
+			want: &etl.DataPath{
+				"pusher-mlab-staging", "ndt", "tcpinfo", "2019/05/25", "20190525", "020001", "tcpinfo", "mlab4", "ord01", "ndt", "", "", ".tgz",
 			},
 		},
 	}
@@ -75,11 +89,16 @@ func TestValidateTestPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := etl.ValidateTestPath(tt.path)
 			if (err != nil) != tt.wantErr {
+				log.Println(tt.path)
 				t.Errorf("ValidateTestPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ValidateTestPath() = %v, want %v", got, tt.want)
+			if got != nil && got.GetDataType() != tt.wantType {
+				t.Error(got.GetDataType(), "!=", tt.wantType)
+			}
+			if diff := deep.Equal(got, tt.want); diff != nil {
+				log.Println(tt.path)
+				t.Errorf("ValidateTestPath() = %v\n", diff)
 			}
 		})
 	}
@@ -87,25 +106,25 @@ func TestValidateTestPath(t *testing.T) {
 
 func TestDataPath_GetDataType(t *testing.T) {
 	tests := []struct {
-		name string
-		exp1 string
-		want etl.DataType
+		name  string
+		type1 string
+		want  etl.DataType
 	}{
 		{
-			name: "okay",
-			exp1: "ndt",
-			want: etl.NDT,
+			name:  "okay",
+			type1: "ndt",
+			want:  etl.NDT,
 		},
 		{
-			name: "invalid",
-			exp1: "foobargum",
-			want: etl.INVALID,
+			name:  "invalid",
+			type1: "foobargum",
+			want:  etl.INVALID,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fn := &etl.DataPath{
-				Exp1: tt.exp1,
+				Type1: tt.type1,
 			}
 			if got := fn.GetDataType(); got != tt.want {
 				t.Errorf("DataPath.GetDataType() = %v, want %v", got, tt.want)
