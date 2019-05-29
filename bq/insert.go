@@ -19,12 +19,15 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
+	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"google.golang.org/api/googleapi"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -261,8 +264,33 @@ func (in *BQInserter) updateMetrics(err error) error {
 		in.inserted -= len(typedErr)
 		in.badRows += len(typedErr)
 		err = nil
+	case *url.Error:
+		log.Printf("Unhandled url.Error on insert %v Project: %s, Dataset: %s, Table: %s\n",
+			typedErr, in.Project(), in.Dataset(), in.FullTableName())
+		metrics.BackendFailureCount.WithLabelValues(
+			in.TableBase(), "failed insert").Inc()
+		metrics.ErrorCount.WithLabelValues(
+			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
+		// TODO - Conservative, but possibly not correct.
+		// This at least preserves the count invariance.
+		in.inserted -= in.pending
+		in.badRows += in.pending
+		err = nil
+	case *googleapi.Error:
+		log.Printf("Unhandled googleapi.Error on insert %v\n", typedErr)
+		metrics.BackendFailureCount.WithLabelValues(
+			in.TableBase(), "failed insert").Inc()
+		metrics.ErrorCount.WithLabelValues(
+			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
+		// TODO - Conservative, but possibly not correct.
+		// This at least preserves the count invariance.
+		in.inserted -= in.pending
+		in.badRows += in.pending
+		err = nil
+
 	default:
-		log.Printf("Unhandled insert error %v\n", typedErr)
+		log.Printf("Unhandled %v on insert %v Project: %s, Table: %s\n", reflect.TypeOf(typedErr).Elem(),
+			typedErr, in.Project(), in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
