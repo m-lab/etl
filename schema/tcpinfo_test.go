@@ -65,7 +65,7 @@ func TestBQSaver(t *testing.T) {
 	if fs != nil {
 		idm := fs["InetDiagMsg"].(map[string]bigquery.Value)
 		id := idm["ID"].(map[string]bigquery.Value)
-		if id["SPort"] != int64(123) {
+		if id["IDiagSPort"] != int64(123) {
 			t.Error(id)
 		}
 	} else {
