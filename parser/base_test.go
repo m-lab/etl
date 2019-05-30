@@ -48,7 +48,7 @@ func (row *Row) GetLogTime() time.Time {
 	return time.Now()
 }
 
-func assertAnnotatable(r *Row) {
+func assertTestRowAnnotatable(r *Row) {
 	func(parser.Annotatable) {}(r)
 }
 
@@ -160,8 +160,10 @@ func TestAsyncPut(t *testing.T) {
 		t.Error(err)
 	}
 
+	b.Inserter.Flush() // To synchronize after the PutAsync.
+
 	if ins.Committed() != 1 {
-		t.Fatalf("Expected %d, Got %d.", 0, ins.Committed())
+		t.Fatalf("Expected %d, Got %d.", 1, ins.Committed())
 	}
 
 	if len(ins.data) < 1 {

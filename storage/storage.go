@@ -268,7 +268,6 @@ func GetStorageClient(writeAccess bool) (*storage.Client, error) {
 
 	// This cannot include a defer cancel, as the client then doesn't work after
 	// the cancel.
-	// client, err := google.DefaultClient(context.Background(), scope)
 	client, err := storage.NewClient(context.Background(), option.WithScopes(scope))
 	if err != nil {
 		return nil, err
