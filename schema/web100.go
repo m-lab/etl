@@ -27,9 +27,14 @@ func assertSaver(ms Web100ValueMap) {
 func (vm Web100ValueMap) Get(name string) Web100ValueMap {
 	wl, ok := vm[name]
 	if !ok {
+		log.Println("nil")
 		return nil
 	}
-	return wl.(Web100ValueMap)
+	m, ok := wl.(map[string]bigquery.Value)
+	if !ok {
+		return nil
+	}
+	return Web100ValueMap(m)
 }
 
 // Get the string at a path in the nested map.  Return value, true if found,
