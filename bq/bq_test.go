@@ -364,23 +364,29 @@ func TestUpdateMetrics(t *testing.T) {
 		t.Error(in)
 	}
 
+	// Try adding 11 rows, with a PutMultiError on all rows.
 	fakeUploader.SetErr(make(bigquery.PutMultiError, 11))
 	bqi.InsertRows(make([]interface{}, 11))
 	bqi.Flush()
+	// There should now be 13 failed rows.
 	if bqi.Failed() != 13 {
 		t.Error(in)
 	}
 
+	// Try adding 1 row with a simple error.
 	fakeUploader.SetErr(&url.Error{Err: errors.New("random error")})
 	bqi.InsertRows(make([]interface{}, 1))
 	bqi.Flush()
+	// There should now be 14 failures.
 	if bqi.Failed() != 14 {
 		t.Error(in)
 	}
 
+	// Try adding 1 row with a googleapi.Error.
 	fakeUploader.SetErr(&googleapi.Error{Code: 404})
 	bqi.InsertRows(make([]interface{}, 1))
 	bqi.Flush()
+	// Should now be 15 failures.
 	if bqi.Failed() != 15 || bqi.Committed() != 0 {
 		t.Error(in)
 	}
