@@ -91,14 +91,14 @@ func (buf *RowBuffer) annotateServers(label string) error {
 	if err != nil {
 		log.Println("error in server GetAnnotations: ", err)
 		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Server side: RPC err in GetAnnotations."}).Inc()
+			Labels{"source": "Server IP: RPC err in GetAnnotations."}).Inc()
 		return err
 	}
 	annMap := response.Annotations
 	if annMap == nil {
 		log.Println("empty server annotation response")
 		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Server side: empty response"}).Inc()
+			Labels{"source": "Server IP: empty response"}).Inc()
 		return ErrAnnotationError
 	}
 
@@ -133,14 +133,14 @@ func (buf *RowBuffer) annotateClients(label string) error {
 	if err != nil {
 		log.Println("error in client GetAnnotations: ", err)
 		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Client side: RPC err in GetAnnotations."}).Inc()
+			Labels{"source": "Client IP: RPC err in GetAnnotations."}).Inc()
 		return err
 	}
 	annMap := response.Annotations
 	if annMap == nil {
 		log.Println("empty client annotation response")
 		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Client side: empty response"}).Inc()
+			Labels{"source": "Client IP: empty response"}).Inc()
 		return ErrAnnotationError
 	}
 

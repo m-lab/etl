@@ -26,7 +26,6 @@ func assertNDTTestIsValueSaver(r parser.NDTTest) {
 	func(bigquery.ValueSaver) {}(r)
 }
 
-
 // A handful of file names from a single ndt tar file.
 var testFileNames []string = []string{
 	`20170509T00:05:13.863119000Z_45.56.98.222.c2s_ndttrace`,
