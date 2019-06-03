@@ -110,18 +110,14 @@ func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Insert
 //===============================================================================
 
 // GetClient returns an appropriate bigquery client.
-// This incurs network delay, so it should not be inside fast loops.
+// The context seems to be embedded in structs, but not used immediately.
 func GetClient(project string) (*bigquery.Client, error) {
 	// We do this here, instead of in init(), because we only want to do it
 	// when we actually want to access the bigquery backend.
 
-	// Network request
-	// It appears that ctx can have a short timeout, BUT we cannot call cancel on it.
-	// If we call defer cancel(), then the client later fails with cancelled context.
 	// So apparently the client holds on to the context, but doesn't care if it
-	// expires.
-	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
-	return bigquery.NewClient(ctx, project)
+	// expires.  Best to just pass in Background.
+	return bigquery.NewClient(context.Background(), project)
 }
 
 //===============================================================================
