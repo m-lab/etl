@@ -12,6 +12,7 @@ import (
 	"github.com/m-lab/tcp-info/snapshot"
 )
 
+// ServerInfo details various information about the server.
 type ServerInfo struct {
 	IP   string
 	Port uint16
@@ -21,6 +22,7 @@ type ServerInfo struct {
 	Network *api.ASData // NOTE: dominant ASN is available at top level.
 }
 
+// ClientInfo details various information about the client.
 type ClientInfo struct {
 	IP   string
 	Port uint16
@@ -29,21 +31,24 @@ type ClientInfo struct {
 	Network *api.ASData // NOTE: dominant ASN is available at top level.
 }
 
+// ParseInfo provides details about the parsing of this row.
 type ParseInfo struct {
 	TaskFileName  string // The tar file containing this test.
 	ParseTime     time.Time
 	ParserVersion string
 }
 
+// TCPRow describes a single BQ row of TCPInfo data.
 type TCPRow struct {
 	UUID     string    // Top level just because
 	TestTime time.Time // Must be top level for partitioning
 
-	SockID    inetdiag.SockID
 	ClientASN uint32 // Top level for clustering
 	ServerASN uint32 // Top level for clustering
 
 	ParseInfo *ParseInfo
+
+	SockID inetdiag.SockID
 
 	Server *ServerInfo
 	Client *ClientInfo
