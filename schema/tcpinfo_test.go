@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -55,18 +56,30 @@ func TestBQSaver(t *testing.T) {
 	row.Snapshots = make([]*snapshot.Snapshot, 2)
 	row.Snapshots[0] = &snapshot.Snapshot{InetDiagMsg: &inetdiag.InetDiagMsg{}}
 	row.Snapshots[1] = &snapshot.Snapshot{} // Leave this without InetDiagMsg to test nil handling
+	row.SockID = row.FinalSnapshot.InetDiagMsg.ID.GetSockID()
 
 	rowMap, _, _ := row.Save()
 	if rowMap["UUID"] != "foobar" {
 		t.Error(spew.Sdump(rowMap))
 	}
 
+	sid, ok := rowMap["SockID"]
+	if !ok {
+		t.Error("Should have SockID")
+	} else {
+		id := sid.(map[string]bigquery.Value)
+		if id["SPort"] != uint16(123) {
+			t.Error(id, "Should have SPort = uint16(123)", reflect.TypeOf(id["SPort"]), id["SPort"])
+		}
+	}
+
 	fs := rowMap["FinalSnapshot"].(map[string]bigquery.Value)
 	if fs != nil {
+		// IDM should NOT have an ID struct field.
 		idm := fs["InetDiagMsg"].(map[string]bigquery.Value)
-		id := idm["ID"].(map[string]bigquery.Value)
-		if id["IDiagSPort"] != int64(123) {
-			t.Error(id)
+		id, ok := idm["ID"]
+		if ok {
+			t.Error("Should not have ID field:", id)
 		}
 	} else {
 		t.Error("Nil FinalSnapshot")

@@ -8,6 +8,7 @@ import (
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/rtx"
+	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/tcp-info/snapshot"
 )
 
@@ -39,6 +40,7 @@ type TCPRow struct {
 	UUID     string    // Top level just because
 	TestTime time.Time // Must be top level for partitioning
 
+	SockID    inetdiag.SockID
 	ClientASN uint32 // Top level for clustering
 	ServerASN uint32 // Top level for clustering
 
@@ -65,44 +67,10 @@ func init() {
 var tcpSchema bigquery.Schema
 
 // Save implements bigquery.ValueSaver
-// This is a rather messy work around the fact that the snapshot SockID
-// has byte slice fields that have to be converted to the appropriate type.
-// Tried writing Save() function just for the SockID, but that didn't work as expected.
-// TODO - consider substituting the InetDiagMsg with a struct containing the desired SockID format.
 func (r *TCPRow) Save() (map[string]bigquery.Value, string, error) {
-	ss := bigquery.StructSaver{Schema: tcpSchema, InsertID: "", Struct: r}
+	ss := bigquery.StructSaver{Schema: tcpSchema, InsertID: r.UUID, Struct: r}
 	m, insertID, err := ss.Save()
-	w := Web100ValueMap(m)
 
-	if w["FinalSnapshot"] != nil {
-		idm := w.GetMap([]string{"FinalSnapshot", "InetDiagMsg"})
-		idSrc := r.FinalSnapshot.InetDiagMsg.ID
-		idm["ID"], _, _ = idSrc.Save()
-	}
-
-	if r.Snapshots != nil {
-		snapMaps := m["Snapshots"].([]bigquery.Value)
-		for i := range r.Snapshots {
-			snap := r.Snapshots[i]
-			if i >= len(snapMaps) || snap == nil || snap.InetDiagMsg == nil {
-				continue
-			}
-			idSrc := snap.InetDiagMsg.ID
-			sm := snapMaps[i]
-			snapMap, ok := sm.(map[string]bigquery.Value)
-			if !ok {
-				continue
-			}
-			idm, ok := snapMap["InetDiagMsg"]
-			if !ok {
-				continue
-			}
-			idmMap, ok := idm.(map[string]bigquery.Value)
-			if ok {
-				idmMap["ID"], _, _ = idSrc.Save()
-			}
-		}
-	}
 	return m, insertID, err
 }
 
@@ -112,16 +80,6 @@ func (r *TCPRow) Schema() (bigquery.Schema, error) {
 	if err != nil {
 		return bigquery.Schema{}, err
 	}
-	subs := map[string]bigquery.FieldSchema{
-		"IDiagSPort":  bigquery.FieldSchema{Name: "IDiagSPort", Description: "", Type: "INTEGER"},
-		"IDiagDPort":  bigquery.FieldSchema{Name: "IDiagDPort", Description: "", Type: "INTEGER"},
-		"IDiagSrc":    bigquery.FieldSchema{Name: "IDiagSrc", Description: "", Type: "STRING"},
-		"IDiagDst":    bigquery.FieldSchema{Name: "IDiagDst", Description: "", Type: "STRING"},
-		"IDiagIf":     bigquery.FieldSchema{Name: "IDiagIf", Description: "", Type: "INTEGER"},
-		"IDiagCookie": bigquery.FieldSchema{Name: "IDiagCookie", Description: "", Type: "INTEGER"},
-	}
-
-	c := bqx.Customize(sch, subs)
-	rr := bqx.RemoveRequired(c)
+	rr := bqx.RemoveRequired(sch)
 	return rr, nil
 }
