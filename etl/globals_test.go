@@ -134,12 +134,19 @@ func TestDataPath_GetDataType(t *testing.T) {
 }
 
 func TestGetMetroName(t *testing.T) {
-	metro_name := etl.GetIATACode("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz")
-	if metro_name != "acc" {
-		fmt.Println(metro_name)
+	iata := etl.GetIATACode("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz")
+	if iata != "acc" {
+		fmt.Println(iata)
 		t.Errorf("Error in getting metro name!\n")
 		return
 	}
+
+	iata = etl.GetIATACode(`gs://pusher-mlab-staging/ndt/tcpinfo/2019/05/25/20190525T020001.697396Z-tcpinfo-mlab4-ord01-ndt.tgz`)
+	if iata != "ord" {
+		t.Error("Error in getting metro name:", iata)
+		return
+	}
+
 }
 
 func TestCalculateIPDistance(t *testing.T) {

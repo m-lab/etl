@@ -3,6 +3,7 @@ package etl
 import (
 	"encoding/base64"
 	"errors"
+	"log"
 	"net"
 	"os"
 	"regexp"
@@ -56,6 +57,8 @@ var (
 
 	dateTimePattern = regexp.MustCompile(dateTime)
 	sitePattern     = regexp.MustCompile(type2 + mlabNSiteNN)
+
+	justSitePattern = regexp.MustCompile(`.*` + mlabNSiteNN + `.*`)
 )
 
 // DataPath breaks out the components of a task filename.
@@ -132,11 +135,15 @@ func IsBatchService() bool {
 // GetIATACode extracts iata code like "acc" from file name like
 // 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
 func GetIATACode(rawFilename string) string {
-	siteName := sitePattern.FindString(rawFilename)
-	if siteName != "" {
-		return siteName[7:10]
+	parts := justSitePattern.FindStringSubmatch(rawFilename)
+	if len(parts) != 3 {
+		log.Println("Unable to extract IATA code from", rawFilename)
+		return ""
 	}
-	return ""
+	if len(parts[2]) < 3 {
+		return parts[2]
+	}
+	return parts[2][0:3]
 }
 
 // GetIntFromIPv4 converts an IPv4 address to equivalent uint32.
