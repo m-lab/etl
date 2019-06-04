@@ -526,8 +526,8 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	if meta["filename"] != nil {
 		fileName = meta["filename"].(string)
 	}
-	metroName := etl.GetMetroName(fileName)
-	metrics.PTTestCount.WithLabelValues(metroName).Inc()
+	iataCode := etl.GetIATACode(fileName)
+	metrics.PTTestCount.WithLabelValues(iataCode).Inc()
 	// lastHop is a close estimation for where the test reached at the end.
 	// It is possible that the last line contains destIP and other IP at the same time
 	// if the previous hop contains multiple paths.
@@ -541,10 +541,10 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
 		lastHop = allNodes[len(allNodes)-1].ip
-		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
+		metrics.PTNotReachDestCount.WithLabelValues(iataCode).Inc()
 		if reachedDest {
 			// This test reach dest in the middle, but then do weird things for unknown reason.
-			metrics.PTMoreHopsAfterDest.WithLabelValues(metroName).Inc()
+			metrics.PTMoreHopsAfterDest.WithLabelValues(iataCode).Inc()
 			log.Printf("middle mess up test_id: " + fileName + " " + testName)
 		}
 	} else {
@@ -554,10 +554,10 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// The last node of allNodes contains the last hop IP.
 	bitsDiff, ipType := etl.NumberBitsDifferent(destIP, lastHop)
 	if ipType == 4 {
-		metrics.PTBitsAwayFromDestV4.WithLabelValues(metroName).Observe(float64(bitsDiff))
+		metrics.PTBitsAwayFromDestV4.WithLabelValues(iataCode).Observe(float64(bitsDiff))
 	}
 	if ipType == 6 {
-		metrics.PTBitsAwayFromDestV6.WithLabelValues(metroName).Observe(float64(bitsDiff))
+		metrics.PTBitsAwayFromDestV6.WithLabelValues(iataCode).Observe(float64(bitsDiff))
 	}
 
 	// Generate Hops from allNodes
@@ -580,6 +580,6 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 		LogTime:          logTime,
 		ConnSpec:         connSpec,
 		LastValidHopLine: lastValidHopLine,
-		MetroName:        metroName,
+		MetroName:        iataCode,
 	}, nil
 }
