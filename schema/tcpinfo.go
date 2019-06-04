@@ -12,7 +12,6 @@ import (
 	"github.com/m-lab/tcp-info/snapshot"
 )
 
-// TODO move to schema/tcpinfo.go
 type ServerInfo struct {
 	IP   string
 	Port uint16
@@ -69,9 +68,7 @@ var tcpSchema bigquery.Schema
 // Save implements bigquery.ValueSaver
 func (r *TCPRow) Save() (map[string]bigquery.Value, string, error) {
 	ss := bigquery.StructSaver{Schema: tcpSchema, InsertID: r.UUID, Struct: r}
-	m, insertID, err := ss.Save()
-
-	return m, insertID, err
+	return ss.Save()
 }
 
 // Schema returns the Bigquery schema for TCPRow.
