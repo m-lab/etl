@@ -39,9 +39,10 @@ const expType = `(?:([a-z-]+)/)?([a-z-]+)/` // experiment OR experiment/type
 
 const datePath = `(\d{4}/[01]\d/[0123]\d)/`
 
-const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6})(\.\d{6})?Z`
-const k8sType = `(?:-([a-z]+))?` // optional datatype string
-const mlabNPodNN = `-(mlab\d)-([a-z]{3}\d[0-9t])-`
+const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6})(\.\d{0,6})?Z`
+
+const type2 = `(?:-([a-z-]+))?` // optional datatype string
+const mlabNSiteNN = `-(mlab\d)-([a-z]{3}\d[0-9t])-`
 const expNNNNE = `([a-z]+)(?:-(\d{4}))?(-e)?`
 const suffix = `(\.tar|\.tar.gz|\.tgz)$`
 
@@ -51,27 +52,26 @@ var (
 		`(?P<preamble>.*)` + dateTime + `(?P<postamble>.*)`)
 
 	legacyStartPattern = regexp.MustCompile(`^` + bucket + expType + datePath + `$`)
-	legacyEndPattern   = regexp.MustCompile(`^` + k8sType + mlabNPodNN + expNNNNE + suffix + `$`)
+	legacyEndPattern   = regexp.MustCompile(`^` + type2 + mlabNSiteNN + expNNNNE + suffix + `$`)
 
 	dateTimePattern = regexp.MustCompile(dateTime)
-	podPattern      = regexp.MustCompile(k8sType + mlabNPodNN)
+	sitePattern     = regexp.MustCompile(type2 + mlabNSiteNN)
 )
 
 // DataPath breaks out the components of a task filename.
 type DataPath struct {
-	// TODO(dev) Delete unused fields.
-	// They are comprehensive now in anticipation of using them to populate
-	// new fields in the BQ tables.
-	Bucket     string // the GCS bucket name.
-	Exp1       string // the experiment directory.
-	Type1      string //
-	DatePath   string // the YYYY/MM/DD date path.
+	// These fields are from the bucket and path
+	Bucket   string // the GCS bucket name.
+	ExpDir   string // the experiment directory.
+	DataType string //
+	DatePath string // the YYYY/MM/DD date path.
+	// The rest are from the filename
 	PackedDate string // the YYYYMMDD date.
 	PackedTime string // the HHMMSS time.
-	K8sType    string // optional k8s type
+	DataType2  string // new platform also embeds the data type in the filename
 	Host       string // the short server name, e.g. mlab1.
-	Pod        string // the pod/site name, e.g. ams02.
-	Experiment string // the experiment name, e.g. ndt
+	Site       string // the pod/site name, e.g. ams02.
+	Experiment string // the experiment name, e.g. ndt, typically identical to ExpDir
 	FileNumber string // the file number, e.g. 0001
 	Embargo    string // optional
 	Suffix     string // the archive suffix, e.g. .tgz
@@ -94,14 +94,14 @@ func ValidateTestPath(path string) (*DataPath, error) {
 	}
 	dp := &DataPath{
 		Bucket:     preamble[1],
-		Exp1:       preamble[2],
-		Type1:      preamble[3],
+		ExpDir:     preamble[2],
+		DataType:   preamble[3],
 		DatePath:   preamble[4],
 		PackedDate: basic[2],
 		PackedTime: basic[3],
-		K8sType:    post[1],
+		DataType2:  post[1],
 		Host:       post[2],
-		Pod:        post[3],
+		Site:       post[3],
 		Experiment: post[4],
 		FileNumber: post[5],
 		Embargo:    post[6],
@@ -112,7 +112,7 @@ func ValidateTestPath(path string) (*DataPath, error) {
 
 // GetDataType finds the type of data stored in a file from its complete filename
 func (fn *DataPath) GetDataType() DataType {
-	dt, ok := dirToDataType[fn.Type1]
+	dt, ok := dirToDataType[fn.DataType]
 	if !ok {
 		return INVALID
 	}
@@ -129,12 +129,12 @@ func IsBatchService() bool {
 	return IsBatch
 }
 
-// GetMetroName extracts metro name like "acc" from file name like
+// GetIATACode extracts iata code like "acc" from file name like
 // 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
-func GetMetroName(rawFilename string) string {
-	podName := podPattern.FindString(rawFilename)
-	if podName != "" {
-		return podName[7:10]
+func GetIATACode(rawFilename string) string {
+	siteName := sitePattern.FindString(rawFilename)
+	if siteName != "" {
+		return siteName[7:10]
 	}
 	return ""
 }

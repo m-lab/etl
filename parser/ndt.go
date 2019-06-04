@@ -661,14 +661,14 @@ func (n *NDTParser) fixValues(r schema.Web100ValueMap) {
 			n.taskFileName, n.timestamp, err)
 	} else {
 		// TODO - this is a rather hacky place to put this.
-		connSpec.Get("server").SetString("iata_code", strings.ToUpper(data.Pod[0:3]))
+		connSpec.Get("server").SetString("iata_code", strings.ToUpper(data.Site[0:3]))
 
 		// If there is no meta file then the server hostname will not be set.
 		// We must check for presence and an empty value.
 		hn, ok := connSpec["server_hostname"]
 		if !ok || hn == "" {
 			connSpec.SetString("server_hostname", fmt.Sprintf(
-				"%s.%s.%s", data.Host, data.Pod, etl.MlabDomain))
+				"%s.%s.%s", data.Host, data.Site, etl.MlabDomain))
 		}
 	}
 

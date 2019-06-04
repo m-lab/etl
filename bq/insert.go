@@ -110,7 +110,6 @@ func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Insert
 //===============================================================================
 
 // GetClient returns an appropriate bigquery client.
-// The context seems to be embedded in structs, but not used immediately.
 func GetClient(project string) (*bigquery.Client, error) {
 	// We do this here, instead of in init(), because we only want to do it
 	// when we actually want to access the bigquery backend.

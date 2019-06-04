@@ -244,7 +244,7 @@ func subworker(rawFileName string, executionCount, retryCount int, age time.Dura
 	// Count the files processed per-host-module per-weekday.
 	// TODO(soltesz): evaluate separating hosts and pods as separate metrics.
 	metrics.FileCount.WithLabelValues(
-		data.Host+"-"+data.Pod+"-"+data.Experiment,
+		data.Host+"-"+data.Site+"-"+data.Experiment,
 		date.Weekday().String()).Add(float64(files))
 
 	metrics.WorkerState.WithLabelValues(data.TableBase(), "finish").Inc()

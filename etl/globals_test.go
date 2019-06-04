@@ -124,7 +124,7 @@ func TestDataPath_GetDataType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fn := &etl.DataPath{
-				Type1: tt.type1,
+				DataType: tt.type1,
 			}
 			if got := fn.GetDataType(); got != tt.want {
 				t.Errorf("DataPath.GetDataType() = %v, want %v", got, tt.want)
@@ -134,7 +134,7 @@ func TestDataPath_GetDataType(t *testing.T) {
 }
 
 func TestGetMetroName(t *testing.T) {
-	metro_name := etl.GetMetroName("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz")
+	metro_name := etl.GetIATACode("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz")
 	if metro_name != "acc" {
 		fmt.Println(metro_name)
 		t.Errorf("Error in getting metro name!\n")
