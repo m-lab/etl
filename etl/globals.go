@@ -51,8 +51,8 @@ var (
 	basicTaskPattern = regexp.MustCompile(
 		`(?P<preamble>.*)` + dateTime + `(?P<postamble>.*)`)
 
-	legacyStartPattern = regexp.MustCompile(`^` + bucket + expType + datePath + `$`)
-	legacyEndPattern   = regexp.MustCompile(`^` + type2 + mlabNSiteNN + expNNNNE + suffix + `$`)
+	startPattern = regexp.MustCompile(`^` + bucket + expType + datePath + `$`)
+	endPattern   = regexp.MustCompile(`^` + type2 + mlabNSiteNN + expNNNNE + suffix + `$`)
 
 	dateTimePattern = regexp.MustCompile(dateTime)
 	sitePattern     = regexp.MustCompile(type2 + mlabNSiteNN)
@@ -83,12 +83,12 @@ func ValidateTestPath(path string) (*DataPath, error) {
 	if basic == nil {
 		return nil, errors.New("Path missing date-time string")
 	}
-	preamble := legacyStartPattern.FindStringSubmatch(basic[1])
+	preamble := startPattern.FindStringSubmatch(basic[1])
 	if preamble == nil {
 		return nil, errors.New("Invalid preable: " + basic[1])
 	}
 
-	post := legacyEndPattern.FindStringSubmatch(basic[5])
+	post := endPattern.FindStringSubmatch(basic[5])
 	if post == nil {
 		return nil, errors.New("Invalid postamble: " + basic[5])
 	}
