@@ -5,6 +5,7 @@ package schema
 // TODO(prod) Improve unit test coverage.
 import (
 	"log"
+	"reflect"
 
 	"cloud.google.com/go/bigquery"
 )
@@ -23,13 +24,20 @@ func assertSaver(ms Web100ValueMap) {
 	func(bigquery.ValueSaver) {}(ms)
 }
 
-// Returns the contained map, or nil if it doesn't exist.
+// Get returns the contained map, or nil if it doesn't exist.
+// This works for either Web100ValueMap or map[string]bigquery.Value
 func (vm Web100ValueMap) Get(name string) Web100ValueMap {
 	wl, ok := vm[name]
 	if !ok {
 		return nil
 	}
-	return wl.(Web100ValueMap)
+	switch wl.(type) {
+	case map[string]bigquery.Value:
+		return Web100ValueMap(wl.(map[string]bigquery.Value))
+	default:
+		log.Println(reflect.TypeOf(wl))
+		return wl.(Web100ValueMap)
+	}
 }
 
 // Get the string at a path in the nested map.  Return value, true if found,
