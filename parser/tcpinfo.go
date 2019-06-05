@@ -141,8 +141,9 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 }
 
 // NewTCPInfoParser creates a new TCPInfoParser.  Duh.
-// TODO - pass in the annotator.
-func NewTCPInfoParser(ins etl.Inserter) *TCPInfoParser {
+// Single annotator may be optionally passed in.
+// TODO change to required parameter.
+func NewTCPInfoParser(ins etl.Inserter, ann ...v2as.Annotator) *TCPInfoParser {
 	bufSize := etl.TCPINFO.BQBufferSize()
 	return &TCPInfoParser{*NewBase(ins, bufSize, v2as.GetAnnotator(annotation.BatchURL))}
 }

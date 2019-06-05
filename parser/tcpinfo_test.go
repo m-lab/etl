@@ -59,7 +59,7 @@ func TestTCPParser(t *testing.T) {
 
 	src, err := localETLSource(filename)
 	if err != nil {
-		t.Fatalf("cannot read testdata.")
+		t.Fatal("Failed reading testdata from", filename)
 	}
 
 	ins := &inMemoryInserter{}
@@ -140,6 +140,7 @@ func TestTCPParser(t *testing.T) {
 	}
 }
 
+// This is a subset of TestTCPParser, but simpler, so might be useful.
 func TestTCPTask(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
@@ -150,7 +151,7 @@ func TestTCPTask(t *testing.T) {
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	src, err := localETLSource(filename)
 	if err != nil {
-		t.Fatalf("cannot read testdata.")
+		t.Fatal("Failed reading testdata from", filename)
 	}
 
 	task := task.NewTask(filename, src, p)
@@ -160,7 +161,7 @@ func TestTCPTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	if n != 364 {
-		t.Error(n, "!=", 364)
+		t.Errorf("Expected ProcessAllTests to handle %d files, but it handled %d.\n", 364, n)
 	}
 }
 
@@ -174,7 +175,7 @@ func TestBQSaver(t *testing.T) {
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	src, err := localETLSource(filename)
 	if err != nil {
-		t.Fatalf("cannot read testdata.")
+		t.Fatal("Failed reading testdata from", filename)
 	}
 
 	task := task.NewTask(filename, src, p)
@@ -195,6 +196,7 @@ func TestBQSaver(t *testing.T) {
 		t.Error(id)
 	}
 }
+
 func BenchmarkTCPParser(b *testing.B) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
@@ -205,7 +207,6 @@ func BenchmarkTCPParser(b *testing.B) {
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	n := 0
 	for i := 0; i < b.N; i += n {
-
 		src, err := localETLSource(filename)
 		if err != nil {
 			b.Fatalf("cannot read testdata.")

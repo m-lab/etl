@@ -124,17 +124,18 @@ func (row *TCPRow) AnnotateClients(annMap map[string]*api.Annotations) error {
 	} else {
 		row.Client.Geo = ann.Geo
 	}
+
 	if ann.Network == nil {
 		metrics.AnnotationMissingCount.WithLabelValues("Empty ann.Network").Inc()
-	} else {
-		row.Client.Network = ann.Network
-		asn, err := ann.Network.BestASN()
-		if err != nil {
-			metrics.AnnotationMissingCount.WithLabelValues("BestASN failed").Inc()
-			return nil
-		}
-		row.ClientASN = uint32(asn)
+		return nil
 	}
+	row.Client.Network = ann.Network
+	asn, err := ann.Network.BestASN()
+	if err != nil {
+		metrics.AnnotationMissingCount.WithLabelValues("BestASN failed").Inc()
+		return nil
+	}
+	row.ClientASN = uint32(asn)
 	return nil
 }
 
