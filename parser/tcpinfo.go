@@ -69,7 +69,7 @@ func (p *TCPInfoParser) IsParsable(testName string, data []byte) (string, bool) 
 
 // ParseAndInsert extracts all ArchivalRecords from the rawContent and inserts into a single row.
 // Approximately 15 usec/snapshot.
-func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
+func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
 	if strings.HasSuffix(testName, "zst") {
 		var err error
 		rawContent, err = gozstd.Decompress(nil, rawContent)
@@ -85,18 +85,18 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	var err error
 	var rec *netlink.ArchivalRecord
 	snaps := make([]*snapshot.Snapshot, 0, 2000)
-	snapMeta := netlink.Metadata{}
+	testMetadata := netlink.Metadata{}
 	for rec, err = ar.Next(); err != io.EOF; rec, err = ar.Next() {
 		if err != nil {
 			break
 		}
-		meta, snap, err := snapshot.Decode(rec)
+		snapMetadata, snap, err := snapshot.Decode(rec)
 		if err != nil {
 			break
 		}
 		// meta data generally appears only once, so we have to save it.
-		if meta != nil {
-			snapMeta = *meta
+		if snapMetadata != nil {
+			testMetadata = *snapMetadata
 		}
 		if snap.Observed != 0 {
 			snaps = append(snaps, snap)
@@ -120,13 +120,13 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	if row.FinalSnapshot.InetDiagMsg != nil {
 		row.SockID = row.FinalSnapshot.InetDiagMsg.ID.GetSockID()
 	}
-	row.UUID = snapMeta.UUID
-	row.TestTime = snapMeta.StartTime
+	row.UUID = testMetadata.UUID
+	row.TestTime = testMetadata.StartTime
 
 	row.ParseInfo = &schema.ParseInfo{ParseTime: time.Now(), ParserVersion: Version()}
 
-	if meta["filename"] != nil {
-		row.ParseInfo.TaskFileName = meta["filename"].(string)
+	if fileMetadata["filename"] != nil {
+		row.ParseInfo.TaskFileName = fileMetadata["filename"].(string)
 	}
 
 	err = p.AddRow(&row)

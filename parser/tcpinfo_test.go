@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"os"
 	"strings"
 	"testing"
@@ -73,10 +72,14 @@ func TestTCPParser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// This taskfile has 364 tcpinfo files in it.
+	// tar -tf parser/testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz | wc
 	if n != 364 {
 		t.Error("Processed", n)
 	}
 
+	// Two tests (Cookies 2E1E and 2DEE) and have no snapshots, so there are only 362 rows committed.
 	if ins.Committed() != 362 {
 		t.Errorf("Expected %d, Got %d.", 362, ins.Committed())
 	}
@@ -84,54 +87,53 @@ func TestTCPParser(t *testing.T) {
 	if len(ins.data) < 1 {
 		t.Fatal("Should have at least one inserted row")
 	}
-	inserted, ok := ins.data[0].(*schema.TCPRow)
+
+	// Examine first row in some detail...
+	first, ok := ins.data[0].(*schema.TCPRow)
 	if !ok {
 		t.Fatal("not a TCPRow")
 	}
-	if inserted.ParseInfo.ParseTime.After(time.Now()) {
+	if first.ParseInfo.ParseTime.After(time.Now()) {
 		t.Error("Should have inserted parse_time")
 	}
-	if inserted.ParseInfo.TaskFileName != filename {
-		t.Error("Should have correct filename", filename, "!=", inserted.ParseInfo.TaskFileName)
+	if first.ParseInfo.TaskFileName != filename {
+		t.Error("Should have correct filename", filename, "!=", first.ParseInfo.TaskFileName)
 	}
 
-	if inserted.ParseInfo.ParserVersion != parserVersion {
-		t.Error("ParserVersion not properly set", inserted.ParseInfo.ParserVersion)
+	if first.ParseInfo.ParserVersion != parserVersion {
+		t.Error("ParserVersion not properly set", first.ParseInfo.ParserVersion)
+	}
+	// Spot check the SockID.SPort.
+	if first.SockID.SPort != 3010 {
+		t.Error("SPort should be 3010", first.SockID)
 	}
 
+	// This section is just for understanding how big these objects typically are, and what kind of compression
+	// rates we see.  Not fundamental to the test.
+	// Find the row with the largest json representation, and estimate the Marshalling time per snapshot.
 	startMarshal := time.Now()
-	jsonBytes, err := json.Marshal(ins.data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	marshalTime := time.Since(startMarshal)
-	t.Log("json is", len(jsonBytes)/n, " bytes per file")
-
-	largest := 0
-	snaps := 0
-	duration := time.Duration(0)
-	sumSnaps := int64(0)
+	var largestRow *schema.TCPRow
+	var largestJson []byte
+	totalSnaps := int64(0)
 	for _, r := range ins.data {
-		jsonBytes, _ := json.Marshal(r)
 		row, _ := r.(*schema.TCPRow)
-		sumSnaps += int64(len(row.Snapshots))
-		if len(jsonBytes) > largest {
-			largest = len(jsonBytes)
-			snaps = len(row.Snapshots)
-			duration = row.FinalSnapshot.Timestamp.Sub(row.Snapshots[0].Timestamp)
+		jsonBytes, _ := json.Marshal(r)
+		totalSnaps += int64(len(row.Snapshots))
+		if len(jsonBytes) > len(largestJson) {
+			largestRow = row
+			largestJson = jsonBytes
 		}
 	}
-	t.Log("Largest is", largest, "bytes in", snaps, "snapshots, over", duration, "with", largest/snaps, "json bytes/snap")
-	t.Log("Total of", sumSnaps, "snapshots decoded and marshalled")
-	t.Log("Average", decodeTime.Nanoseconds()/sumSnaps, "nsec/snap to decode", marshalTime.Nanoseconds()/sumSnaps, "nsec/snap to marshal")
+	marshalTime := time.Since(startMarshal)
 
-	row, _ := ins.data[0].(*schema.TCPRow)
-	// Spot check the SockID.SPort.
-	if row.SockID.SPort != 3010 {
-		t.Error("SPort should be 3010", row.SockID)
-	}
-	snapJson, _ := json.Marshal(row.FinalSnapshot)
-	log.Println(string(snapJson))
+	duration := largestRow.FinalSnapshot.Timestamp.Sub(largestRow.Snapshots[0].Timestamp)
+	t.Log("Largest json is", len(largestJson), "bytes in", len(largestRow.Snapshots), "snapshots, over", duration, "with", len(largestJson)/len(largestRow.Snapshots), "json bytes/snap")
+	t.Log("Total of", totalSnaps, "snapshots decoded and marshalled")
+	t.Log("Average", decodeTime.Nanoseconds()/totalSnaps, "nsec/snap to decode", marshalTime.Nanoseconds()/totalSnaps, "nsec/snap to marshal")
+
+	// Log one snapshot for debugging
+	snapJson, _ := json.Marshal(largestRow.FinalSnapshot)
+	t.Log(string(snapJson))
 
 	if duration > 20*time.Second {
 		t.Error("Incorrect duration calculation", duration)
