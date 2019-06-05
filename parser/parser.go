@@ -49,6 +49,8 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 		return NewPTParser(ins)
 	case etl.SW:
 		return NewDiscoParser(ins)
+	case etl.TCPINFO:
+		return NewTCPInfoParser(ins)
 	default:
 		return nil
 	}
