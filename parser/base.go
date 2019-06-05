@@ -149,6 +149,7 @@ func (buf *RowBuffer) annotateClients(label string) error {
 		if !ok {
 			err = ErrNotAnnotatable
 		} else {
+			// Will not error because we check for nil annMap above.
 			r.AnnotateClients(annMap)
 		}
 	}
