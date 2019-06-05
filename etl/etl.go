@@ -47,7 +47,7 @@ type Inserter interface {
 
 	// Flush flushes any rows in the buffer out to bigquery.
 	// This is synchronous - on return, rows should be committed.
-        // Deprecated:  Please use external buffer, Put, and PutAsync instead.
+	// Deprecated:  Please use external buffer, Put, and PutAsync instead.
 	Flush() error
 
 	// Base Table name of the BQ table that the uploader pushes to.
@@ -87,6 +87,9 @@ type InserterParams struct {
 	MaxRetryDelay time.Duration // Maximum backoff time for Put retries.
 }
 
+// ErrHighInsertionFailureRate should be returned by TaskError when there are more than 10% BQ insertion errors.
+var ErrHighInsertionFailureRate = errors.New("too many insertion failures")
+
 // Parser is the generic interface implemented by each experiment parser.
 type Parser interface {
 	// IsParsable reports a canonical file "kind" and whether the file appears to
@@ -118,8 +121,10 @@ type Parser interface {
 }
 
 //========================================================================
-// Interfaces to allow fakes.
+// Interface to allow fakes.
 //========================================================================
+
+// Uploader defines the BQ Uploader interface, for injection.
 type Uploader interface {
 	Put(ctx context.Context, src interface{}) error
 }

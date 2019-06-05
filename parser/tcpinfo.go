@@ -15,7 +15,6 @@ Notes:
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"log"
 	"strings"
@@ -41,10 +40,10 @@ type TCPInfoParser struct {
 // TaskError return the task level error, based on failed rows, or any other criteria.
 // TaskError returns non-nil if more than 10% of row inserts failed.
 func (p *TCPInfoParser) TaskError() error {
-	if p.Committed() < 10*p.Failed() {
-		log.Printf("Warning: high row insert errors: %d / %d\n",
-			p.Accepted(), p.Failed())
-		return errors.New("too many insertion failures")
+	if p.Accepted() < 10*p.Failed() {
+		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
+			p.Failed(), p.Accepted())
+		return etl.ErrHighInsertionFailureRate
 	}
 	return nil
 }
@@ -62,7 +61,10 @@ func (p *TCPInfoParser) Flush() error {
 
 // IsParsable returns the canonical test type and whether to parse data.
 func (p *TCPInfoParser) IsParsable(testName string, data []byte) (string, bool) {
-	return "tcpinfo", true
+	if strings.HasSuffix(testName, "jsonl.zst") {
+		return "tcpinfo", true
+	}
+	return "", false
 }
 
 // ParseAndInsert extracts all ArchivalRecords from the rawContent and inserts into a single row.
