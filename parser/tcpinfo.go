@@ -1,20 +1,16 @@
 package parser
 
-/* CPU profile highlights (from TestTCPParser -count=100)
-0.17s  0.38%  0.38%     23.24s 51.82%  encoding/json.Marshal
-0.01s 0.022%  7.36%     22.18s 49.45%  encoding/json.sliceEncoder.encode
-0.02s 0.045% 48.12%      1.87s  4.17%  github.com/m-lab/tcp-info/inetdiag.(*ipType).MarshalJSON
+/* CPU profile highlights (from TestTCPParser -count=100) with annotation disabled.
+         0     0%     0%     10.03s 44.92%  encoding/json.Marshal
+         0     0%  7.03%      9.30s 41.65%  encoding/json.sliceEncoder.encode
 
-0.02s 0.045%  7.42%     13.06s 29.12%  encoding/json.Unmarshal
+     5.31s 23.78% 30.86%      5.31s 23.78%  runtime.pthread_cond_signal
 
-0.02s 0.045%  9.01%      5.18s 11.55%  runtime.systemstack
-1.07s  2.39% 11.39%      4.50s 10.03%  runtime.mallocgc
+         0     0% 30.90%      3.29s 14.73%  encoding/json.Unmarshal
 
 Notes:
-  1. Majority of time is spent in JSON marshaling.  This is good!
-  2. ipType marshalling takes a disproportionate fraction of the time, as do other custom marshalers.
-  3. Decoding the JSON from the ArchivalRecords takes 30% of the time.
-  4. The zstd decoding is likely outside the profiling.
+  1. Almost half of time is spent in JSON marshaling.  This is good!
+  2. Decoding the JSON from the ArchivalRecords takes 15% of the time.
 */
 
 import (
@@ -22,7 +18,6 @@ import (
 	"errors"
 	"io"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -38,6 +33,7 @@ import (
 	"github.com/m-lab/tcp-info/snapshot"
 )
 
+// TCPInfoParser handles parsing for TCPINFO datatype.
 type TCPInfoParser struct {
 	Base
 }
@@ -92,15 +88,13 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 		if err != nil {
 			break
 		}
-		meta, snap, decodeErr := snapshot.Decode(rec)
-		if decodeErr != nil {
-			err = decodeErr
+		meta, snap, err := snapshot.Decode(rec)
+		if err != nil {
 			break
 		}
+		// meta data generally appears only once, so we have to save it.
 		if meta != nil {
-			// TODO - do something with this.
 			snapMeta = *meta
-
 		}
 		if snap.Observed != 0 {
 			snaps = append(snaps, snap)
@@ -110,13 +104,12 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	if err != io.EOF {
 		log.Println(err)
 		log.Println(string(rawContent))
-		os.Exit(1)
 		return err
-		// TODO
 	}
 
 	if len(snaps) < 1 {
-		return nil // no rows
+		// For now, we don't save rows with no snapshots.
+		return nil
 	}
 
 	row := schema.TCPRow{}
@@ -145,8 +138,9 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	return err
 }
 
+// NewTCPInfoParser creates a new TCPInfoParser.  Duh.
+// TODO - pass in the annotator.
 func NewTCPInfoParser(ins etl.Inserter) *TCPInfoParser {
 	bufSize := etl.TCPINFO.BQBufferSize()
-	// TODO fix * hack.
 	return &TCPInfoParser{*NewBase(ins, bufSize, v2as.GetAnnotator(annotation.BatchURL))}
 }
