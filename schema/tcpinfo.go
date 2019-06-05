@@ -96,25 +96,22 @@ func (row *TCPRow) GetLogTime() time.Time {
 
 // GetClientIPs returns the client (remote) IP for annotation.  See parser.Annotatable
 func (row *TCPRow) GetClientIPs() []string {
-	if row.Client == nil {
-		return []string{row.SockID.DstIP}
-	}
-	return []string{row.Client.IP}
+	return []string{row.SockID.DstIP}
 }
 
 // GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
 func (row *TCPRow) GetServerIP() string {
-	if row.Server == nil {
-		metrics.AnnotationMissingCount.WithLabelValues("missing ServerIP").Inc()
-		return row.SockID.SrcIP
-	}
-	return row.Server.IP
+	return row.SockID.SrcIP
 }
 
 // AnnotateClients adds the client annotations. See parser.Annotatable
 // annMap must not be null
 func (row *TCPRow) AnnotateClients(annMap map[string]*api.Annotations) error {
-	ann, ok := annMap[row.Client.IP]
+	ip := row.SockID.DstIP
+	if row.Client == nil {
+		row.Client = &ClientInfo{IP: ip, Port: row.SockID.DPort}
+	}
+	ann, ok := annMap[ip]
 	if !ok {
 		metrics.AnnotationMissingCount.WithLabelValues("No annotation for IP").Inc()
 		return nil
@@ -142,7 +139,13 @@ func (row *TCPRow) AnnotateClients(annMap map[string]*api.Annotations) error {
 // AnnotateServer adds the server annotations. See parser.Annotatable
 // local must not be nil
 func (row *TCPRow) AnnotateServer(local *api.Annotations) error {
-	row.Client.Geo = local.Geo
+	if row.Server == nil {
+		row.Server = &ServerInfo{IP: row.SockID.SrcIP, Port: row.SockID.SPort}
+	}
+	if local == nil {
+		return nil
+	}
+	row.Server.Geo = local.Geo
 	if local.Network == nil {
 		return nil
 	}

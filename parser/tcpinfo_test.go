@@ -3,6 +3,7 @@ package parser_test
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -11,7 +12,10 @@ import (
 	"testing"
 	"time"
 
+	v2 "github.com/m-lab/annotation-service/api/v2"
+
 	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -51,6 +55,13 @@ func localETLSource(fn string) (*storage.ETLSource, error) {
 	return &storage.ETLSource{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
 }
 
+type fakeAnnotator struct{}
+
+func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2.Response, error) {
+	return &v2.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
+}
+
+// NOTE: This uses a fake annotator which returns no annotations.
 func TestTCPParser(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parserVersion := parser.InitParserVersionForTest()
@@ -63,7 +74,7 @@ func TestTCPParser(t *testing.T) {
 	}
 
 	ins := &inMemoryInserter{}
-	p := parser.NewTCPInfoParser(ins)
+	p := parser.NewTCPInfoParser(ins, &fakeAnnotator{})
 	task := task.NewTask(filename, src, p)
 
 	startDecode := time.Now()
@@ -106,6 +117,12 @@ func TestTCPParser(t *testing.T) {
 	// Spot check the SockID.SPort.
 	if first.SockID.SPort != 3010 {
 		t.Error("SPort should be 3010", first.SockID)
+	}
+	if first.Client == nil {
+		t.Error("Client annotations should not be nil")
+	}
+	if first.Server == nil {
+		t.Error("Server annotations should not be nil")
 	}
 
 	// This section is just for understanding how big these objects typically are, and what kind of compression

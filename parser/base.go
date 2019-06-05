@@ -31,8 +31,8 @@ type Annotatable interface {
 	GetLogTime() time.Time
 	GetClientIPs() []string // This is a slice to support mutliple hops in traceroute data.
 	GetServerIP() string
-	AnnotateClients(map[string]*api.Annotations) error
-	AnnotateServer(*api.Annotations) error
+	AnnotateClients(map[string]*api.Annotations) error // Must properly handle missing annotations.
+	AnnotateServer(*api.Annotations) error             // Must properly handle nil parameter.
 }
 
 // RowBuffer provides all basic functionality generally needed for buffering, annotating, and inserting

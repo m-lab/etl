@@ -145,5 +145,11 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 // TODO change to required parameter.
 func NewTCPInfoParser(ins etl.Inserter, ann ...v2as.Annotator) *TCPInfoParser {
 	bufSize := etl.TCPINFO.BQBufferSize()
-	return &TCPInfoParser{*NewBase(ins, bufSize, v2as.GetAnnotator(annotation.BatchURL))}
+	var annotator v2as.Annotator
+	if len(ann) > 0 && ann[0] != nil {
+		annotator = ann[0]
+	} else {
+		annotator = v2as.GetAnnotator(annotation.BatchURL)
+	}
+	return &TCPInfoParser{*NewBase(ins, bufSize, annotator)}
 }
