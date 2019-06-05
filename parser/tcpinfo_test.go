@@ -76,7 +76,7 @@ func TestTCPParser(t *testing.T) {
 	// This taskfile has 364 tcpinfo files in it.
 	// tar -tf parser/testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz | wc
 	if n != 364 {
-		t.Error("Processed", n)
+		t.Errorf("Expected ProcessAllTests to handle %d files, but it handled %d.\n", 364, n)
 	}
 
 	// Two tests (Cookies 2E1E and 2DEE) and have no snapshots, so there are only 362 rows committed.
