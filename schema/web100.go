@@ -5,7 +5,6 @@ package schema
 // TODO(prod) Improve unit test coverage.
 import (
 	"log"
-	"reflect"
 
 	"cloud.google.com/go/bigquery"
 )
@@ -35,7 +34,6 @@ func (vm Web100ValueMap) Get(name string) Web100ValueMap {
 	case map[string]bigquery.Value:
 		return Web100ValueMap(wl.(map[string]bigquery.Value))
 	default:
-		log.Println(reflect.TypeOf(wl))
 		return wl.(Web100ValueMap)
 	}
 }
