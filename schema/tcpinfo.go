@@ -139,16 +139,18 @@ func (row *TCPRow) AnnotateClients(annMap map[string]*api.Annotations) error {
 }
 
 // AnnotateServer adds the server annotations. See parser.Annotatable
-// local must not be null
+// local must not be nil
 func (row *TCPRow) AnnotateServer(local *api.Annotations) error {
 	row.Client.Geo = local.Geo
-	if local.Network != nil {
-		row.Server.Network = local.Network
-		asn, err := local.Network.BestASN()
-		if err != nil {
-			metrics.AnnotationMissingCount.WithLabelValues("BestASN failed").Inc()
-		}
-		row.ServerASN = uint32(asn)
+	if local.Network == nil {
+		return nil
 	}
+	row.Server.Network = local.Network
+	asn, err := local.Network.BestASN()
+	if err != nil {
+		metrics.AnnotationMissingCount.WithLabelValues("BestASN failed").Inc()
+		return nil
+	}
+	row.ServerASN = uint32(asn)
 	return nil
 }
