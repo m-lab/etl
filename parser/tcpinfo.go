@@ -120,13 +120,20 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 	if row.FinalSnapshot.InetDiagMsg != nil {
 		row.SockID = row.FinalSnapshot.InetDiagMsg.ID.GetSockID()
 	}
+	row.CopySocketInfo()
+
 	row.UUID = testMetadata.UUID
 	row.TestTime = testMetadata.StartTime
 
 	row.ParseInfo = &schema.ParseInfo{ParseTime: time.Now(), ParserVersion: Version()}
 
 	if fileMetadata["filename"] != nil {
-		row.ParseInfo.TaskFileName = fileMetadata["filename"].(string)
+		fn, ok := fileMetadata["filename"].(string)
+		if ok {
+			row.ParseInfo.TaskFileName = fn
+			row.Server.IATA = etl.GetIATACode(fn)
+			// TODO - should populate other ServerInfo fields from siteinfo API.
+		}
 	}
 
 	err = p.AddRow(&row)

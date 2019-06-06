@@ -59,6 +59,13 @@ type TCPRow struct {
 	Snapshots []*snapshot.Snapshot
 }
 
+// CopySocketInfo creates ServerInfo and ClientInfo with IP and port.
+// Should only be called after SockID is populated.
+func (row *TCPRow) CopySocketInfo() {
+	row.Server = &ServerInfo{IP: row.SockID.SrcIP, Port: row.SockID.SPort}
+	row.Client = &ClientInfo{IP: row.SockID.DstIP, Port: row.SockID.DPort}
+}
+
 func assertTCPRowIsValueSaver(r *TCPRow) {
 	func(bigquery.ValueSaver) {}(r)
 }
