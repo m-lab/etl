@@ -99,30 +99,39 @@ func TestTCPParser(t *testing.T) {
 		t.Fatal("Should have at least one inserted row")
 	}
 
-	// Examine first row in some detail...
-	first, ok := ins.data[0].(*schema.TCPRow)
-	if !ok {
-		t.Fatal("not a TCPRow")
-	}
-	if first.ParseInfo.ParseTime.After(time.Now()) {
-		t.Error("Should have inserted parse_time")
-	}
-	if first.ParseInfo.TaskFileName != filename {
-		t.Error("Should have correct filename", filename, "!=", first.ParseInfo.TaskFileName)
-	}
+	// Examine rows in some detail...
+	for i, rawRow := range ins.data {
+		row, ok := rawRow.(*schema.TCPRow)
+		if !ok {
+			t.Fatal("not a TCPRow")
+		}
+		if row.ParseInfo.ParseTime.After(time.Now()) {
+			t.Error("Should have inserted parse_time")
+		}
+		if row.ParseInfo.TaskFileName != filename {
+			t.Error("Should have correct filename", filename, "!=", row.ParseInfo.TaskFileName)
+		}
 
-	if first.ParseInfo.ParserVersion != parserVersion {
-		t.Error("ParserVersion not properly set", first.ParseInfo.ParserVersion)
-	}
-	// Spot check the SockID.SPort.
-	if first.SockID.SPort != 3010 {
-		t.Error("SPort should be 3010", first.SockID)
-	}
-	if first.Client == nil {
-		t.Error("Client annotations should not be nil")
-	}
-	if first.Server == nil {
-		t.Error("Server annotations should not be nil")
+		if row.ParseInfo.ParserVersion != parserVersion {
+			t.Error("ParserVersion not properly set", row.ParseInfo.ParserVersion)
+		}
+		// Spot check the SockID.SPort.  First 5 rows have SPort = 3010
+		if i < 5 && row.SockID.SPort != 3010 {
+			t.Error("SPort should be 3010", row.SockID, i)
+		}
+		// Check that source (server) IPs are correct.
+		if row.SockID.SrcIP != "195.89.146.242" && row.SockID.SrcIP != "2001:5012:100:24::242" {
+			t.Error("Wrong SrcIP", row.SockID.SrcIP)
+		}
+
+		if row.Client == nil {
+			t.Error("Client annotations should not be nil", row.SockID, row.FinalSnapshot)
+		}
+		if row.Server == nil {
+			t.Error("Server annotations should not be nil")
+		} else if row.Server.IATA == "" {
+			t.Error("Server IATA should not be empty")
+		}
 	}
 
 	// This section is just for understanding how big these objects typically are, and what kind of compression
