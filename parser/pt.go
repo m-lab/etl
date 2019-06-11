@@ -34,9 +34,10 @@ func (f *PTFileName) GetDate() (string, bool) {
 // not polluted and can be inserted into BQ tables
 type cachedPTData struct {
 	TestID           string
-	Hops             []*schema.ParisTracerouteHop
+	Hops             []schema.ScamperHop
 	LogTime          time.Time
-	ConnSpec         *schema.MLabConnectionSpecification
+	Source           schema.ConnectionIP
+	Destination      schema.ConnectionIP
 	LastValidHopLine string
 	MetroName        string
 }
@@ -77,9 +78,9 @@ func NewPTParser(ins etl.Inserter) *PTParser {
 	}
 }
 
-// ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
-func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string) []*schema.ParisTracerouteHop {
-	var results []*schema.ParisTracerouteHop
+// ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
+func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string) []schema.ScamperHop {
+	var results []schema.ScamperHop
 	if len(allNodes) == 0 {
 		return nil
 	}
@@ -87,28 +88,36 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 	// Iterate from the end of the list of nodes to minimize cost of removing nodes.
 	for i := len(allNodes) - 1; i >= 0; i-- {
 		metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
+		oneProbe := schema.HopProbe{
+			Rtt: allNodes[i].rtts,
+		}
+		probes := make([]schema.HopProbe, 0, 1)
+		probes = append(probes, oneProbe)
+		hopLink := schema.HopLink{
+			HopDstIp: allNodes[i].ip,
+			Probes:   probes,
+		}
+		links := make([]schema.HopLink, 0, 1)
+		links = append(links, hopLink)
 		if allNodes[i].parent_ip == "" {
-			oneHop := &schema.ParisTracerouteHop{
-				Protocol:      protocol,
-				Dest_ip:       allNodes[i].ip,
-				Dest_hostname: allNodes[i].hostname,
-				Rtt:           allNodes[i].rtts,
-				Src_ip:        server_IP,
-				Src_af:        IPv4_AF,
-				Dest_af:       IPv4_AF,
+			// create a hop that from server_IP to allNodes[i].ip
+			source := schema.HopIP{
+				Ip: server_IP,
+			}
+			oneHop := schema.ScamperHop{
+				Source: source,
+				Links:  links,
 			}
 			results = append(results, oneHop)
 			break
 		} else {
-			oneHop := &schema.ParisTracerouteHop{
-				Protocol:      protocol,
-				Dest_ip:       allNodes[i].ip,
-				Dest_hostname: allNodes[i].hostname,
-				Rtt:           allNodes[i].rtts,
-				Src_ip:        allNodes[i].parent_ip,
-				Src_hostname:  allNodes[i].parent_hostname,
-				Src_af:        IPv4_AF,
-				Dest_af:       IPv4_AF,
+			source := schema.HopIP{
+				Ip:       allNodes[i].parent_ip,
+				Hostname: allNodes[i].parent_hostname,
+			}
+			oneHop := schema.ScamperHop{
+				Source: source,
+				Links:  links,
 			}
 			results = append(results, oneHop)
 		}
@@ -196,29 +205,25 @@ func (pt *PTParser) FullTableName() string {
 }
 
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
-	for _, hop := range oneTest.Hops {
-		ptTest := schema.PT{
-			TestID:               oneTest.TestID,
-			LogTime:              oneTest.LogTime.Unix(),
-			ParseTime:            time.Now(),
-			ParserVersion:        Version(),
-			TaskFilename:         pt.taskFileName,
-			Connection_spec:      *(oneTest.ConnSpec),
-			Paris_traceroute_hop: *hop,
-			Type:                 int32(2),
-			Project:              int32(3),
-		}
-		err := pt.inserter.InsertRow(ptTest)
-		if err != nil {
-			metrics.ErrorCount.WithLabelValues(
-				pt.TableName(), "pt", "insert-err").Inc()
-			log.Printf("insert-err: %v\n", err)
-			// Inc TestCount only once per row.
-			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
-		} else {
-			// Inc TestCount on successful row insert.
-			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
-		}
+	ptTest := schema.PT{
+		TaskFilename:  pt.taskFileName,
+		ParseTime:     time.Now(),
+		ParserVersion: Version(),
+		Source:        oneTest.Source,
+		Destination:   oneTest.Destination,
+		Hop:           oneTest.Hops,
+	}
+
+	err := pt.inserter.InsertRow(ptTest)
+	if err != nil {
+		metrics.ErrorCount.WithLabelValues(
+			pt.TableName(), "pt", "insert-err").Inc()
+		log.Printf("insert-err: %v\n", err)
+		// Inc TestCount only once per row.
+		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
+	} else {
+		// Inc TestCount on successful row insert.
+		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
 	}
 }
 
@@ -286,12 +291,13 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// If it does appear, then the buffered test was polluted, and it will
 	// be discarded from buffer.
 	// If it does not appear, then no pollution detected.
-	destIP := cashedTest.ConnSpec.Client_ip
+	destIP := cashedTest.Destination.Ip
 	for index, PTTest := range pt.previousTests {
 		// array of hops was built in reverse order from list of nodes
 		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
 		finalHop := PTTest.Hops[0]
-		if PTTest.ConnSpec.Client_ip != destIP && (finalHop.Dest_ip == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
+		if PTTest.Destination.Ip != destIP && len(finalHop.Links) > 0 &&
+			(finalHop.Links[0].HopDstIp == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
 			// Discard pt.previousTests[index]
 			metrics.PTPollutedCount.WithLabelValues(pt.previousTests[index].MetroName).Inc()
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
@@ -562,23 +568,22 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 
 	// Generate Hops from allNodes
 	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName)
-	connSpec := &schema.MLabConnectionSpecification{
-		Server_ip:      serverIP,
-		Server_af:      IPv4_AF,
-		Client_ip:      destIP,
-		Client_af:      IPv4_AF,
-		Data_direction: 0,
+
+	source := schema.ConnectionIP{
+		Ip: serverIP,
+	}
+	destination := schema.ConnectionIP{
+		Ip: destIP,
 	}
 
-	// Only annotate if flag enabled...
-	AddGeoDataPTConnSpec(connSpec, logTime)
-	AddGeoDataPTHopBatch(PTHops, logTime)
+	// TODO: Add annotation to the IP of source, destination and hops.
 
 	return cachedPTData{
 		TestID:           testId,
 		Hops:             PTHops,
 		LogTime:          logTime,
-		ConnSpec:         connSpec,
+		Source:           source,
+		Destination:      destination,
 		LastValidHopLine: lastValidHopLine,
 		MetroName:        iataCode,
 	}, nil
