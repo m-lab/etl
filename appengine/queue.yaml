@@ -652,6 +652,27 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 
+# TCPINFO batch parsing queues.
+- name: etl-tcpinfo-batch-0
+  target: etl-batch-parser
+  rate: 1.5/s
+  bucket_size: 10
+  max_concurrent_requests: 50
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+
+- name: etl-tcpinfo-batch-1
+  target: etl-batch-parser
+  rate: 1.5/s
+  bucket_size: 10
+  max_concurrent_requests: 50
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
