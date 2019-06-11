@@ -78,7 +78,7 @@ func TestPTParser(t *testing.T) {
 
 	// TODO(dev): reformat these individual values to be more readable.
 	expected_hops := []schema.ScamperHop{
-		schema.ScamperHop{Source:{Ip:"64.233.174.109", City:"", CountryCode:"", Hostname:"sr05-te1-8.nuq04.net.google.com"}, Linkc:0, Links:[{HopDstIp:"74.125.224.100", TTL:0, Probes:[{Flowid:0 Rtt:[0.895]}]}]},
+		schema.ScamperHop{Source:{Ip:"64.233.174.109", City:"", CountryCode:"", Hostname:"sr05-te1-8.nuq04.net.google.com"}, Linkc:0, Links:[{HopDstIp:"74.125.224.100", TTL:0, Probes:[{Flowid:0, Rtt:[]float64{0.895}}]}]},
 		schema.ScamperHop{Source:{Ip:72.14.232.136 City: CountryCode: Hostname:bb01-ae7.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
 		schema.ScamperHop{Source:{Ip:72.14.232.136 City: CountryCode: Hostname:bb01-ae7.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
 		schema.ScamperHop{Source:{Ip:72.14.232.136 City: CountryCode: Hostname:bb01-ae7.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
