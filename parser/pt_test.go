@@ -77,8 +77,7 @@ func TestPTParser(t *testing.T) {
 	log.Printf("%+v", cashedTest.Hops)
 
 	// TODO(dev): reformat these individual values to be more readable.
-	expected_hop := schema.ScamperHop{Source: schema.HopIP{Ip: "64.233.174.109", City: "", CountryCode: "", Hostname: "sr05-te1-8.nuq04.net.google.com"}, Linkc: 0, Links: []schema.HopLink{HopDstIp: "74.125.224.100", TTL: 0, Probes: []schema.HopProbe{Flowid: 0, Rtt: []float64{0.895}}}}
-
+	expected_hop := schema.ScamperHop{Source: schema.HopIP{Ip: "64.233.174.109", City: "", CountryCode: "", Hostname: "sr05-te1-8.nuq04.net.google.com"}, Linkc: 0, Links: []schema.HopLink{schema.HopLink{HopDstIp: "74.125.224.100", TTL: 0, Probes: []schema.HopProbe{schema.HopProbe{Flowid: 0, Rtt: []float64{0.895}}}}}}
 	log.Println(len(cashedTest.Hops))
 	if len(cashedTest.Hops) != 28 {
 		t.Fatalf("Wrong number of PT hops!")
