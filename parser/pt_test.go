@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 )
@@ -89,7 +90,7 @@ func TestPTParser(t *testing.T) {
 }
 
 func TestPTInserter(t *testing.T) {
-	ins := &inMemoryInserter{}
+	ins := newInMemoryInserter()
 	pt := parser.NewPTParser(ins)
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
