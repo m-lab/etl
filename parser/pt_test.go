@@ -3,7 +3,7 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
+	//"log"
 	"reflect"
 	"testing"
 
@@ -88,7 +88,6 @@ func TestPTParser(t *testing.T) {
 	}
 }
 
-
 func TestPTInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
 	pt := parser.NewPTParser(ins)
@@ -118,6 +117,7 @@ func TestPTInserter(t *testing.T) {
 		t.Errorf("Not the expected values:")
 	}
 }
+
 /*
 func TestPTPollutionCheck(t *testing.T) {
 	ins := &inMemoryInserter{}
