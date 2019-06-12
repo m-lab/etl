@@ -11,7 +11,6 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
-/*
 // TODO: IPv6 tests
 func TestParseFirstLine(t *testing.T) {
 	protocol, dest_ip, server_ip, err := parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s")
@@ -57,7 +56,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 		t.Fatalf("Did not reach expected destination.")
 	}
 }
-*/
+
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	cashedTest, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
@@ -76,11 +75,8 @@ func TestPTParser(t *testing.T) {
 		t.Fatalf("Wrong results for Client IP.")
 	}
 
-	//log.Printf("%+v", cashedTest.Hops)
-
 	// TODO(dev): reformat these individual values to be more readable.
 	expected_hop := schema.ScamperHop{Source: schema.HopIP{Ip: "64.233.174.109", City: "", CountryCode: "", Hostname: "sr05-te1-8.nuq04.net.google.com"}, Linkc: 0, Links: []schema.HopLink{schema.HopLink{HopDstIp: "74.125.224.100", TTL: 0, Probes: []schema.HopProbe{schema.HopProbe{Flowid: 0, Rtt: []float64{0.895}}}}}}
-	log.Println(len(cashedTest.Hops))
 	if len(cashedTest.Hops) != 38 {
 		t.Fatalf("Wrong number of PT hops!")
 	}
@@ -92,7 +88,7 @@ func TestPTParser(t *testing.T) {
 	}
 }
 
-/*
+
 func TestPTInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
 	pt := parser.NewPTParser(ins)
@@ -106,7 +102,7 @@ func TestPTInserter(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if ins.RowsInBuffer() != 38 {
+	if ins.RowsInBuffer() != 1 {
 		fmt.Println(ins.RowsInBuffer())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
@@ -122,7 +118,7 @@ func TestPTInserter(t *testing.T) {
 		t.Errorf("Not the expected values:")
 	}
 }
-
+/*
 func TestPTPollutionCheck(t *testing.T) {
 	ins := &inMemoryInserter{}
 	pt := parser.NewPTParser(ins)
