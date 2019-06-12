@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"google.golang.org/appengine/aetest"
 )
 
 func init() {
@@ -61,15 +63,26 @@ func TestStats(t *testing.T) {
 			status: http.StatusOK,
 		},
 	}
+
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer inst.Close()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest(`GET`, `http://foobar.com/stats?queuename=`+tt.queue+`&test-bypass=true`, nil)
-			queueStats(w, r)
-			if w.Result().StatusCode != tt.status {
-				b, _ := ioutil.ReadAll(w.Body)
-				t.Log(string(b))
-				t.Error(w.Result().StatusCode)
+			r, err := inst.NewRequest(`GET`, `http://foobar.com/stats?queuename=`+tt.queue+`&test-bypass=true`, nil)
+			if err != nil {
+				t.Error(err)
+			} else {
+				queueStats(w, r)
+				if w.Result().StatusCode != tt.status {
+					b, _ := ioutil.ReadAll(w.Body)
+					t.Log(string(b))
+					t.Error(w.Result().StatusCode)
+				}
 			}
 		})
 	}
@@ -117,17 +130,27 @@ func TestReceiver(t *testing.T) {
 		},
 	}
 
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer inst.Close()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var reqStr string
 			reqStr = "?filename=" + tt.filename + "&test-bypass=true"
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "http://foobar.com/receiver"+reqStr, nil)
-			receiver(w, r)
-			if w.Result().StatusCode != tt.status {
-				b, _ := ioutil.ReadAll(w.Body)
-				t.Log(string(b))
-				t.Error(w.Result().StatusCode)
+			r, err := inst.NewRequest("GET", "http://foobar.com/receiver"+reqStr, nil)
+			if err != nil {
+				t.Error(err)
+			} else {
+				receiver(w, r)
+				if w.Result().StatusCode != tt.status {
+					b, _ := ioutil.ReadAll(w.Body)
+					t.Log(string(b))
+					t.Error(w.Result().StatusCode)
+				}
 			}
 		})
 	}
@@ -167,17 +190,27 @@ func TestReceiverWithQueue(t *testing.T) {
 		},
 	}
 
+	inst, err := aetest.NewInstance(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer inst.Close()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var reqStr string
 			reqStr = "?filename=" + tt.filename + "&queue=" + tt.queue + "&test-bypass=true"
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "http://foobar.com/receiver"+reqStr, nil)
-			receiver(w, r)
-			if w.Result().StatusCode != tt.status {
-				b, _ := ioutil.ReadAll(w.Body)
-				t.Log(string(b))
-				t.Error(w.Result().StatusCode)
+			r, err := inst.NewRequest("GET", "http://foobar.com/receiver"+reqStr, nil)
+			if err != nil {
+				t.Error(err)
+			} else {
+				receiver(w, r)
+				if w.Result().StatusCode != tt.status {
+					b, _ := ioutil.ReadAll(w.Body)
+					t.Log(string(b))
+					t.Error(w.Result().StatusCode)
+				}
 			}
 		})
 	}
