@@ -284,7 +284,8 @@ func (in *BQInserter) updateMetrics(err error) error {
 		err = nil
 
 	default:
-		log.Printf("Unhandled %v on insert %v Project: %s, Table: %s\n", reflect.TypeOf(typedErr).Elem(),
+		// With Elem(), this was causing panics.
+		log.Printf("Unhandled %v on insert %v Project: %s, Table: %s\n", reflect.TypeOf(typedErr),
 			typedErr, in.Project(), in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
