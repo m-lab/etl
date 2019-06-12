@@ -77,58 +77,21 @@ func TestPTParser(t *testing.T) {
 	log.Printf("%+v", cashedTest.Hops)
 
 	// TODO(dev): reformat these individual values to be more readable.
-	expected_hops := []schema.ScamperHop{
+	expected_hop :=
 		schema.ScamperHop{Source:schema.HopIP{Ip:"64.233.174.109", City:"", CountryCode:"", Hostname:"sr05-te1-8.nuq04.net.google.com"}, Linkc:0, Links:[]schema.HopLink{HopDstIp:"74.125.224.100", TTL:0, Probes:[]schema.HopProbe{Flowid:0, Rtt:[]float64{0.895}}}},
-		schema.ScamperHop{Source:{Ip:72.14.232.136 City: CountryCode: Hostname:bb01-ae7.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.232.136 City: CountryCode: Hostname:bb01-ae7.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.232.136 City: CountryCode: Hostname:bb01-ae7.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.232.136 City: CountryCode: Hostname:bb01-ae7.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:216.239.49.250 City: CountryCode: Hostname:bb01-ae3.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:216.239.49.250 City: CountryCode: Hostname:bb01-ae3.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:216.239.49.250 City: CountryCode: Hostname:bb01-ae3.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:216.239.49.250 City: CountryCode: Hostname:bb01-ae3.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:216.239.49.250 City: CountryCode: Hostname:bb01-ae3.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:216.239.49.250 City: CountryCode: Hostname:bb01-ae3.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:216.239.49.250 City: CountryCode: Hostname:bb01-ae3.nuq04.net.google.com} Linkc:0 Links:[{HopDstIp:64.233.174.109 TTL:0 Probes:[{Flowid:0 Rtt:[1.614]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.196.8 City: CountryCode: Hostname:pr02-xe-3-0-1.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:72.14.232.136 TTL:0 Probes:[{Flowid:0 Rtt:[1.693]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.196.8 City: CountryCode: Hostname:pr02-xe-3-0-1.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:72.14.232.136 TTL:0 Probes:[{Flowid:0 Rtt:[1.693]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.196.8 City: CountryCode: Hostname:pr02-xe-3-0-1.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:72.14.232.136 TTL:0 Probes:[{Flowid:0 Rtt:[1.693]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.196.8 City: CountryCode: Hostname:pr02-xe-3-0-1.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:72.14.232.136 TTL:0 Probes:[{Flowid:0 Rtt:[1.693]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.218.190 City: CountryCode: Hostname:pr01-xe-7-1-0.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:216.239.49.250 TTL:0 Probes:[{Flowid:0 Rtt:[1.386]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.218.190 City: CountryCode: Hostname:pr01-xe-7-1-0.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:216.239.49.250 TTL:0 Probes:[{Flowid:0 Rtt:[1.386]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.218.190 City: CountryCode: Hostname:pr01-xe-7-1-0.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:216.239.49.250 TTL:0 Probes:[{Flowid:0 Rtt:[1.386]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.218.190 City: CountryCode: Hostname:pr01-xe-7-1-0.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:216.239.49.250 TTL:0 Probes:[{Flowid:0 Rtt:[1.386]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.218.190 City: CountryCode: Hostname:pr01-xe-7-1-0.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:216.239.49.250 TTL:0 Probes:[{Flowid:0 Rtt:[1.386]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.218.190 City: CountryCode: Hostname:pr01-xe-7-1-0.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:216.239.49.250 TTL:0 Probes:[{Flowid:0 Rtt:[1.386]}]}]},
-		schema.ScamperHop{Source:{Ip:72.14.218.190 City: CountryCode: Hostname:pr01-xe-7-1-0.pao03.net.google.com} Linkc:0 Links:[{HopDstIp:216.239.49.250 TTL:0 Probes:[{Flowid:0 Rtt:[1.386]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.196.8 TTL:0 Probes:[{Flowid:0 Rtt:[0.556]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.196.8 TTL:0 Probes:[{Flowid:0 Rtt:[0.556]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.196.8 TTL:0 Probes:[{Flowid:0 Rtt:[0.556]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.196.8 TTL:0 Probes:[{Flowid:0 Rtt:[0.556]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.218.190 TTL:0 Probes:[{Flowid:0 Rtt:[0.53]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.218.190 TTL:0 Probes:[{Flowid:0 Rtt:[0.53]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.218.190 TTL:0 Probes:[{Flowid:0 Rtt:[0.53]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.218.190 TTL:0 Probes:[{Flowid:0 Rtt:[0.53]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.218.190 TTL:0 Probes:[{Flowid:0 Rtt:[0.53]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.218.190 TTL:0 Probes:[{Flowid:0 Rtt:[0.53]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.253.46 City: CountryCode: Hostname:us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com} Linkc:0 Links:[{HopDstIp:72.14.218.190 TTL:0 Probes:[{Flowid:0 Rtt:[0.53]}]}]},
-		schema.ScamperHop{Source:{Ip:172.25.252.166 City: CountryCode: Hostname:us-mtv-ply1-bb1-tengigabitethernet2-3.n.corp.google.com} Linkc:0 Links:[{HopDstIp:172.25.253.46 TTL:0 Probes:[{Flowid:0 Rtt:[0.343]}]}]} ,
-		schema.ScamperHop{Source:{Ip:172.25.252.172 City: CountryCode: Hostname:us-mtv-cl4-core1-gigabitethernet1-1.n.corp.google.com} Linkc:0 Links:[{HopDstIp:172.25.252.166 TTL:0 Probes:[{Flowid:0 Rtt:[0.501]}]}]},
-		schema.ScamperHop{Source:{Ip:172.17.95.252 City: CountryCode: Hostname:172.17.95.252} Linkc:0 Links:[{HopDstIp:172.25.252.172 TTL:0 Probes:[{Flowid:0 Rtt:[0.407]}]}]},
-		schema.ScamperHop{Source:{Ip:172.17.94.34 City: CountryCode: Hostname:} Linkc:0 Links:[{HopDstIp:172.17.95.252 TTL:0 Probes:[{Flowid:0 Rtt:[0.376]}]}]},
+		
+	log.Println(len(cashedTest.Hops))
+	if len(cashedTest.Hops) != 28) {
+		t.Fatalf("Wrong number of PT hops!")
 	}
-	if len(cashedTest.Hops) != len(expected_hops) {
-		t.Fatalf("Wrong results for PT hops!")
-	}
-	/*
-		for i := 0; i < len(cashedTest.Hops); i++ {
-			if !reflect.DeepEqual(cashedTest.Hops[i], expected_hops[i]) {
+	
+			if !reflect.DeepEqual(cashedTest.Hops[0], expected_hop) {
 				fmt.Println(i)
-				fmt.Printf("Here is expected    : %v\n", expected_hops[i])
-				fmt.Printf("Here is what is real: %v\n", cashedTest.Hops[i])
+				fmt.Printf("Here is expected    : %v\n", expected_hop)
+				fmt.Printf("Here is what is real: %v\n", cashedTest.Hops[0])
 				t.Fatalf("Wrong results for PT hops!")
 			}
-		}*/
+		}
 }
 
 /*
