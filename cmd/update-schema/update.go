@@ -13,12 +13,12 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-func CreateOrUpdateTCP(project string) {
+func CreateOrUpdateTCP(project string, dataset string, table string) {
 	row := schema.TCPRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "TCPRow.Schema")
 
-	name := project + ".base_tables.tcpinfo"
+	name := project + "." + dataset + "." + table
 	log.Println("Using:", name)
 	pdt, err := bqx.ParsePDT(name)
 	rtx.Must(err, "ParsePDT")
@@ -48,6 +48,8 @@ func CreateOrUpdateTCP(project string) {
 
 func main() {
 	//CreateOrUpdateTCP("mlab-testing")
-	CreateOrUpdateTCP("mlab-sandbox")
-	CreateOrUpdateTCP("mlab-staging")
+	CreateOrUpdateTCP("mlab-sandbox", "base_tables", "tcpinfo")
+	CreateOrUpdateTCP("mlab-sandbox", "batch", "tcpinfo")
+	CreateOrUpdateTCP("mlab-staging", "base_tables", "tcpinfo")
+	CreateOrUpdateTCP("mlab-staging", "batch", "tcpinfo")
 }
