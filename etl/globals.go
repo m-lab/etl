@@ -44,7 +44,7 @@ const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6})(\.\d{0,6})?Z`
 
 const type2 = `(?:-([a-z-]+))?` // optional datatype string
 const mlabNSiteNN = `-(mlab\d)-([a-z]{3}\d[0-9t])-`
-const expNNNNE = `([a-z]+)(?:-(\d{4}))?(-e)?`
+const expNNNNE = `([a-z-]+)(?:-(\d{4}))?(-e)?`
 const suffix = `(\.tar|\.tar.gz|\.tgz)$`
 
 // These are here to facilitate use across queue-pusher and parsing components.

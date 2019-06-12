@@ -322,3 +322,12 @@ func TestDirToTablename(t *testing.T) {
 		t.Errorf("DirToTablename() failed to translate PT dir name correctly.")
 	}
 }
+
+func TestParisFilename(t *testing.T) {
+
+	path, err := etl.ValidateTestPath(`gs://archive-mlab-oti/paris-traceroute/2019/06/11/20190611T000002Z-mlab2-bom01-paris-traceroute-0000.tgz`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Println(path)
+}
