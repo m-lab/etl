@@ -76,13 +76,13 @@ func TestStats(t *testing.T) {
 			r, err := inst.NewRequest(`GET`, `http://foobar.com/stats?queuename=`+tt.queue+`&test-bypass=true`, nil)
 			if err != nil {
 				t.Error(err)
-			} else {
-				queueStats(w, r)
-				if w.Result().StatusCode != tt.status {
-					b, _ := ioutil.ReadAll(w.Body)
-					t.Log(string(b))
-					t.Error(w.Result().StatusCode)
-				}
+				return
+			}
+			queueStats(w, r)
+			if w.Result().StatusCode != tt.status {
+				b, _ := ioutil.ReadAll(w.Body)
+				t.Log(string(b))
+				t.Error(w.Result().StatusCode)
 			}
 		})
 	}
@@ -144,13 +144,13 @@ func TestReceiver(t *testing.T) {
 			r, err := inst.NewRequest("GET", "http://foobar.com/receiver"+reqStr, nil)
 			if err != nil {
 				t.Error(err)
-			} else {
-				receiver(w, r)
-				if w.Result().StatusCode != tt.status {
-					b, _ := ioutil.ReadAll(w.Body)
-					t.Log(string(b))
-					t.Error(w.Result().StatusCode)
-				}
+				return
+			}
+			receiver(w, r)
+			if w.Result().StatusCode != tt.status {
+				b, _ := ioutil.ReadAll(w.Body)
+				t.Log(string(b))
+				t.Error(w.Result().StatusCode)
 			}
 		})
 	}
