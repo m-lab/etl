@@ -1,8 +1,10 @@
 package parser_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
+	"reflect"
 	"testing"
 
 	"github.com/m-lab/etl/parser"
@@ -74,17 +76,16 @@ func TestPTParser(t *testing.T) {
 		t.Fatalf("Wrong results for Client IP.")
 	}
 
-	log.Printf("%+v", cashedTest.Hops)
+	//log.Printf("%+v", cashedTest.Hops)
 
 	// TODO(dev): reformat these individual values to be more readable.
 	expected_hop := schema.ScamperHop{Source: schema.HopIP{Ip: "64.233.174.109", City: "", CountryCode: "", Hostname: "sr05-te1-8.nuq04.net.google.com"}, Linkc: 0, Links: []schema.HopLink{schema.HopLink{HopDstIp: "74.125.224.100", TTL: 0, Probes: []schema.HopProbe{schema.HopProbe{Flowid: 0, Rtt: []float64{0.895}}}}}}
 	log.Println(len(cashedTest.Hops))
-	if len(cashedTest.Hops) != 28 {
+	if len(cashedTest.Hops) != 38 {
 		t.Fatalf("Wrong number of PT hops!")
 	}
 
 	if !reflect.DeepEqual(cashedTest.Hops[0], expected_hop) {
-		fmt.Println(i)
 		fmt.Printf("Here is expected    : %v\n", expected_hop)
 		fmt.Printf("Here is what is real: %v\n", cashedTest.Hops[0])
 		t.Fatalf("Wrong results for PT hops!")
