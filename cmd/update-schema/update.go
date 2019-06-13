@@ -52,4 +52,6 @@ func main() {
 	CreateOrUpdateTCP("mlab-sandbox", "batch", "tcpinfo")
 	CreateOrUpdateTCP("mlab-staging", "base_tables", "tcpinfo")
 	CreateOrUpdateTCP("mlab-staging", "batch", "tcpinfo")
+	CreateOrUpdateTCP("mlab-oti", "base_tables", "tcpinfo")
+	CreateOrUpdateTCP("mlab-oti", "batch", "tcpinfo")
 }
