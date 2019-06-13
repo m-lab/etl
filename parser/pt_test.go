@@ -3,6 +3,7 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
+
 	//"log"
 	"reflect"
 	"testing"
@@ -106,20 +107,12 @@ func TestPTInserter(t *testing.T) {
 		fmt.Println(ins.RowsInBuffer())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
-	fmt.Println(ins.data[0])
 
-	expectedValues := &schema.PT{}
-
-	// Copy ParseTime from actual output before using DeepEqual.
-	expectedValues.ParseTime = (ins.data[0].(schema.PT)).ParseTime
-	if !reflect.DeepEqual(ins.data[0], *expectedValues) {
-		fmt.Printf("Here is expected    : %v\n", expectedValues)
-		fmt.Printf("Here is what is real: %v\n", ins.data[0])
-		t.Errorf("Not the expected values:")
+	if ins.data[0].(schema.PT).TaskFilename != "gs://fake-bucket/fake-archive.tgz" {
+		t.Fatalf("Task filename is wrong.")
 	}
 }
 
-/*
 func TestPTPollutionCheck(t *testing.T) {
 	ins := &inMemoryInserter{}
 	pt := parser.NewPTParser(ins)
@@ -139,7 +132,7 @@ func TestPTPollutionCheck(t *testing.T) {
 			// The second test reached expected destIP, and was inserted into BigQuery table.
 			// The buffer has only the first test.
 			expectedBufferedTest: 1,
-			expectedNumRows:      16,
+			expectedNumRows:      1,
 		},
 		{
 			fileName: "testdata/PT/20171208T00:00:14Z-139.60.160.135-2023-173.205.3.44-1101.paris",
@@ -147,19 +140,19 @@ func TestPTPollutionCheck(t *testing.T) {
 			// expectedBufferedTest is 0, which means pollution detected and test removed.
 			expectedBufferedTest: 0,
 			// The third test reached its destIP and was inserted into BigQuery.
-			expectedNumRows: 29,
+			expectedNumRows: 2,
 		},
 		{
 			fileName: "testdata/PT/20171208T00:00:14Z-76.227.226.149-37156-173.205.3.37-52156.paris",
 			// The 4th test was buffered.
 			expectedBufferedTest: 1,
-			expectedNumRows:      29,
+			expectedNumRows:      2,
 		},
 		{
 			fileName: "testdata/PT/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris",
 			// The 5th test was buffered too.
 			expectedBufferedTest: 2,
-			expectedNumRows:      29,
+			expectedNumRows:      2,
 		},
 		{
 			fileName: "testdata/PT/20171208T22:03:59Z-139.60.160.135-1519-163.22.28.44-1101.paris",
@@ -168,7 +161,7 @@ func TestPTPollutionCheck(t *testing.T) {
 			// Buffer contains the 4th test now.
 			expectedBufferedTest: 1,
 			// The 6th test reached its destIP and was inserted into BigQuery.
-			expectedNumRows: 46,
+			expectedNumRows: 3,
 		},
 	}
 
@@ -186,16 +179,15 @@ func TestPTPollutionCheck(t *testing.T) {
 			t.Fatalf("Data not buffered correctly")
 		}
 		if ins.RowsInBuffer() != test.expectedNumRows {
-			t.Fatalf("Data not inserted into BigQuery correctly.")
+			t.Fatalf("Data of test %s not inserted into BigQuery correctly. Expect %d Actually %d", test.fileName, test.expectedNumRows, ins.RowsInBuffer())
 		}
 	}
 
 	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
-	if ins.RowsInBuffer() != 56 {
-		t.Fatalf("Data not inserted into BigQuery correctly.")
+	if ins.RowsInBuffer() != 4 {
+		t.Fatalf("Number of tests in buffer not correct, expect 4, actually %d.", ins.RowsInBuffer())
 	}
-
 }
 
 func TestPTEmptyTest(t *testing.T) {
@@ -209,4 +201,3 @@ func TestPTEmptyTest(t *testing.T) {
 		t.Fatalf("Do not handle empty test correctly.")
 	}
 }
-*/
