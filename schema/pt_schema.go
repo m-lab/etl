@@ -71,8 +71,8 @@ type ScamperHop struct {
 }
 
 type PTTest struct {
-	Parseinfo      ParseInfo    `json:"parseinfo"`
 	UUID           string       `json:"uuid,string" bigquery:"uuid"`
+	Parseinfo      ParseInfo    `json:"parseinfo"`
 	StartTime      int64        `json:"start_time,int64" bigquery:"start_time"`
 	StopTime       int64        `json:"stop_time,int64" bigquery:"stop_time"`
 	ScamperVersion string       `json:"scamper_version,string" bigquery:"scamper_version"`
