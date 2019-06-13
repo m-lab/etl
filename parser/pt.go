@@ -36,8 +36,8 @@ type cachedPTData struct {
 	TestID           string
 	Hops             []schema.ScamperHop
 	LogTime          time.Time
-	Source           schema.ConnectionIP
-	Destination      schema.ConnectionIP
+	Source           schema.ServerInfo
+	Destination      schema.ClientInfo
 	LastValidHopLine string
 	MetroName        string
 }
@@ -205,13 +205,17 @@ func (pt *PTParser) FullTableName() string {
 }
 
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
-	ptTest := schema.PT{
-		TaskFilename:  pt.taskFileName,
+	parseInfo := schema.ParseInfo{
+		TaskFileName:  pt.taskFileName,
 		ParseTime:     time.Now(),
 		ParserVersion: Version(),
-		Source:        oneTest.Source,
-		Destination:   oneTest.Destination,
-		Hop:           oneTest.Hops,
+	}
+
+	ptTest := schema.PTTest{
+		Parseinfo:   parseInfo,
+		Source:      oneTest.Source,
+		Destination: oneTest.Destination,
+		Hop:         oneTest.Hops,
 	}
 
 	err := pt.inserter.InsertRow(ptTest)
@@ -291,12 +295,12 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// If it does appear, then the buffered test was polluted, and it will
 	// be discarded from buffer.
 	// If it does not appear, then no pollution detected.
-	destIP := cashedTest.Destination.Ip
+	destIP := cashedTest.Destination.IP
 	for index, PTTest := range pt.previousTests {
 		// array of hops was built in reverse order from list of nodes
 		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
 		finalHop := PTTest.Hops[0]
-		if PTTest.Destination.Ip != destIP && len(finalHop.Links) > 0 &&
+		if PTTest.Destination.IP != destIP && len(finalHop.Links) > 0 &&
 			(finalHop.Links[0].HopDstIp == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
 			// Discard pt.previousTests[index]
 			metrics.PTPollutedCount.WithLabelValues(pt.previousTests[index].MetroName).Inc()
@@ -569,11 +573,11 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// Generate Hops from allNodes
 	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName)
 
-	source := schema.ConnectionIP{
-		Ip: serverIP,
+	source := schema.ServerInfo{
+		IP: serverIP,
 	}
-	destination := schema.ConnectionIP{
-		Ip: destIP,
+	destination := schema.ClientInfo{
+		IP: destIP,
 	}
 
 	// TODO: Add annotation to the IP of source, destination and hops.

@@ -68,11 +68,11 @@ func TestPTParser(t *testing.T) {
 		t.Fatalf("Do not process log time correctly.")
 	}
 
-	if cashedTest.Source.Ip != "172.17.94.34" {
+	if cashedTest.Source.IP != "172.17.94.34" {
 		t.Fatalf("Wrong results for Server IP.")
 	}
 
-	if cashedTest.Destination.Ip != "74.125.224.100" {
+	if cashedTest.Destination.IP != "74.125.224.100" {
 		t.Fatalf("Wrong results for Client IP.")
 	}
 
@@ -107,7 +107,7 @@ func TestPTInserter(t *testing.T) {
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
 
-	if ins.data[0].(schema.PT).TaskFilename != "gs://fake-bucket/fake-archive.tgz" {
+	if ins.data[0].(schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
 		t.Fatalf("Task filename is wrong.")
 	}
 }
