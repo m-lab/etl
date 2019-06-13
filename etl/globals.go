@@ -36,7 +36,7 @@ const YYYYMMDD = `\d{4}[01]\d[0123]\d`
 const MlabDomain = `measurement-lab.org`
 
 const bucket = `gs://([^/]*)/`
-const expType = `(?:([a-z-]+)/)?([a-z-]+)/` // experiment OR experiment/type
+const expType = `(?:([a-z-]+)/)?([a-z-]+)/` // experiment OR experiment/type.
 
 const datePath = `(\d{4}/[01]\d/[0123]\d)/`
 
@@ -44,7 +44,9 @@ const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6})(\.\d{0,6})?Z`
 
 const type2 = `(?:-([a-z-]+))?` // optional datatype string
 const mlabNSiteNN = `-(mlab\d)-([a-z]{3}\d[0-9t])-`
-const expNNNNE = `([a-z]+)(?:-(\d{4}))?(-e)?`
+
+// This parses the experiment name, optional -NNNN sequence number, and optional -e (for old embargoed files)
+const expNNNNE = `([a-z-]+)(?:-(\d{4}))?(-e)?`
 const suffix = `(\.tar|\.tar.gz|\.tgz)$`
 
 // These are here to facilitate use across queue-pusher and parsing components.
@@ -53,7 +55,11 @@ var (
 		`(?P<preamble>.*)` + dateTime + `(?P<postamble>.*)`)
 
 	startPattern = regexp.MustCompile(`^` + bucket + expType + datePath + `$`)
-	endPattern   = regexp.MustCompile(`^` + type2 + mlabNSiteNN + expNNNNE + suffix + `$`)
+	endPattern   = regexp.MustCompile(`^` +
+		type2 + // 1
+		mlabNSiteNN + // 2,3
+		expNNNNE + // 4,5,6
+		suffix + `$`) // 7
 
 	dateTimePattern = regexp.MustCompile(dateTime)
 	sitePattern     = regexp.MustCompile(type2 + mlabNSiteNN)
@@ -236,7 +242,7 @@ var (
 	dataTypeToBQBufferSize = map[DataType]int{
 		NDT:             10,
 		NDT_OMIT_DELTAS: 50,
-		TCPINFO:         10,  // TODO We really should make this adaptive.
+		TCPINFO:         5,   // TODO We really should make this adaptive.
 		SS:              500, // Average json size is 2.5K
 		PT:              300,
 		SW:              100,

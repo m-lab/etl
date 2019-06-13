@@ -5,12 +5,12 @@ package pushqueue
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/m-lab/etl/etl"
 	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/taskqueue"
 )
 
@@ -57,7 +57,8 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 
 	if queuename == "" {
 		http.Error(w, `{"message": "Bad request parameters"}`, http.StatusBadRequest)
-		log.Printf("%+v\n", w)
+		ctx := appengine.NewContext(r)
+		log.Errorf(ctx, "%+v\n", w)
 		return
 	}
 
@@ -103,7 +104,8 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 	// Validate filename.
 	fnData, err := etl.ValidateTestPath(decodedFilename)
 	if err != nil {
-		log.Println(err)
+		ctx := appengine.NewContext(r)
+		log.Errorf(ctx, "%v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
 		return
