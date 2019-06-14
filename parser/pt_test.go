@@ -43,48 +43,48 @@ func TestParseLegacyFormatData(t *testing.T) {
 		fmt.Println("cannot load test data")
 		return
 	}
-	cashedTest, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily")
+	cachedTest, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if len(cashedTest.Hops) != 9 {
+	if len(cachedTest.Hops) != 9 {
 		t.Fatalf("Do not process hops correctly.")
 	}
-	if cashedTest.LogTime.Unix() != 1452559544 {
+	if cachedTest.LogTime.Unix() != 1452559544 {
 		t.Fatalf("Do not process log time correctly.")
 	}
-	if cashedTest.LastValidHopLine != "ExpectedDestIP" {
+	if cachedTest.LastValidHopLine != "ExpectedDestIP" {
 		t.Fatalf("Did not reach expected destination.")
 	}
 }
 
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	cashedTest, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
+	cachedTest, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if cashedTest.LogTime.Unix() != 1490053990 {
+	if cachedTest.LogTime.Unix() != 1490053990 {
 		t.Fatalf("Do not process log time correctly.")
 	}
 
-	if cashedTest.Source.IP != "172.17.94.34" {
+	if cachedTest.Source.IP != "172.17.94.34" {
 		t.Fatalf("Wrong results for Server IP.")
 	}
 
-	if cashedTest.Destination.IP != "74.125.224.100" {
+	if cachedTest.Destination.IP != "74.125.224.100" {
 		t.Fatalf("Wrong results for Client IP.")
 	}
 
 	// TODO(dev): reformat these individual values to be more readable.
 	expected_hop := schema.ScamperHop{Source: schema.HopIP{Ip: "64.233.174.109", City: "", CountryCode: "", Hostname: "sr05-te1-8.nuq04.net.google.com"}, Linkc: 0, Links: []schema.HopLink{schema.HopLink{HopDstIp: "74.125.224.100", TTL: 0, Probes: []schema.HopProbe{schema.HopProbe{Flowid: 0, Rtt: []float64{0.895}}}}}}
-	if len(cashedTest.Hops) != 38 {
+	if len(cachedTest.Hops) != 38 {
 		t.Fatalf("Wrong number of PT hops!")
 	}
 
-	if !reflect.DeepEqual(cashedTest.Hops[0], expected_hop) {
+	if !reflect.DeepEqual(cachedTest.Hops[0], expected_hop) {
 		fmt.Printf("Here is expected    : %v\n", expected_hop)
-		fmt.Printf("Here is what is real: %v\n", cashedTest.Hops[0])
+		fmt.Printf("Here is what is real: %v\n", cachedTest.Hops[0])
 		t.Fatalf("Wrong results for PT hops!")
 	}
 }
