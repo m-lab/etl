@@ -286,7 +286,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			pt.TableName(), "pt", "corrupted content").Inc()
 		metrics.TestCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
-		log.Println(err)
+		log.Printf("%v %s", err, testName)
 		return err
 	}
 
@@ -490,7 +490,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 			var err error
 			protocol, destIP, serverIP, err = ParseFirstLine(oneLine)
 			if err != nil {
-				log.Println(oneLine)
+				log.Printf("%s %s", oneLine, testName)
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				return cachedPTData{}, err
