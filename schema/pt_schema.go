@@ -6,6 +6,7 @@ import (
 	"github.com/m-lab/go/bqx"
 )
 
+
 type HopIP struct {
 	Ip          string `json:"ip,string"`
 	City        string `json:"city,string"`
