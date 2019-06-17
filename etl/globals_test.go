@@ -326,7 +326,7 @@ func TestGetFilename(t *testing.T) {
 }
 
 func TestDirToTablename(t *testing.T) {
-	if etl.DirToTablename("paris-traceroute") != "traceroute" {
+	if etl.DirToTablename("paris-traceroute") != "scamper" {
 		t.Errorf("DirToTablename() failed to translate PT dir name correctly.")
 	}
 }
