@@ -1,6 +1,11 @@
 // This files contains schema for Paris TraceRoute tests.
 package schema
 
+import (
+	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/go/bqx"
+)
+
 type HopIP struct {
 	Ip          string `json:"ip,string"`
 	City        string `json:"city,string"`
@@ -36,4 +41,14 @@ type PTTest struct {
 	ProbeSize      int64        `json:"probe_size,int64"`
 	ProbeC         int64        `json:"probec,int64"`
 	Hop            []ScamperHop `json:"hop"`
+}
+
+// Schema returns the Bigquery schema for PTTest.
+func (row *PTTest) Schema() (bigquery.Schema, error) {
+	sch, err := bigquery.InferSchema(row)
+	if err != nil {
+		return bigquery.Schema{}, err
+	}
+	rr := bqx.RemoveRequired(sch)
+	return rr, nil
 }
