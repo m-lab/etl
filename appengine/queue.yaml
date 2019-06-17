@@ -479,7 +479,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -488,7 +488,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -497,7 +497,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -506,7 +506,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -515,7 +515,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -524,7 +524,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -533,7 +533,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -542,7 +542,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -551,7 +551,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -560,7 +560,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -569,7 +569,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -578,7 +578,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -587,7 +587,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -596,7 +596,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -605,7 +605,7 @@ queue:
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 100
+  max_concurrent_requests: 5
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
