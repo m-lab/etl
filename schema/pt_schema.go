@@ -2,6 +2,8 @@
 package schema
 
 import (
+	"time"
+
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/go/bqx"
 )
@@ -32,6 +34,7 @@ type ScamperHop struct {
 
 type PTTest struct {
 	UUID           string       `json:"uuid,string" bigquery:"uuid"`
+	TestTime       time.Time    `json:"testtime"`
 	Parseinfo      ParseInfo    `json:"parseinfo"`
 	StartTime      int64        `json:"start_time,int64" bigquery:"start_time"`
 	StopTime       int64        `json:"stop_time,int64" bigquery:"stop_time"`
@@ -51,4 +54,21 @@ func (row *PTTest) Schema() (bigquery.Schema, error) {
 	}
 	rr := bqx.RemoveRequired(sch)
 	return rr, nil
+}
+
+// Implement parser.Annotatable
+
+// GetLogTime returns the timestamp that should be used for annotation.
+func (row *PTTest) GetLogTime() time.Time {
+	return row.TestTime
+}
+
+// GetClientIPs returns the client (remote) IP for annotation.  See parser.Annotatable
+func (row *PTTest) GetClientIPs() []string {
+	return []string{row.Destination.IP}
+}
+
+// GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
+func (row *PTTest) GetServerIP() string {
+	return row.Source.IP
 }

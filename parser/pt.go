@@ -13,6 +13,8 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
@@ -43,8 +45,7 @@ type cachedPTData struct {
 }
 
 type PTParser struct {
-	inserter etl.Inserter
-	etl.RowStats
+	Base
 	// Care should be taken to ensure this does not accumulate many rows and
 	// lead to OOM problems.
 	previousTests []cachedPTData
@@ -70,12 +71,15 @@ const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 const PTBufferSize int = 2
 
-func NewPTParser(ins etl.Inserter) *PTParser {
-	return &PTParser{
-		inserter:      ins,
-		RowStats:      ins,
-		previousTests: []cachedPTData{},
+func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
+	bufSize := etl.PT.BQBufferSize()
+	var annotator v2as.Annotator
+	if len(ann) > 0 && ann[0] != nil {
+		annotator = ann[0]
+	} else {
+		annotator = v2as.GetAnnotator(annotation.BatchURL)
 	}
+	return &PTParser{*NewBase(ins, bufSize, annotator)}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
@@ -212,6 +216,7 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 	}
 
 	ptTest := schema.PTTest{
+		TestTime:    oneTest.LogTime,
 		Parseinfo:   parseInfo,
 		Source:      oneTest.Source,
 		Destination: oneTest.Destination,
