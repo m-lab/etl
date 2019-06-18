@@ -170,18 +170,19 @@ func (buf *RowBuffer) Annotate(metricLabel string) error {
 	start := time.Now()
 	defer metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": metricLabel}).Observe(float64(time.Since(start).Nanoseconds()))
 
-	// TODO Consider doing these in parallel?
-	clientErr := buf.annotateClients(metricLabel)
-	serverErr := buf.annotateServers(metricLabel)
+	if metricLabel != "traceroute" {
+		// TODO Consider doing these in parallel?
+		clientErr := buf.annotateClients(metricLabel)
+		serverErr := buf.annotateServers(metricLabel)
 
-	if clientErr != nil {
-		return clientErr
+		if clientErr != nil {
+			return clientErr
+		}
+
+		if serverErr != nil {
+			return serverErr
+		}
 	}
-
-	if serverErr != nil {
-		return serverErr
-	}
-
 	return nil
 }
 

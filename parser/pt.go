@@ -79,7 +79,7 @@ func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
 	} else {
 		annotator = v2as.GetAnnotator(annotation.BatchURL)
 	}
-	return &PTParser{*NewBase(ins, bufSize, annotator)}
+	return &PTParser{Base: *NewBase(ins, bufSize, annotator)}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
@@ -98,7 +98,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 		probes := make([]schema.HopProbe, 0, 1)
 		probes = append(probes, oneProbe)
 		hopLink := schema.HopLink{
-			HopDstIp: allNodes[i].ip,
+			HopDstIP: allNodes[i].ip,
 			Probes:   probes,
 		}
 		links := make([]schema.HopLink, 0, 1)
@@ -106,7 +106,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 		if allNodes[i].parent_ip == "" {
 			// create a hop that from server_IP to allNodes[i].ip
 			source := schema.HopIP{
-				Ip: server_IP,
+				IP: server_IP,
 			}
 			oneHop := schema.ScamperHop{
 				Source: source,
@@ -116,7 +116,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 			break
 		} else {
 			source := schema.HopIP{
-				Ip:       allNodes[i].parent_ip,
+				IP:       allNodes[i].parent_ip,
 				Hostname: allNodes[i].parent_hostname,
 			}
 			oneHop := schema.ScamperHop{
@@ -201,11 +201,7 @@ func (pt *PTParser) TaskError() error {
 }
 
 func (pt *PTParser) TableName() string {
-	return pt.inserter.TableBase()
-}
-
-func (pt *PTParser) FullTableName() string {
-	return pt.inserter.FullTableName()
+	return pt.TableBase()
 }
 
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
@@ -223,7 +219,14 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 		Hop:         oneTest.Hops,
 	}
 
-	err := pt.inserter.InsertRow(ptTest)
+	err := pt.AddRow(&ptTest)
+	if err == etl.ErrBufferFull {
+		// Flush asynchronously, to improve throughput.
+		pt.Annotate(pt.TableName())
+		pt.PutAsync(pt.TakeRows())
+		err = pt.AddRow(&ptTest)
+	}
+
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "insert-err").Inc()
@@ -247,8 +250,7 @@ func (pt *PTParser) ProcessLastTests() error {
 
 func (pt *PTParser) Flush() error {
 	pt.ProcessLastTests()
-	return pt.inserter.Flush()
-
+	return pt.Inserter.Flush()
 }
 
 func CreateTestId(fn string, bn string) string {
@@ -306,7 +308,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
 		finalHop := PTTest.Hops[0]
 		if PTTest.Destination.IP != destIP && len(finalHop.Links) > 0 &&
-			(finalHop.Links[0].HopDstIp == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
+			(finalHop.Links[0].HopDstIP == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
 			// Discard pt.previousTests[index]
 			metrics.PTPollutedCount.WithLabelValues(pt.previousTests[index].MetroName).Inc()
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)

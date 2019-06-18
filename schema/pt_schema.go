@@ -5,14 +5,17 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/annotation-service/api"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/bqx"
 )
 
 type HopIP struct {
-	Ip          string `json:"ip,string"`
+	IP          string `json:"ip,string"`
 	City        string `json:"city,string"`
 	CountryCode string `json:"country_code,string"`
 	Hostname    string `json:"hostname,string"`
+	ASN         uint32 `json:"asn,uint32"`
 }
 
 type HopProbe struct {
@@ -21,7 +24,7 @@ type HopProbe struct {
 }
 
 type HopLink struct {
-	HopDstIp string     `json:"hop_dst_ip,string"`
+	HopDstIP string     `json:"hop_dst_ip,string"`
 	TTL      int64      `json:"ttl,int64"`
 	Probes   []HopProbe `json:"probes"`
 }
@@ -71,4 +74,79 @@ func (row *PTTest) GetClientIPs() []string {
 // GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
 func (row *PTTest) GetServerIP() string {
 	return row.Source.IP
+}
+
+func (row *PTTest) GetPTIPs() []string {
+	var requestIPs map[string]bool
+	requestIPs[row.Source.IP] = true
+	requestIPs[row.Destination.IP] = true
+	for _, hop := range row.Hop {
+		requestIPs[hop.Source.IP] = true
+	}
+	batchRequest := make([]string, 0, len(requestIPs))
+	for key, _ := range requestIPs {
+		batchRequest = append(batchRequest, key)
+	}
+	return batchRequest
+}
+
+func (row *PTTest) AnnotateHops(annMap map[string]*api.Annotations) error {
+	for _, hop := range row.Hop {
+		ip := hop.Source.IP
+		ann, ok := annMap[ip]
+		if !ok {
+			metrics.AnnotationMissingCount.WithLabelValues("No annotation for PT hops").Inc()
+		}
+		if ann.Geo == nil {
+			metrics.AnnotationMissingCount.WithLabelValues("Empty PT Geo").Inc()
+		} else {
+			hop.Source.City = ann.Geo.City
+			hop.Source.CountryCode = ann.Geo.CountryCode
+		}
+		if ann.Network == nil {
+			metrics.AnnotationMissingCount.WithLabelValues("Empty PT ASN").Inc()
+		} else {
+			asn, err := ann.Network.BestASN()
+			if err != nil {
+				metrics.AnnotationMissingCount.WithLabelValues("PT Hop ASN failed").Inc()
+			}
+			hop.Source.ASN = uint32(asn)
+		}
+	}
+	return nil
+}
+
+// AnnotateClients adds the client annotations. See parser.Annotatable
+// annMap must not be null
+func (row *PTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
+	ip := row.Destination.IP
+
+	ann, ok := annMap[ip]
+	if !ok {
+		metrics.AnnotationMissingCount.WithLabelValues("No annotation for PT client IP").Inc()
+		return nil
+	}
+	if ann.Geo == nil {
+		metrics.AnnotationMissingCount.WithLabelValues("Empty ann.Geo").Inc()
+	} else {
+		row.Destination.Geo = ann.Geo
+	}
+
+	if ann.Network == nil {
+		metrics.AnnotationMissingCount.WithLabelValues("Empty ann.Network for PT client IP").Inc()
+		return nil
+	}
+	row.Destination.Network = ann.Network
+	return nil
+}
+
+// AnnotateServer adds the server annotations. See parser.Annotatable
+// local must not be nil
+func (row *PTTest) AnnotateServer(local *api.Annotations) error {
+	row.Source.Geo = local.Geo
+	if local.Network == nil {
+		return nil
+	}
+	row.Source.Network = local.Network
+	return nil
 }
