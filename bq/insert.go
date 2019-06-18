@@ -429,7 +429,6 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 			in.TableBase(), "succeed").Observe(time.Since(start).Seconds())
 	} else {
 		// This adjusts the inserted count, failure count, and updates in.rows.
-
 		log.Printf("%s %v", in.TableBase(), err)
 		err = in.updateMetrics(err)
 		metrics.InsertionHistogram.WithLabelValues(
