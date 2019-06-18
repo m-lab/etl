@@ -14,6 +14,7 @@ import (
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/schema"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -161,7 +162,7 @@ func (buf *RowBuffer) AnnotatePT() error {
 	ipSlice := make([]string, 0, 50*len(buf.rows)) // This may be inadequate, but its a reasonable start.
 	logTime := time.Time{}
 	for i := range buf.rows {
-		r, ok := buf.rows[i].(PTTest)
+		r, ok := buf.rows[i].(schema.PTTest)
 		if !ok {
 			return ErrNotAnnotatable
 		}
@@ -172,6 +173,12 @@ func (buf *RowBuffer) AnnotatePT() error {
 	}
 
 	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, "traceroute")
+	if err != nil {
+		log.Println("error in PT GetAnnotations: ", err)
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT: RPC err in GetAnnotations."}).Inc()
+		return err
+	}
 	annMap := response.Annotations
 	if annMap == nil {
 		log.Println("empty PT annotation response")
@@ -180,7 +187,7 @@ func (buf *RowBuffer) AnnotatePT() error {
 		return ErrAnnotationError
 	}
 	for i := range buf.rows {
-		r, ok := buf.rows[i].(PTTest)
+		r, ok := buf.rows[i].(schema.PTTest)
 		if !ok {
 			err = ErrNotAnnotatable
 		} else {
@@ -190,7 +197,7 @@ func (buf *RowBuffer) AnnotatePT() error {
 			r.AnnotateHops(annMap)
 		}
 	}
-
+	return nil
 }
 
 // Annotate fetches annotations for all rows in the buffer.
@@ -220,7 +227,7 @@ func (buf *RowBuffer) Annotate(metricLabel string) error {
 		}
 	} else {
 		// Handle PT
-		AnnotatePT()
+		buf.AnnotatePT()
 	}
 	return nil
 }
