@@ -207,6 +207,7 @@ func (dt DataType) BQBufferSize() int {
 // TODO - use camelcase.
 const (
 	NDT             = DataType("ndt")
+	NDT_LEGACY      = DataType("ndt_legacy")
 	NDT_OMIT_DELTAS = DataType("ndt_nodelta") // to support larger buffer size.
 	SS              = DataType("sidestream")
 	PT              = DataType("traceroute")
@@ -220,6 +221,7 @@ var (
 	// TODO - this should be loaded from a config.
 	dirToDataType = map[string]DataType{
 		"ndt":              NDT,
+		"legacy":           NDT_LEGACY,
 		"sidestream":       SS,
 		"paris-traceroute": PT,
 		"switch":           SW,
@@ -229,12 +231,13 @@ var (
 	// DataTypeToTable maps from data type to BigQuery table name.
 	// TODO - this should be loaded from a config.
 	dataTypeToTable = map[DataType]string{
-		NDT:     "ndt",
-		SS:      "sidestream",
-		PT:      "scamper",
-		SW:      "switch",
-		TCPINFO: "tcpinfo",
-		INVALID: "invalid",
+		NDT:        "ndt",
+		SS:         "sidestream",
+		PT:         "scamper",
+		SW:         "switch",
+		TCPINFO:    "tcpinfo",
+		NDT_LEGACY: "legacy",
+		INVALID:    "invalid",
 	}
 
 	// Map from data type to number of buffer size for BQ insertion.
@@ -246,6 +249,7 @@ var (
 		SS:              500, // Average json size is 2.5K
 		PT:              5,
 		SW:              100,
+		NDT_LEGACY:      50,
 		INVALID:         0,
 	}
 	// There is also a mapping of data types to queue names in
