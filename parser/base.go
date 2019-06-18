@@ -157,6 +157,42 @@ func (buf *RowBuffer) annotateClients(label string) error {
 	return err
 }
 
+func (buf *RowBuffer) AnnotatePT() error {
+	ipSlice := make([]string, 0, 50*len(buf.rows)) // This may be inadequate, but its a reasonable start.
+	logTime := time.Time{}
+	for i := range buf.rows {
+		r, ok := buf.rows[i].(PTTest)
+		if !ok {
+			return ErrNotAnnotatable
+		}
+		ipSlice = append(ipSlice, r.GetPTIPs()...)
+		if (logTime == time.Time{}) {
+			logTime = r.GetLogTime()
+		}
+	}
+
+	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, "traceroute")
+	annMap := response.Annotations
+	if annMap == nil {
+		log.Println("empty PT annotation response")
+		metrics.AnnotationErrorCount.With(prometheus.
+			Labels{"source": "PT: empty response"}).Inc()
+		return ErrAnnotationError
+	}
+	for i := range buf.rows {
+		r, ok := buf.rows[i].(PTTest)
+		if !ok {
+			err = ErrNotAnnotatable
+		} else {
+			// Will not error because we check for nil annMap above.
+			r.AnnotateClients(annMap)
+			r.AnnotateServer(annMap[r.GetServerIP()])
+			r.AnnotateHops(annMap)
+		}
+	}
+
+}
+
 // Annotate fetches annotations for all rows in the buffer.
 // Not thread-safe.  Should only be called by owning thread.
 // TODO should convert this to operate on the rows, instead of the buffer.
@@ -182,6 +218,9 @@ func (buf *RowBuffer) Annotate(metricLabel string) error {
 		if serverErr != nil {
 			return serverErr
 		}
+	} else {
+		// Handle PT
+		AnnotatePT()
 	}
 	return nil
 }
