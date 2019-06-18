@@ -224,18 +224,7 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 		// Flush asynchronously, to improve throughput.
 		pt.Annotate(pt.TableName())
 		pt.PutAsync(pt.TakeRows())
-		err = pt.AddRow(&ptTest)
-	}
-
-	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
-			pt.TableName(), "pt", "insert-err").Inc()
-		log.Printf("insert-err: %v\n", err)
-		// Inc TestCount only once per row.
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
-	} else {
-		// Inc TestCount on successful row insert.
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
+		pt.AddRow(&ptTest)
 	}
 }
 
