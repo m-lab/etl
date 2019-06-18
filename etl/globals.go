@@ -231,7 +231,7 @@ var (
 	dataTypeToTable = map[DataType]string{
 		NDT:     "ndt",
 		SS:      "sidestream",
-		PT:      "traceroute",
+		PT:      "scamper",
 		SW:      "switch",
 		TCPINFO: "tcpinfo",
 		INVALID: "invalid",
@@ -244,7 +244,7 @@ var (
 		NDT_OMIT_DELTAS: 50,
 		TCPINFO:         5,   // TODO We really should make this adaptive.
 		SS:              500, // Average json size is 2.5K
-		PT:              300,
+		PT:              5,
 		SW:              100,
 		INVALID:         0,
 	}
