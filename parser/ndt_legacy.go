@@ -84,7 +84,6 @@ func (dp *NDTLegacyParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 		metrics.RowSizeHistogram.WithLabelValues(
 			dp.TableName()).Observe(float64(len(test)))
 
-		log.Println("Inserting:", stats)
 		err = dp.inserter.InsertRow(stats)
 		if err != nil {
 			switch t := err.(type) {
