@@ -35,12 +35,10 @@ type NDTResult struct {
 // NDTLegacySchema defines the BQ schema for the NDTLegacys produced by the
 // ndt-server for the NDT3 and NDT4 clients.
 type NDTLegacySchema struct {
-	TaskFilename  string    `json:"task_filename,string" bigquery:"task_filename"`
-	TestID        string    `json:"test_id,string" bigquery:"test_id"`
-	ParseTime     time.Time `json:"parse_time" bigquery:"parse_time"`
-	ParserVersion string    `json:"parser_version,string" bigquery:"parser_version"`
-	LogTime       int64     `json:"log_time,int64" bigquery:"log_time"`
-	Result        NDTResult `json:"result" bigquery:"result"`
+	ParseInfo *ParseInfo
+	TestID    string    `json:"test_id,string" bigquery:"test_id"`
+	LogTime   int64     `json:"log_time,int64" bigquery:"log_time"`
+	Result    NDTResult `json:"result" bigquery:"result"`
 }
 
 // Schema returns the Bigquery schema for NDTLegacySchema

@@ -1,6 +1,10 @@
-// Package parser defines the Parser interface and implementations for the different
-// test types, NDT, Paris Traceroute, and SideStream.
 package parser
+
+// WARNING:
+// WARNING: Parser for a deprecated format.
+// WARNING: After 2019-08-01 this parser should be removed or unit tests added.
+// WARNING: TODO: https://github.com/m-lab/etl/issues/697
+// WARNING:
 
 // This file defines the Parser subtype that handles NDTLegacy data.
 
@@ -60,10 +64,12 @@ func (dp *NDTLegacyParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 
 	for dec.More() {
 		stats := schema.NDTLegacySchema{
-			TaskFilename:  meta["filename"].(string),
-			TestID:        testName,
-			ParseTime:     time.Now(),
-			ParserVersion: Version(),
+			TestID: testName,
+			ParseInfo: &schema.ParseInfo{
+				TaskFileName:  meta["filename"].(string),
+				ParseTime:     time.Now(),
+				ParserVersion: Version(),
+			},
 		}
 		err := dec.Decode(&stats.Result)
 		if err != nil {
@@ -75,10 +81,6 @@ func (dp *NDTLegacyParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 
 		// Set the LogTime to the Result.StartTime
 		stats.LogTime = stats.Result.StartTime.Unix()
-
-		// Count the number of samples per record.
-		metrics.DeltaNumFieldsHistogram.WithLabelValues(
-			dp.TableName()).Observe(1.0)
 
 		// Estimate the row size based on the input JSON size.
 		metrics.RowSizeHistogram.WithLabelValues(
@@ -101,10 +103,6 @@ func (dp *NDTLegacyParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 		// Count successful inserts.
 		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt_legacy", "ok").Inc()
 	}
-
-	// There should always be one row per file.
-	metrics.EntryFieldCountHistogram.WithLabelValues(
-		dp.TableName()).Observe(float64(rowCount))
 
 	return nil
 }
