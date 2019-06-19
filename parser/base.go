@@ -185,6 +185,7 @@ func (buf *RowBuffer) Annotate(metricLabel string) error {
 	if serverErr != nil {
 		return serverErr
 	}
+
 	return nil
 }
 
