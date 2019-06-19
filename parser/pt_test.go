@@ -127,6 +127,11 @@ func TestPTInserter(t *testing.T) {
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
 	pt.AnnotateAndPutAsync("traceroute")
+
+	if len(ins.data) != 1 {
+		fmt.Println(len(ins.data))
+		t.Fatalf("Number of rows in inserter is wrong.")
+	}
 	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
 		t.Fatalf("Task filename is wrong.")
 	}
