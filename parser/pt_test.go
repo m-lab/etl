@@ -122,12 +122,12 @@ func TestPTInserter(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if ins.RowsInBuffer() != 1 {
-		fmt.Println(ins.RowsInBuffer())
+	if pt.RowNum() != 1 {
+		fmt.Println(pt.RowNum())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
-
-	if ins.data[0].(schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
+	pt.AnnotateAndPutAsync("traceroute")
+	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
 		t.Fatalf("Task filename is wrong.")
 	}
 }
@@ -197,14 +197,14 @@ func TestPTPollutionCheck(t *testing.T) {
 		if pt.NumBufferedTests() != test.expectedBufferedTest {
 			t.Fatalf("Data not buffered correctly")
 		}
-		if ins.RowsInBuffer() != test.expectedNumRows {
+		if pt.RowNum() != test.expectedNumRows {
 			t.Fatalf("Data of test %s not inserted into BigQuery correctly. Expect %d Actually %d", test.fileName, test.expectedNumRows, ins.RowsInBuffer())
 		}
 	}
 
 	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
-	if ins.RowsInBuffer() != 4 {
+	if pt.RowNum() != 4 {
 		t.Fatalf("Number of tests in buffer not correct, expect 4, actually %d.", ins.RowsInBuffer())
 	}
 }
