@@ -94,9 +94,9 @@ queue:
 - name: etl-ndt-batch-0
   target: etl-batch-parser
   # At 10/s, the ndt requests cause a lot of 429s, and crowd out the other queues.
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -105,9 +105,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-1
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -115,9 +115,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-2
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -125,9 +125,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-3
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -135,9 +135,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-4
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -145,9 +145,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-5
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -155,9 +155,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-6
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -165,9 +165,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-7
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -175,9 +175,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-8
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -185,9 +185,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-9
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -195,9 +195,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-10
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -205,9 +205,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-11
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -215,9 +215,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-12
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -225,9 +225,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-13
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -235,9 +235,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-14
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -245,9 +245,9 @@ queue:
     max_doublings: 0
 - name: etl-ndt-batch-15
   target: etl-batch-parser
-  rate: 5/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 150
+  max_concurrent_requests: 120
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -677,9 +677,9 @@ queue:
 - name: etl-legacy-batch-0
   target: etl-batch-parser
   # At 0.2/sec, this was getting crowded out by ndt.
-  rate: 1/s
+  rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 5
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -687,9 +687,9 @@ queue:
     max_doublings: 0
 - name: etl-legacy-batch-1
   target: etl-batch-parser
-  rate: 1/s
+  rate: 5/s
   bucket_size: 10
-  max_concurrent_requests: 5
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
