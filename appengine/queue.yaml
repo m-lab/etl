@@ -673,6 +673,27 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 
+- name: etl-legacy-batch-0
+  target: etl-batch-parser
+  rate: 0.2/s
+  bucket_size: 10
+  max_concurrent_requests: 5
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+    max_doublings: 0
+- name: etl-legacy-batch-1
+  target: etl-batch-parser
+  rate: 0.2/s
+  bucket_size: 10
+  max_concurrent_requests: 5
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+    max_doublings: 0
+
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
