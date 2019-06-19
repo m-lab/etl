@@ -14,7 +14,6 @@ import (
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/etl/schema"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -162,48 +161,6 @@ func (buf *RowBuffer) annotateClients(label string) error {
 	return err
 }
 
-func (buf *RowBuffer) AnnotatePT() error {
-	ipSlice := make([]string, 0, 50*len(buf.rows)) // This may be inadequate, but its a reasonable start.
-	logTime := time.Time{}
-	for i := range buf.rows {
-		r, ok := buf.rows[i].(schema.PTTest)
-		if !ok {
-			return ErrNotAnnotatable
-		}
-		ipSlice = append(ipSlice, r.GetPTIPs()...)
-		if (logTime == time.Time{}) {
-			logTime = r.GetLogTime()
-		}
-	}
-
-	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, "traceroute")
-	if err != nil {
-		log.Println("error in PT GetAnnotations: ", err)
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "PT: RPC err in GetAnnotations."}).Inc()
-		return err
-	}
-	annMap := response.Annotations
-	if annMap == nil {
-		log.Println("empty PT annotation response")
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "PT: empty response"}).Inc()
-		return ErrAnnotationError
-	}
-	for i := range buf.rows {
-		r, ok := buf.rows[i].(schema.PTTest)
-		if !ok {
-			err = ErrNotAnnotatable
-		} else {
-			// Will not error because we check for nil annMap above.
-			r.AnnotateClients(annMap)
-			r.AnnotateServer(annMap[r.GetServerIP()])
-			r.AnnotateHops(annMap)
-		}
-	}
-	return nil
-}
-
 // Annotate fetches annotations for all rows in the buffer.
 // Not thread-safe.  Should only be called by owning thread.
 // TODO should convert this to operate on the rows, instead of the buffer.
@@ -217,21 +174,16 @@ func (buf *RowBuffer) Annotate(metricLabel string) error {
 	start := time.Now()
 	defer metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": metricLabel}).Observe(float64(time.Since(start).Nanoseconds()))
 
-	if metricLabel != "traceroute" {
-		// TODO Consider doing these in parallel?
-		clientErr := buf.annotateClients(metricLabel)
-		serverErr := buf.annotateServers(metricLabel)
+	// TODO Consider doing these in parallel?
+	clientErr := buf.annotateClients(metricLabel)
+	serverErr := buf.annotateServers(metricLabel)
 
-		if clientErr != nil {
-			return clientErr
-		}
+	if clientErr != nil {
+		return clientErr
+	}
 
-		if serverErr != nil {
-			return serverErr
-		}
-	} else {
-		// Handle PT
-		buf.AnnotatePT()
+	if serverErr != nil {
+		return serverErr
 	}
 	return nil
 }

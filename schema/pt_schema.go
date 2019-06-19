@@ -68,17 +68,7 @@ func (row *PTTest) GetLogTime() time.Time {
 
 // GetClientIPs returns the client (remote) IP for annotation.  See parser.Annotatable
 func (row *PTTest) GetClientIPs() []string {
-	return []string{row.Destination.IP}
-}
-
-// GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
-func (row *PTTest) GetServerIP() string {
-	return row.Source.IP
-}
-
-func (row *PTTest) GetPTIPs() []string {
-	var requestIPs map[string]bool
-	requestIPs[row.Source.IP] = true
+	requestIPs := make(map[string]bool, len(row.Hop)+1)
 	requestIPs[row.Destination.IP] = true
 	for _, hop := range row.Hop {
 		requestIPs[hop.Source.IP] = true
@@ -88,6 +78,11 @@ func (row *PTTest) GetPTIPs() []string {
 		batchRequest = append(batchRequest, key)
 	}
 	return batchRequest
+}
+
+// GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
+func (row *PTTest) GetServerIP() string {
+	return row.Source.IP
 }
 
 func (row *PTTest) AnnotateHops(annMap map[string]*api.Annotations) error {
@@ -137,6 +132,8 @@ func (row *PTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 		return nil
 	}
 	row.Destination.Network = ann.Network
+
+	row.AnnotateHops(annMap)
 	return nil
 }
 
