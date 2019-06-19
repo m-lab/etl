@@ -677,9 +677,9 @@ queue:
 - name: etl-legacy-batch-0
   target: etl-batch-parser
   # At 0.2/sec, this was getting crowded out by ndt.
-  rate: 1/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 5
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -687,9 +687,9 @@ queue:
     max_doublings: 0
 - name: etl-legacy-batch-1
   target: etl-batch-parser
-  rate: 1/s
+  rate: 3/s
   bucket_size: 10
-  max_concurrent_requests: 5
+  max_concurrent_requests: 10
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
