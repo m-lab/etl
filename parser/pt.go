@@ -1,6 +1,7 @@
-// Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
-// The format of test file can be found at https://paris-traceroute.net/.
 package parser
+
+// Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+// The format of legacy test file can be found at https://paris-traceroute.net/.
 
 import (
 	"errors"
@@ -13,6 +14,8 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
@@ -43,8 +46,7 @@ type cachedPTData struct {
 }
 
 type PTParser struct {
-	inserter etl.Inserter
-	etl.RowStats
+	Base
 	// Care should be taken to ensure this does not accumulate many rows and
 	// lead to OOM problems.
 	previousTests []cachedPTData
@@ -70,12 +72,15 @@ const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 const PTBufferSize int = 2
 
-func NewPTParser(ins etl.Inserter) *PTParser {
-	return &PTParser{
-		inserter:      ins,
-		RowStats:      ins,
-		previousTests: []cachedPTData{},
+func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
+	bufSize := etl.PT.BQBufferSize()
+	var annotator v2as.Annotator
+	if len(ann) > 0 && ann[0] != nil {
+		annotator = ann[0]
+	} else {
+		annotator = v2as.GetAnnotator(annotation.BatchURL)
 	}
+	return &PTParser{Base: *NewBase(ins, bufSize, annotator)}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
@@ -94,7 +99,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 		probes := make([]schema.HopProbe, 0, 1)
 		probes = append(probes, oneProbe)
 		hopLink := schema.HopLink{
-			HopDstIp: allNodes[i].ip,
+			HopDstIP: allNodes[i].ip,
 			Probes:   probes,
 		}
 		links := make([]schema.HopLink, 0, 1)
@@ -102,7 +107,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 		if allNodes[i].parent_ip == "" {
 			// create a hop that from server_IP to allNodes[i].ip
 			source := schema.HopIP{
-				Ip: server_IP,
+				IP: server_IP,
 			}
 			oneHop := schema.ScamperHop{
 				Source: source,
@@ -112,7 +117,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 			break
 		} else {
 			source := schema.HopIP{
-				Ip:       allNodes[i].parent_ip,
+				IP:       allNodes[i].parent_ip,
 				Hostname: allNodes[i].parent_hostname,
 			}
 			oneHop := schema.ScamperHop{
@@ -197,11 +202,7 @@ func (pt *PTParser) TaskError() error {
 }
 
 func (pt *PTParser) TableName() string {
-	return pt.inserter.TableBase()
-}
-
-func (pt *PTParser) FullTableName() string {
-	return pt.inserter.FullTableName()
+	return pt.TableBase()
 }
 
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
@@ -212,22 +213,19 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 	}
 
 	ptTest := schema.PTTest{
+		TestTime:    oneTest.LogTime,
 		Parseinfo:   parseInfo,
 		Source:      oneTest.Source,
 		Destination: oneTest.Destination,
 		Hop:         oneTest.Hops,
 	}
 
-	err := pt.inserter.InsertRow(ptTest)
-	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
-			pt.TableName(), "pt", "insert-err").Inc()
-		log.Printf("insert-err: %v\n", err)
-		// Inc TestCount only once per row.
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
-	} else {
-		// Inc TestCount on successful row insert.
-		metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
+	err := pt.AddRow(&ptTest)
+	if err == etl.ErrBufferFull {
+		// Flush asynchronously, to improve throughput.
+		pt.Annotate(pt.TableName())
+		pt.PutAsync(pt.TakeRows())
+		pt.AddRow(&ptTest)
 	}
 }
 
@@ -242,8 +240,7 @@ func (pt *PTParser) ProcessLastTests() error {
 
 func (pt *PTParser) Flush() error {
 	pt.ProcessLastTests()
-	return pt.inserter.Flush()
-
+	return pt.Inserter.Flush()
 }
 
 func CreateTestId(fn string, bn string) string {
@@ -280,7 +277,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		pt.taskFileName = meta["filename"].(string)
 	}
 
-	cashedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
+	cachedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
@@ -295,13 +292,13 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// If it does appear, then the buffered test was polluted, and it will
 	// be discarded from buffer.
 	// If it does not appear, then no pollution detected.
-	destIP := cashedTest.Destination.IP
+	destIP := cachedTest.Destination.IP
 	for index, PTTest := range pt.previousTests {
 		// array of hops was built in reverse order from list of nodes
 		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
 		finalHop := PTTest.Hops[0]
 		if PTTest.Destination.IP != destIP && len(finalHop.Links) > 0 &&
-			(finalHop.Links[0].HopDstIp == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
+			(finalHop.Links[0].HopDstIP == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
 			// Discard pt.previousTests[index]
 			metrics.PTPollutedCount.WithLabelValues(pt.previousTests[index].MetroName).Inc()
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
@@ -317,8 +314,8 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// the new test.
 	// Also we don't care about test LogTime order, since there are other
 	// workers inserting other blocks of hops concurrently.
-	if cashedTest.LastValidHopLine == "ExpectedDestIP" {
-		pt.InsertOneTest(cashedTest)
+	if cachedTest.LastValidHopLine == "ExpectedDestIP" {
+		pt.InsertOneTest(cachedTest)
 		return nil
 	}
 
@@ -329,7 +326,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		pt.previousTests = pt.previousTests[1:]
 	}
 	// Insert current test into pt.previousTests
-	pt.previousTests = append(pt.previousTests, cashedTest)
+	pt.previousTests = append(pt.previousTests, cachedTest)
 	return nil
 }
 

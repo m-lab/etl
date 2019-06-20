@@ -57,6 +57,10 @@ func (buf *RowBuffer) AddRow(row interface{}) error {
 	return nil
 }
 
+func (buf *RowBuffer) NumRowsForTest() int {
+	return len(buf.rows)
+}
+
 // TakeRows returns all rows in the buffer, and clears the buffer.
 // Not thread-safe.  Should only be called by owning thread.
 func (buf *RowBuffer) TakeRows() []interface{} {

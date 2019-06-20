@@ -79,7 +79,7 @@ func TestPTParser(t *testing.T) {
 	// TODO(dev): reformat these individual values to be more readable.
 	expected_hop := schema.ScamperHop{
 		Source: schema.HopIP{
-			Ip:          "64.233.174.109",
+			IP:          "64.233.174.109",
 			City:        "",
 			CountryCode: "",
 			Hostname:    "sr05-te1-8.nuq04.net.google.com",
@@ -87,7 +87,7 @@ func TestPTParser(t *testing.T) {
 		Linkc: 0,
 		Links: []schema.HopLink{
 			schema.HopLink{
-				HopDstIp: "74.125.224.100",
+				HopDstIP: "74.125.224.100",
 				TTL:      0,
 				Probes: []schema.HopProbe{
 					schema.HopProbe{
@@ -122,12 +122,17 @@ func TestPTInserter(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if ins.RowsInBuffer() != 1 {
-		fmt.Println(ins.RowsInBuffer())
+	if pt.NumRowsForTest() != 1 {
+		fmt.Println(pt.NumRowsForTest())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
-
-	if ins.data[0].(schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
+	pt.AnnotateAndPutAsync("traceroute")
+	//pt.Inserter.Flush()
+	if len(ins.data) != 1 {
+		fmt.Println(len(ins.data))
+		t.Fatalf("Number of rows in inserter is wrong.")
+	}
+	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
 		t.Fatalf("Task filename is wrong.")
 	}
 }
@@ -197,14 +202,14 @@ func TestPTPollutionCheck(t *testing.T) {
 		if pt.NumBufferedTests() != test.expectedBufferedTest {
 			t.Fatalf("Data not buffered correctly")
 		}
-		if ins.RowsInBuffer() != test.expectedNumRows {
+		if pt.NumRowsForTest() != test.expectedNumRows {
 			t.Fatalf("Data of test %s not inserted into BigQuery correctly. Expect %d Actually %d", test.fileName, test.expectedNumRows, ins.RowsInBuffer())
 		}
 	}
 
 	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
-	if ins.RowsInBuffer() != 4 {
+	if pt.NumRowsForTest() != 4 {
 		t.Fatalf("Number of tests in buffer not correct, expect 4, actually %d.", ins.RowsInBuffer())
 	}
 }
