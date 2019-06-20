@@ -90,7 +90,7 @@ func (row *PTTest) AnnotateHops(annMap map[string]*api.Annotations) error {
 		ip := hop.Source.IP
 		ann, ok := annMap[ip]
 		if !ok {
-			metrics.AnnotationMissingCount.WithLabelValues("No annotation for PT hops").Inc()
+			metrics.AnnotationMissingCount.WithLabelValues("No annotation for PT hop").Inc()
 		}
 		if ann.Geo == nil {
 			metrics.AnnotationMissingCount.WithLabelValues("Empty PT Geo").Inc()

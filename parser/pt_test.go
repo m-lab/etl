@@ -122,12 +122,12 @@ func TestPTInserter(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if pt.RowNum() != 1 {
-		fmt.Println(pt.RowNum())
+	if pt.NumRowsForTest() != 1 {
+		fmt.Println(pt.NumRowsForTest())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
 	pt.AnnotateAndPutAsync("traceroute")
-
+	//pt.Inserter.Flush()
 	if len(ins.data) != 1 {
 		fmt.Println(len(ins.data))
 		t.Fatalf("Number of rows in inserter is wrong.")
@@ -202,14 +202,14 @@ func TestPTPollutionCheck(t *testing.T) {
 		if pt.NumBufferedTests() != test.expectedBufferedTest {
 			t.Fatalf("Data not buffered correctly")
 		}
-		if pt.RowNum() != test.expectedNumRows {
+		if pt.NumRowsForTest() != test.expectedNumRows {
 			t.Fatalf("Data of test %s not inserted into BigQuery correctly. Expect %d Actually %d", test.fileName, test.expectedNumRows, ins.RowsInBuffer())
 		}
 	}
 
 	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
-	if pt.RowNum() != 4 {
+	if pt.NumRowsForTest() != 4 {
 		t.Fatalf("Number of tests in buffer not correct, expect 4, actually %d.", ins.RowsInBuffer())
 	}
 }

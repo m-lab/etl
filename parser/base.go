@@ -57,7 +57,7 @@ func (buf *RowBuffer) AddRow(row interface{}) error {
 	return nil
 }
 
-func (buf *RowBuffer) RowNum() int {
+func (buf *RowBuffer) NumRowsForTest() int {
 	return len(buf.rows)
 }
 

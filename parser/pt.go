@@ -1,6 +1,7 @@
-// Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
-// The format of test file can be found at https://paris-traceroute.net/.
 package parser
+
+// Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+// The format of legacy test file can be found at https://paris-traceroute.net/.
 
 import (
 	"errors"
@@ -276,7 +277,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		pt.taskFileName = meta["filename"].(string)
 	}
 
-	cashedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
+	cachedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
@@ -291,7 +292,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// If it does appear, then the buffered test was polluted, and it will
 	// be discarded from buffer.
 	// If it does not appear, then no pollution detected.
-	destIP := cashedTest.Destination.IP
+	destIP := cachedTest.Destination.IP
 	for index, PTTest := range pt.previousTests {
 		// array of hops was built in reverse order from list of nodes
 		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
@@ -313,8 +314,8 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// the new test.
 	// Also we don't care about test LogTime order, since there are other
 	// workers inserting other blocks of hops concurrently.
-	if cashedTest.LastValidHopLine == "ExpectedDestIP" {
-		pt.InsertOneTest(cashedTest)
+	if cachedTest.LastValidHopLine == "ExpectedDestIP" {
+		pt.InsertOneTest(cachedTest)
 		return nil
 	}
 
@@ -325,7 +326,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		pt.previousTests = pt.previousTests[1:]
 	}
 	// Insert current test into pt.previousTests
-	pt.previousTests = append(pt.previousTests, cashedTest)
+	pt.previousTests = append(pt.previousTests, cachedTest)
 	return nil
 }
 
