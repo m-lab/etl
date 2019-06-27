@@ -138,8 +138,6 @@ func assertSaver(ms MapSaver) {
 //----------------------------------------------------------------------------
 
 type BQInserter struct {
-	etl.Inserter
-
 	// These are either constant or threadsafe.
 	params     etl.InserterParams
 	uploader   etl.Uploader  // May be a BQ Uploader, or a test Uploader
@@ -347,14 +345,11 @@ func (in *BQInserter) Flush() error {
 	rows := in.rows
 	// Allocate new slice of rows.  Any failed rows are lost.
 	in.rows = make([]interface{}, 0, in.params.BufferSize)
-	in.acquire()
-	err := in.flushSlice(rows)
-	in.release()
-	return err
+	return in.Put(rows)
 }
 
 // flushSlice flushes a slice of rows to BigQuery.
-// It is NOT threadsafe, and should only be called by Flush.
+// It is NOT threadsafe.
 func (in *BQInserter) flushSlice(rows []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Dec()
@@ -428,11 +423,31 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 		metrics.InsertionHistogram.WithLabelValues(
 			in.TableBase(), "succeed").Observe(time.Since(start).Seconds())
 	} else {
-		// This adjusts the inserted count, failure count, and updates in.rows.
-		log.Printf("%s %v", in.TableBase(), err)
-		err = in.updateMetrics(err)
-		metrics.InsertionHistogram.WithLabelValues(
-			in.TableBase(), "fail").Observe(time.Since(start).Seconds())
+		size := len(rows)
+		apiError, ok := err.(*googleapi.Error)
+		if !ok || size <= 1 || apiError.Code != 400 || !strings.HasPrefix(apiError.Error(), "Request payload size exceeds the limit:") {
+			// This adjusts the inserted count, failure count, and updates in.rows.
+			log.Printf("%s %v", in.TableBase(), err)
+			err = in.updateMetrics(err)
+			metrics.InsertionHistogram.WithLabelValues(
+				in.TableBase(), "fail").Observe(time.Since(start).Seconds())
+		}
+
+		// Explicitly handle "Request paload size exceeds ..."
+		// NOTE: This splitting behavior may cause repeated encoding of the same data.  Worst case,
+		// all the data may be encoded log2(size) times.  So best if this only happens infrequently.
+		log.Printf("Splitting %d rows to avoid size limit for %s\n", size, in.TableBase())
+		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Splitting buffer").Inc()
+		in.pending = 0
+		err1 := in.flushSlice(rows[:size/2])
+		err2 := in.flushSlice(rows[size/2:])
+		// Recursive calls handled accounting for any errors not resolved by splitting,
+		// but we want to return any non-nil error up the stack WITHOUT repeating the accounting.
+		if err1 != nil {
+			err = err1
+		} else {
+			err = err2
+		}
 	}
 	return err
 }
