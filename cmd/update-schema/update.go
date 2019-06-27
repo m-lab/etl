@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
+	"os"
 	"time"
 
 	"github.com/m-lab/etl/schema"
@@ -13,7 +15,8 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-func CreateOrUpdateTCP(project string, dataset string, table string) {
+// CreateOrUpdateTCP will update existing table, or create new table if update fails.
+func CreateOrUpdateTCP(project string, dataset string, table string) error {
 	row := schema.TCPRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "TCPRow.Schema")
@@ -28,30 +31,65 @@ func CreateOrUpdateTCP(project string, dataset string, table string) {
 	client, err := bigquery.NewClient(ctx, pdt.Project)
 	rtx.Must(err, "NewClient")
 
-	log.Println("Trying Update")
-	// Update non-existing table
 	err = pdt.UpdateTable(ctx, client, schema)
-	if err != nil {
-		apiErr, ok := err.(*googleapi.Error)
-		if !ok || apiErr.Code != 404 {
-		}
-
-		log.Println("UpdateTable failed:", err)
-
-		log.Println("Trying Create")
-		err = pdt.CreateTable(ctx, client, schema, "description",
-			&bigquery.TimePartitioning{ /*Field: "TestTime"*/ }, nil)
-
-		rtx.Must(err, "CreateTable")
+	if err == nil {
+		log.Println("Successfully updated", pdt)
+		return nil
 	}
+	log.Println("UpdateTable failed:", err)
+	// TODO add specific error handling for incompatible schema change
+
+	apiErr, ok := err.(*googleapi.Error)
+	if !ok || apiErr.Code != 404 {
+		// TODO - different behavior on specific error types?
+	}
+
+	err = pdt.CreateTable(ctx, client, schema, "description",
+		&bigquery.TimePartitioning{ /*Field: "TestTime"*/ }, nil)
+	if err == nil {
+		log.Println("Successfully created", pdt)
+		return nil
+	}
+	log.Println("Create failed:", err)
+	return err
 }
 
+var (
+	updateType = flag.String("updateType", "", "Short name of datatype to be updated (tcpinfo, scamper, ...).")
+)
+
+// For now, this just updates all known tables for the provided project.
 func main() {
-	//CreateOrUpdateTCP("mlab-testing")
-	CreateOrUpdateTCP("mlab-sandbox", "base_tables", "tcpinfo")
-	CreateOrUpdateTCP("mlab-sandbox", "batch", "tcpinfo")
-	CreateOrUpdateTCP("mlab-staging", "base_tables", "tcpinfo")
-	CreateOrUpdateTCP("mlab-staging", "batch", "tcpinfo")
-	CreateOrUpdateTCP("mlab-oti", "base_tables", "tcpinfo")
-	CreateOrUpdateTCP("mlab-oti", "batch", "tcpinfo")
+	flag.Parse()
+	errCount := 0
+
+	project := os.Getenv("GCLOUD_PROJECT")
+	if project == "" {
+		log.Fatal("Missing GCLOUD_PROJECT environment variable.")
+	}
+
+	switch *updateType {
+	case "":
+		fallthrough
+	case "all": // Do everything
+		if err := CreateOrUpdateTCP(project, "base_tables", "tcpinfo"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateTCP(project, "batch", "tcpinfo"); err != nil {
+			errCount++
+		}
+
+	case "tcpinfo":
+		if err := CreateOrUpdateTCP(project, "base_tables", "tcpinfo"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateTCP(project, "batch", "tcpinfo"); err != nil {
+			errCount++
+		}
+
+	default:
+		log.Fatal("invalid updateType")
+	}
+
+	os.Exit(errCount)
 }
