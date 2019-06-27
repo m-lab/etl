@@ -18,6 +18,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	bqv2 "google.golang.org/api/bigquery/v2"
+	"google.golang.org/api/googleapi"
 )
 
 //---------------------------------------------------------------------------------------
@@ -249,7 +250,9 @@ type FakeUploader struct {
 	Request *bqv2.TableDataInsertAllRequest
 	// Set this with SetErr to return an error.  Error is cleared on each call.
 	Err       error
-	CallCount int // Number of times Put is called.
+	CallCount int // Number of times Put is called
+
+	RejectIfMoreThan int // threshold for producing 400 error.
 }
 
 func (u *FakeUploader) SetErr(err error) {
@@ -350,6 +353,9 @@ func toValueSaver(x interface{}) (bigquery.ValueSaver, bool, error) {
 }
 
 func (u *FakeUploader) putMulti(ctx context.Context, src []bigquery.ValueSaver) error {
+	if u.RejectIfMoreThan > 0 && len(src) > u.RejectIfMoreThan {
+		return &googleapi.Error{Code: 400, Message: "Request payload size exceeds the limit: 10485760"}
+	}
 	var rows []*InsertionRow
 	for _, saver := range src {
 		row, insertID, err := saver.Save()

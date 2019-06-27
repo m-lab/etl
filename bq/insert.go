@@ -425,15 +425,15 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 	} else {
 		size := len(rows)
 		apiError, ok := err.(*googleapi.Error)
-		if !ok || size <= 1 || apiError.Code != 400 || !strings.HasPrefix(apiError.Error(), "Request payload size exceeds the limit:") {
+		if !ok || size <= 1 || apiError.Code != 400 || !strings.Contains(apiError.Error(), "Request payload size exceeds the limit:") {
 			// This adjusts the inserted count, failure count, and updates in.rows.
 			log.Printf("%s %v", in.TableBase(), err)
-			err = in.updateMetrics(err)
 			metrics.InsertionHistogram.WithLabelValues(
 				in.TableBase(), "fail").Observe(time.Since(start).Seconds())
+			return in.updateMetrics(err)
 		}
 
-		// Explicitly handle "Request paload size exceeds ..."
+		// Explicitly handle "Request payload size exceeds ..."
 		// NOTE: This splitting behavior may cause repeated encoding of the same data.  Worst case,
 		// all the data may be encoded log2(size) times.  So best if this only happens infrequently.
 		log.Printf("Splitting %d rows to avoid size limit for %s\n", size, in.TableBase())
