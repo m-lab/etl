@@ -1,5 +1,10 @@
 package main
 
+// This command requires the GCLOUD_PROJECT environment variable, and takes an optional
+// single -updateType flag to specify "all" or "tcpinfo".
+// Currently, it handles only the tcpinfo type.
+// The specific table to update is currently hardcoded based on the updateType.
+
 import (
 	"context"
 	"flag"
