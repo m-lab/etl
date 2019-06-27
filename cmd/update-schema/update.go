@@ -4,6 +4,10 @@ package main
 // single -updateType flag to specify "all" or "tcpinfo".
 // Currently, it handles only the tcpinfo type.
 // The specific table to update is currently hardcoded based on the updateType.
+//
+// Examples:
+//  GCLOUD_PROJECT=mlab-sandbox go run cmd/update-schema/update.go
+//  GCLOUD_PROJECT=mlab-sandbox go run cmd/update-schema/update.go -updateType=tcpinfo
 
 import (
 	"context"
