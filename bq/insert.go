@@ -441,7 +441,9 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 		in.pending = 0
 		err1 := in.flushSlice(rows[:size/2])
 		err2 := in.flushSlice(rows[size/2:])
-		// Recursive calls handled accounting for any errors not resolved by splitting,
+		// The recursive calls will have added various InsertionHistogram results, included successes
+		// and failures, so we don't need to add those here.
+		// Recursive calls also will have handled accounting for any errors not resolved by splitting,
 		// but we want to return any non-nil error up the stack WITHOUT repeating the accounting.
 		if err1 != nil {
 			err = err1
