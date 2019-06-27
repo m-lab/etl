@@ -271,6 +271,38 @@ func TestHandleInsertErrors(t *testing.T) {
 	}
 }
 
+func TestHandleRequestTooLarge(t *testing.T) {
+	fakeUploader := fake.NewFakeUploader()
+	fakeUploader.RejectIfMoreThan = 2
+	bqi, e := bq.NewBQInserter(standardInsertParams(5), fakeUploader)
+	if e != nil {
+		log.Printf("%v\n", e)
+		t.Fatal()
+	}
+
+	// These don't have to implement saver as long as Err is being set,
+	// and flush is not autotriggering more than once.
+	var items []interface{}
+	items = append(items, Item{Name: "x1", Count: 17, Foobar: 44})
+	items = append(items, Item{Name: "x2", Count: 12, Foobar: 44})
+	items = append(items, Item{Name: "x3", Count: 12, Foobar: 44})
+	items = append(items, Item{Name: "x4", Count: 12, Foobar: 44})
+	items = append(items, Item{Name: "x5", Count: 12, Foobar: 44})
+
+	bqi.InsertRows(items)
+	bqi.Flush()
+	// Should see two fails, and three successes.
+	if fakeUploader.CallCount != 5 {
+		t.Errorf("Expected %d calls, got %d\n", 5, fakeUploader.CallCount)
+	}
+	if bqi.Committed() != 5 {
+		t.Error("Lost rows:", bqi.Committed())
+	}
+	if bqi.Failed() > 0 {
+		t.Errorf("Lost rows: %+v", bqi)
+	}
+}
+
 func TestQuotaError(t *testing.T) {
 
 	// Set up an Inserter with a fake Uploader backend for testing.
