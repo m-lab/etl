@@ -291,6 +291,10 @@ func TestHandleRequestTooLarge(t *testing.T) {
 
 	bqi.InsertRows(items)
 	bqi.Flush()
+	// Should see two fails, and three successes.
+	if fakeUploader.CallCount != 5 {
+		t.Errorf("Expected %d calls, got %d\n", 3, fakeUploader.CallCount)
+	}
 	if bqi.Committed() != 5 {
 		t.Error("Lost rows:", bqi.Committed())
 	}
