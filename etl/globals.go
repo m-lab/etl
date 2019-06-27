@@ -245,7 +245,7 @@ var (
 	dataTypeToBQBufferSize = map[DataType]int{
 		NDT:             10,
 		NDT_OMIT_DELTAS: 50,
-		TCPINFO:         5,   // TODO We really should make this adaptive.
+		TCPINFO:         10,
 		SS:              500, // Average json size is 2.5K
 		PT:              5,
 		SW:              100,
