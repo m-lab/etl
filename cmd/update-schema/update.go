@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/m-lab/go/flagx"
+
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/rtx"
 
@@ -15,14 +17,18 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-// CreateOrUpdateTCP will update existing table, or create new table if update fails.
-func CreateOrUpdateTCP(project string, dataset string, table string) error {
+// CreateOrUpdateTCPInfo will update existing TCPInfo table, or create new table if update fails.
+func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
 	row := schema.TCPRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "TCPRow.Schema")
 
+	return CreateOrUpdate(schema, project, dataset, table)
+}
+
+// CreateOrUpdate will update or create a table from the given schema.
+func CreateOrUpdate(schema bigquery.Schema, project string, dataset string, table string) error {
 	name := project + "." + dataset + "." + table
-	log.Println("Using:", name)
 	pdt, err := bqx.ParsePDT(name)
 	rtx.Must(err, "ParsePDT")
 
@@ -61,6 +67,8 @@ var (
 // For now, this just updates all known tables for the provided project.
 func main() {
 	flag.Parse()
+	flagx.ArgsFromEnv(flag.CommandLine)
+
 	errCount := 0
 
 	project := os.Getenv("GCLOUD_PROJECT")
@@ -70,25 +78,28 @@ func main() {
 
 	switch *updateType {
 	case "":
+		if len(os.Args) > 1 {
+			log.Fatal("Invalid arguments - must include -updateType=...")
+		}
 		fallthrough
 	case "all": // Do everything
-		if err := CreateOrUpdateTCP(project, "base_tables", "tcpinfo"); err != nil {
+		if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateTCP(project, "batch", "tcpinfo"); err != nil {
+		if err := CreateOrUpdateTCPInfo(project, "batch", "tcpinfo"); err != nil {
 			errCount++
 		}
 
 	case "tcpinfo":
-		if err := CreateOrUpdateTCP(project, "base_tables", "tcpinfo"); err != nil {
+		if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateTCP(project, "batch", "tcpinfo"); err != nil {
+		if err := CreateOrUpdateTCPInfo(project, "batch", "tcpinfo"); err != nil {
 			errCount++
 		}
 
 	default:
-		log.Fatal("invalid updateType")
+		log.Fatal("invalid updateType: ", *updateType)
 	}
 
 	os.Exit(errCount)
