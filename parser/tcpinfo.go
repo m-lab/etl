@@ -27,6 +27,7 @@ import (
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/tcp-info/netlink"
 	"github.com/m-lab/tcp-info/snapshot"
@@ -70,6 +71,10 @@ func (p *TCPInfoParser) IsParsable(testName string, data []byte) (string, bool) 
 // ParseAndInsert extracts all ArchivalRecords from the rawContent and inserts into a single row.
 // Approximately 15 usec/snapshot.
 func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
+	tableName := p.TableName()
+	metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Inc()
+	defer metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Dec()
+
 	if strings.HasSuffix(testName, "zst") {
 		var err error
 		rawContent, err = gozstd.Decompress(nil, rawContent)
@@ -82,6 +87,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 	rdr := bytes.NewReader(rawContent)
 	ar := netlink.NewArchiveReader(rdr)
 
+	metrics.WorkerState.WithLabelValues(tableName, "tcpinfo-parse").Inc()
 	var err error
 	var rec *netlink.ArchivalRecord
 	snaps := make([]*snapshot.Snapshot, 0, 2000)
@@ -135,6 +141,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 			// TODO - should populate other ServerInfo fields from siteinfo API.
 		}
 	}
+	metrics.WorkerState.WithLabelValues(tableName, "tcpinfo-parse").Dec()
 
 	err = p.AddRow(&row)
 	if err == etl.ErrBufferFull {

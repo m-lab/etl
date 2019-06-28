@@ -445,8 +445,8 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte, tableName string) (cachedPTData, error) {
 	//log.Printf("%s", testName)
-	metrics.WorkerState.WithLabelValues(tableName, "parse").Inc()
-	defer metrics.WorkerState.WithLabelValues(tableName, "parse").Dec()
+	metrics.WorkerState.WithLabelValues(tableName, "pt-parse").Inc()
+	defer metrics.WorkerState.WithLabelValues(tableName, "pt-parse").Dec()
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
