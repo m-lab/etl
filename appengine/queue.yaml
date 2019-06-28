@@ -656,9 +656,9 @@ queue:
 # TCPINFO batch parsing queues.
 - name: etl-tcpinfo-batch-0
   target: etl-batch-parser
-  rate: 0.2/s
+  rate: 2/s
   bucket_size: 10
-  max_concurrent_requests: 5
+  max_concurrent_requests: 50
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -666,9 +666,9 @@ queue:
 
 - name: etl-tcpinfo-batch-1
   target: etl-batch-parser
-  rate: 0.2/s
+  rate: 2/s
   bucket_size: 10
-  max_concurrent_requests: 5
+  max_concurrent_requests: 50
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
