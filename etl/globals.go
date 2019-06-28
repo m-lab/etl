@@ -233,7 +233,7 @@ var (
 	dataTypeToTable = map[DataType]string{
 		NDT:        "ndt",
 		SS:         "sidestream",
-		PT:         "scamper",
+		PT:         "traceroute",
 		SW:         "switch",
 		TCPINFO:    "tcpinfo",
 		NDT_LEGACY: "legacy",
