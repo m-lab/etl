@@ -88,6 +88,9 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 	ar := netlink.NewArchiveReader(rdr)
 
 	metrics.WorkerState.WithLabelValues(tableName, "tcpinfo-parse").Inc()
+	// This will include the annotation when the buffer flushes, which is unfortunate.
+	defer metrics.WorkerState.WithLabelValues(tableName, "tcpinfo-parse").Dec()
+
 	var err error
 	var rec *netlink.ArchivalRecord
 	snaps := make([]*snapshot.Snapshot, 0, 2000)
@@ -141,7 +144,6 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 			// TODO - should populate other ServerInfo fields from siteinfo API.
 		}
 	}
-	metrics.WorkerState.WithLabelValues(tableName, "tcpinfo-parse").Dec()
 
 	err = p.AddRow(&row)
 	if err == etl.ErrBufferFull {
