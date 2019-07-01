@@ -35,6 +35,14 @@ func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
 	return CreateOrUpdate(schema, project, dataset, table)
 }
 
+func CreateOrUpdatePT(project string, dataset string, table string) {
+	row := schema.PTTest{}
+	schema, err := row.Schema()
+	rtx.Must(err, "PTTest.Schema")
+
+	return CreateOrUpdate(schema, project, dataset, table)
+}
+
 // CreateOrUpdate will update or create a table from the given schema.
 func CreateOrUpdate(schema bigquery.Schema, project string, dataset string, table string) error {
 	name := project + "." + dataset + "." + table
@@ -104,6 +112,14 @@ func main() {
 			errCount++
 		}
 		if err := CreateOrUpdateTCPInfo(project, "batch", "tcpinfo"); err != nil {
+			errCount++
+		}
+		
+	case "traceroute":
+		if err := CreateOrUpdatePT(project, "base_tables", "traceroute"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
 			errCount++
 		}
 
