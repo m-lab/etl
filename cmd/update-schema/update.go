@@ -35,7 +35,7 @@ func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
 	return CreateOrUpdate(schema, project, dataset, table)
 }
 
-func CreateOrUpdatePT(project string, dataset string, table string) {
+func CreateOrUpdatePT(project string, dataset string, table string) error {
 	row := schema.PTTest{}
 	schema, err := row.Schema()
 	rtx.Must(err, "PTTest.Schema")
