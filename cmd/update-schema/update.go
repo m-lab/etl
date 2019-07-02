@@ -106,6 +106,12 @@ func main() {
 		if err := CreateOrUpdateTCPInfo(project, "batch", "tcpinfo"); err != nil {
 			errCount++
 		}
+		if err := CreateOrUpdatePT(project, "base_tables", "traceroute"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
+			errCount++
+		}
 
 	case "tcpinfo":
 		if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {
