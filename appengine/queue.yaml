@@ -465,7 +465,7 @@ queue:
 
 - name: etl-traceroute-batch-0
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
   max_concurrent_requests: 5
@@ -478,7 +478,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-1
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -487,7 +487,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-2
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -496,7 +496,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-3
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -505,7 +505,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-4
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -514,7 +514,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-5
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -523,7 +523,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-6
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -532,7 +532,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-7
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -541,7 +541,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-8
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -550,7 +550,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-9
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -559,7 +559,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-10
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -568,7 +568,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-11
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -577,7 +577,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-12
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -586,7 +586,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-13
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -595,7 +595,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-14
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -604,7 +604,7 @@ queue:
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-15
   target: etl-batch-parser
-  rate: 5/s
+  rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
   retry_parameters:
@@ -700,12 +700,12 @@ queue:
   target: etl-traceroute-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
-  rate: 0.5/s
+  rate: 1/s
   # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
   # have very little impact for our environment.
   bucket_size: 10
   # Maximum number of concurrent requests.
-  max_concurrent_requests: 180
+  max_concurrent_requests: 5
 
 - name: etl-sidestream-queue
   target: etl-sidestream-parser
