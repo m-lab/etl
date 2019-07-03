@@ -284,6 +284,19 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == disco-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
+## Service: etl-active-parser -- AppEngine Flexible Environment.
+## This parser actively reprocesses existing data.  It will eventually replace etl-batch-parser.
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-active.yaml
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == active-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+
 ######################################################################
 #  Staging deployments
 #  Auto deployed on merge with master branch
@@ -312,6 +325,8 @@ deploy:
     && gcloud app deploy --project=mlab-staging $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging batch nodryrun
     && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging base_tables nodryrun
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-active.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
