@@ -287,6 +287,11 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return err
 	}
 
+	if len(cachedTest.Hops) == 0 {
+		// Empty test, no further action.
+		return nil
+	}
+
 	// Check all buffered PT tests whether Client_ip in connSpec appear in
 	// the last hop of the buffered test.
 	// If it does appear, then the buffered test was polluted, and it will
@@ -542,8 +547,8 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// reach destIP at the last hop.
 	lastHop := destIP
 	if len(allNodes) == 0 {
-		// Empty test, stop here.
-		return cachedPTData{}, errors.New("Empty Test.")
+		// Empty test, stop here.  Not an error.
+		return cachedPTData{}, nil
 	}
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
