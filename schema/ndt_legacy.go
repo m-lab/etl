@@ -6,9 +6,9 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/go/bqx"
 
-	"github.com/m-lab/ndt-server/legacy/c2s"
-	"github.com/m-lab/ndt-server/legacy/ndt"
-	"github.com/m-lab/ndt-server/legacy/s2c"
+	"github.com/m-lab/ndt-server/ndt5/c2s"
+	"github.com/m-lab/ndt-server/ndt5/ndt"
+	"github.com/m-lab/ndt-server/ndt5/s2c"
 )
 
 // TODO: Remove this in favor of using the ndt-server legacy.NDTResult directly
