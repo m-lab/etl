@@ -14,8 +14,13 @@ package active
 //     tasks if there are any.  When there are no more tasks, it signals ProcessAll
 //     that the token channel may be returned to the caller.
 
-// TODO: Utilization based management:
-// The manager start new tasks when either:
+// TODO:
+// A. Add metrics
+//
+// B. Recovery and monitoring using datastore.
+//
+// C. Utilization based management:
+//    The manager starts new tasks when either:
 //   1. Two tasks have completed since the last task started.
 //   2. The 10 second utilization of any single cpu falls below 80%.
 //   3. The total 10 second utilization falls below 90%.
@@ -24,7 +29,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -73,25 +77,23 @@ type FileSource struct {
 	done chan *TaskFile
 
 	// Remaining fields should only be accessed by the ProcessAll function.
-	// while holding the mutex.
 	status DatastoreRecord
 
 	lastUpdate time.Time // Time of last call to UpdatePending
 	allFiles   map[string]*TaskFile
-	pending    []*TaskFile // Ordered list
+	pending    []*TaskFile // Ordered list - TODO make this a channel?
 	inFlight   map[string]*TaskFile
+
+	// The function that processes each task.
+	process func(*TaskFile) error
 }
 
 // NewFileSource creates a new source for active processing.
-func NewFileSource(sc stiface.Client, project string, prefix string, retryLimit int) (*FileSource, error) {
+func NewFileSource(sc stiface.Client, project string, prefix string, retryLimit int, processFunc func(*TaskFile) error) (*FileSource, error) {
 	files, _, err := gcs.GetFilesSince(context.Background(), sc, project, prefix, time.Time{})
 	if err != nil {
 		// TODO metric
 		return nil, err
-	}
-
-	if len(files) < 1 {
-		return nil, ErrNoMoreFiles
 	}
 
 	fs := FileSource{
@@ -102,7 +104,9 @@ func NewFileSource(sc stiface.Client, project string, prefix string, retryLimit 
 		pending:    make([]*TaskFile, 0, len(files)),
 		inFlight:   make(map[string]*TaskFile, 100),
 		retryLimit: retryLimit,
-		done:       make(chan *TaskFile, 0)}
+		done:       make(chan *TaskFile, 0),
+		process:    processFunc,
+	}
 
 	// Don't need to hold the lock yet, because we are sole owner.
 	for _, f := range files {
@@ -156,6 +160,11 @@ func (fs *FileSource) next(ctx context.Context) (*TaskFile, error) {
 	return nil, nil
 }
 
+// ErrTaskNotFound is returned if an inflight task is not found in inFlight.
+var ErrTaskNotFound = errors.New("task not found")
+
+// complete updates the state on task completion.
+// NOT THREAD-SAFE.  Should be called only by ProcessAll (through doneHandler)
 // complete updates the FileSource to reflect the completion of
 // a processing attempt.
 // If the processing ends in an error, the task will be moved to
@@ -163,7 +172,8 @@ func (fs *FileSource) next(ctx context.Context) (*TaskFile, error) {
 func (fs *FileSource) complete(tf *TaskFile) error {
 	_, exists := fs.inFlight[tf.path]
 	if !exists {
-		return errors.New("task not in flight")
+		log.Println("Did not find", tf.path)
+		return ErrTaskNotFound
 	}
 
 	delete(fs.inFlight, tf.path)
@@ -176,12 +186,9 @@ func (fs *FileSource) complete(tf *TaskFile) error {
 	return nil
 }
 
-var ErrNoMoreFiles = errors.New("No more files in file source")
-
-// process starts the next task.
-func (fs *FileSource) process(tf *TaskFile) {
-	_, tf.lastErr = worker.ProcessTask(tf.path)
-	fs.done <- tf
+func processTask(tf *TaskFile) error {
+	_, err := worker.ProcessTask(tf.path)
+	return err
 }
 
 // doneHandler handles all the done channel returns.  For every
@@ -189,55 +196,67 @@ func (fs *FileSource) process(tf *TaskFile) {
 // any additional tokens that become available.
 // When there are no further pending items, it decrements the wait group
 // to indicate to ProcessAll that no more tokens are needed.
-func (fs *FileSource) doneHandler(ctx context.Context, tokens chan struct{}, wg *sync.WaitGroup) {
-DRAIN:
+func (fs *FileSource) doneHandler(ctx context.Context, tokens chan struct{}) error {
+	var lastErr error
+PROCESS:
 	for {
 		select {
 		case t := <-fs.done:
-			fs.complete(t)
+			err := fs.complete(t)
+			if err != nil {
+				lastErr = err
+				log.Println(err)
+			}
 			<-tokens // return the token
 		case tokens <- struct{}{}:
 			tf, err := fs.next(ctx)
 			if err != nil {
+				lastErr = err
 				log.Println(err)
 			}
 			if tf != nil {
-				fs.process(tf)
+				// This adds the task to inFlight.
+				fs.inFlight[tf.path] = tf
+				tf.lastErr = fs.process(tf)
+				fs.done <- tf
 			} else {
 				// return the token
 				<-tokens
-				break DRAIN
+				break PROCESS
 			}
 		}
 	}
 
-	wg.Done()
-	for t := range fs.done {
-		fs.complete(t)
-		<-tokens // return the token
-		if len(fs.inFlight) == 0 {
-			close(fs.done)
-		}
+	// Now drain any remaining tasks in flight.
+	if len(fs.inFlight) > 0 {
+		go func() {
+			for t := range fs.done {
+				fs.complete(t)
+				<-tokens // return the token
+				if len(fs.inFlight) == 0 {
+					close(fs.done)
+				}
+			}
+		}()
+	} else {
+		close(fs.done)
 	}
+	return lastErr
 }
 
 // ProcessAll iterates through all the TaskFiles, processing each one.
-// At the end, it will also make one attempt to reprocess any that failed
-// the first time.
+// It may also retry any that failed the first time.
 func (fs *FileSource) ProcessAll(ctx context.Context, tokens chan struct{}) error {
 	if len(fs.pending) == 0 {
 		return nil
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	// Handle completed tasks, and start more.
-	go fs.doneHandler(ctx, tokens, &wg)
+	// Handle tasks in parallel.
+	// When this returns, there are still tasks in flight, but no more
+	// will be started.
+	err := fs.doneHandler(ctx, tokens)
 
-	// Wait until no more pending.
-	wg.Wait()
-
-	// Return the semaphore queue for some other FileSource to use.
-	return nil
-
+	// The token channel may be reused, but there may be additional tokens
+	// returned to it by the ongoing doneHandler.
+	return err
 }
