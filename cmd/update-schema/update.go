@@ -43,6 +43,13 @@ func CreateOrUpdatePT(project string, dataset string, table string) error {
 	return CreateOrUpdate(schema, project, dataset, table)
 }
 
+func CreateOrUpdateNDTResult(project string, dataset string, table string) error {
+	row := schema.NDTResult{}
+	schema, err := row.Schema()
+	rtx.Must(err, "NDTResult.Schema")
+	return CreateOrUpdate(schema, project, dataset, table)
+}
+
 // CreateOrUpdate will update or create a table from the given schema.
 func CreateOrUpdate(schema bigquery.Schema, project string, dataset string, table string) error {
 	name := project + "." + dataset + "." + table
@@ -112,6 +119,12 @@ func main() {
 		if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
 			errCount++
 		}
+		if err := CreateOrUpdateNDTResult(project, "base_tables", "result"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateNDTResult(project, "batch", "result"); err != nil {
+			errCount++
+		}
 
 	case "tcpinfo":
 		if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {
@@ -120,12 +133,20 @@ func main() {
 		if err := CreateOrUpdateTCPInfo(project, "batch", "tcpinfo"); err != nil {
 			errCount++
 		}
-		
+
 	case "traceroute":
 		if err := CreateOrUpdatePT(project, "base_tables", "traceroute"); err != nil {
 			errCount++
 		}
 		if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
+			errCount++
+		}
+
+	case "result":
+		if err := CreateOrUpdateNDTResult(project, "base_tables", "result"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateNDTResult(project, "batch", "result"); err != nil {
 			errCount++
 		}
 
