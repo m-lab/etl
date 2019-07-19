@@ -36,13 +36,13 @@ const YYYYMMDD = `\d{4}[01]\d[0123]\d`
 const MlabDomain = `measurement-lab.org`
 
 const bucket = `gs://([^/]*)/`
-const expType = `(?:([a-z-]+)/)?([a-z-]+)/` // experiment OR experiment/type.
+const expType = `(?:([a-z-]+)/)?([a-z0-9-]+)/` // experiment OR experiment/type.
 
 const datePath = `(\d{4}/[01]\d/[0123]\d)/`
 
 const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6})(\.\d{0,6})?Z`
 
-const type2 = `(?:-([a-z-]+))?` // optional datatype string
+const type2 = `(?:-([a-z0-9-]+))?` // optional datatype string
 const mlabNSiteNN = `-(mlab\d)-([a-z]{3}\d[0-9t])-`
 
 // This parses the experiment name, optional -NNNN sequence number, and optional -e (for old embargoed files)
@@ -207,7 +207,7 @@ func (dt DataType) BQBufferSize() int {
 // TODO - use camelcase.
 const (
 	NDT             = DataType("ndt")
-	NDT_LEGACY      = DataType("ndt_legacy")
+	NDT_RESULT      = DataType("ndt_result")
 	NDT_OMIT_DELTAS = DataType("ndt_nodelta") // to support larger buffer size.
 	SS              = DataType("sidestream")
 	PT              = DataType("traceroute")
@@ -221,7 +221,8 @@ var (
 	// TODO - this should be loaded from a config.
 	dirToDataType = map[string]DataType{
 		"ndt":              NDT,
-		"legacy":           NDT_LEGACY,
+		"ndt5":             NDT_RESULT,
+		"ndt7":             NDT_RESULT,
 		"sidestream":       SS,
 		"paris-traceroute": PT,
 		"switch":           SW,
@@ -236,7 +237,7 @@ var (
 		PT:         "traceroute",
 		SW:         "switch",
 		TCPINFO:    "tcpinfo",
-		NDT_LEGACY: "legacy",
+		NDT_RESULT: "result",
 		INVALID:    "invalid",
 	}
 
@@ -249,7 +250,7 @@ var (
 		SS:              500, // Average json size is 2.5K
 		PT:              5,
 		SW:              100,
-		NDT_LEGACY:      50,
+		NDT_RESULT:      50,
 		INVALID:         0,
 	}
 	// There is also a mapping of data types to queue names in
