@@ -3,7 +3,6 @@ package etl
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -117,7 +116,6 @@ func ValidateTestPath(path string) (*DataPath, error) {
 		Embargo:    post[6],
 		Suffix:     post[7],
 	}
-	fmt.Printf("%#v\n", dp)
 	return dp, nil
 }
 
