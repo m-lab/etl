@@ -71,7 +71,8 @@ func getBucket(ctx context.Context, sClient stiface.Client, project, bucketName 
 	return bucket, nil
 }
 
-// TODO - similar to code in etl-gardener/cloud/tq/tq.go
+// GetFilesSince gets list of all storage objects with prefix, created or updated since given date.
+// TODO - similar to code in etl-gardener/cloud/tq/tq.go.  Should move to go/cloud/gcs
 func GetFilesSince(ctx context.Context, sClient stiface.Client, project string, prefix string, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
 	// Submit all files from the bucket that match the prefix.
 	p, err := ParsePrefix(prefix)

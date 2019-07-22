@@ -3,6 +3,7 @@ package gcs_test
 import (
 	"context"
 	"log"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +26,9 @@ func TestNewPlatformPrefix(t *testing.T) {
 	if pp.DataType != "tcpinfo" {
 		t.Error(pp)
 	}
+	if pp.Path() != "ndt/tcpinfo/2019/04/01/" {
+		t.Error(pp.Path())
+	}
 }
 
 func TestLegacyPrefix(t *testing.T) {
@@ -37,6 +41,16 @@ func TestLegacyPrefix(t *testing.T) {
 		t.Error(pp)
 	}
 
+	if pp.Path() != "ndt/2019/04/01/" {
+		t.Error(pp.Path())
+	}
+}
+
+func TestGetFilesSince_BadPrefix(t *testing.T) {
+	_, _, err := gcs.GetFilesSince(context.Background(), nil, "project", "gs://foobar/2019/01/01/", time.Now().Add(-time.Minute))
+	if err == nil || !strings.Contains(err.Error(), "Invalid test path:") {
+		t.Fatal("Should return error", err)
+	}
 }
 
 func TestGetFilesSince(t *testing.T) {
