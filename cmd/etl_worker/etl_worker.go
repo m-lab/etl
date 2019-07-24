@@ -252,6 +252,9 @@ func subworker(rawFileName string, executionCount, retryCount int, age time.Dura
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "TaskError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
+		// NOTE: This may cause indefinite retries, and stalled task queue.  Task will eventually
+		// expire, but it might be better to have a different mechanism for retries, particularly
+		// for gardener, which waits for empty task queue.
 		return http.StatusInternalServerError, `{"message": "Error in ProcessAllTests"}`
 		// TODO - anything better we could do here?
 	}

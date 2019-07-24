@@ -461,8 +461,8 @@ func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schem
 
 func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	// Extract the values from the last snapshot.
-	metrics.WorkerState.WithLabelValues(n.TableName(), "parse").Inc()
-	defer metrics.WorkerState.WithLabelValues(n.TableName(), "parse").Dec()
+	metrics.WorkerState.WithLabelValues(n.TableName(), "ndt-parse").Inc()
+	defer metrics.WorkerState.WithLabelValues(n.TableName(), "ndt-parse").Dec()
 
 	if !strings.HasSuffix(test.fn, ".gz") {
 		metrics.WarningCount.WithLabelValues(
