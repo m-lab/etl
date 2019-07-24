@@ -2,6 +2,7 @@
 package schema
 
 import (
+	"log"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -91,11 +92,15 @@ func (row *PTTest) AnnotateHops(annMap map[string]*api.Annotations) error {
 		ann, ok := annMap[ip]
 		if !ok {
 			metrics.AnnotationMissingCount.WithLabelValues("No annotation for PT hop").Inc()
+			log.Println("missing hop geo with err ", ok)
+			continue
 		}
 		if ann.Geo == nil {
 			metrics.AnnotationMissingCount.WithLabelValues("Empty PT Geo").Inc()
+			log.Println("empty hop geo")
 		} else {
 			hop.Source.City = ann.Geo.City
+			log.Println("here is hop city:", ann.Geo.City)
 			hop.Source.CountryCode = ann.Geo.CountryCode
 		}
 		if ann.Network == nil {
