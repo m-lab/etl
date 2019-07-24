@@ -139,6 +139,9 @@ func (row *PTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 	row.Destination.Network = ann.Network
 
 	row.AnnotateHops(annMap)
+	for _, hop := range row.Hop {
+		log.Println("here is annotated hop city:", hop.Source.City)
+	}
 	return nil
 }
 
