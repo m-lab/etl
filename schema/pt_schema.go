@@ -2,7 +2,6 @@
 package schema
 
 import (
-	"log"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -87,20 +86,16 @@ func (row *PTTest) GetServerIP() string {
 }
 
 func (row *PTTest) AnnotateHops(annMap map[string]*api.Annotations) error {
-	for index, hop := range row.Hop {
-		ip := hop.Source.IP
-		ann, ok := annMap[ip]
+	for index, _ := range row.Hop {
+		ann, ok := annMap[row.Hop[index].Source.IP]
 		if !ok {
 			metrics.AnnotationMissingCount.WithLabelValues("No annotation for PT hop").Inc()
-			log.Println("missing hop geo with err ", ok)
 			continue
 		}
 		if ann.Geo == nil {
 			metrics.AnnotationMissingCount.WithLabelValues("Empty PT Geo").Inc()
-			log.Println("empty hop geo")
 		} else {
 			row.Hop[index].Source.City = ann.Geo.City
-			log.Println("here is hop city:", ann.Geo.City)
 			row.Hop[index].Source.CountryCode = ann.Geo.CountryCode
 		}
 		if ann.Network == nil {
@@ -139,9 +134,6 @@ func (row *PTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 	row.Destination.Network = ann.Network
 
 	row.AnnotateHops(annMap)
-	for _, hop := range row.Hop {
-		log.Println("here is annotated hop city:", hop.Source.City)
-	}
 	return nil
 }
 
