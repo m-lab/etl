@@ -674,7 +674,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 
-- name: etl-legacy-batch-0
+- name: etl-ndt5-batch-0
   target: etl-batch-parser
   # At 0.2/sec, this was getting crowded out by ndt.
   rate: 5/s
@@ -685,7 +685,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
     max_doublings: 0
-- name: etl-legacy-batch-1
+- name: etl-ndt5-batch-1
   target: etl-batch-parser
   rate: 5/s
   bucket_size: 10
