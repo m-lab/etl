@@ -119,10 +119,10 @@ func main() {
 		if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDTResult(project, "base_tables", "result"); err != nil {
+		if err := CreateOrUpdateNDTResult(project, "base_tables", "ndt5"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDTResult(project, "batch", "result"); err != nil {
+		if err := CreateOrUpdateNDTResult(project, "batch", "ndt5"); err != nil {
 			errCount++
 		}
 
@@ -142,11 +142,11 @@ func main() {
 			errCount++
 		}
 
-	case "result":
-		if err := CreateOrUpdateNDTResult(project, "base_tables", "result"); err != nil {
+	case "ndt5":
+		if err := CreateOrUpdateNDTResult(project, "base_tables", "ndt5"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDTResult(project, "batch", "result"); err != nil {
+		if err := CreateOrUpdateNDTResult(project, "batch", "ndt5"); err != nil {
 			errCount++
 		}
 
