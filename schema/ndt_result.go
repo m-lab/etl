@@ -2,9 +2,7 @@ package schema
 
 import (
 	"cloud.google.com/go/bigquery"
-	"github.com/kr/pretty"
 	"github.com/m-lab/go/bqx"
-	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/ndt-server/data"
 )
 
@@ -38,13 +36,14 @@ func (row *NDTResult) Schema() (bigquery.Schema, error) {
 	rr := bqx.RemoveRequired(sch)
 	var md clientMetadata
 	mdSch, err := bigquery.InferSchema(&md)
+	if err != nil {
+		return bigquery.Schema{}, err
+	}
 	mdSch = bqx.RemoveRequired(mdSch)
 	c := bqx.CustomizeAppend(rr, map[string]*bigquery.FieldSchema{
 		"Control":  mdSch[0],
 		"Upload":   mdSch[0],
 		"Download": mdSch[0],
 	})
-	pretty.Print(c)
-	rtx.Must(err, "Failed to infer schema for nvArray")
 	return c, err
 }
