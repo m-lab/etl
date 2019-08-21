@@ -50,51 +50,6 @@ func (dp *NDTResultParser) IsParsable(testName string, data []byte) (string, boo
 	return "unknown", false
 }
 
-// ValueMap implements the bigquery.ValueSaver interface. Rows as ValueMaps can
-// be directly written to BigQuery tables.
-type ValueMap map[string]bigquery.Value
-
-// Save converts the ValueMap to the underlying type. It never fails.
-func (s ValueMap) Save() (row map[string]bigquery.Value, insertID string, err error) {
-	return s, "", nil
-}
-
-func assertSaver(ms ValueMap) {
-	func(bigquery.ValueSaver) {}(ms)
-}
-
-// convert translates a map[string]interface{} (such as from an unmarshalled
-// JSON object) to a ValueMap.
-func convert(orig map[string]interface{}) ValueMap {
-	c := ValueMap{}
-	for name, v := range orig {
-		switch v.(type) {
-		case map[string]interface{}:
-			c[name] = convert(v.(map[string]interface{}))
-		default:
-			c[name] = bigquery.Value(v)
-		}
-	}
-	return c
-}
-
-// convertMapToNameValue replaces map objects to an array of NameValue structs.
-func convertMapToNameValue(result map[string]interface{}, control, metadata string) {
-	if result[control] == nil {
-		return
-	}
-	c := result[control].(map[string]interface{})
-	md := c[metadata]
-	delete(c, metadata)
-	nv := []schema.NameValue{}
-	if md != nil {
-		for name, value := range md.(map[string]interface{}) {
-			nv = append(nv, schema.NameValue{Name: name, Value: value.(string)})
-		}
-	}
-	c[metadata] = nv
-}
-
 // NOTE: NDTResult data is a JSON object that should be pushed directly into BigQuery.
 // We read the value into a struct, for compatibility with current inserter
 // backend and to eventually rely on the schema inference in m-lab/go/bqx.CreateTable().
@@ -110,16 +65,15 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 	rowCount := 0
 
 	for dec.More() {
-		stats := map[string]interface{}{
-			"test_id": testName,
-			"ParseInfo": map[string]interface{}{
-				"TaskFileName":  meta["filename"].(string),
-				"ParseTime":     time.Now(),
-				"ParserVersion": Version(),
+		stats := schema.NDTResult{
+			TestID: testName,
+			ParseInfo: &schema.ParseInfo{
+				TaskFileName:  meta["filename"].(string),
+				ParseTime:     time.Now(),
+				ParserVersion: Version(),
 			},
 		}
-		result := map[string]interface{}{}
-		err := dec.Decode(&result)
+		err := dec.Decode(&stats.Result)
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				dp.TableName(), "ndt_result", "Decode").Inc()
@@ -127,15 +81,8 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 		}
 		rowCount++
 
-		convertMapToNameValue(result, "Control", "ClientMetadata")
-		convertMapToNameValue(result, "Upload", "ClientMetadata")
-		convertMapToNameValue(result, "Download", "ClientMetadata")
-
-		stats["result"] = result
 		// Set the LogTime to the Result.StartTime
-		t, err := time.Parse(time.RFC3339Nano, result["StartTime"].(string))
-		rtx.Must(err, "Failed to parse: %s", result["StartTime"].(string))
-		stats["log_time"] = t.Unix()
+		stats.LogTime = stats.Result.StartTime.Unix()
 
 		// Estimate the row size based on the input JSON size.
 		metrics.RowSizeHistogram.WithLabelValues(
@@ -143,7 +90,7 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 
 		rtx.Must(err, "Failed to convert to valuesaver")
 
-		err = dp.inserter.InsertRow(convert(stats))
+		err = dp.inserter.InsertRow(stats)
 		if err != nil {
 			switch t := err.(type) {
 			case bigquery.PutMultiError:
