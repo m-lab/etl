@@ -20,7 +20,6 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
-	"github.com/m-lab/go/rtx"
 )
 
 //=====================================================================================
@@ -87,8 +86,6 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 		// Estimate the row size based on the input JSON size.
 		metrics.RowSizeHistogram.WithLabelValues(
 			dp.TableName()).Observe(float64(len(test)))
-
-		rtx.Must(err, "Failed to convert to valuesaver")
 
 		err = dp.inserter.InsertRow(stats)
 		if err != nil {
