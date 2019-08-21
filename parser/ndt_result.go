@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"src/github.com/kr/pretty"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -142,7 +141,6 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 		metrics.RowSizeHistogram.WithLabelValues(
 			dp.TableName()).Observe(float64(len(test)))
 
-		pretty.Print(stats)
 		rtx.Must(err, "Failed to convert to valuesaver")
 
 		err = dp.inserter.InsertRow(convert(stats))
