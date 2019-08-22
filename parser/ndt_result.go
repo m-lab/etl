@@ -1,11 +1,5 @@
 package parser
 
-// WARNING:
-// WARNING: Parser for a deprecated format.
-// WARNING: After 2019-08-01 this parser should be removed or unit tests added.
-// WARNING: TODO: https://github.com/m-lab/etl/issues/697
-// WARNING:
-
 // This file defines the Parser subtype that handles NDTResult data.
 
 import (
@@ -33,7 +27,8 @@ type NDTResultParser struct {
 func NewNDTResultParser(ins etl.Inserter) etl.Parser {
 	return &NDTResultParser{
 		inserter: ins,
-		RowStats: ins} // Delegate RowStats functions to the Inserter.
+		RowStats: ins, // Delegate RowStats functions to the Inserter.
+	}
 }
 
 func (dp *NDTResultParser) TaskError() error {
@@ -43,10 +38,15 @@ func (dp *NDTResultParser) TaskError() error {
 // IsParsable returns the canonical test type and whether to parse data.
 func (dp *NDTResultParser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like: "<UUID>.json"
-	if strings.HasSuffix(testName, "json") {
-		return "ndt_result", true
+	if !strings.HasSuffix(testName, "json") {
+		return "unknown", false
 	}
-	return "unknown", false
+	// Earlier versions of the unified result objects recorded the ClientMetadata
+	// as an object, which cannot parse with the new struct.
+	if strings.Contains(string(data), `"ClientMetadata":{`) {
+		return "unknown", false
+	}
+	return "ndt_result", true
 }
 
 // NOTE: NDTResult data is a JSON object that should be pushed directly into BigQuery.
