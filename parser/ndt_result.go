@@ -39,10 +39,10 @@ func (dp *NDTResultParser) TaskError() error {
 // IsParsable returns the canonical test type and whether to parse data.
 func (dp *NDTResultParser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like: "<UUID>.json"
-	if !strings.HasSuffix(testName, "json") {
-		return "unknown", false
+	if strings.HasSuffix(testName, "json") {
+		return "ndt_result", true
 	}
-	return "ndt_result", true
+	return "unknown", false
 }
 
 // NOTE: NDTResult data is a JSON object that should be pushed directly into BigQuery.
