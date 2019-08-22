@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -41,11 +42,6 @@ func (dp *NDTResultParser) IsParsable(testName string, data []byte) (string, boo
 	if !strings.HasSuffix(testName, "json") {
 		return "unknown", false
 	}
-	// Earlier versions of the unified result objects recorded the ClientMetadata
-	// as an object, which cannot parse with the new struct.
-	if strings.Contains(string(data), `"ClientMetadata":{`) {
-		return "unknown", false
-	}
 	return "ndt_result", true
 }
 
@@ -58,6 +54,14 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Dec()
+
+	// An older version of the NDT result struct used a JSON object (Go map) to
+	// store ClientMetadata. Results in that format will fail to parse. This step
+	// simply removes the ClientMetadta formatted as a JSON object so that the
+	// parsing will succeed. This should only apply to data from 2019-07-17 (v0.10)
+	// to 2019-08-26 (v0.12). For these tests the ClientMetadata will be empty.
+	var re = regexp.MustCompile(`,"ClientMetadata":{[^}]+}`)
+	test = []byte(re.ReplaceAllString(string(test), ``))
 
 	rdr := bytes.NewReader(test)
 	dec := json.NewDecoder(rdr)
