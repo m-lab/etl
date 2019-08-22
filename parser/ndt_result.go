@@ -55,6 +55,7 @@ func (dp *NDTResultParser) IsParsable(testName string, data []byte) (string, boo
 
 // ParseAndInsert decodes the NDT Result JSON data and inserts it into BQ.
 func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Dec()
 

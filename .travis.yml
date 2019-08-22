@@ -149,7 +149,7 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == qp-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+    condition: $TRAVIS_BRANCH == qp-sandbox-* || $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == batch-sandbox-*
 
 ## Service: cloud function -- AppEngine Flexible Environment.
 - provider: script

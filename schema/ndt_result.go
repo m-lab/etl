@@ -3,12 +3,11 @@ package schema
 import (
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/go/bqx"
-
 	"github.com/m-lab/ndt-server/data"
 )
 
 // NDTResult defines the BQ schema for the NDT Result produced by the
-// ndt-server for the NDT5 and NDT7 clients.
+// ndt-server for the NDT clients.
 type NDTResult struct {
 	ParseInfo *ParseInfo
 	TestID    string         `json:"test_id,string" bigquery:"test_id"`
@@ -23,5 +22,5 @@ func (row *NDTResult) Schema() (bigquery.Schema, error) {
 		return bigquery.Schema{}, err
 	}
 	rr := bqx.RemoveRequired(sch)
-	return rr, nil
+	return rr, err
 }

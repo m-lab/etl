@@ -43,7 +43,7 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
 	case etl.NDT:
 		return NewNDTParser(ins)
-	case etl.NDT_RESULT:
+	case etl.NDT5:
 		return NewNDTResultParser(ins)
 	case etl.SS:
 		return NewDefaultSSParser(ins) // TODO fix this hack.
