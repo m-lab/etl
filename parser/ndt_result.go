@@ -1,17 +1,12 @@
 package parser
 
-// WARNING:
-// WARNING: Parser for a deprecated format.
-// WARNING: After 2019-08-01 this parser should be removed or unit tests added.
-// WARNING: TODO: https://github.com/m-lab/etl/issues/697
-// WARNING:
-
 // This file defines the Parser subtype that handles NDTResult data.
 
 import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -33,7 +28,8 @@ type NDTResultParser struct {
 func NewNDTResultParser(ins etl.Inserter) etl.Parser {
 	return &NDTResultParser{
 		inserter: ins,
-		RowStats: ins} // Delegate RowStats functions to the Inserter.
+		RowStats: ins, // Delegate RowStats functions to the Inserter.
+	}
 }
 
 func (dp *NDTResultParser) TaskError() error {
@@ -58,6 +54,14 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Dec()
+
+	// An older version of the NDT result struct used a JSON object (Go map) to
+	// store ClientMetadata. Results in that format will fail to parse. This step
+	// simply removes the ClientMetadta formatted as a JSON object so that the
+	// parsing will succeed. This should only apply to data from 2019-07-17 (v0.10)
+	// to 2019-08-26 (v0.12). For these tests the ClientMetadata will be empty.
+	var re = regexp.MustCompile(`,"ClientMetadata":{[^}]+}`)
+	test = []byte(re.ReplaceAllString(string(test), ``))
 
 	rdr := bytes.NewReader(test)
 	dec := json.NewDecoder(rdr)
