@@ -102,7 +102,7 @@ func decrementInFlight() {
 }
 
 // TODO(gfr) unify counting for http and pubsub paths?
-func handler(rwr http.ResponseWriter, rq *http.Request) {
+func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 	// This will add metric count and log message from any panic.
 	// The panic will still propagate, and http will report it.
 	defer func() {
@@ -212,7 +212,7 @@ func main() {
 
 	http.HandleFunc("/", Status)
 	http.HandleFunc("/status", Status)
-	http.HandleFunc("/worker", metrics.DurationHandler("generic", handler))
+	http.HandleFunc("/worker", metrics.DurationHandler("generic", handleRequest))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
 
 	// Enable block profiling
