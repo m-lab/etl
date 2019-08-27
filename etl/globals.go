@@ -35,10 +35,14 @@ const YYYYMMDD = `\d{4}[01]\d[0123]\d`
 // MlabDomain is the DNS domain for all mlab servers.
 const MlabDomain = `measurement-lab.org`
 
-const bucket = `gs://([^/]*)/`
-const expType = `(?:([a-z-]+)/)?([a-z0-9-]+)/` // experiment OR experiment/type.
+// BucketPattern is used to extract gsutil bucket name.
+const BucketPattern = `gs://([^/]*)/`
 
-const datePath = `(\d{4}/[01]\d/[0123]\d)/`
+// ExpTypePattern is used to extract the experiment or experiment/type part of the path.
+const ExpTypePattern = `(?:([a-z-]+)/)?([a-z0-9-]+)/` // experiment OR experiment/type.
+
+// DatePathPattern is used to extract the date directory part of the path, e.g. 2017/01/02
+const DatePathPattern = `(\d{4}/[01]\d/[0123]\d)/`
 
 const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6})(\.\d{0,6})?Z`
 
@@ -54,7 +58,7 @@ var (
 	basicTaskPattern = regexp.MustCompile(
 		`(?P<preamble>.*)` + dateTime + `(?P<postamble>.*)`)
 
-	startPattern = regexp.MustCompile(`^` + bucket + expType + datePath + `$`)
+	startPattern = regexp.MustCompile(`^` + BucketPattern + ExpTypePattern + DatePathPattern + `$`)
 	endPattern   = regexp.MustCompile(`^` +
 		type2 + // 1
 		mlabNSiteNN + // 2,3

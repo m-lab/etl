@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/GoogleCloudPlatform/google-cloud-go-testing/storage/stiface"
+	"github.com/m-lab/etl/etl"
 	"google.golang.org/api/iterator"
 )
 
@@ -100,19 +101,12 @@ func GetFilesSince(ctx context.Context, sClient stiface.Client, project string, 
 
 // CODE BELOW is common with etl-gardener state.go.
 
-// These are common with code in etl/etl/globals.go
-const (
-	bucket   = `gs://([^/]*)/`
-	expType  = `(?:([a-z-]+)/)?([a-z-]+)/` // experiment OR experiment/type
-	datePath = `(\d{4}/[01]\d/[0123]\d)/`
-)
-
 // These are here to facilitate use across queue-pusher and parsing components.
 var (
 	// This matches any valid test file name, and some invalid ones.
-	prefixPattern = regexp.MustCompile(bucket + // #1
-		expType + // #2 #3
-		datePath) // #4 - YYYY/MM/DD
+	prefixPattern = regexp.MustCompile(etl.BucketPattern + // #1 - e.g. gs://archive-mlab-sandbox
+		etl.ExpTypePattern + // #2 #3 - e.g. ndt/tcpinfo
+		etl.DatePathPattern) // #4 - YYYY/MM/DD
 )
 
 // Prefix is a valid gs:// prefix for either legacy or new platform data.
