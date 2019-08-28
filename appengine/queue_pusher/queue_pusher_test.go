@@ -41,6 +41,10 @@ func TestDefaultHandler(t *testing.T) {
 }
 
 func TestStats(t *testing.T) {
+	if testing.Short() {
+		t.Log("Skipping test for -short")
+		return
+	}
 	tests := []struct {
 		name   string
 		queue  string
@@ -89,6 +93,10 @@ func TestStats(t *testing.T) {
 }
 
 func TestReceiver(t *testing.T) {
+	if testing.Short() {
+		t.Log("Skipping test for -short")
+		return
+	}
 	tests := []struct {
 		name     string
 		filename string
@@ -157,6 +165,10 @@ func TestReceiver(t *testing.T) {
 }
 
 func TestReceiverWithQueue(t *testing.T) {
+	if testing.Short() {
+		t.Log("Skipping test for -short")
+		return
+	}
 	tests := []struct {
 		name     string
 		filename string
