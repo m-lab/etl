@@ -90,34 +90,26 @@ type FileSource struct {
 
 // NewFileSource creates a new source for active processing.
 func NewFileSource(sc stiface.Client, project string, prefix string, retryLimit int, processFunc func(*TaskFile) error) (*FileSource, error) {
-	files, _, err := gcs.GetFilesSince(context.Background(), sc, project, prefix, time.Time{})
-	if err != nil {
-		// TODO metric
-		return nil, err
-	}
-
 	fs := FileSource{
 		client:     sc,
 		project:    project,
 		prefix:     prefix,
 		status:     DatastoreRecord{Name: prefix},
-		pending:    make([]*TaskFile, 0, len(files)),
+		pending:    make([]*TaskFile, 0, 1),
+		allFiles:   make(map[string]*TaskFile, 100),
 		inFlight:   make(map[string]*TaskFile, 100),
 		retryLimit: retryLimit,
 		done:       make(chan *TaskFile, 0),
 		process:    processFunc,
 	}
 
-	// Don't need to hold the lock yet, because we are sole owner.
-	for _, f := range files {
-		fs.pending = append(fs.pending, &TaskFile{path: f.Name, obj: f})
-	}
 	return &fs, nil
 }
 
 // updatePending should be called when there are no more pending tasks.
 // Not thread-safe - should only be called by ProcessAll.
 func (fs *FileSource) updatePending(ctx context.Context) error {
+	// Allow for a little clock skew.
 	updateTime := time.Now().Add(-time.Second)
 	files, _, err := gcs.GetFilesSince(context.Background(), fs.client, fs.project, fs.prefix, fs.lastUpdate)
 	if err != nil {
@@ -125,6 +117,9 @@ func (fs *FileSource) updatePending(ctx context.Context) error {
 	}
 	fs.lastUpdate = updateTime
 
+	if len(fs.pending) == 0 && cap(fs.pending) < len(files) {
+		fs.pending = make([]*TaskFile, 0, len(files))
+	}
 	for _, f := range files {
 		if f.Prefix != "" {
 			log.Println("Skipping subdirectory:", f.Prefix)
@@ -132,6 +127,7 @@ func (fs *FileSource) updatePending(ctx context.Context) error {
 		}
 		// Append any new files that aren't found in existing Taskfiles.
 		if _, exists := fs.allFiles[f.Name]; !exists {
+			log.Println("Adding", f.Name)
 			tf := TaskFile{path: f.Name, obj: f}
 			fs.allFiles[f.Name] = &tf
 			fs.pending = append(fs.pending, &tf)
@@ -183,7 +179,7 @@ func (fs *FileSource) complete(tf *TaskFile) error {
 			tf.failures++
 		}
 	}
-	return nil
+	return tf.lastErr
 }
 
 func processTask(tf *TaskFile) error {
@@ -201,8 +197,8 @@ func (fs *FileSource) doneHandler(ctx context.Context, tokens chan struct{}) err
 PROCESS:
 	for {
 		select {
-		case t := <-fs.done:
-			err := fs.complete(t)
+		case tf := <-fs.done:
+			err := fs.complete(tf)
 			if err != nil {
 				lastErr = err
 				log.Println(err)
@@ -217,8 +213,10 @@ PROCESS:
 			if tf != nil {
 				// This adds the task to inFlight.
 				fs.inFlight[tf.path] = tf
-				tf.lastErr = fs.process(tf)
-				fs.done <- tf
+				go func() {
+					tf.lastErr = fs.process(tf)
+					fs.done <- tf
+				}()
 			} else {
 				// return the token
 				<-tokens
@@ -247,10 +245,6 @@ PROCESS:
 // ProcessAll iterates through all the TaskFiles, processing each one.
 // It may also retry any that failed the first time.
 func (fs *FileSource) ProcessAll(ctx context.Context, tokens chan struct{}) error {
-	if len(fs.pending) == 0 {
-		return nil
-	}
-
 	// Handle tasks in parallel.
 	// When this returns, there are still tasks in flight, but no more
 	// will be started.
