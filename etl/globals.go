@@ -3,6 +3,7 @@ package etl
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -98,7 +99,7 @@ func ValidateTestPath(path string) (*DataPath, error) {
 	}
 	preamble := startPattern.FindStringSubmatch(basic[1])
 	if preamble == nil {
-		return nil, errors.New("Invalid preable: " + basic[1])
+		return nil, errors.New("Invalid preamble: " + fmt.Sprint(basic))
 	}
 
 	post := endPattern.FindStringSubmatch(basic[5])

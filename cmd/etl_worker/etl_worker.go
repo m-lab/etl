@@ -13,12 +13,9 @@ import (
 
 	"github.com/m-lab/go/prometheusx"
 
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/storage"
-	"github.com/m-lab/etl/task"
+	"github.com/m-lab/etl/worker"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
@@ -71,6 +68,7 @@ func Status(w http.ResponseWriter, r *http.Request) {
 // Basic throttling to restrict the number of tasks in flight.
 const defaultMaxInFlight = 20
 
+// This limits the number of workers available for externally requested single task files.
 var maxInFlight int32 // Max number of concurrent workers (and tasks in flight).
 var inFlight int32    // Current number of tasks in flight.
 
@@ -104,7 +102,7 @@ func decrementInFlight() {
 }
 
 // TODO(gfr) unify counting for http and pubsub paths?
-func worker(rwr http.ResponseWriter, rq *http.Request) {
+func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 	// This will add metric count and log message from any panic.
 	// The panic will still propagate, and http will report it.
 	defer func() {
@@ -178,89 +176,13 @@ func subworker(rawFileName string, executionCount, retryCount int, age time.Dura
 	log.Printf("Received filename: %q  Retries: %d, Executions: %d, Age: %5.2f hours\n",
 		fn, retryCount, executionCount, age.Hours())
 
-	data, err := etl.ValidateTestPath(fn)
-	if err != nil {
-		log.Printf("Invalid filename: %v\n", err)
-		return http.StatusBadRequest, `{"message": "Invalid filename."}`
+	status, err = worker.ProcessTask(fn)
+	if err == nil {
+		msg = `{"message": "Success"}`
+	} else {
+		msg = fmt.Sprintf(`{"message": "%s"}`, err.Error())
 	}
-	dataType := data.GetDataType()
-
-	// Count number of workers operating on each table.
-	metrics.WorkerCount.WithLabelValues(data.TableBase()).Inc()
-	defer metrics.WorkerCount.WithLabelValues(data.TableBase()).Dec()
-
-	// These keep track of the (nested) state of the worker.
-	metrics.WorkerState.WithLabelValues(data.TableBase(), "worker").Inc()
-	defer metrics.WorkerState.WithLabelValues(data.TableBase(), "worker").Dec()
-
-	// Move this into Validate function
-	if dataType == etl.INVALID {
-		metrics.TaskCount.WithLabelValues(data.TableBase(), "worker", "BadRequest").Inc()
-		log.Printf("Invalid filename: %s\n", fn)
-		return http.StatusBadRequest, `{"message": "Invalid filename."}`
-	}
-
-	client, err := storage.GetStorageClient(false)
-	if err != nil {
-		metrics.TaskCount.WithLabelValues(data.TableBase(), "worker", "ServiceUnavailable").Inc()
-		log.Printf("Error getting storage client: %v\n", err)
-		return http.StatusServiceUnavailable, `{"message": "Could not create client."}`
-	}
-
-	// TODO - add a timer for reading the file.
-	tr, err := storage.NewETLSource(client, fn)
-	if err != nil {
-		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "ETLSourceError").Inc()
-		log.Printf("Error opening gcs file: %v", err)
-		return http.StatusInternalServerError, `{"message": "Problem opening gcs file."}`
-		// TODO - anything better we could do here?
-	}
-	defer tr.Close()
-	// Label storage metrics with the expected table name.
-	tr.TableBase = data.TableBase()
-
-	dateFormat := "20060102"
-	date, err := time.Parse(dateFormat, data.PackedDate)
-
-	ins, err := bq.NewInserter(dataType, date)
-	if err != nil {
-		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "NewInserterError").Inc()
-		log.Printf("Error creating BQ Inserter:  %v", err)
-		return http.StatusInternalServerError, `{"message": "Problem creating BQ inserter."}`
-		// TODO - anything better we could do here?
-	}
-
-	// Create parser, injecting Inserter
-	p := parser.NewParser(dataType, ins)
-	if p == nil {
-		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "NewInserterError").Inc()
-		log.Printf("Error creating parser for %s", dataType)
-		return http.StatusInternalServerError, fmt.Sprintf(`{"message": "Problem creating parser for %s."}`, dataType)
-	}
-	tsk := task.NewTask(fn, tr, p)
-
-	files, err := tsk.ProcessAllTests()
-
-	// Count the files processed per-host-module per-weekday.
-	// TODO(soltesz): evaluate separating hosts and pods as separate metrics.
-	metrics.FileCount.WithLabelValues(
-		data.Host+"-"+data.Site+"-"+data.Experiment,
-		date.Weekday().String()).Add(float64(files))
-
-	metrics.WorkerState.WithLabelValues(data.TableBase(), "finish").Inc()
-	defer metrics.WorkerState.WithLabelValues(data.TableBase(), "finish").Dec()
-	if err != nil {
-		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "TaskError").Inc()
-		log.Printf("Error Processing Tests:  %v", err)
-		// NOTE: This may cause indefinite retries, and stalled task queue.  Task will eventually
-		// expire, but it might be better to have a different mechanism for retries, particularly
-		// for gardener, which waits for empty task queue.
-		return http.StatusInternalServerError, `{"message": "Error in ProcessAllTests"}`
-		// TODO - anything better we could do here?
-	}
-
-	metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "OK").Inc()
-	return http.StatusOK, `{"message": "Success"}`
+	return
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
@@ -290,7 +212,7 @@ func main() {
 
 	http.HandleFunc("/", Status)
 	http.HandleFunc("/status", Status)
-	http.HandleFunc("/worker", metrics.DurationHandler("generic", worker))
+	http.HandleFunc("/worker", metrics.DurationHandler("generic", handleRequest))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
 
 	// Enable block profiling
