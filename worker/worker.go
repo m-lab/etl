@@ -24,6 +24,7 @@ var (
 // Returns an http status code and an error if the task did not complete successfully.
 // This was previously a private function in etl_worker.go.
 // TODO - add comprehensive unit test??
+// TODO - refactor into a Worker struct containing a StorageClient and other similar things, to allow use of fake implementations for testing.
 func ProcessTask(fn string) (int, error) {
 	data, err := etl.ValidateTestPath(fn)
 	if err != nil {
