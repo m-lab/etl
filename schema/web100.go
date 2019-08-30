@@ -14,13 +14,28 @@ import (
 // Web100ValueMap implements the web100.Saver interface for recording web100 values.
 type Web100ValueMap map[string]bigquery.Value
 
-// Returns the contained map, or nil if it doesn't exist.
+// Save implements the bigquery.ValueSaver interface
+func (s Web100ValueMap) Save() (row map[string]bigquery.Value, insertID string, err error) {
+	return s, "", nil
+}
+
+func assertSaver(ms Web100ValueMap) {
+	func(bigquery.ValueSaver) {}(ms)
+}
+
+// Get returns the contained map, or nil if it doesn't exist.
+// This works for either Web100ValueMap or map[string]bigquery.Value
 func (vm Web100ValueMap) Get(name string) Web100ValueMap {
 	wl, ok := vm[name]
 	if !ok {
 		return nil
 	}
-	return wl.(Web100ValueMap)
+	switch wl.(type) {
+	case map[string]bigquery.Value:
+		return Web100ValueMap(wl.(map[string]bigquery.Value))
+	default:
+		return wl.(Web100ValueMap)
+	}
 }
 
 // Get the string at a path in the nested map.  Return value, true if found,
@@ -195,6 +210,8 @@ func EmptyConnectionSpec() Web100ValueMap {
 	return Web100ValueMap{
 		"client_geolocation": EmptyGeolocation(),
 		"server_geolocation": EmptyGeolocation(),
+		"client":             Web100ValueMap{"network": make(Web100ValueMap, 2)},
+		"server":             Web100ValueMap{"network": make(Web100ValueMap, 2)},
 	}
 }
 

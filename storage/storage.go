@@ -14,15 +14,14 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/m-lab/etl/metrics"
+	"google.golang.org/api/option"
 
-	"golang.org/x/oauth2/google"
-	storage "google.golang.org/api/storage/v1"
+	"cloud.google.com/go/storage"
 )
 
 // ErrOversizeFile is returned when exceptionally large files are skipped.
@@ -180,13 +179,20 @@ func (rr *ETLSource) NextTest(maxSize int64) (string, []byte, error) {
 // Closer handles gzip files.
 type Closer struct {
 	zipper io.Closer // Must be non-null
-	body   io.Closer // Must be non-null
+	rdr    io.Closer // Must be non-null
+	cancel func()    // Context cancel.
 }
 
 // Close invokes the gzip and body Close() functions.
 func (t *Closer) Close() error {
-	err := t.zipper.Close()
-	t.body.Close()
+	defer t.cancel()
+	var err error
+	if t.zipper != nil {
+		err = t.zipper.Close()
+		t.rdr.Close() // ignoring this error?
+	} else {
+		err = t.rdr.Close()
+	}
 	return err
 }
 
@@ -197,7 +203,7 @@ var errNoClient = errors.New("client should be non-null")
 //
 // uri should be of form gs://bucket/filename.tar or gs://bucket/filename.tgz
 // FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
-func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
+func NewETLSource(client *storage.Client, uri string) (*ETLSource, error) {
 	if client == nil {
 		return nil, errNoClient
 	}
@@ -219,47 +225,50 @@ func NewETLSource(client *http.Client, uri string) (*ETLSource, error) {
 	}
 
 	// TODO(prod) Evaluate whether this is long enough.
+	// TODO - appengine requests time out after 60 minutes, so more than that doesn't help.
 	// SS processing sometimes times out with 1 hour.
 	// Is there a limit on http requests from task queue, or into flex instance?
-	obj, err := getObject(client, bucket, fn, 300*time.Minute)
+	rdr, cancel, err := getReader(client, bucket, fn, 300*time.Minute)
 	if err != nil {
+		cancel()
+		log.Println(err)
 		return nil, err
 	}
 
-	rdr := obj.Body
-	var closer io.Closer = obj.Body
+	closer := &Closer{nil, rdr, cancel}
 	// Handle .tar.gz, .tgz files.
 	if strings.HasSuffix(strings.ToLower(fn), "gz") {
 		// TODO add unit test
 		// NB: This must not be :=, or it creates local rdr.
 		// TODO - add retries with backoff.
-		rdr, err = gzip.NewReader(obj.Body)
+		gzRdr, err := gzip.NewReader(rdr)
 		if err != nil {
-			obj.Body.Close()
+			closer.Close()
+			log.Println(err)
 			return nil, err
 		}
-
-		closer = &Closer{rdr, obj.Body}
+		closer.zipper = gzRdr
+		rdr = gzRdr
 	}
 	tarReader := tar.NewReader(rdr)
 
-	timeout := 16 * time.Millisecond
-	return &ETLSource{tarReader, closer, timeout, "invalid"}, nil
+	baseTimeout := 16 * time.Millisecond
+	return &ETLSource{tarReader, closer, baseTimeout, "invalid"}, nil
 }
 
 // GetStorageClient provides a storage reader client.
 // This contacts the backend server, so should be used infrequently.
-func GetStorageClient(writeAccess bool) (*http.Client, error) {
+func GetStorageClient(writeAccess bool) (*storage.Client, error) {
 	var scope string
 	if writeAccess {
-		scope = storage.DevstorageReadWriteScope
+		scope = storage.ScopeReadWrite
 	} else {
-		scope = storage.DevstorageReadOnlyScope
+		scope = storage.ScopeReadOnly
 	}
 
-	// Use a short timeout, so we get an error quickly if there is a problem.
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	client, err := google.DefaultClient(ctx, scope)
+	// This cannot include a defer cancel, as the client then doesn't work after
+	// the cancel.
+	client, err := storage.NewClient(context.Background(), option.WithScopes(scope))
 	if err != nil {
 		return nil, err
 	}
@@ -271,23 +280,11 @@ func GetStorageClient(writeAccess bool) (*http.Client, error) {
 //---------------------------------------------------------------------------------
 
 // Caller is responsible for closing response body.
-func getObject(client *http.Client, bucket string, fn string, timeout time.Duration) (*http.Response, error) {
-	// Lightweight, error only if client is nil.
-	service, err := storage.New(client)
-	if err != nil {
-		return nil, err
-	}
-
+func getReader(client *storage.Client, bucket string, fn string, timeout time.Duration) (io.ReadCloser, func(), error) {
 	// Lightweight - only setting up the local object.
-	call := service.Objects.Get(bucket, fn)
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
-	call = call.Context(ctx)
-
-	// Heavyweight.
-	// Doesn't look like any googleapi.CallOptions are useful here.
-	contentResponse, err := call.Download()
-	if err != nil {
-		return nil, err
-	}
-	return contentResponse, err
+	b := client.Bucket(bucket)
+	obj := b.Object(fn)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	rdr, err := obj.NewReader(ctx)
+	return rdr, cancel, err
 }

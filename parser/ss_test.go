@@ -3,11 +3,14 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 )
@@ -68,7 +71,21 @@ func TestSSInserter(t *testing.T) {
 	parser.InitParserVersionForTest()
 
 	ins := &inMemoryInserter{}
-	n := parser.NewSSParser(ins)
+	// Completely fake annotation data.
+	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
+		"Annotations":{"5.228.253.100":{"Geo":{"postal_code":"52282"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "178.141.112.12":{"Geo":{"postal_code":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "193.169.96.33":{"Geo":{"postal_code":"19316"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "178.141.112.12":{"Geo":{"postal_code":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "45.56.98.222":{"Geo":{"postal_code":"45569"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "213.248.112.75":{"Geo":{"postal_code":"213248"}, "Network":{"Systems":[{"ASNs":[456]}]}}
+				   }}`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, responseJSON)
+	}))
+	defer ts.Close()
+
+	p := parser.NewSSParser(ins, v2as.GetAnnotator(ts.URL))
 	filename := "testdata/20170203T00:00:00Z_ALL0.web100"
 	rawData, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -76,17 +93,31 @@ func TestSSInserter(t *testing.T) {
 	}
 
 	meta := map[string]bigquery.Value{"filename": filename}
-	err = n.ParseAndInsert(meta, filename, rawData)
+	err = p.ParseAndInsert(meta, filename, rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	n.Flush()
+	err = p.Annotate(p.TableName())
+	if err != nil {
+		t.Error(err)
+	}
+	err = p.Flush()
+	if err != nil {
+		t.Error(err)
+	}
 	if ins.Committed() != 6 {
 		t.Fatalf("Expected %d, Got %d.", 6, ins.Committed())
 	}
 
 	if len(ins.data) < 1 {
 		t.Fatal("Should have at least one inserted row")
+	}
+
+	for _, r := range ins.data {
+		row, _ := r.(*schema.SS)
+		if row.Web100_log_entry.Connection_spec.Remote_geolocation.PostalCode == "" {
+			t.Error(row.Web100_log_entry.Connection_spec.Remote_ip, "missing PostalCode")
+		}
 	}
 	inserted := ins.data[0].(*schema.SS)
 	if inserted.ParseTime.After(time.Now()) {

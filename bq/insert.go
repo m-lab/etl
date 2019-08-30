@@ -19,12 +19,15 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
+	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"google.golang.org/api/googleapi"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -107,18 +110,13 @@ func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Insert
 //===============================================================================
 
 // GetClient returns an appropriate bigquery client.
-// This incurs network delay, so it should not be inside fast loops.
 func GetClient(project string) (*bigquery.Client, error) {
 	// We do this here, instead of in init(), because we only want to do it
 	// when we actually want to access the bigquery backend.
 
-	// Network request
-	// It appears that ctx can have a short timeout, BUT we cannot call cancel on it.
-	// If we call defer cancel(), then the client later fails with cancelled context.
 	// So apparently the client holds on to the context, but doesn't care if it
-	// expires.
-	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
-	return bigquery.NewClient(ctx, project)
+	// expires.  Best to just pass in Background.
+	return bigquery.NewClient(context.Background(), project)
 }
 
 //===============================================================================
@@ -126,19 +124,20 @@ func GetClient(project string) (*bigquery.Client, error) {
 // MapSaver is a generic implementation of bq.ValueSaver, based on maps.  This avoids extra
 // conversion steps in the bigquery library (except for the JSON conversion).
 // IMPLEMENTS: bigquery.ValueSaver
-type MapSaver struct {
-	Values map[string]bigquery.Value
+type MapSaver map[string]bigquery.Value
+
+// Save implements the bigquery.ValueSaver interface
+func (s MapSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
+	return s, "", nil
 }
 
-func (s *MapSaver) Save() (row map[string]bigquery.Value, insertID string, err error) {
-	return s.Values, "", nil
+func assertSaver(ms MapSaver) {
+	func(bigquery.ValueSaver) {}(ms)
 }
 
 //----------------------------------------------------------------------------
 
 type BQInserter struct {
-	etl.Inserter
-
 	// These are either constant or threadsafe.
 	params     etl.InserterParams
 	uploader   etl.Uploader  // May be a BQ Uploader, or a test Uploader
@@ -239,7 +238,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		if len(typedErr) > 10 && len(typedErr) == in.pending {
 			log.Printf("Insert error: %v\n", err)
 			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "unknown", "insert row error").
+				in.TableBase(), "PutMultiError", "insert row error").
 				Add(float64(len(typedErr)))
 		} else {
 			// Handle each error individually.
@@ -251,15 +250,41 @@ func (in *BQInserter) updateMetrics(err error) error {
 				for _, oneErr := range rowError.Errors {
 					log.Printf("Insert error: %v\n", oneErr)
 					metrics.ErrorCount.WithLabelValues(
-						in.TableBase(), "unknown", "insert row error").Inc()
+						in.TableBase(), "PutMultiError", "insert row error").Inc()
 				}
 			}
 		}
 		in.inserted -= len(typedErr)
 		in.badRows += len(typedErr)
 		err = nil
+	case *url.Error:
+		log.Printf("Unhandled url.Error on insert %v Project: %s, Dataset: %s, Table: %s\n",
+			typedErr, in.Project(), in.Dataset(), in.FullTableName())
+		metrics.BackendFailureCount.WithLabelValues(
+			in.TableBase(), "failed insert").Inc()
+		metrics.ErrorCount.WithLabelValues(
+			in.TableBase(), "url.Error", "UNHANDLED insert error").Inc()
+		// TODO - Conservative, but possibly not correct.
+		// This at least preserves the count invariance.
+		in.inserted -= in.pending
+		in.badRows += in.pending
+		err = nil
+	case *googleapi.Error:
+		log.Printf("Unhandled googleapi.Error on insert %v\n", typedErr)
+		metrics.BackendFailureCount.WithLabelValues(
+			in.TableBase(), "failed insert").Inc()
+		metrics.ErrorCount.WithLabelValues(
+			in.TableBase(), "googleapi.Error", "UNHANDLED insert error").Inc()
+		// TODO - Conservative, but possibly not correct.
+		// This at least preserves the count invariance.
+		in.inserted -= in.pending
+		in.badRows += in.pending
+		err = nil
+
 	default:
-		log.Printf("Unhandled insert error %v\n", typedErr)
+		// With Elem(), this was causing panics.
+		log.Printf("Unhandled %v on insert %v Project: %s, Table: %s\n", reflect.TypeOf(typedErr),
+			typedErr, in.Project(), in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
@@ -320,14 +345,11 @@ func (in *BQInserter) Flush() error {
 	rows := in.rows
 	// Allocate new slice of rows.  Any failed rows are lost.
 	in.rows = make([]interface{}, 0, in.params.BufferSize)
-	in.acquire()
-	err := in.flushSlice(rows)
-	in.release()
-	return err
+	return in.Put(rows)
 }
 
 // flushSlice flushes a slice of rows to BigQuery.
-// It is NOT threadsafe, and should only be called by Flush.
+// It is NOT threadsafe.
 func (in *BQInserter) flushSlice(rows []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Dec()
@@ -401,10 +423,33 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 		metrics.InsertionHistogram.WithLabelValues(
 			in.TableBase(), "succeed").Observe(time.Since(start).Seconds())
 	} else {
-		// This adjusts the inserted count, failure count, and updates in.rows.
-		err = in.updateMetrics(err)
-		metrics.InsertionHistogram.WithLabelValues(
-			in.TableBase(), "fail").Observe(time.Since(start).Seconds())
+		size := len(rows)
+		apiError, ok := err.(*googleapi.Error)
+		if !ok || size <= 1 || apiError.Code != 400 || !strings.Contains(apiError.Error(), "Request payload size exceeds the limit:") {
+			// This adjusts the inserted count, failure count, and updates in.rows.
+			log.Printf("%s %v", in.TableBase(), err)
+			metrics.InsertionHistogram.WithLabelValues(
+				in.TableBase(), "fail").Observe(time.Since(start).Seconds())
+			return in.updateMetrics(err)
+		}
+
+		// Explicitly handle "Request payload size exceeds ..."
+		// NOTE: This splitting behavior may cause repeated encoding of the same data.  Worst case,
+		// all the data may be encoded log2(size) times.  So best if this only happens infrequently.
+		log.Printf("Splitting %d rows to avoid size limit for %s\n", size, in.TableBase())
+		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Splitting buffer").Inc()
+		in.pending = 0
+		err1 := in.flushSlice(rows[:size/2])
+		err2 := in.flushSlice(rows[size/2:])
+		// The recursive calls will have added various InsertionHistogram results, included successes
+		// and failures, so we don't need to add those here.
+		// Recursive calls also will have handled accounting for any errors not resolved by splitting,
+		// but we want to return any non-nil error up the stack WITHOUT repeating the accounting.
+		if err1 != nil {
+			err = err1
+		} else {
+			err = err2
+		}
 	}
 	return err
 }

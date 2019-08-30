@@ -10,82 +10,34 @@ import (
 	"strings"
 	"time"
 
+	v2as "github.com/m-lab/annotation-service/api/v2"
+
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/web100"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Parser for parsing sidestream tests.
 
-// RowBuffer for SS.
-type RowBuffer struct {
-	bufferSize int
-	rows       []interface{}
-}
-
-// AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
-// Not thread-safe.  Should only be called by owning thread.
-func (buf *RowBuffer) AddRow(row schema.SS) error {
-	for len(buf.rows) >= buf.bufferSize-1 {
-		return etl.ErrBufferFull
-	}
-	buf.rows = append(buf.rows, &row)
-	return nil
-}
-
-// TakeRows returns all rows in the buffer, and clears the buffer.
-// Not thread-safe.  Should only be called by owning thread.
-func (buf *RowBuffer) TakeRows() []interface{} {
-	res := buf.rows
-	buf.rows = make([]interface{}, 0, buf.bufferSize)
-	return res
-}
-
-// Annotate fetches annotations for all rows in the buffer.
-// Not thread-safe.  Should only be called by owning thread.
-func (buf *RowBuffer) Annotate(tableBase string) {
-	metrics.WorkerState.WithLabelValues(tableBase, "annotate").Inc()
-	defer metrics.WorkerState.WithLabelValues(tableBase, "annotate").Dec()
-	if len(buf.rows) == 0 {
-		return
-	}
-
-	ipSlice := make([]string, 2*len(buf.rows))
-	geoSlice := make([]*api.GeolocationIP, 2*len(buf.rows))
-	for i := range buf.rows {
-		row := buf.rows[i].(*schema.SS)
-		connSpec := &row.Web100_log_entry.Connection_spec
-		ipSlice[i+i] = connSpec.Local_ip
-		geoSlice[i+i] = &connSpec.Local_geolocation
-		ipSlice[i+i+1] = connSpec.Remote_ip
-		geoSlice[i+i+1] = &connSpec.Remote_geolocation
-	}
-	// Just use the logtime of the first row.
-	logTime := time.Unix(buf.rows[0].(*schema.SS).Web100_log_entry.LogTime, 0)
-	start := time.Now()
-	// TODO - are there any errors we should process from Fetch?
-	annotation.FetchGeoAnnotations(ipSlice, logTime, geoSlice)
-	metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": "SS"}).Observe(float64(time.Since(start).Nanoseconds()))
-}
-
 // SSParser provides a parser implementation for SideStream data.
 type SSParser struct {
-	inserter etl.Inserter
-	etl.RowStats
-	RowBuffer
+	Base
 }
 
 // NewSSParser creates a new sidestream parser.
-func NewSSParser(ins etl.Inserter) *SSParser {
+func NewSSParser(ins etl.Inserter, ann v2as.Annotator) *SSParser {
 	bufSize := etl.SS.BQBufferSize()
-	buf := RowBuffer{bufSize, make([]interface{}, 0, bufSize)}
-	return &SSParser{ins, ins, buf}
+	return &SSParser{*NewBase(ins, bufSize, ann)}
+}
+
+// TODO get rid of this hack.
+func NewDefaultSSParser(ins etl.Inserter) *SSParser {
+	bufSize := etl.SS.BQBufferSize()
+	return &SSParser{*NewBase(ins, bufSize, v2as.GetAnnotator(annotation.BatchURL))}
 }
 
 // ExtractLogtimeFromFilename extracts the log time.
@@ -142,26 +94,9 @@ func ParseKHeader(header string) ([]string, error) {
 	return varNames, nil
 }
 
-// TaskError return the task level error, based on failed rows, or any other criteria.
-func (ss *SSParser) TaskError() error {
-	return nil
-}
-
 // TableName of the table that this Parser inserts into.
 func (ss *SSParser) TableName() string {
-	return ss.inserter.TableBase()
-}
-
-// FullTableName of the BQ table that the uploader pushes to,
-// including $YYYYMMNN, or _YYYYMMNN
-func (ss *SSParser) FullTableName() string {
-	return ss.inserter.FullTableName()
-}
-
-// Flush flushes any pending rows.
-func (ss *SSParser) Flush() error {
-	ss.inserter.Put(ss.TakeRows())
-	return ss.inserter.Flush()
+	return ss.TableBase()
 }
 
 // PackDataIntoSchema packs data into sidestream BigQeury schema and buffers it.
@@ -347,13 +282,14 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if meta["filename"] != nil {
 			ssTest.TaskFileName = meta["filename"].(string)
 		}
+
 		// Add row to buffer, possibly flushing buffer if it is full.
-		err = ss.AddRow(ssTest)
+		err = ss.AddRow(&ssTest)
 		if err == etl.ErrBufferFull {
+			ss.Annotate(ss.TableBase())
 			// Flush asynchronously, to improve throughput.
-			ss.Annotate(ss.inserter.TableBase())
-			ss.inserter.PutAsync(ss.TakeRows())
-			err = ss.AddRow(ssTest)
+			ss.PutAsync(ss.TakeRows())
+			err = ss.AddRow(&ssTest)
 		}
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(

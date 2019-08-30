@@ -18,7 +18,7 @@ func init() {
 var gParserVersion string
 
 // initParserVersion initializes the gParserVersion variable for use by all parsers.
-func initParserVersion() {
+func initParserVersion() string {
 	release, ok := os.LookupEnv("RELEASE_TAG")
 	if ok && release != "empty_tag" {
 		gParserVersion = "https://github.com/m-lab/etl/tree/" + release
@@ -30,6 +30,7 @@ func initParserVersion() {
 			gParserVersion = "local development"
 		}
 	}
+	return gParserVersion
 }
 
 // Version returns the parser version used by parsers to annotate data rows.
@@ -42,12 +43,16 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
 	case etl.NDT:
 		return NewNDTParser(ins)
+	case etl.NDT5:
+		return NewNDTResultParser(ins)
 	case etl.SS:
-		return NewSSParser(ins)
+		return NewDefaultSSParser(ins) // TODO fix this hack.
 	case etl.PT:
 		return NewPTParser(ins)
 	case etl.SW:
 		return NewDiscoParser(ins)
+	case etl.TCPINFO:
+		return NewTCPInfoParser(ins)
 	default:
 		return nil
 	}

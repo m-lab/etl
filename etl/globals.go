@@ -3,6 +3,8 @@ package etl
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"log"
 	"net"
 	"os"
 	"regexp"
@@ -21,88 +23,110 @@ func init() {
 	OmitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
 }
 
+// We currently have two filename patterns:
+// Legacy: gs://archive-mlab-sandbox/ndt/2018/03/29/20180329T000001Z-mlab1-acc02-ndt-0000.tgz
+
+// K8S: gs://pusher-mlab-staging/ndt/tcpinfo/2019/05/25/20190525T020001.697396Z-tcpinfo-mlab4-ord01-ndt.tgz
+//  In this case we have:
+//    start with bucket/exp/type/YYYY/MM/DD/YYYYMMDDTHHMMSS.MMMMMMZ-type-mlabN-pod0K-exp.tgz
+
 // YYYYMMDD is a regexp string for identifying dense dates.
 const YYYYMMDD = `\d{4}[01]\d[0123]\d`
 
 // MlabDomain is the DNS domain for all mlab servers.
 const MlabDomain = `measurement-lab.org`
 
-const start = `^gs://(?P<bucket>.*)/(?P<exp>[^/]*)/`
-const datePath = `(?P<datepath>\d{4}/[01]\d/[0123]\d)/`
-const dateTime = `(?P<packeddate>\d{4}[01]\d[0123]\d)T(?P<packedtime>\d{6})Z`
-const mlabN_podNN = `-(?P<host>mlab\d)-(?P<pod>[[:alpha:]]{3}\d[0-9t])-`
-const exp_NNNN = `(?P<experiment>.*)-(?P<filenumber>\d{4})(?P<etag>-e)?`
-const suffix = `(?P<suffix>\.tar|\.tar.gz|\.tgz)$`
+// BucketPattern is used to extract gsutil bucket name.
+const BucketPattern = `gs://([^/]*)/`
+
+// ExpTypePattern is used to extract the experiment or experiment/type part of the path.
+const ExpTypePattern = `(?:([a-z-]+)/)?([a-z0-9-]+)/` // experiment OR experiment/type.
+
+// DatePathPattern is used to extract the date directory part of the path, e.g. 2017/01/02
+const DatePathPattern = `(\d{4}/[01]\d/[0123]\d)/`
+
+const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6})(\.\d{0,6})?Z`
+
+const type2 = `(?:-([a-z0-9-]+))?` // optional datatype string
+const mlabNSiteNN = `-(mlab\d)-([a-z]{3}\d[0-9t])-`
+
+// This parses the experiment name, optional -NNNN sequence number, and optional -e (for old embargoed files)
+const expNNNNE = `([a-z-]+)(?:-(\d{4}))?(-e)?`
+const suffix = `(\.tar|\.tar.gz|\.tgz)$`
 
 // These are here to facilitate use across queue-pusher and parsing components.
 var (
-	// This matches any valid test file name, and some invalid ones.
-	TaskPattern = regexp.MustCompile(start + // #1 #2
-		datePath + // #3 - YYYY/MM/DD
-		dateTime + // #4 - YYYYMMDDTHHMMSSZ
-		mlabN_podNN + // #5 #6 - e.g. -mlab1-lax04-
-		exp_NNNN + // #7 #8 e.g. ndt-0001
-		suffix) // #9 typically .tgz
+	basicTaskPattern = regexp.MustCompile(
+		`(?P<preamble>.*)` + dateTime + `(?P<postamble>.*)`)
 
-	startPattern = regexp.MustCompile(start)
-	endPattern   = regexp.MustCompile(suffix)
-	podPattern   = regexp.MustCompile(mlabN_podNN)
+	startPattern = regexp.MustCompile(`^` + BucketPattern + ExpTypePattern + DatePathPattern + `$`)
+	endPattern   = regexp.MustCompile(`^` +
+		type2 + // 1
+		mlabNSiteNN + // 2,3
+		expNNNNE + // 4,5,6
+		suffix + `$`) // 7
+
+	dateTimePattern = regexp.MustCompile(dateTime)
+	sitePattern     = regexp.MustCompile(type2 + mlabNSiteNN)
+
+	justSitePattern = regexp.MustCompile(`.*` + mlabNSiteNN + `.*`)
 )
 
 // DataPath breaks out the components of a task filename.
 type DataPath struct {
-	// TODO(dev) Delete unused fields.
-	// They are comprehensive now in anticipation of using them to populate
-	// new fields in the BQ tables.
-	Bucket     string // #1 -- the GCS bucket name.
-	Exp1       string // #2 -- the experiment directory.
-	DatePath   string // #3 -- the YYYY/MM/DD date path.
-	PackedDate string // #4 -- the YYYYMMDD date.
-	PackedTime string // #5 -- the HHMMSS time.
-	Host       string // #6 -- the short server name, e.g. mlab1.
-	Pod        string // #7 -- the pod/site name, e.g. ams02.
-	Experiment string // #8 -- the experiment name, e.g. ndt
-	FileNumber string // #9 -- the file number, e.g. 0001
-	Suffix     string // #10 -- the archive suffix, e.g. .tgz
+	// These fields are from the bucket and path
+	Bucket   string // the GCS bucket name.
+	ExpDir   string // the experiment directory.
+	DataType string //
+	DatePath string // the YYYY/MM/DD date path.
+	// The rest are from the filename
+	PackedDate string // the YYYYMMDD date.
+	PackedTime string // the HHMMSS time.
+	DataType2  string // new platform also embeds the data type in the filename
+	Host       string // the short server name, e.g. mlab1.
+	Site       string // the pod/site name, e.g. ams02.
+	Experiment string // the experiment name, e.g. ndt, typically identical to ExpDir
+	FileNumber string // the file number, e.g. 0001
+	Embargo    string // optional
+	Suffix     string // the archive suffix, e.g. .tgz
 }
 
 // ValidateTestPath validates a task filename.
 func ValidateTestPath(path string) (*DataPath, error) {
-	fields := TaskPattern.FindStringSubmatch(path)
-
-	if fields == nil {
-		if !startPattern.MatchString(path) {
-			return nil, errors.New("Path should begin with gs://.../.../: " + path)
-		}
-		if !endPattern.MatchString(path) {
-			return nil, errors.New("Path should end in .tar, .tgz, or .tar.gz: " + path)
-		}
-		if !podPattern.MatchString(path) {
-			return nil, errors.New("Path should contain -mlabN-podNN: " + path)
-		}
-		return nil, errors.New("Invalid test path: " + path)
+	basic := basicTaskPattern.FindStringSubmatch(path)
+	if basic == nil {
+		return nil, errors.New("Path missing date-time string")
 	}
-	if len(fields) < 11 {
-		return nil, errors.New("Path does not include all fields: " + path)
+	preamble := startPattern.FindStringSubmatch(basic[1])
+	if preamble == nil {
+		return nil, errors.New("Invalid preamble: " + fmt.Sprint(basic))
+	}
+
+	post := endPattern.FindStringSubmatch(basic[5])
+	if post == nil {
+		return nil, errors.New("Invalid postamble: " + basic[5])
 	}
 	dp := &DataPath{
-		Bucket:     fields[1],
-		Exp1:       fields[2],
-		DatePath:   fields[3],
-		PackedDate: fields[4],
-		PackedTime: fields[5],
-		Host:       fields[6],
-		Pod:        fields[7],
-		Experiment: fields[8],
-		FileNumber: fields[9],
-		Suffix:     fields[11],
+		Bucket:     preamble[1],
+		ExpDir:     preamble[2],
+		DataType:   preamble[3],
+		DatePath:   preamble[4],
+		PackedDate: basic[2],
+		PackedTime: basic[3],
+		DataType2:  post[1],
+		Host:       post[2],
+		Site:       post[3],
+		Experiment: post[4],
+		FileNumber: post[5],
+		Embargo:    post[6],
+		Suffix:     post[7],
 	}
 	return dp, nil
 }
 
 // GetDataType finds the type of data stored in a file from its complete filename
 func (fn *DataPath) GetDataType() DataType {
-	dt, ok := dirToDataType[fn.Exp1]
+	dt, ok := dirToDataType[fn.DataType]
 	if !ok {
 		return INVALID
 	}
@@ -119,14 +143,18 @@ func IsBatchService() bool {
 	return IsBatch
 }
 
-// GetMetroName extracts metro name like "acc" from file name like
+// GetIATACode extracts iata code like "acc" from file name like
 // 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
-func GetMetroName(rawFilename string) string {
-	podName := podPattern.FindString(rawFilename)
-	if podName != "" {
-		return podName[7:10]
+func GetIATACode(rawFilename string) string {
+	parts := justSitePattern.FindStringSubmatch(rawFilename)
+	if len(parts) != 3 {
+		log.Println("Unable to extract IATA code from", rawFilename)
+		return ""
 	}
-	return ""
+	if len(parts[2]) < 3 {
+		return parts[2]
+	}
+	return parts[2][0:3]
 }
 
 // GetIntFromIPv4 converts an IPv4 address to equivalent uint32.
@@ -180,12 +208,17 @@ func (dt DataType) BQBufferSize() int {
 	return dataTypeToBQBufferSize[dt]
 }
 
+// These constants enumerate the different data types.
+// TODO - use camelcase.
 const (
 	NDT             = DataType("ndt")
+	NDT5            = DataType("ndt5")
+	NDT7            = DataType("ndt7")
 	NDT_OMIT_DELTAS = DataType("ndt_nodelta") // to support larger buffer size.
 	SS              = DataType("sidestream")
 	PT              = DataType("traceroute")
 	SW              = DataType("switch")
+	TCPINFO         = DataType("tcpinfo")
 	INVALID         = DataType("invalid")
 )
 
@@ -194,9 +227,12 @@ var (
 	// TODO - this should be loaded from a config.
 	dirToDataType = map[string]DataType{
 		"ndt":              NDT,
+		"ndt5":             NDT5,
+		"ndt7":             NDT7,
 		"sidestream":       SS,
 		"paris-traceroute": PT,
 		"switch":           SW,
+		"tcpinfo":          TCPINFO,
 	}
 
 	// DataTypeToTable maps from data type to BigQuery table name.
@@ -206,6 +242,9 @@ var (
 		SS:      "sidestream",
 		PT:      "traceroute",
 		SW:      "switch",
+		TCPINFO: "tcpinfo",
+		NDT5:    "ndt5",
+		NDT7:    "ndt7",
 		INVALID: "invalid",
 	}
 
@@ -214,9 +253,12 @@ var (
 	dataTypeToBQBufferSize = map[DataType]int{
 		NDT:             10,
 		NDT_OMIT_DELTAS: 50,
+		TCPINFO:         10,
 		SS:              500, // Average json size is 2.5K
-		PT:              300,
+		PT:              5,
 		SW:              100,
+		NDT5:            50,
+		NDT7:            50,
 		INVALID:         0,
 	}
 	// There is also a mapping of data types to queue names in

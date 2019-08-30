@@ -1,6 +1,7 @@
-// Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
-// The format of test file can be found at https://paris-traceroute.net/.
 package parser
+
+// Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+// The format of legacy test file can be found at https://paris-traceroute.net/.
 
 import (
 	"errors"
@@ -13,6 +14,8 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
@@ -34,16 +37,16 @@ func (f *PTFileName) GetDate() (string, bool) {
 // not polluted and can be inserted into BQ tables
 type cachedPTData struct {
 	TestID           string
-	Hops             []*schema.ParisTracerouteHop
+	Hops             []schema.ScamperHop
 	LogTime          time.Time
-	ConnSpec         *schema.MLabConnectionSpecification
+	Source           schema.ServerInfo
+	Destination      schema.ClientInfo
 	LastValidHopLine string
 	MetroName        string
 }
 
 type PTParser struct {
-	inserter etl.Inserter
-	etl.RowStats
+	Base
 	// Care should be taken to ensure this does not accumulate many rows and
 	// lead to OOM problems.
 	previousTests []cachedPTData
@@ -69,17 +72,20 @@ const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 const PTBufferSize int = 2
 
-func NewPTParser(ins etl.Inserter) *PTParser {
-	return &PTParser{
-		inserter:      ins,
-		RowStats:      ins,
-		previousTests: []cachedPTData{},
+func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
+	bufSize := etl.PT.BQBufferSize()
+	var annotator v2as.Annotator
+	if len(ann) > 0 && ann[0] != nil {
+		annotator = ann[0]
+	} else {
+		annotator = v2as.GetAnnotator(annotation.BatchURL)
 	}
+	return &PTParser{Base: *NewBase(ins, bufSize, annotator)}
 }
 
-// ProcessAllNodes take the array of the Nodes, and generate one ParisTracerouteHop entry from each node.
-func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string) []*schema.ParisTracerouteHop {
-	var results []*schema.ParisTracerouteHop
+// ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
+func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string) []schema.ScamperHop {
+	var results []schema.ScamperHop
 	if len(allNodes) == 0 {
 		return nil
 	}
@@ -87,28 +93,36 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 	// Iterate from the end of the list of nodes to minimize cost of removing nodes.
 	for i := len(allNodes) - 1; i >= 0; i-- {
 		metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
+		oneProbe := schema.HopProbe{
+			Rtt: allNodes[i].rtts,
+		}
+		probes := make([]schema.HopProbe, 0, 1)
+		probes = append(probes, oneProbe)
+		hopLink := schema.HopLink{
+			HopDstIP: allNodes[i].ip,
+			Probes:   probes,
+		}
+		links := make([]schema.HopLink, 0, 1)
+		links = append(links, hopLink)
 		if allNodes[i].parent_ip == "" {
-			oneHop := &schema.ParisTracerouteHop{
-				Protocol:      protocol,
-				Dest_ip:       allNodes[i].ip,
-				Dest_hostname: allNodes[i].hostname,
-				Rtt:           allNodes[i].rtts,
-				Src_ip:        server_IP,
-				Src_af:        IPv4_AF,
-				Dest_af:       IPv4_AF,
+			// create a hop that from server_IP to allNodes[i].ip
+			source := schema.HopIP{
+				IP: server_IP,
+			}
+			oneHop := schema.ScamperHop{
+				Source: source,
+				Links:  links,
 			}
 			results = append(results, oneHop)
 			break
 		} else {
-			oneHop := &schema.ParisTracerouteHop{
-				Protocol:      protocol,
-				Dest_ip:       allNodes[i].ip,
-				Dest_hostname: allNodes[i].hostname,
-				Rtt:           allNodes[i].rtts,
-				Src_ip:        allNodes[i].parent_ip,
-				Src_hostname:  allNodes[i].parent_hostname,
-				Src_af:        IPv4_AF,
-				Dest_af:       IPv4_AF,
+			source := schema.HopIP{
+				IP:       allNodes[i].parent_ip,
+				Hostname: allNodes[i].parent_hostname,
+			}
+			oneHop := schema.ScamperHop{
+				Source: source,
+				Links:  links,
 			}
 			results = append(results, oneHop)
 		}
@@ -188,37 +202,30 @@ func (pt *PTParser) TaskError() error {
 }
 
 func (pt *PTParser) TableName() string {
-	return pt.inserter.TableBase()
-}
-
-func (pt *PTParser) FullTableName() string {
-	return pt.inserter.FullTableName()
+	return pt.TableBase()
 }
 
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
-	for _, hop := range oneTest.Hops {
-		ptTest := schema.PT{
-			TestID:               oneTest.TestID,
-			LogTime:              oneTest.LogTime.Unix(),
-			ParseTime:            time.Now(),
-			ParserVersion:        Version(),
-			TaskFilename:         pt.taskFileName,
-			Connection_spec:      *(oneTest.ConnSpec),
-			Paris_traceroute_hop: *hop,
-			Type:                 int32(2),
-			Project:              int32(3),
-		}
-		err := pt.inserter.InsertRow(ptTest)
-		if err != nil {
-			metrics.ErrorCount.WithLabelValues(
-				pt.TableName(), "pt", "insert-err").Inc()
-			log.Printf("insert-err: %v\n", err)
-			// Inc TestCount only once per row.
-			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "insert-err").Inc()
-		} else {
-			// Inc TestCount on successful row insert.
-			metrics.TestCount.WithLabelValues(pt.TableName(), "pt", "ok").Inc()
-		}
+	parseInfo := schema.ParseInfo{
+		TaskFileName:  pt.taskFileName,
+		ParseTime:     time.Now(),
+		ParserVersion: Version(),
+	}
+
+	ptTest := schema.PTTest{
+		TestTime:    oneTest.LogTime,
+		Parseinfo:   parseInfo,
+		Source:      oneTest.Source,
+		Destination: oneTest.Destination,
+		Hop:         oneTest.Hops,
+	}
+
+	err := pt.AddRow(&ptTest)
+	if err == etl.ErrBufferFull {
+		// Flush asynchronously, to improve throughput.
+		pt.Annotate(pt.TableName())
+		pt.PutAsync(pt.TakeRows())
+		pt.AddRow(&ptTest)
 	}
 }
 
@@ -233,8 +240,7 @@ func (pt *PTParser) ProcessLastTests() error {
 
 func (pt *PTParser) Flush() error {
 	pt.ProcessLastTests()
-	return pt.inserter.Flush()
-
+	return pt.Inserter.Flush()
 }
 
 func CreateTestId(fn string, bn string) string {
@@ -271,13 +277,13 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		pt.taskFileName = meta["filename"].(string)
 	}
 
-	cashedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
+	cachedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
 		metrics.TestCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
-		log.Println(err)
+		log.Printf("%v %s", err, testName)
 		return err
 	}
 
@@ -286,12 +292,13 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// If it does appear, then the buffered test was polluted, and it will
 	// be discarded from buffer.
 	// If it does not appear, then no pollution detected.
-	destIP := cashedTest.ConnSpec.Client_ip
+	destIP := cachedTest.Destination.IP
 	for index, PTTest := range pt.previousTests {
 		// array of hops was built in reverse order from list of nodes
 		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
 		finalHop := PTTest.Hops[0]
-		if PTTest.ConnSpec.Client_ip != destIP && (finalHop.Dest_ip == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
+		if PTTest.Destination.IP != destIP && len(finalHop.Links) > 0 &&
+			(finalHop.Links[0].HopDstIP == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
 			// Discard pt.previousTests[index]
 			metrics.PTPollutedCount.WithLabelValues(pt.previousTests[index].MetroName).Inc()
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
@@ -307,8 +314,8 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// the new test.
 	// Also we don't care about test LogTime order, since there are other
 	// workers inserting other blocks of hops concurrently.
-	if cashedTest.LastValidHopLine == "ExpectedDestIP" {
-		pt.InsertOneTest(cashedTest)
+	if cachedTest.LastValidHopLine == "ExpectedDestIP" {
+		pt.InsertOneTest(cachedTest)
 		return nil
 	}
 
@@ -319,7 +326,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		pt.previousTests = pt.previousTests[1:]
 	}
 	// Insert current test into pt.previousTests
-	pt.previousTests = append(pt.previousTests, cashedTest)
+	pt.previousTests = append(pt.previousTests, cachedTest)
 	return nil
 }
 
@@ -438,8 +445,8 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 // TODO(dev): dedup the hops that are identical.
 func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte, tableName string) (cachedPTData, error) {
 	//log.Printf("%s", testName)
-	metrics.WorkerState.WithLabelValues(tableName, "parse").Inc()
-	defer metrics.WorkerState.WithLabelValues(tableName, "parse").Dec()
+	metrics.WorkerState.WithLabelValues(tableName, "pt-parse").Inc()
+	defer metrics.WorkerState.WithLabelValues(tableName, "pt-parse").Dec()
 
 	// Get the logtime
 	fn := PTFileName{Name: filepath.Base(testName)}
@@ -480,7 +487,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 			var err error
 			protocol, destIP, serverIP, err = ParseFirstLine(oneLine)
 			if err != nil {
-				log.Println(oneLine)
+				log.Printf("%s %s", oneLine, testName)
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				return cachedPTData{}, err
@@ -526,8 +533,8 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	if meta["filename"] != nil {
 		fileName = meta["filename"].(string)
 	}
-	metroName := etl.GetMetroName(fileName)
-	metrics.PTTestCount.WithLabelValues(metroName).Inc()
+	iataCode := etl.GetIATACode(fileName)
+	metrics.PTTestCount.WithLabelValues(iataCode).Inc()
 	// lastHop is a close estimation for where the test reached at the end.
 	// It is possible that the last line contains destIP and other IP at the same time
 	// if the previous hop contains multiple paths.
@@ -541,10 +548,10 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
 		lastHop = allNodes[len(allNodes)-1].ip
-		metrics.PTNotReachDestCount.WithLabelValues(metroName).Inc()
+		metrics.PTNotReachDestCount.WithLabelValues(iataCode).Inc()
 		if reachedDest {
 			// This test reach dest in the middle, but then do weird things for unknown reason.
-			metrics.PTMoreHopsAfterDest.WithLabelValues(metroName).Inc()
+			metrics.PTMoreHopsAfterDest.WithLabelValues(iataCode).Inc()
 			log.Printf("middle mess up test_id: " + fileName + " " + testName)
 		}
 	} else {
@@ -554,32 +561,31 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// The last node of allNodes contains the last hop IP.
 	bitsDiff, ipType := etl.NumberBitsDifferent(destIP, lastHop)
 	if ipType == 4 {
-		metrics.PTBitsAwayFromDestV4.WithLabelValues(metroName).Observe(float64(bitsDiff))
+		metrics.PTBitsAwayFromDestV4.WithLabelValues(iataCode).Observe(float64(bitsDiff))
 	}
 	if ipType == 6 {
-		metrics.PTBitsAwayFromDestV6.WithLabelValues(metroName).Observe(float64(bitsDiff))
+		metrics.PTBitsAwayFromDestV6.WithLabelValues(iataCode).Observe(float64(bitsDiff))
 	}
 
 	// Generate Hops from allNodes
 	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName)
-	connSpec := &schema.MLabConnectionSpecification{
-		Server_ip:      serverIP,
-		Server_af:      IPv4_AF,
-		Client_ip:      destIP,
-		Client_af:      IPv4_AF,
-		Data_direction: 0,
+
+	source := schema.ServerInfo{
+		IP: serverIP,
+	}
+	destination := schema.ClientInfo{
+		IP: destIP,
 	}
 
-	// Only annotate if flag enabled...
-	AddGeoDataPTConnSpec(connSpec, logTime)
-	AddGeoDataPTHopBatch(PTHops, logTime)
+	// TODO: Add annotation to the IP of source, destination and hops.
 
 	return cachedPTData{
 		TestID:           testId,
 		Hops:             PTHops,
 		LogTime:          logTime,
-		ConnSpec:         connSpec,
+		Source:           source,
+		Destination:      destination,
 		LastValidHopLine: lastValidHopLine,
-		MetroName:        metroName,
+		MetroName:        iataCode,
 	}, nil
 }

@@ -190,3 +190,45 @@ type SS struct {
 	Type             int64          `json:"type,int64"`
 	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`
 }
+
+// Implement parser.Annotatable
+
+// GetLogTime returns the timestamp that should be used for annotation.
+func (ss *SS) GetLogTime() time.Time {
+	// StartTimeStamp is in usec.
+	return time.Unix(0, 1000*ss.Web100_log_entry.Snap.StartTimeStamp)
+}
+
+// GetClientIPs returns the client (remote) IP for annotation.  See parser.Annotatable
+func (ss *SS) GetClientIPs() []string {
+	return []string{ss.Web100_log_entry.Connection_spec.Remote_ip}
+}
+
+// GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
+func (ss *SS) GetServerIP() string {
+	return ss.Web100_log_entry.Connection_spec.Local_ip
+}
+
+// AnnotateClients adds the client annotations. See parser.Annotatable
+func (ss *SS) AnnotateClients(annMap map[string]*api.Annotations) error {
+	connSpec := &ss.Web100_log_entry.Connection_spec
+	if annMap != nil {
+		ann, ok := annMap[connSpec.Remote_ip]
+		if ok && ann.Geo != nil {
+			connSpec.Remote_geolocation = *ann.Geo
+		}
+		// TODO Handle ASN
+	}
+	return nil
+}
+
+// AnnotateServer adds the server annotations. See parser.Annotatable
+func (ss *SS) AnnotateServer(local *api.Annotations) error {
+	connSpec := &ss.Web100_log_entry.Connection_spec
+	if local != nil && local.Geo != nil {
+		// TODO - this should probably be a pointer
+		connSpec.Local_geolocation = *local.Geo
+		// TODO Handle ASN
+	}
+	return nil
+}

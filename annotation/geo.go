@@ -36,14 +36,37 @@ var BaseURL = AnnotatorURL + "/annotate?"
 // BatchURL provides the base URL for batch annotation requests
 var BatchURL = AnnotatorURL + "/batch_annotate"
 
-// FetchGeoAnnotations takes a slice of strings
-// containing ip addresses, a timestamp, and a slice of pointers to
-// the GeolocationIP structs that correspond to the ip addresses. A
-// precondition assumed by this function is that both slices are the
-// same length. It will then make a call to the batch annotator, using
-// the ip addresses and the timestamp. Then, it uses that data to fill
-// in the structs pointed to by the slice of GeolocationIP pointers.
-func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.GeolocationIP) {
+// trackMissingResponses generates metrics for missing annotations.
+func trackMissingResponses(anno *api.GeoData) {
+	if anno == nil {
+		metrics.AnnotationMissingCount.WithLabelValues("nil-response").Inc()
+		return
+	}
+
+	netOk := anno.Network != nil && len(anno.Network.Systems) > 0 && len(anno.Network.Systems[0].ASNs) > 0 && anno.Network.Systems[0].ASNs[0] != 0
+	geoOk := anno.Geo != nil && anno.Geo.Latitude != 0 && anno.Geo.Longitude != 0
+
+	if netOk && geoOk {
+		return
+	}
+	if netOk {
+		if anno.Geo == nil {
+			metrics.AnnotationMissingCount.WithLabelValues("nil-geo").Inc()
+		} else {
+			metrics.AnnotationMissingCount.WithLabelValues("empty-geo").Inc()
+		}
+	} else if geoOk {
+		if anno.Network == nil {
+			metrics.AnnotationMissingCount.WithLabelValues("nil-asn").Inc()
+		} else {
+			metrics.AnnotationMissingCount.WithLabelValues("empty-asn").Inc()
+		}
+	} else {
+		metrics.AnnotationMissingCount.WithLabelValues("both").Inc()
+	}
+}
+
+func getAnnotations(ctx context.Context, timestamp time.Time, ips []string) ([]string, *v2.Response, error) {
 	normalized := make([]string, len(ips))
 	for i := range ips {
 		if ips[i] == "" {
@@ -55,20 +78,48 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.Geolo
 		var err error
 		normalized[i], err = web100.NormalizeIPv6(ips[i])
 		if err != nil {
-			log.Println(err)
+			log.Println(ips[i], err)
 			metrics.AnnotationWarningCount.With(prometheus.
 				Labels{"source": "NormalizeIPv6 Error"}).Inc()
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
 	resp, err := v2.GetAnnotations(ctx, BatchURL, timestamp, normalized)
 	if err != nil {
-		// There are many error types returned here, so we log the error, but use the code location
+		log.Output(2, err.Error())
+		// There are many error types returned here, so we log the error, but use the caller location
 		// for the metric.
-		log.Println(err)
-		_, file, line, _ := runtime.Caller(0)
+		_, file, line, _ := runtime.Caller(2)
 		metrics.AnnotationErrorCount.With(prometheus.Labels{"source": fmt.Sprint(file, ":", line)}).Inc()
+		metrics.AnnotationMissingCount.WithLabelValues("rpc error").Add(float64(len(ips)))
+		return normalized, nil, err
+	}
+
+	if resp != nil {
+		for _, anno := range resp.Annotations {
+			trackMissingResponses(anno)
+		}
+	}
+
+	return normalized, resp, err
+}
+
+// AddGeoAnnotations takes a slice of string ip addresses, a timestamp,
+// and a slice of pointers to corresponding GeolocationIP structs.
+// Slices must be the same length, or the function will immediately return.
+// It calls the batch annotator, using the ip addresses and the timestamp and uses
+// the response to fill in the structs pointed to by the slice of GeolocationIP pointers.
+// Deprecated:  Use Annotatable interface and parser.Base instead.
+func AddGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.GeolocationIP) {
+	if ips == nil || geoDest == nil || len(ips) != len(geoDest) || len(ips) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	normalized, resp, err := getAnnotations(ctx, timestamp, ips)
+
+	if err != nil {
+		// getAnnotations should have logged error and updated metric.
 		return
 	}
 
@@ -81,6 +132,35 @@ func FetchGeoAnnotations(ips []string, timestamp time.Time, geoDest []*api.Geolo
 		}
 		*geoDest[i] = *data.Geo
 	}
+}
+
+// FetchAllAnnotations takes a slice of strings containing ip addresses, a timestamp.
+// It returns an array of pointers to GeoData structs corresponding to the ip addresses, or
+// nil if there is an error.
+// Deprecated:  Use Annotatable interface and parser.Base instead.
+func FetchAllAnnotations(ips []string, timestamp time.Time) []*api.GeoData {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	normalized, resp, err := getAnnotations(ctx, timestamp, ips)
+
+	if err != nil {
+		return nil
+	}
+
+	geoDest := make([]*api.GeoData, len(ips)) // nil pointers
+
+	for i := range normalized {
+		data, ok := resp.Annotations[normalized[i]]
+		if !ok || data.Geo == nil {
+			metrics.AnnotationWarningCount.With(prometheus.
+				Labels{"source": "Missing or empty data for IP Address!!!"}).Inc()
+			continue
+		}
+		geoDest[i] = data
+	}
+
+	return geoDest
 }
 
 // GetAndInsertGeolocationIPStruct takes a NON-NIL pointer to a
@@ -166,11 +246,13 @@ func ParseJSONGeoDataResponse(jsonBuffer []byte) (*api.GeoData, error) {
 // ip-timestamp strings to GeoData structs, or a nil map if it
 // encounters any error and cannot get the data for any reason
 // TODO - dedup common code in GetGeoData
+// Deprecated:  Use Annotatable interface and parser.Base instead.
 func GetBatchGeoData(url string, data []api.RequestData) map[string]api.GeoData {
 	// Query the service and grab the response safely
 	// All errors are recorded to metrics, so OK to ignore them here.
 	annotatorResponse, err := BatchQueryAnnotationService(url, data)
 	if err != nil {
+		// This is now very spammy, since we added ServiceUnavailable status.
 		log.Println("BatchQueryAnnotationService Error:", err)
 		return nil
 	}

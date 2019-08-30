@@ -1,5 +1,5 @@
-// The metrics package defines prometheus metric types and provides
-// convenience methods to add accounting to various parts of the pipeline.
+// Package metrics defines prometheus metric types and provides convenience
+// methods to add accounting to various parts of the pipeline.
 //
 // When defining new operations or metrics, these are helpful values to track:
 //  - things coming into or go out of the system: requests, files, tests, api calls.
@@ -16,46 +16,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
-
-func init() {
-	// Register the metrics defined with Prometheus's default registry.
-
-	// Annotator
-	prometheus.MustRegister(AnnotationTimeSummary)
-	prometheus.MustRegister(AnnotationRequestCount)
-	prometheus.MustRegister(AnnotationErrorCount)
-	prometheus.MustRegister(AnnotationWarningCount)
-
-	// PT
-	prometheus.MustRegister(PTHopCount)
-	prometheus.MustRegister(PTTestCount)
-	prometheus.MustRegister(PTNotReachDestCount)
-	prometheus.MustRegister(PTMoreHopsAfterDest)
-	prometheus.MustRegister(PTBitsAwayFromDestV4)
-	prometheus.MustRegister(PTBitsAwayFromDestV6)
-	prometheus.MustRegister(PTPollutedCount)
-
-	// NDT
-	prometheus.MustRegister(DeltaNumFieldsHistogram)
-	prometheus.MustRegister(EntryFieldCountHistogram)
-	prometheus.MustRegister(FileSizeHistogram)
-	prometheus.MustRegister(RowSizeHistogram)
-
-	// Common metrics
-	prometheus.MustRegister(FileCount)
-	prometheus.MustRegister(PanicCount)
-	prometheus.MustRegister(WorkerCount)
-	prometheus.MustRegister(WorkerState)
-	prometheus.MustRegister(TaskCount)
-	prometheus.MustRegister(TestCount)
-	prometheus.MustRegister(ErrorCount)
-	prometheus.MustRegister(WarningCount)
-	prometheus.MustRegister(BackendFailureCount)
-	prometheus.MustRegister(GCSRetryCount)
-	prometheus.MustRegister(DurationHistogram)
-	prometheus.MustRegister(InsertionHistogram)
-}
 
 // TODO
 // Want a goroutine that monitors the workers, and updates metrics to indicate how long the
@@ -70,7 +32,7 @@ var (
 	//    etl_annotator_Annotation_Time_Summary
 	// Example usage:
 	//    metrics.AnnotationTimeSummary.observe(float64)
-	AnnotationTimeSummary = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+	AnnotationTimeSummary = promauto.NewSummaryVec(prometheus.SummaryOpts{
 		Name: "etl_annotator_Annotation_Time_Summary",
 		Help: "The total time to annotate, in nanoseconds.",
 	}, []string{"test_type"})
@@ -80,7 +42,7 @@ var (
 	//    etl_annotator_Request_Count
 	// Example usage:
 	//    metrics.AnnotationRequestCount.Inc()
-	AnnotationRequestCount = prometheus.NewGauge(prometheus.GaugeOpts{
+	AnnotationRequestCount = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "etl_annotator_Request_Count",
 		Help: "The current number of annotation requests",
 	})
@@ -90,10 +52,10 @@ var (
 	//    etl_annotator_Error_Count
 	// Example usage:
 	//    metrics.AnnotationErrorCount.Inc()
-	AnnotationErrorCount = prometheus.NewCounterVec(
+	AnnotationErrorCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_annotator_Error_Count",
-			Help: "The current number of errors encountered while attempting to add geo data.",
+			Help: "The current number of errors encountered while attempting to add annotation data.",
 		}, []string{"source"})
 
 	// AnnotationWarningCount measures the number of annotation warnings
@@ -101,11 +63,23 @@ var (
 	//    etl_annotator_Warning_Count
 	// Example usage:
 	//    metrics.AnnotationWarningCount.Inc()
-	AnnotationWarningCount = prometheus.NewCounterVec(
+	AnnotationWarningCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_annotator_Warning_Count",
-			Help: "The current number of Warnings encountered while attempting to add geo data.",
+			Help: "The current number of Warnings encountered while attempting to add annotation data.",
 		}, []string{"source"})
+
+	// AnnotationMissingCount measures the number of IPs with missing annotation.
+	// The type could be "rpc error", "nil entry", "asn", "geo", or "both".
+	// Provides metrics:
+	//    etl_annotator_missing_total
+	// Example usage:
+	//    metrics.AnnotationMissingCount.WithLabelValues("nil entry").Inc()
+	AnnotationMissingCount = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_annotation_missing_total",
+			Help: "The current number of IPs with missing annotation data.",
+		}, []string{"type"})
 
 	// PanicCount counts the number of panics encountered in the pipeline.
 	//
@@ -113,7 +87,7 @@ var (
 	//   etl_panic_count{source}
 	// Example usage:
 	//   metrics.PanicCount.WithLabelValues("worker").Inc()
-	PanicCount = prometheus.NewCounterVec(
+	PanicCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_panic_count",
 			Help: "Number of panics encountered.",
@@ -128,7 +102,7 @@ var (
 	//   etl_worker_count
 	// Example usage:
 	//   metrics.WorkerCount.WithLabelValues("ndt").Inc()
-	WorkerCount = prometheus.NewGaugeVec(
+	WorkerCount = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "etl_worker_count",
 			Help: "Number of active workers.",
@@ -142,7 +116,7 @@ var (
 	//   etl_worker_count{table="ndt", state="insert"}
 	// Example usage:
 	//   metrics.WorkerState.WithLabelValues("ndt", "flush").Inc() / .Dec()
-	WorkerState = prometheus.NewGaugeVec(
+	WorkerState = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "etl_worker_state",
 			Help: "Number of workers in different states.",
@@ -158,7 +132,7 @@ var (
 	//   etl_files_processed{rsync_host_module, day_of_week}
 	// Example usage:
 	//   metrics.FileCount.WithLabelValues("mlab1-atl01-ndt", "Sunday").Inc()
-	FileCount = prometheus.NewCounterVec(
+	FileCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_files_processed",
 			Help: "Number of files processed.",
@@ -172,7 +146,7 @@ var (
 	//   etl_task_count{table, package, status}
 	// Example usage:
 	//   metrics.TaskCount.WithLabelValues("ndt", "Task", "ok").Inc()
-	TaskCount = prometheus.NewCounterVec(
+	TaskCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_task_count",
 			Help: "Number of tasks/archive files processed.",
@@ -188,7 +162,7 @@ var (
 	// Example usage:
 	// metrics.TestCount.WithLabelValues(
 	//	tt.Inserter.TableBase(), "s2c", "ok").Inc()
-	TestCount = prometheus.NewCounterVec(
+	TestCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_test_count",
 			Help: "Number of tests processed.",
@@ -204,7 +178,7 @@ var (
 	// Example usage:
 	// metrics.PTHopCount.WithLabelValues(
 	//	tt.Inserter.TableBase(), "hop", "ok").Inc()
-	PTHopCount = prometheus.NewCounterVec(
+	PTHopCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_pthop_count",
 			Help: "Number of hops for PT tests processed.",
@@ -219,7 +193,7 @@ var (
 	//   etl_pt_test_count_per_metro{metro}
 	// Example usage:
 	//   metrics.PTTestCountPerSite.WithLabelValues("sea").Inc()
-	PTTestCount = prometheus.NewCounterVec(
+	PTTestCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_pt_test_count_per_metro",
 			Help: "Count how many PT tests per metro.",
@@ -235,7 +209,7 @@ var (
 	//   etl_pt_not_reach_dest_count{metro}
 	// Example usage:
 	//   metrics.PTNotReachDestCount.WithLabelValues("sea").Inc()
-	PTNotReachDestCount = prometheus.NewCounterVec(
+	PTNotReachDestCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_pt_not_reach_dest_count",
 			Help: "Count how many PT tests did not reach expected destination at the last hop per metro.",
@@ -251,7 +225,7 @@ var (
 	//   etl_pt_more_hops_after_dest_count{metro}
 	// Example usage:
 	//   metrics.PTMoreHopsAfterDest.WithLabelValues("sea").Inc()
-	PTMoreHopsAfterDest = prometheus.NewCounterVec(
+	PTMoreHopsAfterDest = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_pt_more_hops_after_dest_count",
 			Help: "Count how many PT tests reach expected destination in middle but do more hops afterwards instead of ending there.",
@@ -268,7 +242,7 @@ var (
 	//   etl_pt_bits_away_from_dest_v4{metro}
 	// Usage example:
 	//   metrics.PTBitsAwayFromDestV4.WithLabelValues("sea").Observe(bitsdiff)
-	PTBitsAwayFromDestV4 = prometheus.NewHistogramVec(
+	PTBitsAwayFromDestV4 = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_pt_bits_away_from_dest_v4",
 			Help: "Bits diff distribution between last hop and expected destination IP for IPv4.",
@@ -287,7 +261,7 @@ var (
 	//   etl_pt_bits_away_from_dest_v6{metro}
 	// Usage example:
 	//   metrics.PTNotReachBitsDiffV6.WithLabelValues("sea").Observe(bitsdiff)
-	PTBitsAwayFromDestV6 = prometheus.NewHistogramVec(
+	PTBitsAwayFromDestV6 = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_pt_bits_away_from_dest_v6",
 			Help: "Bits diff distribution between last hop and expected destination IP for IPv6.",
@@ -304,7 +278,7 @@ var (
 	//   etl_pt_polluted_total{metro}
 	// Example usage:
 	//   metrics.PTPollutedCount.WithLabelValues("sea").Inc()
-	PTPollutedCount = prometheus.NewCounterVec(
+	PTPollutedCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_pt_polluted_total",
 			Help: "Count how many PT tests polluted per metro.",
@@ -319,7 +293,7 @@ var (
 	//   etl_warning_count{table, filetype, kind}
 	// Example usage:
 	//   metrics.WarningCount.WithLabelValues(TableName(), "s2c", "small test").Inc()
-	WarningCount = prometheus.NewCounterVec(
+	WarningCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_warning_count",
 			Help: "Warnings that do not result in test loss.",
@@ -334,7 +308,7 @@ var (
 	//   etl_error_count{table, filetype, kind}
 	// Example usage:
 	//   metrics.ErrorCount.WithLabelValues(TableName(), s2c, "insert").Inc()
-	ErrorCount = prometheus.NewCounterVec(
+	ErrorCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_error_count",
 			Help: "Errors that cause test loss.",
@@ -350,7 +324,7 @@ var (
 	//   etl_backend_failure_count{table, kind}
 	// Example usage:
 	//   metrics.BackendFailureCount.WithLabelValues(TableName(), "insert").Inc()
-	BackendFailureCount = prometheus.NewCounterVec(
+	BackendFailureCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_backend_failure_count",
 			Help: "Backend failures, whether or not recoverable.",
@@ -366,7 +340,7 @@ var (
 	// Example usage:
 	// metrics.GCSRetryCount.WithLabelValues(
 	//	TableName(), "open", retries, "ok").Inc()
-	GCSRetryCount = prometheus.NewCounterVec(
+	GCSRetryCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "etl_gcs_retry_count",
 			Help: "Number of retries on GCS reads.",
@@ -388,7 +362,7 @@ var (
 	// Usage example:
 	//   metrics.RowSizeHistogram.WithLabelValues(
 	//           "ndt").Observe(len(json))
-	RowSizeHistogram = prometheus.NewHistogramVec(
+	RowSizeHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_row_json_size",
 			Help: "Row json size distributions.",
@@ -414,7 +388,7 @@ var (
 	// Usage example:
 	//   metrics.DeltaNumFieldsHistogram.WithLabelValues(
 	//           "ndt").Observe(fieldCount)
-	DeltaNumFieldsHistogram = prometheus.NewHistogramVec(
+	DeltaNumFieldsHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_delta_num_field",
 			Help: "Number of fields in delta distribution.",
@@ -442,7 +416,7 @@ var (
 	// Usage example:
 	//   metrics.EntryFieldCountHistogram.WithLabelValues(
 	//           "ndt").Observe(fieldCount)
-	EntryFieldCountHistogram = prometheus.NewHistogramVec(
+	EntryFieldCountHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_entry_field_count",
 			Help: "total snapshot field count distributions.",
@@ -471,7 +445,7 @@ var (
 	//   // do some stuff.
 	//   metrics.InsertionHistogram.WithLabelValues(
 	//           "ndt_test", "ok").Observe(time.Since(t).Seconds())
-	InsertionHistogram = prometheus.NewHistogramVec(
+	InsertionHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_insertion_time_seconds",
 			Help: "Insertion time distributions.",
@@ -497,7 +471,7 @@ var (
 	//   // do some stuff.
 	//   metrics.DurationHistogram.WithLabelValues(
 	//           "ndt").Observe(time.Since(t).Seconds())
-	DurationHistogram = prometheus.NewHistogramVec(
+	DurationHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_worker_duration_seconds",
 			Help: "Worker execution time distributions.",
@@ -517,7 +491,7 @@ var (
 	// Example usage:
 	//   metrics.FileSizeHistogram.WithLabelValues(
 	//       "ndt", "c2s_snaplog", "parsed").Observe(size)
-	FileSizeHistogram = prometheus.NewHistogramVec(
+	FileSizeHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "etl_test_file_size_bytes",
 			Help: "Size of individual test files.",

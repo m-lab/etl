@@ -64,7 +64,7 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 		values[k] = v
 	}
 	values["testname"] = testName
-	return tp.inserter.InsertRow(bq.MapSaver{Values: values})
+	return tp.inserter.InsertRow(bq.MapSaver(values))
 }
 
 // These functions are also required to complete the etl.Parser interface.
