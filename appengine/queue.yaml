@@ -464,7 +464,7 @@ queue:
     max_backoff_seconds: 20
 
 - name: etl-traceroute-batch-0
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   # max concurrent is limited, because we will share the pipeline with other experiment types
@@ -477,7 +477,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-1
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -486,7 +486,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-2
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -495,7 +495,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-3
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -504,7 +504,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-4
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -513,7 +513,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-5
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -522,7 +522,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-6
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -531,7 +531,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-7
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -540,7 +540,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-8
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -549,7 +549,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-9
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -558,7 +558,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-10
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -567,7 +567,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-11
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -576,7 +576,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-12
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -585,7 +585,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-13
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -594,7 +594,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-14
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -603,7 +603,7 @@ queue:
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 - name: etl-traceroute-batch-15
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   rate: 1/s
   bucket_size: 10
   max_concurrent_requests: 5
@@ -697,7 +697,7 @@ queue:
     max_doublings: 0
 
 - name: etl-traceroute-queue
-  target: etl-traceroute-parser
+  target: etl-batch-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
   rate: 1/s
