@@ -255,7 +255,7 @@ var (
 		NDT_OMIT_DELTAS: 50,
 		TCPINFO:         10,
 		SS:              500, // Average json size is 2.5K
-		PT:              50,
+		PT:              100,
 		SW:              100,
 		NDT5:            50,
 		NDT7:            50,
