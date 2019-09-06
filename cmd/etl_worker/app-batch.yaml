@@ -10,20 +10,20 @@ service: etl-batch-parser
 
 # TODO(dev): adjust CPU and memory based on actual requirements.
 resources:
-  cpu: 6
+  cpu: 2
   # Instances support between [(cpu * 0.9) - 0.4, (cpu * 6.5) - 0.4]
   # Actual memory available is exposed via GAE_MEMORY_MB environment variable.
   # Recent observation with 20 workers per instance hovers around 1.5 GB.
   # However, we see some OOMs at 3 GB, so let's try 6
-  memory_gb: 36
+  memory_gb: 66
 
   # TODO - Adjust once we understand requirements.
   disk_size_gb: 10
 
 automatic_scaling:
   # This is intended for batch jobs.
-  min_num_instances: 50
-  max_num_instances: 200
+  min_num_instances: 20
+  max_num_instances: 100
   # Very long cool down period, to reduce the likelihood of tasks being truncated.
   cool_down_period_sec: 1800
   # We don't care much about latency, so a high utilization is desireable.
