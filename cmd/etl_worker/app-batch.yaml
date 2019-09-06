@@ -15,7 +15,7 @@ resources:
   # Actual memory available is exposed via GAE_MEMORY_MB environment variable.
   # Recent observation with 20 workers per instance hovers around 1.5 GB.
   # However, we see some OOMs at 3 GB, so let's try 6
-  memory_gb: 66
+  memory_gb: 6
 
   # TODO - Adjust once we understand requirements.
   disk_size_gb: 10
