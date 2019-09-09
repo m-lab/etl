@@ -14,6 +14,7 @@ import (
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/web100"
+	"github.com/m-lab/go/logx"
 )
 
 // MetaFileData is the parsed info from the .meta file.
@@ -54,10 +55,12 @@ var fieldPairs = map[string]string{
 	"websockets": "websockets",
 }
 
+var logBadIP = logx.NewLogEvery(nil, 5*time.Second)
+
 func handleIP(connSpec schema.Web100ValueMap, prefix string, ipString string) {
 	connSpec.SetString(prefix+"_ip", ipString)
 	if web100.ValidateIP(ipString) != nil {
-		log.Printf("Failed parsing connSpec IP: %s\n", ipString)
+		logBadIP.Printf("Failed parsing connSpec IP: %s\n", ipString)
 		metrics.WarningCount.WithLabelValues(
 			"ndt", "unknown", "failed parsing connSpec IP").Inc()
 	} else {
