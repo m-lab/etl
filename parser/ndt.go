@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/m-lab/go/logx"
+
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/annotation-service/api"
@@ -811,6 +813,8 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 	}
 }
 
+var logMissing = logx.NewLogEvery(nil, 60*time.Second) // This is per instance.
+
 // AnnotateClients adds the client annotations. See parser.Annotatable
 // This is a bit ugly because of the use of bigquery Value maps.
 func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
@@ -843,7 +847,7 @@ func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 		// The rate of missing annotations is modest aside from 45.56.98,222, so we log
 		// all of them.  May have to reconsider if this is too spammy.  Might want to
 		// limit to once per second with logx.LogEvery.
-		log.Println("Missing annotation for", ip)
+		logMissing.Println("Missing annotation for", ip)
 
 		// A large fraction of our unannotated entries are from this ipv6 prefix.
 		// Don't know why, but break it out with its own label to facilitate debugging.

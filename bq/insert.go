@@ -270,7 +270,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		in.badRows += in.pending
 		err = nil
 	case *googleapi.Error:
-		log.Printf("Unhandled googleapi.Error on insert %v\n", typedErr)
+		log.Printf("%s %v", in.TableBase(), typedErr)
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
@@ -427,7 +427,6 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 		apiError, ok := err.(*googleapi.Error)
 		if !ok || size <= 1 || apiError.Code != 400 || !strings.Contains(apiError.Error(), "Request payload size exceeds the limit:") {
 			// This adjusts the inserted count, failure count, and updates in.rows.
-			log.Printf("%s %v", in.TableBase(), err)
 			metrics.InsertionHistogram.WithLabelValues(
 				in.TableBase(), "fail").Observe(time.Since(start).Seconds())
 			return in.updateMetrics(err)
