@@ -4,6 +4,7 @@ package parser
 // The format of legacy test file can be found at https://paris-traceroute.net/.
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -21,28 +22,249 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
+// -------------------------------------------------
+// The following are struct and funcs shared by legacy parsing and Json parsing.
+// -------------------------------------------------
 type PTFileName struct {
 	Name string
 }
 
 func (f *PTFileName) GetDate() (string, bool) {
-	if len(f.Name) > 18 {
-		// Return date string in format "20170320T23:53:10Z"
-		return f.Name[0:18], true
+	i := strings.Index(f.Name, "Z")
+	if i >= 15 {
+		// Return date string in format "20170320T23:53:10Z" or "20170320T235310Z"
+		return f.Name[0 : i+1], true
 	}
 	return "", false
 }
 
+// Return timestamp parsed from file name.
+func GetLogtime(filename PTFileName) (time.Time, error) {
+	date, success := filename.GetDate()
+	if !success {
+		return time.Time{}, nil
+	}
+	// date is in format like "20170320T23:53:10Z" or "20170320T235310Z"
+	var revisedDate string
+	if len(date) >= 18 {
+		revisedDate = date[0:4] + "-" + date[4:6] + "-" + date[6:18]
+	} else {
+		revisedDate = date[0:4] + "-" + date[4:6] + "-" + date[6:11] + ":" + date[11:13] + ":" + date[13:16]
+	}
+	t, err := time.Parse(time.RFC3339, revisedDate)
+	if err != nil {
+		log.Println(err)
+		return time.Time{}, err
+	}
+	return t, nil
+}
+
+// -------------------------------------------------
+// The following are struct and funcs used by Json parsing.
+// -------------------------------------------------
+
+type TS struct {
+	sec  int64
+	usec int64
+}
+
+type Reply struct {
+	rx         TS
+	ttl        int
+	rtt        float64
+	icmp_type  int
+	icmp_code  int
+	icmp_q_tos int
+	icmp_q_ttl int
+}
+
+type Probe struct {
+	tx      TS
+	replyc  int
+	ttl     int64
+	attempt int
+	flowid  int64
+	replies []Reply
+}
+
+type ScamperLink struct {
+	addr   string
+	probes []Probe
+}
+
+type ScamperNode struct {
+	addr  string
+	name  string
+	q_ttl int
+	linkc int64
+	links []ScamperLink
+}
+
+// ParseJson the raw jsonl test file into hops ParisTracerouteHop.
+// TODO(dev): dedup the hops that are identical.
+func ParseJson(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
+	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
+	defer metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Dec()
+
+	// Get the logtime
+	logTime, err := GetLogtime(PTFileName{Name: filepath.Base(testName)})
+	if err != nil {
+		return schema.PTTest{}, err
+	}
+
+	// Split the Json files and parse it line by line.
+	var uuid, scamperVersion string
+	var startTime, stopTime float64
+	var probeSize, probeC float64
+	var serverIP, destIP string
+	var hops []schema.ScamperHop
+
+	for index, oneLine := range strings.Split(string(rawContent[:]), "\n") {
+		oneLine = strings.TrimSuffix(oneLine, "\n")
+		// Skip empty line or initial lines starting with #.
+		if len(oneLine) == 0 {
+			continue
+		}
+
+		var scamperResult map[string]interface{}
+		err := json.Unmarshal([]byte(oneLine), &scamperResult)
+
+		log.Println(err)
+
+		if index == 0 && len(scamperResult) == 1 {
+			// extract uuid from {"UUID": "ndt-74mqr_1565960097_000000000006DBCC"}
+			uuid = scamperResult["UUID"].(string)
+			log.Println(uuid)
+			continue
+		}
+		log.Println(len(scamperResult))
+		var entryType string
+		for key, value := range scamperResult {
+			log.Println(key)
+			if key == "type" {
+				entryType = value.(string)
+				break
+			}
+		}
+		log.Println("here2")
+		if entryType == "cycle-start" {
+			// extract start_time
+			// {"type":"cycle-start", "list_name":"/tmp/scamperctrl:62485", "id":1, "hostname":"ndt-74mqr", "start_time":1567900908}
+			startTime = scamperResult["start_time"].(float64)
+			log.Println(startTime)
+		} else if entryType == "cycle-stop" {
+			stopTime = scamperResult["stop_time"].(float64)
+			log.Println(stopTime)
+		} else if entryType == "tracelb" {
+			// extract server, destionation IP
+			serverIP = scamperResult["src"].(string)
+			destIP = scamperResult["dst"].(string)
+			log.Println(serverIP)
+			log.Println(destIP)
+
+			// extract version
+			scamperVersion = scamperResult["version"].(string)
+
+			// extract probeSize, probeC
+			probeSize = scamperResult["probe_size"].(float64)
+			probeC = scamperResult["probec"].(float64)
+
+			// Check whether there is "nodes"
+			hasNodes := false
+			for key, _ := range scamperResult {
+				log.Println(key)
+				if key == "nodes" {
+					hasNodes = true
+					break
+				}
+			}
+			if !hasNodes {
+				continue
+			}
+			// extract hops
+			for _, oneNode := range scamperResult["nodes"].([]interface{}) {
+				var links []schema.HopLink
+				cNode := oneNode.(map[string]interface{})
+				log.Println(cNode["addr"].(string))
+				for _, oneLink := range cNode["links"].([]interface{}) {
+					var probes []schema.HopProbe
+					var ttl int64
+					cLink := oneLink.([]interface{})[0].(map[string]interface{})
+					for _, oneProbe := range cLink["probes"].([]interface{}) {
+						cProbe := oneProbe.(map[string]interface{})
+						var rtt []float64
+						for _, oneReply := range cProbe["replies"].([]interface{}) {
+							rtt = append(rtt, oneReply.(map[string]interface{})["rtt"].(float64))
+						}
+						probes = append(probes, schema.HopProbe{Flowid: int64(cProbe["flowid"].(float64)), Rtt: rtt})
+						ttl = int64(cProbe["ttl"].(float64))
+					}
+					links = append(links, schema.HopLink{HopDstIP: cLink["addr"].(string), TTL: ttl, Probes: probes})
+				}
+				// Check whether cNode has name field
+				var hostname string
+				for key, value := range cNode {
+					if key == "name" {
+						hostname = value.(string)
+						break
+					}
+				}
+
+				hops = append(hops, schema.ScamperHop{
+					Source: schema.HopIP{IP: cNode["addr"].(string), Hostname: hostname},
+					Linkc:  int64(cNode["linkc"].(float64)),
+					Links:  links,
+				})
+			}
+
+		} else {
+			// Invalid entry
+		}
+	}
+
+	source := schema.ServerInfo{
+		IP: serverIP,
+	}
+	destination := schema.ClientInfo{
+		IP: destIP,
+	}
+
+	parseInfo := schema.ParseInfo{
+		TaskFileName:  taskFilename,
+		ParseTime:     time.Now(),
+		ParserVersion: Version(),
+	}
+
+	return schema.PTTest{
+		UUID:           uuid,
+		TestTime:       logTime,
+		Parseinfo:      parseInfo,
+		StartTime:      int64(startTime),
+		StopTime:       int64(stopTime),
+		ScamperVersion: scamperVersion,
+		Source:         source,
+		Destination:    destination,
+		ProbeSize:      int64(probeSize),
+		ProbeC:         int64(probeC),
+		Hop:            hops,
+	}, nil
+}
+
+// -------------------------------------------------
+// The following are struct and funcs used by legacy parsing.
+// -------------------------------------------------
+
 // The data structure is used to store the parsed results temporarily before it is verified
 // not polluted and can be inserted into BQ tables
 type cachedPTData struct {
-	TestID           string
+	//TestID           string
 	Hops             []schema.ScamperHop
 	LogTime          time.Time
 	Source           schema.ServerInfo
 	Destination      schema.ClientInfo
 	LastValidHopLine string
 	MetroName        string
+	UUID             string
 }
 
 type PTParser struct {
@@ -182,21 +404,6 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 	return protocol, destIP, serverIP, nil
 }
 
-// Return timestamp parsed from file name.
-func GetLogtime(filename PTFileName) (time.Time, error) {
-	date, _ := filename.GetDate()
-	// data is in format like "20170320T23:53:10Z"
-	revisedDate := date[0:4] + "-" + date[4:6] + "-" + date[6:18]
-
-	t, err := time.Parse(time.RFC3339, revisedDate)
-	if err != nil {
-		log.Println(err)
-		return time.Time{}, err
-	}
-
-	return t, nil
-}
-
 func (pt *PTParser) TaskError() error {
 	return nil
 }
@@ -213,6 +420,7 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 	}
 
 	ptTest := schema.PTTest{
+		UUID:        oneTest.UUID,
 		TestTime:    oneTest.LogTime,
 		Parseinfo:   parseInfo,
 		Source:      oneTest.Source,
@@ -277,6 +485,22 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		pt.taskFileName = meta["filename"].(string)
 	}
 
+	// Process the json output of Scamper binary.
+	if strings.Contains(meta["filename"].(string), "jsonl") {
+		ptTest, err := ParseJson(testName, rawContent, pt.TableName(), pt.taskFileName)
+		if err == nil {
+			err := pt.AddRow(&ptTest)
+			if err == etl.ErrBufferFull {
+				// Flush asynchronously, to improve throughput.
+				pt.Annotate(pt.TableName())
+				pt.PutAsync(pt.TakeRows())
+				pt.AddRow(&ptTest)
+			}
+		}
+		return err
+	}
+
+	// Process the legacy Paris Traceroute txt output
 	cachedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
@@ -580,7 +804,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// TODO: Add annotation to the IP of source, destination and hops.
 
 	return cachedPTData{
-		TestID:           testId,
+		//TestID:           testId,
 		Hops:             PTHops,
 		LogTime:          logTime,
 		Source:           source,

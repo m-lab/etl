@@ -1,18 +1,45 @@
 package parser_test
 
 import (
-	"fmt"
-	"io/ioutil"
-
-	"reflect"
 	"testing"
 
-	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/schema"
 )
 
 // TODO: IPv6 tests
+func TestGetLogtime(t *testing.T) {
+	fn1 := parser.PTFileName{Name: "20160112T00:45:44Z_ALL27409.paris"}
+	t1, err1 := parser.GetLogtime(fn1)
+	if err1 != nil || t1.String() != "2016-01-12 00:45:44 +0000 UTC" {
+		t.Errorf("Error in parsing log time from legacy filename!\n")
+	}
+
+	fn2 := parser.PTFileName{Name: "20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris"}
+	t2, err2 := parser.GetLogtime(fn2)
+	if err2 != nil || t2.String() != "2017-03-20 23:53:10 +0000 UTC" {
+		t.Errorf("Error in parsing log time from 5-tuple filename!\n")
+	}
+
+	fn3 := parser.PTFileName{Name: "20190908T000148Z_ndt-74mqr_1565960097_000000000006DBCC.jsonl"}
+	t3, err3 := parser.GetLogtime(fn3)
+	if err3 != nil || t3.String() != "2019-09-08 00:01:48 +0000 UTC" {
+		t.Errorf("Error in parsing log time from scamper Json filename!\n")
+	}
+}
+
+func TestParseJson(t *testing.T) {
+	testStr1 := `{"UUID": "ndt-plh7v_1566050090_000000000004D60F"}
+	{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51803", "id":1, "hostname":"ndt-plh7v", "start_time":1566691268}
+	{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51803", "id":1, "hostname":"ndt-plh7v", "start_time":1566691268}
+	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"2405:2000:301::101", "dst":"2406:3003:2007:3acc:38ad:70da:ebd7:85b0", "start":{"sec":1566691268, "usec":495665, "ftime":"2019-08-25 00:01:08"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":67, "probec_max":3000, "nodec":3, "linkc":3, "nodes":[{"addr":"2405:2000:ffa0:102::3", "q_ttl":1, "linkc":1, "links":[[{"addr":"*"}],[{"addr":"*"}],]}]}
+	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51803", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691541}`
+	parser.ParseJson("20160112T00:45:44Z_ALL27409.paris", []byte(testStr1), "", "")
+
+	//parser.GetJsonField([]byte(testJson))
+	t.Errorf("XXX!\n")
+}
+
+/*
 func TestParseFirstLine(t *testing.T) {
 	protocol, dest_ip, server_ip, err := parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s")
 	if dest_ip != "98.162.212.214" || server_ip != "64.86.132.76" || protocol != "icmp" || err != nil {
@@ -225,3 +252,5 @@ func TestPTEmptyTest(t *testing.T) {
 		t.Fatalf("Do not handle empty test correctly.")
 	}
 }
+
+*/
