@@ -63,43 +63,6 @@ func GetLogtime(filename PTFileName) (time.Time, error) {
 // The following are struct and funcs used by Json parsing.
 // -------------------------------------------------
 
-type TS struct {
-	sec  int64
-	usec int64
-}
-
-type Reply struct {
-	rx         TS
-	ttl        int
-	rtt        float64
-	icmp_type  int
-	icmp_code  int
-	icmp_q_tos int
-	icmp_q_ttl int
-}
-
-type Probe struct {
-	tx      TS
-	replyc  int
-	ttl     int64
-	attempt int
-	flowid  int64
-	replies []Reply
-}
-
-type ScamperLink struct {
-	addr   string
-	probes []Probe
-}
-
-type ScamperNode struct {
-	addr  string
-	name  string
-	q_ttl int
-	linkc int64
-	links []ScamperLink
-}
-
 // ParseJson the raw jsonl test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
 func ParseJson(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
@@ -140,7 +103,7 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 			}
 		}
 
-		if index == 0 && len(scamperResult) == 1 {
+		if index == 0 && len(scamperResult) <= 2 {
 			// extract uuid from {"UUID": "ndt-74mqr_1565960097_000000000006DBCC"}
 			uuid = scamperResult["UUID"].(string)
 			continue
