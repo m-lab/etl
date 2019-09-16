@@ -15,6 +15,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"github.com/google/go-jsonnet"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
@@ -53,7 +54,6 @@ func GetLogtime(filename PTFileName) (time.Time, error) {
 	}
 	t, err := time.Parse(time.RFC3339, revisedDate)
 	if err != nil {
-		log.Println(err)
 		return time.Time{}, err
 	}
 	return t, nil
@@ -129,38 +129,39 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 		var scamperResult map[string]interface{}
 		err := json.Unmarshal([]byte(oneLine), &scamperResult)
 
-		log.Println(err)
+		if err != nil {
+			// use jsonnett to do extra reprocessing
+			vm := jsonnet.MakeVM()
+			output, err := vm.EvaluateSnippet("file", oneLine)
+			err = json.Unmarshal([]byte(output), &scamperResult)
+			if err != nil {
+				// fail and return here.
+				return schema.PTTest{}, err
+			}
+		}
 
 		if index == 0 && len(scamperResult) == 1 {
 			// extract uuid from {"UUID": "ndt-74mqr_1565960097_000000000006DBCC"}
 			uuid = scamperResult["UUID"].(string)
-			log.Println(uuid)
 			continue
 		}
-		log.Println(len(scamperResult))
 		var entryType string
 		for key, value := range scamperResult {
-			log.Println(key)
 			if key == "type" {
 				entryType = value.(string)
 				break
 			}
 		}
-		log.Println("here2")
 		if entryType == "cycle-start" {
 			// extract start_time
 			// {"type":"cycle-start", "list_name":"/tmp/scamperctrl:62485", "id":1, "hostname":"ndt-74mqr", "start_time":1567900908}
 			startTime = scamperResult["start_time"].(float64)
-			log.Println(startTime)
 		} else if entryType == "cycle-stop" {
 			stopTime = scamperResult["stop_time"].(float64)
-			log.Println(stopTime)
 		} else if entryType == "tracelb" {
 			// extract server, destionation IP
 			serverIP = scamperResult["src"].(string)
 			destIP = scamperResult["dst"].(string)
-			log.Println(serverIP)
-			log.Println(destIP)
 
 			// extract version
 			scamperVersion = scamperResult["version"].(string)
@@ -172,7 +173,6 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 			// Check whether there is "nodes"
 			hasNodes := false
 			for key, _ := range scamperResult {
-				log.Println(key)
 				if key == "nodes" {
 					hasNodes = true
 					break
@@ -185,11 +185,13 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 			for _, oneNode := range scamperResult["nodes"].([]interface{}) {
 				var links []schema.HopLink
 				cNode := oneNode.(map[string]interface{})
-				log.Println(cNode["addr"].(string))
 				for _, oneLink := range cNode["links"].([]interface{}) {
 					var probes []schema.HopProbe
 					var ttl int64
 					cLink := oneLink.([]interface{})[0].(map[string]interface{})
+					if cLink["probes"] == nil {
+						continue
+					}
 					for _, oneProbe := range cLink["probes"].([]interface{}) {
 						cProbe := oneProbe.(map[string]interface{})
 						var rtt []float64
