@@ -65,6 +65,11 @@ type TaskFile struct {
 	lastErr  error
 }
 
+// Path returns the full path to the file.
+func (tf TaskFile) Path() string {
+	return tf.path
+}
+
 // FileSource handles reading, caching, and updating a list of files,
 // and tracking the processing status of each file.
 type FileSource struct {
