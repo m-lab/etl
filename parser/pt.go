@@ -221,7 +221,7 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 // The data structure is used to store the parsed results temporarily before it is verified
 // not polluted and can be inserted into BQ tables
 type cachedPTData struct {
-	//TestID           string
+	TestID           string
 	Hops             []schema.ScamperHop
 	LogTime          time.Time
 	Source           schema.ServerInfo
@@ -770,7 +770,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// TODO: Add annotation to the IP of source, destination and hops.
 
 	return cachedPTData{
-		//TestID:           testId,
+		TestID:           testId,
 		Hops:             PTHops,
 		LogTime:          logTime,
 		Source:           source,
