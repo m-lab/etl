@@ -236,6 +236,7 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 		// TODO add metric
 		rwr.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(rwr, `{"message": "Missing path"}`)
+		return
 	}
 
 	sc, err := storage.GetStorageClient(false)
@@ -262,6 +263,7 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 	if err != nil {
 		rwr.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(rwr, fmt.Sprintf(`{"message": "Invalid path: %s %s"}`, path, err.Error()))
+		return
 	}
 	// Log errors on completion.
 	go func() {
