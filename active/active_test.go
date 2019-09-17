@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"sync"
 	"testing"
 	"time"
 
@@ -58,7 +59,10 @@ func TestProcessAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	tokens := make(chan struct{}, 2)
-	fs.ProcessAll(context.Background(), tokens)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	fs.ProcessAll(context.Background(), tokens, &wg)
+	wg.Wait()
 	// At this point, we may be still draining the last tasks.
 	for len(tokens) > 0 {
 		time.Sleep(10 * time.Millisecond)
@@ -86,7 +90,10 @@ func TestNoFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	tokens := make(chan struct{}, 2)
-	fs.ProcessAll(context.Background(), tokens)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	fs.ProcessAll(context.Background(), tokens, &wg)
+	wg.Wait()
 	if len(fs.Errors()) > 0 {
 		t.Error("ProcessAll() had errors", fs.Errors())
 	}
