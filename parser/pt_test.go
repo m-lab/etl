@@ -62,10 +62,20 @@ func TestParseJson(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Err during json parsing %v", err)
 	}
+
+	if output.UUID != "ndt-plh7v_1566050090_000000000004D60F" {
+		t.Fatalf("Wrong results for UUID parsing!")
+	}
+	if output.Source.IP != "2001:550:1b01:1:e41d:2d00:151:f6c0" || output.Destination.IP != "2600:1009:b013:1a59:c369:b528:98fd:ab43" {
+		t.Fatalf("Wrong results for source/destination IP parsing!")
+	}
+	if output.ProbeSize != 60 || output.ProbeC != 85 {
+		t.Fatalf("Wrong results for probe size or probec parsing!")
+	}
 	if !reflect.DeepEqual(output.Hop[0], expectedHop) {
 		fmt.Printf("Here is expected    : %+v\n", expectedHop)
-		fmt.Printf("Here is what is real: %+v\n", output)
-		t.Fatalf("Wrong results for Json parsing!")
+		fmt.Printf("Here is what is real: %+v\n", output.Hop[0])
+		t.Fatalf("Wrong results for Json hops parsing!")
 	}
 }
 
