@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/parser"
@@ -250,7 +251,8 @@ func TestPTPollutionCheck(t *testing.T) {
 		if err != nil {
 			t.Fatalf("cannot read testdata.")
 		}
-		err = pt.ParseAndInsert(nil, test.fileName, rawData)
+		meta := map[string]bigquery.Value{"filename": test.fileName, "parse_time": time.Now()}
+		err = pt.ParseAndInsert(meta, test.fileName, rawData)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}

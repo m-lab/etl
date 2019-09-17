@@ -448,10 +448,12 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if meta["filename"] != nil {
 		testId = CreateTestId(meta["filename"].(string), filepath.Base(testName))
 		pt.taskFileName = meta["filename"].(string)
+	} else {
+		return errors.New("empty filename")
 	}
 
 	// Process the json output of Scamper binary.
-	if strings.Contains(meta["filename"].(string), "jsonl") {
+	if strings.Contains(pt.taskFileName, "jsonl") {
 		ptTest, err := ParseJson(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
 			err := pt.AddRow(&ptTest)
