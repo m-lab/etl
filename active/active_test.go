@@ -21,19 +21,19 @@ func init() {
 }
 
 type counter struct {
-	fail  int
-	total int
+	fail    int
+	success int
 }
 
 func (c *counter) processTask(tf *active.TaskFile) error {
 	time.Sleep(10 * time.Millisecond)
 	if c.fail > 0 {
-		log.Println("Failing", tf)
+		log.Println("Intentional temporary failure:", tf)
 		c.fail--
 		return errors.New("intentional test failure")
 	}
 	log.Println(tf)
-	c.total++
+	c.success++
 	return nil
 }
 
@@ -50,24 +50,27 @@ func TestProcessAll(t *testing.T) {
 				&storage.ObjectAttrs{Name: "obj6", Updated: time.Now()},
 			}})
 
-	p := counter{fail: 2}
+	// First four attempts will fail.  This means that one of the 3 tasks will have two failures.
+	p := counter{fail: 4}
+	// Retry once per file.  This means one of the 3 tasks will never succeed.
 	fs, err := active.NewFileSource(fc, "fake", "gs://foobar/ndt/2019/01/01/", 1, p.processTask)
 	if err != nil {
 		t.Fatal(err)
 	}
 	tokens := make(chan struct{}, 2)
-	err = fs.ProcessAll(context.Background(), tokens)
-	if err.Error() != "intentional test failure" {
-		t.Error("Should have seen intentional test failure:", err)
-	}
-
+	fs.ProcessAll(context.Background(), tokens)
 	// At this point, we may be still draining the last tasks.
 	for len(tokens) > 0 {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if p.total != 3 {
-		t.Error(p.total, "!= 3")
+	// One file should have failed twice.  Others should have failed once, then succeeded.
+	if len(fs.Errors()) != 1 {
+		t.Errorf("ProcessAll() had %d errors %v, %v", len(fs.Errors()), fs.Errors()[0], fs.Errors())
+	}
+
+	if p.success != 2 {
+		t.Error("Expected 3 successes, got", p.success)
 	}
 }
 
@@ -77,15 +80,15 @@ func TestNoFiles(t *testing.T) {
 		cloudtest.BucketHandle{
 			ObjAttrs: []*storage.ObjectAttrs{}})
 
-	p := counter{}
+	p := counter{} // All processing attempts will succeed.
 	fs, err := active.NewFileSource(fc, "fake", "gs://foobar/ndt/2019/01/01/", 1, p.processTask)
 	if err != nil {
 		t.Fatal(err)
 	}
 	tokens := make(chan struct{}, 2)
-	err = fs.ProcessAll(context.Background(), tokens)
-	if err != nil {
-		t.Error("ProcessAll() error", err)
+	fs.ProcessAll(context.Background(), tokens)
+	if len(fs.Errors()) > 0 {
+		t.Error("ProcessAll() had errors", fs.Errors())
 	}
 
 	// At this point, we may be still draining the last tasks.
@@ -93,7 +96,8 @@ func TestNoFiles(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if p.total != 0 {
-		t.Error(p.total, "!= 0")
+	// processTask should never be called, because there are no files.
+	if p.success+p.fail != 0 {
+		t.Error("Expected 0 successes, got", p.success)
 	}
 }

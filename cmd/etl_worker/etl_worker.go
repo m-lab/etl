@@ -211,17 +211,24 @@ func setMaxInFlight() {
 	}
 }
 
+// processOneFile is used by active.ProcessAll to invoke ProcessTask.
 func processOneFile(tf *active.TaskFile) error {
 	_, err := worker.ProcessTask(tf.Path())
 	return err
 }
 
+var admission = make(chan bool, 1)
+
+// This is a hack, and should not generally be used.
+// It has no admission control.
 func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 	// This will add metric count and log message from any panic.
 	// The panic will still propagate, and http will report it.
 	defer func() {
 		metrics.CountPanics(recover(), "worker")
 	}()
+
+	admission <- true // obtain semaphore
 
 	path := rq.FormValue("path")
 	if len(path) == 0 {
@@ -238,6 +245,7 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 		return
 	}
 	stc := stiface.AdaptClient(sc)
+	// Allow two retries for failed tasks.
 	fs, err := active.NewFileSource(stc, "mlab-sandbox", path, 2, processOneFile)
 	if err != nil {
 		// TODO add metric
@@ -245,14 +253,16 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 		fmt.Fprintf(rwr, fmt.Sprintf(`{"message": "Invalid path: %s"}`, path))
 		return
 	}
-	tokens := make(chan struct{}, 2)
-	err = fs.ProcessAll(context.Background(), tokens)
-	if err != nil {
-		// TODO add metric
-		rwr.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(rwr, fmt.Sprintf(`{"message": "%s"}`, err.Error()))
-		return
-	}
+	// Allow 60 concurrent tasks.
+	tokens := make(chan struct{}, 60)
+	go func() {
+		fs.ProcessAll(context.Background(), tokens)
+		<-admission // return the semaphore
+		if len(fs.Errors()) != 0 {
+			// TODO add metric
+			log.Println(path, "Had errors:", len(fs.Errors()))
+		}
+	}()
 
 	rwr.WriteHeader(http.StatusOK)
 	fmt.Fprintf(rwr, fmt.Sprintf(`{"message": "Processing %s"}`, path))
