@@ -28,7 +28,9 @@ package active
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -58,11 +60,12 @@ type TaskFile struct {
 	path string               // Full path to object.
 	obj  *storage.ObjectAttrs // Optional if completed or errored.
 
-	// Status - pending, processing, completed, errored.
-	status string // For now - eventually this might be an enum.
-
 	failures int
 	lastErr  error
+}
+
+func (tf TaskFile) String() string {
+	return fmt.Sprintf("%s: %d failures, %v", tf.path, tf.failures, tf.lastErr)
 }
 
 // Path returns the full path to the file.
@@ -91,6 +94,8 @@ type FileSource struct {
 
 	// The function that processes each task.
 	process func(*TaskFile) error
+
+	err []*TaskFile
 }
 
 // NewFileSource creates a new source for active processing.
@@ -106,9 +111,15 @@ func NewFileSource(sc stiface.Client, project string, prefix string, retryLimit 
 		retryLimit: retryLimit,
 		done:       make(chan *TaskFile, 0),
 		process:    processFunc,
+		err:        make([]*TaskFile, 0, 10),
 	}
 
 	return &fs, nil
+}
+
+// Errors returns a list of all TaskFile objects that ended with error.
+func (fs *FileSource) Errors() []*TaskFile {
+	return fs.err
 }
 
 // updatePending should be called when there are no more pending tasks.
@@ -146,6 +157,7 @@ func (fs *FileSource) updatePending(ctx context.Context) error {
 // are initially none available, and reprocesses tasks from the
 // errored list if the there are still none pending.
 // Caller should have already obtained a semaphore.
+// Returns an error iff updatePending errored.
 func (fs *FileSource) next(ctx context.Context) (*TaskFile, error) {
 	if len(fs.pending) == 0 {
 		err := fs.updatePending(ctx)
@@ -164,13 +176,12 @@ func (fs *FileSource) next(ctx context.Context) (*TaskFile, error) {
 // ErrTaskNotFound is returned if an inflight task is not found in inFlight.
 var ErrTaskNotFound = errors.New("task not found")
 
-// complete updates the state on task completion.
 // NOT THREAD-SAFE.  Should be called only by ProcessAll (through doneHandler)
-// complete updates the FileSource to reflect the completion of
+// updateState updates the FileSource to reflect the completion of
 // a processing attempt.
 // If the processing ends in an error, the task will be moved to
 // the end of the pending list, unless the task has already been retried fs.retry times.
-func (fs *FileSource) complete(tf *TaskFile) error {
+func (fs *FileSource) updateState(tf *TaskFile) error {
 	_, exists := fs.inFlight[tf.path]
 	if !exists {
 		log.Println("Did not find", tf.path)
@@ -182,8 +193,11 @@ func (fs *FileSource) complete(tf *TaskFile) error {
 		if tf.failures < fs.retryLimit {
 			fs.pending = append(fs.pending, tf)
 			tf.failures++
+		} else {
+			fs.err = append(fs.err, tf)
 		}
 	}
+
 	return tf.lastErr
 }
 
@@ -192,70 +206,61 @@ func processTask(tf *TaskFile) error {
 	return err
 }
 
-// doneHandler handles all the done channel returns.  For every
-// completed task, it will attempt to start two tasks, to utilize
-// any additional tokens that become available.
-// When there are no further pending items, it decrements the wait group
-// to indicate to ProcessAll that no more tokens are needed.
-func (fs *FileSource) doneHandler(ctx context.Context, tokens chan struct{}) error {
-	var lastErr error
+// doneHandler handles all the done channel returns.
+// It returns when there are no more pending tasks,
+// When all items have been processed, it closes the done channel.
+func (fs *FileSource) doneHandler(ctx context.Context, tokens chan struct{}, wg *sync.WaitGroup) {
 PROCESS:
 	for {
 		select {
 		case tf := <-fs.done:
-			err := fs.complete(tf)
+			err := fs.updateState(tf) // This removes the task from inFlight.
 			if err != nil {
-				lastErr = err
-				log.Println(err)
+				log.Println(tf.Path(), err)
 			}
 			<-tokens // return the token
 		case tokens <- struct{}{}:
 			tf, err := fs.next(ctx)
 			if err != nil {
-				lastErr = err
 				log.Println(err)
 			}
-			if tf != nil {
-				// This adds the task to inFlight.
-				fs.inFlight[tf.path] = tf
-				go func() {
-					tf.lastErr = fs.process(tf)
-					fs.done <- tf
-				}()
-			} else {
+			if tf == nil {
 				// return the token
 				<-tokens
 				break PROCESS
 			}
+
+			// This adds the task to inFlight.
+			fs.inFlight[tf.path] = tf
+			go func() {
+				tf.lastErr = fs.process(tf)
+				fs.done <- tf
+			}()
 		}
+	}
+
+	if wg != nil {
+		wg.Done() // Signal that there are no more pending tasks.
 	}
 
 	// Now drain any remaining tasks in flight.
 	if len(fs.inFlight) > 0 {
-		go func() {
-			for t := range fs.done {
-				fs.complete(t)
-				<-tokens // return the token
-				if len(fs.inFlight) == 0 {
-					close(fs.done)
-				}
+		for t := range fs.done {
+			fs.updateState(t) // This removes the task from inFlight.
+			<-tokens          // return the token
+			if len(fs.inFlight) == 0 {
+				break
 			}
-		}()
-	} else {
-		close(fs.done)
+		}
 	}
-	return lastErr
+	close(fs.done)
 }
 
 // ProcessAll iterates through all the TaskFiles, processing each one.
 // It may also retry any that failed the first time.
-func (fs *FileSource) ProcessAll(ctx context.Context, tokens chan struct{}) error {
+func (fs *FileSource) ProcessAll(ctx context.Context, tokens chan struct{}) {
 	// Handle tasks in parallel.
 	// When this returns, there are still tasks in flight, but no more
 	// will be started.
-	err := fs.doneHandler(ctx, tokens)
-
-	// The token channel may be reused, but there may be additional tokens
-	// returned to it by the ongoing doneHandler.
-	return err
+	fs.doneHandler(ctx, tokens, nil)
 }
