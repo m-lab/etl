@@ -143,8 +143,8 @@ func (fs *FileSource) updatePending(ctx context.Context) error {
 		}
 		// Append any new files that aren't found in existing Taskfiles.
 		if _, exists := fs.allFiles[f.Name]; !exists {
-			log.Println("Adding", f.Name)
-			tf := TaskFile{path: f.Name, obj: f}
+			log.Println("Adding", "gs://"+f.Bucket+"/"+f.Name)
+			tf := TaskFile{path: "gs://" + f.Bucket + "/" + f.Name, obj: f}
 			fs.allFiles[f.Name] = &tf
 			fs.pending = append(fs.pending, &tf)
 		}
