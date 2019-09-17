@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -22,12 +23,16 @@ func init() {
 }
 
 type counter struct {
+	t       *testing.T
 	fail    int
 	success int
 }
 
 func (c *counter) processTask(tf *active.TaskFile) error {
 	time.Sleep(10 * time.Millisecond)
+	if !strings.HasPrefix(tf.Path(), "gs://foobar/") {
+		c.t.Error("Invalid path:", tf.Path())
+	}
 	if c.fail > 0 {
 		log.Println("Intentional temporary failure:", tf)
 		c.fail--
@@ -43,16 +48,16 @@ func TestProcessAll(t *testing.T) {
 	fc.AddTestBucket("foobar",
 		cloudtest.BucketHandle{
 			ObjAttrs: []*storage.ObjectAttrs{
-				&storage.ObjectAttrs{Name: "ndt/2019/01/01/obj1", Updated: time.Now()},
-				&storage.ObjectAttrs{Name: "ndt/2019/01/01/obj2", Updated: time.Now()},
-				&storage.ObjectAttrs{Name: "ndt/2019/01/01/obj3"},
-				&storage.ObjectAttrs{Name: "ndt/2019/01/01/subdir/obj4", Updated: time.Now()},
-				&storage.ObjectAttrs{Name: "ndt/2019/01/01/subdir/obj5", Updated: time.Now()},
-				&storage.ObjectAttrs{Name: "obj6", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj1", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj2", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj3"},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/subdir/obj4", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/subdir/obj5", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "obj6", Updated: time.Now()},
 			}})
 
 	// First four attempts will fail.  This means that one of the 3 tasks will have two failures.
-	p := counter{fail: 4}
+	p := counter{t: t, fail: 4}
 	// Retry once per file.  This means one of the 3 tasks will never succeed.
 	fs, err := active.NewFileSource(fc, "fake", "gs://foobar/ndt/2019/01/01/", 1, p.processTask)
 	if err != nil {
@@ -84,7 +89,7 @@ func TestNoFiles(t *testing.T) {
 		cloudtest.BucketHandle{
 			ObjAttrs: []*storage.ObjectAttrs{}})
 
-	p := counter{} // All processing attempts will succeed.
+	p := counter{t: t} // All processing attempts will succeed.
 	fs, err := active.NewFileSource(fc, "fake", "gs://foobar/ndt/2019/01/01/", 1, p.processTask)
 	if err != nil {
 		t.Fatal(err)
