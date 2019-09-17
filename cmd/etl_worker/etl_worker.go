@@ -229,8 +229,6 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 		metrics.CountPanics(recover(), "worker")
 	}()
 
-	admission <- true // obtain semaphore
-
 	path := rq.FormValue("path")
 	if len(path) == 0 {
 		// TODO add metric
@@ -269,7 +267,6 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 	go func() {
 		wg.Wait()
 
-		<-admission // return the semaphore
 		if len(fs.Errors()) != 0 {
 			// TODO add metric
 			log.Println(path, "Had errors:", len(fs.Errors()))
