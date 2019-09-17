@@ -258,9 +258,15 @@ PROCESS:
 
 // ProcessAll iterates through all the TaskFiles, processing each one.
 // It may also retry any that failed the first time.
-func (fs *FileSource) ProcessAll(ctx context.Context, tokens chan struct{}) {
+func (fs *FileSource) ProcessAll(ctx context.Context, tokens chan struct{}, wg *sync.WaitGroup) error {
+	err := fs.updatePending(ctx)
+	if err != nil {
+		return err
+	}
 	// Handle tasks in parallel.
 	// When this returns, there are still tasks in flight, but no more
 	// will be started.
-	fs.doneHandler(ctx, tokens, nil)
+	go fs.doneHandler(ctx, tokens, wg)
+
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -255,8 +256,17 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 	}
 	// Allow 60 concurrent tasks.
 	tokens := make(chan struct{}, 60)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	err = fs.ProcessAll(context.Background(), tokens, &wg)
+	if err != nil {
+		rwr.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(rwr, fmt.Sprintf(`{"message": "Invalid path: %s %s"}`, path, err.Error()))
+	}
+	// Log errors on completion.
 	go func() {
-		fs.ProcessAll(context.Background(), tokens)
+		wg.Wait()
+
 		<-admission // return the semaphore
 		if len(fs.Errors()) != 0 {
 			// TODO add metric
