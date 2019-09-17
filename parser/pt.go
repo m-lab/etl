@@ -63,8 +63,7 @@ func GetLogtime(filename PTFileName) (time.Time, error) {
 // The following are struct and funcs used by Json parsing.
 // -------------------------------------------------
 
-// ParseJson the raw jsonl test file into hops ParisTracerouteHop.
-// TODO(dev): dedup the hops that are identical.
+// ParseJson the raw jsonl test file into schema.PTTest.
 func ParseJson(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
 	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Dec()
@@ -105,6 +104,9 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 
 		if index == 0 && len(scamperResult) <= 2 {
 			// extract uuid from {"UUID": "ndt-74mqr_1565960097_000000000006DBCC"}
+			if scamperResult["UUID"] == nil {
+				return schema.PTTest{}, errors.New("empty UUID")
+			}
 			uuid = scamperResult["UUID"].(string)
 			continue
 		}
@@ -174,24 +176,21 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 						break
 					}
 				}
-
+				linkc := int64(0)
+				if cNode["linkc"] != nil {
+					linkc = int64(cNode["linkc"].(float64))
+				}
 				hops = append(hops, schema.ScamperHop{
 					Source: schema.HopIP{IP: cNode["addr"].(string), Hostname: hostname},
-					Linkc:  int64(cNode["linkc"].(float64)),
+					Linkc:  linkc,
 					Links:  links,
 				})
 			}
 
 		} else {
 			// Invalid entry
+			return schema.PTTest{}, errors.New("invalid type entry")
 		}
-	}
-
-	source := schema.ServerInfo{
-		IP: serverIP,
-	}
-	destination := schema.ClientInfo{
-		IP: destIP,
 	}
 
 	parseInfo := schema.ParseInfo{
@@ -207,8 +206,8 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 		StartTime:      int64(startTime),
 		StopTime:       int64(stopTime),
 		ScamperVersion: scamperVersion,
-		Source:         source,
-		Destination:    destination,
+		Source:         schema.ServerInfo{IP: serverIP},
+		Destination:    schema.ClientInfo{IP: destIP},
 		ProbeSize:      int64(probeSize),
 		ProbeC:         int64(probeC),
 		Hop:            hops,
