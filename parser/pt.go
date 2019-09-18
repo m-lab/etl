@@ -150,7 +150,6 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 
 	for index, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine = strings.TrimSuffix(oneLine, "\n")
-		// Skip empty line or initial lines starting with #.
 		if len(oneLine) == 0 {
 			continue
 		}
@@ -525,7 +524,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				pt.AddRow(&ptTest)
 			}
 		}
-		return err
+		return nil
 	}
 
 	// Process the legacy Paris Traceroute txt output
