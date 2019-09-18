@@ -33,8 +33,8 @@ type PTFileName struct {
 func (f *PTFileName) GetDate() (string, bool) {
 	i := strings.Index(f.Name, "Z")
 	if i >= 15 {
-		// Return date string in format "20170320T23:53:10Z" or "20170320T235310Z"
-		return f.Name[0 : i+1], true
+		// covert date like "20170320T23:53:10Z" or "20170320T235310Z" into one format
+		return strings.Replace(f.Name[0:i+1], ":", "", -1), true
 	}
 	return "", false
 }
@@ -45,8 +45,7 @@ func GetLogtime(filename PTFileName) (time.Time, error) {
 	if !success {
 		return time.Time{}, errors.New("no date in filename")
 	}
-	// date is in format like "20170320T23:53:10Z" or "20170320T235310Z"
-	date = strings.Replace(date, ":", "", -1)
+
 	return time.Parse("20060102T150405Z", date)
 }
 
