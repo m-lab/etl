@@ -43,25 +43,92 @@ func (f *PTFileName) GetDate() (string, bool) {
 func GetLogtime(filename PTFileName) (time.Time, error) {
 	date, success := filename.GetDate()
 	if !success {
-		return time.Time{}, nil
+		return time.Time{}, errors.New("no date in filename")
 	}
 	// date is in format like "20170320T23:53:10Z" or "20170320T235310Z"
-	var revisedDate string
-	if len(date) >= 18 {
-		revisedDate = date[0:4] + "-" + date[4:6] + "-" + date[6:18]
-	} else {
-		revisedDate = date[0:4] + "-" + date[4:6] + "-" + date[6:11] + ":" + date[11:13] + ":" + date[13:16]
-	}
-	t, err := time.Parse(time.RFC3339, revisedDate)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return t, nil
+	date = strings.Replace(date, ":", "", -1)
+	return time.Parse("20060102T150405Z", date)
 }
 
 // -------------------------------------------------
 // The following are struct and funcs used by Json parsing.
 // -------------------------------------------------
+
+type TS struct {
+	Sec  int64 `json:"sec"`
+	Usec int64 `json:"usec"`
+}
+
+type Reply struct {
+	Rx         TS      `json:"rx"`
+	Ttl        int     `json:"ttl"`
+	Rtt        float64 `json:"rtt"`
+	Icmp_type  int     `json:"icmp_type"`
+	Icmp_code  int     `json:"icmp_code"`
+	Icmp_q_tos int     `json:"icmp_q_tos"`
+	Icmp_q_ttl int     `json:"icmp_q_ttl"`
+}
+
+type Probe struct {
+	Tx      TS      `json:"tx"`
+	Replyc  int     `json:"replyc"`
+	Ttl     int64   `json:"ttl"`
+	Attempt int     `json:"attempt"`
+	Flowid  int64   `json:"flowid"`
+	Replies []Reply `json:"replies"`
+}
+
+type ScamperLink struct {
+	Addr   string  `json:"addr"`
+	Probes []Probe `json:"probes"`
+}
+
+type ScamperNode struct {
+	Addr  string          `json:"addr"`
+	Name  string          `json:"name"`
+	Q_ttl int             `json:"q_ttl"`
+	Linkc int64           `json:"linkc"`
+	Links [][]ScamperLink `json:"links"`
+}
+
+type TracelbLine struct {
+	Type         string        `json:"type"`
+	Version      string        `json:"version"`
+	Userid       float64       `json:"userid"`
+	Method       string        `json:"method"`
+	Src          string        `json:"src"`
+	Dst          string        `json:"dst"`
+	Start        TS            `json:"start"`
+	Probe_size   float64       `json:"probe_size"`
+	Firsthop     float64       `json:"firsthop"`
+	Attempts     float64       `json:"attempts"`
+	Confidence   float64       `json:"confidence"`
+	Tos          float64       `json:"tos"`
+	Gaplint      float64       `json:"gaplint"`
+	Wait_timeout float64       `json:"wait_timeout"`
+	Wait_probe   float64       `json:"wait_probe"`
+	Probec       float64       `json:"probec"`
+	Probec_max   float64       `json:"probec_max"`
+	Nodec        float64       `json:"nodec"`
+	Linkc        float64       `json:"linkc"`
+	Nodes        []ScamperNode `json:"nodes"`
+}
+
+type CyclestartLine struct {
+	Type       string  `json:"type"`
+	List_name  string  `json:"list_name"`
+	id         float64 `json:"id"`
+	Hostname   string  `json:"hostname"`
+	Start_time float64 `json:"start_time"`
+}
+
+type CyclestopLine struct {
+	Type      string  `json:"type"`
+	List_name string  `json:"list_name"`
+	id        float64 `json:"id"`
+	Hostname  string  `json:"hostname"`
+	Stop_time float64 `json:"stop_time"`
+}
 
 // ParseJson the raw jsonl test file into schema.PTTest.
 func ParseJson(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
@@ -75,11 +142,11 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 	}
 
 	// Split the Json files and parse it line by line.
-	var uuid, scamperVersion string
-	var startTime, stopTime float64
-	var probeSize, probeC float64
-	var serverIP, destIP string
+	var uuid string
 	var hops []schema.ScamperHop
+	var cycleStart CyclestartLine
+	var tracelb TracelbLine
+	var cycleStop CyclestopLine
 
 	for index, oneLine := range strings.Split(string(rawContent[:]), "\n") {
 		oneLine = strings.TrimSuffix(oneLine, "\n")
@@ -102,93 +169,88 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 			}
 		}
 
-		if index == 0 && len(scamperResult) <= 2 {
+		// The first line should always be UUID line.
+		if index == 0 {
 			// extract uuid from {"UUID": "ndt-74mqr_1565960097_000000000006DBCC"}
-			if scamperResult["UUID"] == nil {
+			_, ok := scamperResult["UUID"]
+			if !ok {
+				metrics.ErrorCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
+				metrics.TestCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
 				return schema.PTTest{}, errors.New("empty UUID")
 			}
 			uuid = scamperResult["UUID"].(string)
 			continue
 		}
 		var entryType string
-		for key, value := range scamperResult {
-			if key == "type" {
-				entryType = value.(string)
-				break
-			}
+		_, ok := scamperResult["type"]
+		if !ok {
+			continue
 		}
+		entryType = scamperResult["type"].(string)
 		if entryType == "cycle-start" {
 			// extract start_time
 			// {"type":"cycle-start", "list_name":"/tmp/scamperctrl:62485", "id":1, "hostname":"ndt-74mqr", "start_time":1567900908}
-			startTime = scamperResult["start_time"].(float64)
+			err := json.Unmarshal([]byte(oneLine), &cycleStart)
+			if err != nil {
+				metrics.ErrorCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
+				metrics.TestCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
+				return schema.PTTest{}, err
+			}
 		} else if entryType == "cycle-stop" {
-			stopTime = scamperResult["stop_time"].(float64)
+			err := json.Unmarshal([]byte(oneLine), &cycleStop)
+			if err != nil {
+				return schema.PTTest{}, err
+			}
 		} else if entryType == "tracelb" {
-			// extract server, destionation IP
-			serverIP = scamperResult["src"].(string)
-			destIP = scamperResult["dst"].(string)
-
-			// extract version
-			scamperVersion = scamperResult["version"].(string)
-
-			// extract probeSize, probeC
-			probeSize = scamperResult["probe_size"].(float64)
-			probeC = scamperResult["probec"].(float64)
-
-			// Check whether there is "nodes"
-			hasNodes := false
-			for key, _ := range scamperResult {
-				if key == "nodes" {
-					hasNodes = true
-					break
+			// Parse the line in struct
+			err := json.Unmarshal([]byte(oneLine), &tracelb)
+			if err != nil {
+				// use jsonnett to do extra reprocessing
+				vm := jsonnet.MakeVM()
+				output, err := vm.EvaluateSnippet("file", oneLine)
+				err = json.Unmarshal([]byte(output), &tracelb)
+				//log.Printf("%+v\n", tracelb)
+				if err != nil {
+					// fail and return here.
+					metrics.ErrorCount.WithLabelValues(
+						tableName, "pt", "corrupted json content").Inc()
+					metrics.TestCount.WithLabelValues(
+						tableName, "pt", "corrupted json content").Inc()
+					return schema.PTTest{}, err
 				}
 			}
-			if !hasNodes {
-				continue
-			}
-			// extract hops
-			for _, oneNode := range scamperResult["nodes"].([]interface{}) {
+
+			for _, oneNode := range tracelb.Nodes {
 				var links []schema.HopLink
-				cNode := oneNode.(map[string]interface{})
-				for _, oneLink := range cNode["links"].([]interface{}) {
+				for _, oneLink := range oneNode.Links[0] {
 					var probes []schema.HopProbe
 					var ttl int64
-					cLink := oneLink.([]interface{})[0].(map[string]interface{})
-					if cLink["probes"] == nil {
-						continue
-					}
-					for _, oneProbe := range cLink["probes"].([]interface{}) {
-						cProbe := oneProbe.(map[string]interface{})
+					for _, oneProbe := range oneLink.Probes {
 						var rtt []float64
-						for _, oneReply := range cProbe["replies"].([]interface{}) {
-							rtt = append(rtt, oneReply.(map[string]interface{})["rtt"].(float64))
+						for _, oneReply := range oneProbe.Replies {
+							rtt = append(rtt, oneReply.Rtt)
 						}
-						probes = append(probes, schema.HopProbe{Flowid: int64(cProbe["flowid"].(float64)), Rtt: rtt})
-						ttl = int64(cProbe["ttl"].(float64))
+						probes = append(probes, schema.HopProbe{Flowid: int64(oneProbe.Flowid), Rtt: rtt})
+						ttl = int64(oneProbe.Ttl)
 					}
-					links = append(links, schema.HopLink{HopDstIP: cLink["addr"].(string), TTL: ttl, Probes: probes})
-				}
-				// Check whether cNode has name field
-				var hostname string
-				for key, value := range cNode {
-					if key == "name" {
-						hostname = value.(string)
-						break
-					}
-				}
-				linkc := int64(0)
-				if cNode["linkc"] != nil {
-					linkc = int64(cNode["linkc"].(float64))
+					links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
 				}
 				hops = append(hops, schema.ScamperHop{
-					Source: schema.HopIP{IP: cNode["addr"].(string), Hostname: hostname},
-					Linkc:  linkc,
+					Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
+					Linkc:  oneNode.Linkc,
 					Links:  links,
 				})
 			}
-
 		} else {
 			// Invalid entry
+			metrics.ErrorCount.WithLabelValues(
+				tableName, "pt", "corrupted json content").Inc()
+			metrics.TestCount.WithLabelValues(
+				tableName, "pt", "corrupted json content").Inc()
 			return schema.PTTest{}, errors.New("invalid type entry")
 		}
 	}
@@ -203,13 +265,13 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 		UUID:           uuid,
 		TestTime:       logTime,
 		Parseinfo:      parseInfo,
-		StartTime:      int64(startTime),
-		StopTime:       int64(stopTime),
-		ScamperVersion: scamperVersion,
-		Source:         schema.ServerInfo{IP: serverIP},
-		Destination:    schema.ClientInfo{IP: destIP},
-		ProbeSize:      int64(probeSize),
-		ProbeC:         int64(probeC),
+		StartTime:      int64(cycleStart.Start_time),
+		StopTime:       int64(cycleStop.Stop_time),
+		ScamperVersion: tracelb.Version,
+		Source:         schema.ServerInfo{IP: tracelb.Src},
+		Destination:    schema.ClientInfo{IP: tracelb.Dst},
+		ProbeSize:      int64(tracelb.Probe_size),
+		ProbeC:         int64(tracelb.Probec),
 		Hop:            hops,
 	}, nil
 }
