@@ -3,6 +3,7 @@ package gcs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"regexp"
 	"time"
@@ -23,6 +24,10 @@ func getFilesSince(ctx context.Context, bh stiface.BucketHandle, prefix string, 
 	// TODO - handle timeout errors?
 	// TODO - should we add a deadline?
 	it := bh.Objects(ctx, &qry)
+	if it == nil {
+		log.Println("Nil object iterator for", bh)
+		return nil, 0, fmt.Errorf("Object iterator is nil.  BucketHandle: %v Prefix: %s", bh, prefix)
+	}
 
 	files := make([]*storage.ObjectAttrs, 0, 1000)
 
@@ -94,6 +99,10 @@ func GetFilesSince(ctx context.Context, sClient stiface.Client, project string, 
 		// }
 		log.Println(err)
 		return nil, 0, err
+	}
+	if bucket == nil {
+		log.Println("Nil bucket for", project, prefix)
+		return nil, 0, fmt.Errorf("Nil bucket for %s %s", project, prefix)
 	}
 
 	return getFilesSince(ctx, bucket, p.Path(), since)
