@@ -140,7 +140,7 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 		return schema.PTTest{}, err
 	}
 
-	// Split the Json files and parse it line by line.
+	// Split the JSON file and parse it line by line.
 	var uuid string
 	var hops []schema.ScamperHop
 	var cycleStart CyclestartLine
