@@ -116,7 +116,7 @@ type TracelbLine struct {
 type CyclestartLine struct {
 	Type       string  `json:"type"`
 	List_name  string  `json:"list_name"`
-	id         float64 `json:"id"`
+	ID         float64 `json:"id"`
 	Hostname   string  `json:"hostname"`
 	Start_time float64 `json:"start_time"`
 }
@@ -124,7 +124,7 @@ type CyclestartLine struct {
 type CyclestopLine struct {
 	Type      string  `json:"type"`
 	List_name string  `json:"list_name"`
-	id        float64 `json:"id"`
+	ID        float64 `json:"id"`
 	Hostname  string  `json:"hostname"`
 	Stop_time float64 `json:"stop_time"`
 }
