@@ -129,8 +129,8 @@ type CyclestopLine struct {
 	Stop_time float64 `json:"stop_time"`
 }
 
-// ParseJson the raw jsonl test file into schema.PTTest.
-func ParseJson(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
+// ParseJSON the raw jsonl test file into schema.PTTest.
+func ParseJSON(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
 	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Dec()
 
@@ -201,6 +201,10 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 		} else if entryType == "cycle-stop" {
 			err := json.Unmarshal([]byte(oneLine), &cycleStop)
 			if err != nil {
+				metrics.ErrorCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
+				metrics.TestCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
 				return schema.PTTest{}, err
 			}
 		} else if entryType == "tracelb" {
@@ -208,6 +212,7 @@ func ParseJson(testName string, rawContent []byte, tableName string, taskFilenam
 			err := json.Unmarshal([]byte(oneLine), &tracelb)
 			if err != nil {
 				// use jsonnett to do extra reprocessing
+				// TODO: this is a hack. We should see if this can be simplified.
 				vm := jsonnet.MakeVM()
 				output, err := vm.EvaluateSnippet("file", oneLine)
 				err = json.Unmarshal([]byte(output), &tracelb)
@@ -513,7 +518,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 	// Process the json output of Scamper binary.
 	if strings.Contains(pt.taskFileName, "jsonl") {
-		ptTest, err := ParseJson(testName, rawContent, pt.TableName(), pt.taskFileName)
+		ptTest, err := ParseJSON(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
 			err := pt.AddRow(&ptTest)
 			if err == etl.ErrBufferFull {
