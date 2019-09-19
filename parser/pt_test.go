@@ -312,7 +312,7 @@ func TestPTEmptyTest(t *testing.T) {
 		return
 	}
 	_, parseErr := parser.Parse(nil, "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily")
-	if parseErr.Error() != "Empty Test." {
-		t.Fatalf("Do not handle empty test correctly.")
+	if parseErr != nil {
+		t.Fatal(parseErr)
 	}
 }
