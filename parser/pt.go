@@ -134,6 +134,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Dec()
 
+	log.Println(taskFilename)
 	// Get the logtime
 	logTime, err := GetLogtime(PTFileName{Name: filepath.Base(testName)})
 	if err != nil {
@@ -163,6 +164,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			err = json.Unmarshal([]byte(output), &scamperResult)
 			if err != nil {
 				// fail and return here.
+				log.Println("extra jasonnet processing failed")
 				return schema.PTTest{}, err
 			}
 		}
@@ -527,6 +529,9 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				pt.PutAsync(pt.TakeRows())
 				pt.AddRow(&ptTest)
 			}
+		} else {
+			// Modify metrics
+			log.Printf("JSON parsing failed with error %v for %s", err, testName)
 		}
 		return nil
 	}
