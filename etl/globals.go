@@ -233,6 +233,7 @@ var (
 		"paris-traceroute": PT,
 		"switch":           SW,
 		"tcpinfo":          TCPINFO,
+		"traceroute":       PT,
 	}
 
 	// DataTypeToTable maps from data type to BigQuery table name.
