@@ -57,7 +57,7 @@ func TestParseJsonSimple(t *testing.T) {
 	}
 }
 
-func TestParseJsonComplex2(t *testing.T) {
+func XTestParseJsonComplex2(t *testing.T) {
 	testStr := `
 	{"UUID": "ndt-x7jcx_1559749627_0000000000008E7B"}
 {"type":"cycle-start", "list_name":"/tmp/scamperctrl:5394", "id":1, "hostname":"ndt-x7jcx", "start_time":1559894119}
