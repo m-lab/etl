@@ -751,7 +751,7 @@ queue:
   max_concurrent_requests: 5
 
 - name: etl-scamper-queue
-  target: etl-traceroute-parser
+  target: etl-scamper-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
   rate: 1/s
