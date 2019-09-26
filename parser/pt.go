@@ -134,7 +134,6 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Dec()
 
-	log.Println(taskFilename)
 	// Get the logtime
 	logTime, err := GetLogtime(PTFileName{Name: filepath.Base(testName)})
 	if err != nil {
@@ -164,7 +163,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			err = json.Unmarshal([]byte(output), &scamperResult)
 			if err != nil {
 				// fail and return here.
-				log.Println("extra jasonnet processing failed")
+				log.Printf("extra jasonnet processing failed for %s", testName)
 				return schema.PTTest{}, err
 			}
 		}
@@ -500,9 +499,6 @@ func (pt *PTParser) NumBufferedTests() int {
 
 // IsParsable returns the canonical test type and whether to parse data.
 func (pt *PTParser) IsParsable(testName string, data []byte) (string, bool) {
-	if strings.HasSuffix(testName, ".jsonl") {
-		log.Println(testName)
-	}
 	if strings.HasSuffix(testName, ".paris") || strings.HasSuffix(testName, ".jsonl") {
 		return "paris", true
 	}
@@ -525,6 +521,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if strings.Contains(testName, "jsonl") {
 		ptTest, err := ParseJSON(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
+			log.Printf("JSON success parse for %s", testName)
 			err := pt.AddRow(&ptTest)
 			if err == etl.ErrBufferFull {
 				// Flush asynchronously, to improve throughput.
