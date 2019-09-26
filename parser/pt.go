@@ -521,7 +521,6 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if strings.Contains(testName, "jsonl") {
 		ptTest, err := ParseJSON(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
-			log.Printf("JSON success parse for %s", testName)
 			err := pt.AddRow(&ptTest)
 			if err == etl.ErrBufferFull {
 				// Flush asynchronously, to improve throughput.
