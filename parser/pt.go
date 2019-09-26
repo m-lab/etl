@@ -522,7 +522,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 
 	// Process the json output of Scamper binary.
-	if strings.Contains(pt.taskFileName, "jsonl") {
+	if strings.Contains(testName, "jsonl") {
 		ptTest, err := ParseJSON(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
 			err := pt.AddRow(&ptTest)
