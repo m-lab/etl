@@ -207,7 +207,8 @@ deploy:
                $TRAVIS_BRANCH == ss-sandbox-* ||
                $TRAVIS_BRANCH == fast-sandbox-* ||
                $TRAVIS_BRANCH == pt-sandbox-* ||
-               $TRAVIS_BRANCH == disco-sandbox-*
+               $TRAVIS_BRANCH == disco-sandbox-* ||
+               $TRAVIS_BRANCH == scamper-sandbox-*
 
 ## Service: etl-ndt-parser -- AppEngine Flexible Environment.
 - provider: script
@@ -314,6 +315,8 @@ deploy:
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-scamper.yaml
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker fast-sidestream.yaml
@@ -379,6 +382,8 @@ deploy:
     && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-scamper.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
