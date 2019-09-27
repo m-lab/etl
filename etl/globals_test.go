@@ -92,6 +92,14 @@ func TestValidateTestPath(t *testing.T) {
 				"archive-mlab-oti", "", "paris-traceroute", "2019/06/11", "20190611", "000002", "", "mlab2", "bom01", "paris-traceroute", "0000", "", ".tgz",
 			},
 		},
+		{
+			name:     "scamper-tgz",
+			path:     `gs://archive-mlab-oti/ndt/traceroute/2019/06/20/20190620T224809.435046Z-traceroute-mlab1-den06-ndt.tgz`,
+			wantType: etl.PT,
+			want: &etl.DataPath{
+				"archive-mlab-oti", "ndt", "traceroute", "2019/06/20", "20190620", "224809", "traceroute", "mlab1", "den06", "ndt", "", "", ".tgz",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

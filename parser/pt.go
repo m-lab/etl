@@ -163,6 +163,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			err = json.Unmarshal([]byte(output), &scamperResult)
 			if err != nil {
 				// fail and return here.
+				log.Printf("extra jasonnet processing failed for %s", testName)
 				return schema.PTTest{}, err
 			}
 		}
@@ -498,7 +499,7 @@ func (pt *PTParser) NumBufferedTests() int {
 
 // IsParsable returns the canonical test type and whether to parse data.
 func (pt *PTParser) IsParsable(testName string, data []byte) (string, bool) {
-	if strings.HasSuffix(testName, ".paris") {
+	if strings.HasSuffix(testName, ".paris") || strings.HasSuffix(testName, ".jsonl") {
 		return "paris", true
 	}
 	return "unknown", false
@@ -517,7 +518,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 
 	// Process the json output of Scamper binary.
-	if strings.Contains(pt.taskFileName, "jsonl") {
+	if strings.Contains(testName, "jsonl") {
 		ptTest, err := ParseJSON(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
 			err := pt.AddRow(&ptTest)
@@ -527,6 +528,9 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 				pt.PutAsync(pt.TakeRows())
 				pt.AddRow(&ptTest)
 			}
+		} else {
+			// Modify metrics
+			log.Printf("JSON parsing failed with error %v for %s", err, testName)
 		}
 		return nil
 	}

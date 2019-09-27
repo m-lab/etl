@@ -696,8 +696,62 @@ queue:
     max_backoff_seconds: 20
     max_doublings: 0
 
+# Scamper JSON barch queue.
+- name: etl-scamper-batch-0
+  target: etl-batch-parser
+  rate: 1/s
+  bucket_size: 10
+  # max concurrent is limited, because we will share the pipeline with other experiment types
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    # min and max are same, so that queue rate only diminishes as tasks are drained
+    # it is set rather low, because traceroute days have relatively few files compared to NDT
+    # and we want the rate limited by the rate/concurrent requests, not by the backoff
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-scamper-batch-1
+  target: etl-batch-parser
+  rate: 1/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-scamper-batch-2
+  target: etl-batch-parser
+  rate: 1/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+- name: etl-scamper-batch-3
+  target: etl-batch-parser
+  rate: 1/s
+  bucket_size: 10
+  max_concurrent_requests: 20
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+
+
 - name: etl-traceroute-queue
   target: etl-traceroute-parser
+  # Average rate at which to release tasks to the service.  Default is 5/sec
+  # This is actually the rate at which tokens are added to the bucket.
+  rate: 1/s
+  # Number of tokens that can accumulate in the bucket.  Default is 5.  This should
+  # have very little impact for our environment.
+  bucket_size: 10
+  # Maximum number of concurrent requests.
+  max_concurrent_requests: 5
+
+- name: etl-scamper-queue
+  target: etl-scamper-parser
   # Average rate at which to release tasks to the service.  Default is 5/sec
   # This is actually the rate at which tokens are added to the bucket.
   rate: 1/s
