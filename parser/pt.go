@@ -231,6 +231,10 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			for _, oneNode := range tracelb.Nodes {
 				var links []schema.HopLink
 				if len(oneNode.Links) == 0 {
+					hops = append(hops, schema.ScamperHop{
+						Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
+						Linkc:  oneNode.Linkc,
+					}
 					continue
 				}
 				for _, oneLink := range oneNode.Links[0] {
