@@ -230,6 +230,9 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 
 			for _, oneNode := range tracelb.Nodes {
 				var links []schema.HopLink
+				if len(oneNode.Links) == 0 {
+					continue
+				}
 				for _, oneLink := range oneNode.Links[0] {
 					var probes []schema.HopProbe
 					var ttl int64
