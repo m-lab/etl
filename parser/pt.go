@@ -163,7 +163,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			err = json.Unmarshal([]byte(output), &scamperResult)
 			if err != nil {
 				// fail and return here.
-				log.Printf("extra jasonnet processing failed for %s", testName)
+				log.Printf("extra jsonnet processing failed for %s, %s", testName, taskFilename)
 				return schema.PTTest{}, err
 			}
 		}
