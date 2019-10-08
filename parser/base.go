@@ -72,7 +72,7 @@ func (buf *RowBuffer) TakeRows() []interface{} {
 // TODO update this to use local cache of high quality annotations.
 // label is used to label metrics and errors in GetAnnotations
 func (buf *RowBuffer) annotateServers(label string) error {
-	ipSlice := make([]string, len(buf.rows))
+	ipSlice := make([]string, 0, len(buf.rows))
 	logTime := time.Time{}
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
@@ -80,8 +80,11 @@ func (buf *RowBuffer) annotateServers(label string) error {
 			return ErrNotAnnotatable
 		}
 
-		// the ith row has its server IP in ipSlice[i].
-		ipSlice[i] = r.GetServerIP()
+		// Only ask for the IP if it is non-empty.
+		ip := r.GetServerIP()
+		if ip != "" {
+			ipSlice = append(ipSlice, ip)
+		}
 
 		if (logTime == time.Time{}) {
 			logTime = r.GetLogTime()
@@ -108,9 +111,12 @@ func (buf *RowBuffer) annotateServers(label string) error {
 		if !ok {
 			err = ErrNotAnnotatable
 		} else {
-			ann, ok := annMap[ipSlice[i]]
-			if ok {
-				r.AnnotateServer(ann)
+			ip := r.GetServerIP()
+			if ip != "" {
+				ann, ok := annMap[ip]
+				if ok {
+					r.AnnotateServer(ann)
+				}
 			}
 		}
 	}
