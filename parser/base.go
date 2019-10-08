@@ -92,7 +92,7 @@ func (buf *RowBuffer) annotateServers(label string) error {
 		}
 	}
 
-	for ip, _ := range serverIPs {
+	for ip := range serverIPs {
 		ipSlice = append(ipSlice, ip)
 	}
 	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, label)
