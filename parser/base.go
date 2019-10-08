@@ -73,6 +73,7 @@ func (buf *RowBuffer) TakeRows() []interface{} {
 // label is used to label metrics and errors in GetAnnotations
 func (buf *RowBuffer) annotateServers(label string) error {
 	ipSlice := make([]string, 0, len(buf.rows))
+	serverIPs := make(map[string]struct{})
 	logTime := time.Time{}
 	for i := range buf.rows {
 		r, ok := buf.rows[i].(Annotatable)
@@ -83,7 +84,7 @@ func (buf *RowBuffer) annotateServers(label string) error {
 		// Only ask for the IP if it is non-empty.
 		ip := r.GetServerIP()
 		if ip != "" {
-			ipSlice = append(ipSlice, ip)
+			serverIPs[ip] = struct{}{}
 		}
 
 		if (logTime == time.Time{}) {
@@ -91,6 +92,9 @@ func (buf *RowBuffer) annotateServers(label string) error {
 		}
 	}
 
+	for ip, _ := range serverIPs {
+		ipSlice = append(ipSlice, ip)
+	}
 	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, label)
 	if err != nil {
 		log.Println("error in server GetAnnotations: ", err)
