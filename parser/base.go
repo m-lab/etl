@@ -72,7 +72,6 @@ func (buf *RowBuffer) TakeRows() []interface{} {
 // TODO update this to use local cache of high quality annotations.
 // label is used to label metrics and errors in GetAnnotations
 func (buf *RowBuffer) annotateServers(label string) error {
-	ipSlice := make([]string, 0, len(buf.rows))
 	serverIPs := make(map[string]struct{})
 	logTime := time.Time{}
 	for i := range buf.rows {
@@ -92,8 +91,12 @@ func (buf *RowBuffer) annotateServers(label string) error {
 		}
 	}
 
+	ipSlice := make([]string, 0, len(buf.rows))
 	for ip := range serverIPs {
 		ipSlice = append(ipSlice, ip)
+	}
+	if len(ipSlice) == 0 {
+		return nil
 	}
 	response, err := buf.ann.GetAnnotations(context.Background(), logTime, ipSlice, label)
 	if err != nil {
