@@ -84,6 +84,13 @@ func TestBase(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	// Add a row with empty server IP
+	err = b.AddRow(&Row{"1.2.3.4", "", nil, nil})
+	if err != nil {
+		t.Error(err)
+	}
+
 	err = b.Annotate("tablename")
 	if err != nil {
 		t.Error(err)
@@ -92,8 +99,8 @@ func TestBase(t *testing.T) {
 		t.Error("Callcount should be 2:", callCount)
 	}
 	b.Flush()
-	if ins.Committed() != 1 {
-		t.Fatalf("Expected %d, Got %d.", 1, ins.Committed())
+	if ins.Committed() != 2 {
+		t.Fatalf("Expected %d, Got %d.", 2, ins.Committed())
 	}
 
 	if len(ins.data) < 1 {
