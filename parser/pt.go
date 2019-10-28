@@ -129,6 +129,13 @@ type CyclestopLine struct {
 	Stop_time float64 `json:"stop_time"`
 }
 
+type Metadata struct {
+	UUID                    string
+	TracerouteCallerVersion string
+	CachedResult            bool
+	CachedUUID              string
+}
+
 // ParseJSON the raw jsonl test file into schema.PTTest.
 func ParseJSON(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
 	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
@@ -143,6 +150,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	// Split the JSON file and parse it line by line.
 	var uuid string
 	var hops []schema.ScamperHop
+	var meta Metadata
 	var cycleStart CyclestartLine
 	var tracelb TracelbLine
 	var cycleStop CyclestopLine
@@ -153,6 +161,21 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			continue
 		}
 
+		// The first line should always be UUID line.
+		if index == 0 {
+			// extract uuid from {"UUID": "ndt-74mqr_1565960097_000000000006DBCC"}
+			err := json.Unmarshal([]byte(oneLine), &meta)
+			if err != nil {
+				metrics.ErrorCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
+				metrics.TestCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
+				return schema.PTTest{}, errors.New("empty UUID")
+			}
+			uuid = meta.UUID
+			continue
+		}
+
 		var scamperResult map[string]interface{}
 		err := json.Unmarshal([]byte(oneLine), &scamperResult)
 
@@ -160,7 +183,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			// use jsonnett to do extra reprocessing
 			vm := jsonnet.MakeVM()
 			output, err := vm.EvaluateSnippet("file", oneLine)
-			err = json.Unmarshal([]byte(output), &scamperResult)
+			err = json.Unmarshal([]byte(output), &meta)
 			if err != nil {
 				// fail and return here.
 				log.Printf("extra jsonnet processing failed for %s, %s", testName, taskFilename)
@@ -168,20 +191,6 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			}
 		}
 
-		// The first line should always be UUID line.
-		if index == 0 {
-			// extract uuid from {"UUID": "ndt-74mqr_1565960097_000000000006DBCC"}
-			_, ok := scamperResult["UUID"]
-			if !ok {
-				metrics.ErrorCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				metrics.TestCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				return schema.PTTest{}, errors.New("empty UUID")
-			}
-			uuid = scamperResult["UUID"].(string)
-			continue
-		}
 		var entryType string
 		_, ok := scamperResult["type"]
 		if !ok {
