@@ -148,7 +148,8 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	}
 
 	// Split the JSON file and parse it line by line.
-	var uuid string
+	var uuid, version string
+	var isCache bool
 	var hops []schema.ScamperHop
 	var meta Metadata
 	var cycleStart CyclestartLine
@@ -173,6 +174,8 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 				return schema.PTTest{}, errors.New("empty UUID")
 			}
 			uuid = meta.UUID
+			version = meta.TracerouteCallerVersion
+			isCache = meta.CachedResult
 			continue
 		}
 
@@ -281,17 +284,19 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	}
 
 	return schema.PTTest{
-		UUID:           uuid,
-		TestTime:       logTime,
-		Parseinfo:      parseInfo,
-		StartTime:      int64(cycleStart.Start_time),
-		StopTime:       int64(cycleStop.Stop_time),
-		ScamperVersion: tracelb.Version,
-		Source:         schema.ServerInfo{IP: tracelb.Src},
-		Destination:    schema.ClientInfo{IP: tracelb.Dst},
-		ProbeSize:      int64(tracelb.Probe_size),
-		ProbeC:         int64(tracelb.Probec),
-		Hop:            hops,
+		UUID:                    uuid,
+		TestTime:                logTime,
+		Parseinfo:               parseInfo,
+		StartTime:               int64(cycleStart.Start_time),
+		StopTime:                int64(cycleStop.Stop_time),
+		ScamperVersion:          tracelb.Version,
+		Source:                  schema.ServerInfo{IP: tracelb.Src},
+		Destination:             schema.ClientInfo{IP: tracelb.Dst},
+		ProbeSize:               int64(tracelb.Probe_size),
+		ProbeC:                  int64(tracelb.Probec),
+		Hop:                     hops,
+		TracerouteCallerVersion: version,
+		CachedResult:            isCache,
 	}, nil
 }
 
