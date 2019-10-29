@@ -186,7 +186,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			// use jsonnett to do extra reprocessing
 			vm := jsonnet.MakeVM()
 			output, err := vm.EvaluateSnippet("file", oneLine)
-			err = json.Unmarshal([]byte(output), &meta)
+			err = json.Unmarshal([]byte(output), &scamperResult)
 			if err != nil {
 				// fail and return here.
 				log.Printf("extra jsonnet processing failed for %s, %s", testName, taskFilename)
