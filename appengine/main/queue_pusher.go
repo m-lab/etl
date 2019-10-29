@@ -1,6 +1,6 @@
 // Package pushqueue provides a microservice that accepts HTTP requests, creates
 // a Task from given parameters, and adds the Task to a TaskQueue.
-package pushqueue
+package main
 
 import (
 	"encoding/json"

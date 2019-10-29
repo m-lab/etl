@@ -1,4 +1,4 @@
-package pushqueue
+package main
 
 // TODO
 // 1. Convert most of the tests to use an actual server.
