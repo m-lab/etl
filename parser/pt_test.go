@@ -3,7 +3,6 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -102,8 +101,6 @@ func TestParseJsonComplex(t *testing.T) {
 		t.Fatalf("Wrong results for UUID parsing!")
 	}
 	if output.Source.IP != "2001:550:1b01:1:e41d:2d00:151:f6c0" || output.Destination.IP != "2600:1009:b013:1a59:c369:b528:98fd:ab43" {
-		log.Println(output.Source.IP)
-		log.Println(output.Destination.IP)
 		t.Fatalf("Wrong results for source/destination IP parsing!")
 	}
 	if output.ProbeSize != 60 || output.ProbeC != 85 {
