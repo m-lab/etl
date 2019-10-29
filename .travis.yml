@@ -64,7 +64,7 @@ script:
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
 # TODO - separate storage tests into integration and lightweight.
-- MODULES="annotation appengine/queue_pusher bq etl metrics parser schema task web100"
+- MODULES="annotation appengine/main bq etl metrics parser schema task web100"
 - for module in $MODULES; do
     COVER_PKGS=${COVER_PKGS}./$module/..., ;
   done
@@ -144,7 +144,7 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/main
   skip_cleanup: true
   on:
     repo: m-lab/etl
