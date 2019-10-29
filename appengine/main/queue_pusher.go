@@ -144,3 +144,8 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+func main() {
+	init()
+	http.ListenAndServe(":3000", nil)
+}
