@@ -149,7 +149,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 
 	// Split the JSON file and parse it line by line.
 	var uuid, version string
-	var isCache bool
+	var resultFromCache bool
 	var hops []schema.ScamperHop
 	var meta Metadata
 	var cycleStart CyclestartLine
@@ -175,7 +175,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			}
 			uuid = meta.UUID
 			version = meta.TracerouteCallerVersion
-			isCache = meta.CachedResult
+			resultFromCache = meta.CachedResult
 			continue
 		}
 
@@ -296,7 +296,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 		ProbeC:                  int64(tracelb.Probec),
 		Hop:                     hops,
 		TracerouteCallerVersion: version,
-		CachedResult:            isCache,
+		CachedResult:            resultFromCache,
 	}, nil
 }
 
