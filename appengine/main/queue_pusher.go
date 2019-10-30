@@ -146,6 +146,8 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	init()
+	http.HandleFunc("/", defaultHandler)
+	http.HandleFunc("/receiver", receiver)
+	http.HandleFunc("/stats", queueStats)
 	http.ListenAndServe(":3000", nil)
 }
