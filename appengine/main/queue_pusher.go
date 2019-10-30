@@ -5,8 +5,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 
 	"github.com/m-lab/etl/etl"
 	"google.golang.org/appengine"
@@ -143,5 +145,12 @@ func main() {
 	http.HandleFunc("/", defaultHandler)
 	http.HandleFunc("/receiver", receiver)
 	http.HandleFunc("/stats", queueStats)
-	appengine.Main()
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+		log.Printf("Defaulting to port %s", port)
+	}
+
+	log.Printf("Listening on port %s", port)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
