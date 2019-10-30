@@ -31,7 +31,8 @@ automatic_scaling:
 # TODO(dev): are any values redundant or irrelevant?
 network:
   instance_tag: etl-parser
-  name: default
+  name: data-processing
+  subnetwork_name: dp-gardener
   # Forward port 9090 on the GCE instance address to the same port in the
   # container address. Only forward TCP traffic.
   # Note: the default AppEngine container port 8080 cannot be forwarded.
