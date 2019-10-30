@@ -3,7 +3,7 @@ service: queue-pusher
 
 handlers:
 - url: /.*
-  script: _go_app
+  script: auto
 
 env_variables:
   # These should be substituted in the travis deployment script.
