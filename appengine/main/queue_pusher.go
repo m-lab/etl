@@ -34,12 +34,6 @@ func isDirectQueueNameOK(name string) bool {
 	return true
 }
 
-func init() {
-	http.HandleFunc("/", defaultHandler)
-	http.HandleFunc("/receiver", receiver)
-	http.HandleFunc("/stats", queueStats)
-}
-
 // A default handler for root path.
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
