@@ -21,6 +21,10 @@ func (row *NDTResult) Schema() (bigquery.Schema, error) {
 	if err != nil {
 		return bigquery.Schema{}, err
 	}
+	docs := bqx.NewSchemaDoc(MustAsset("toplevel.yaml"))
+	bqx.UpdateSchemaDescription(sch, docs)
+	docs = bqx.NewSchemaDoc(MustAsset("ndt_result.yaml"))
+	bqx.UpdateSchemaDescription(sch, docs)
 	rr := bqx.RemoveRequired(sch)
 	return rr, err
 }
