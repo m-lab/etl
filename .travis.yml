@@ -19,6 +19,9 @@ language: go
 go:
  - 1.12
 
+env:
+- PATH=$PATH:$HOME/gopath/bin
+
 before_install:
 - sudo apt-get install -y jq  # Dependency for sync_tables_with_schema.sh.
 # Install javascript libraries
