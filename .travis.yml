@@ -56,8 +56,11 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 script:
-# Generate the binary assets for the ETL schema package.
+# Enforce that the local binary assets match the generated ones.
+- cp schema/bindata.go /tmp/current-bindata.go
 - go generate ./schema
+- diff -q schema/bindata.go /tmp/current-bindata.go || (
+  echo "Files do not match; run 'go generate ./schema' and commit changes" )
 
 # Run all javascript tests.
 - pushd $TRAVIS_BUILD_DIR/functions
