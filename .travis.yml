@@ -324,8 +324,8 @@ deploy:
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker fast-sidestream.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
-    # && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    # SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
+#   && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+#   SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
     && cd $TRAVIS_BUILD_DIR/functions
     && gcloud functions deploy createStagingTaskOnFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-staging
     && gcloud functions deploy createStagingTaskOnEmbargoFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-staging
@@ -390,8 +390,8 @@ deploy:
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
-    # && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    # SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/appengine/queue_pusher
+#   && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+#   SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
   on:
     repo: m-lab/etl
