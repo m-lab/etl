@@ -85,7 +85,7 @@ func readmeMd() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "README.md", size: 298, mode: os.FileMode(420), modTime: time.Unix(1572477993, 0)}
+	info := bindataFileInfo{name: "README.md", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -105,7 +105,7 @@ func ndt_resultYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "ndt_result.yaml", size: 1391, mode: os.FileMode(420), modTime: time.Unix(1572480731, 0)}
+	info := bindataFileInfo{name: "ndt_result.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -125,7 +125,7 @@ func toplevelYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "toplevel.yaml", size: 518, mode: os.FileMode(420), modTime: time.Unix(1572482332, 0)}
+	info := bindataFileInfo{name: "toplevel.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
