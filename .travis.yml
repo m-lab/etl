@@ -32,6 +32,9 @@ before_install:
 - go get github.com/mattn/goveralls
 - go get github.com/wadey/gocovmerge
 
+# Tools to generate and embed binary assets.
+- go get -u github.com/go-bindata/go-bindata
+
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
 # Install gcloud, for integration tests.
@@ -53,6 +56,9 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 script:
+# Generate the binary assets for the ETL schema package.
+- go generate ./schema
+
 # Run all javascript tests.
 - pushd $TRAVIS_BUILD_DIR/functions
 - npm test
@@ -249,7 +255,7 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_BRANCH == pt-sandbox-* || $TRAVIS_BRANCH == sandbox-*
-    
+
 ## Service: etl-scamper-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
