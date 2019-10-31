@@ -140,6 +140,9 @@ deploy:
 #  - before code review for development code in a specific branch.
 ######################################################################
 
+## Service: queue-pusher -- AppEngine Standard Environment.
+## Removed for issue https://github.com/m-lab/etl/issues/751
+
 ## Service: cloud function -- AppEngine Flexible Environment.
 - provider: script
   script:
