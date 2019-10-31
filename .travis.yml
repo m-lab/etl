@@ -61,7 +61,8 @@ script:
 
 # Enforce that the local binary assets match the generated ones.
 - cp schema/bindata.go /tmp/current-bindata.go
-- PATH=$PATH:$HOME/gopath/bin go generate ./schema
+- echo $PATH
+- go generate ./schema
 - diff -q schema/bindata.go /tmp/current-bindata.go || (
   echo "Files do not match; run 'go generate ./schema' and commit changes" )
 
