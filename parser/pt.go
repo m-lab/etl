@@ -190,6 +190,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 
 		switch index {
 		case 1:
+			// Some early stage tests only has UUID field in this meta line.
 			err := json.Unmarshal([]byte(jsonLine), &cycleStart)
 			if err != nil {
 				metrics.ErrorCount.WithLabelValues(
@@ -226,6 +227,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 					})
 					continue
 				}
+				// This is Links[0] special processing is due to scamper adding extra "{}" here
 				for _, oneLink := range oneNode.Links[0] {
 					var probes []schema.HopProbe
 					var ttl int64
