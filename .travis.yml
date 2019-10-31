@@ -61,6 +61,7 @@ script:
 
 # Enforce that the local binary assets match the generated ones.
 - cp schema/bindata.go /tmp/current-bindata.go
+- ls -l /home/travis/gopath/bin
 - echo $PATH
 - go generate ./schema
 - diff -q schema/bindata.go /tmp/current-bindata.go || (
