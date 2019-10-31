@@ -35,6 +35,9 @@ before_install:
 - go get github.com/mattn/goveralls
 - go get github.com/wadey/gocovmerge
 
+# Tool to generate and embed binary assets.
+- go get github.com/go-bindata/go-bindata/go-bindata
+
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
 # Install gcloud, for integration tests.
@@ -56,13 +59,8 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 script:
-# Tool to generate and embed binary assets.
-- go get -u github.com/go-bindata/go-bindata
-
 # Enforce that the local binary assets match the generated ones.
 - cp schema/bindata.go /tmp/current-bindata.go
-- ls -l /home/travis/gopath/bin
-- echo $PATH
 - go generate ./schema
 - diff -q schema/bindata.go /tmp/current-bindata.go || (
   echo "Files do not match; run 'go generate ./schema' and commit changes" )
