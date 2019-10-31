@@ -50,7 +50,7 @@ func GetLogtime(filename PTFileName) (time.Time, error) {
 }
 
 // -------------------------------------------------
-// The following are struct and funcs used by Json parsing.
+// The following are structs and funcs used by JSON parsing.
 // -------------------------------------------------
 
 type TS struct {
@@ -90,6 +90,27 @@ type ScamperNode struct {
 	Links [][]ScamperLink `json:"links"`
 }
 
+// There are 4 lines in the traceroute test .jsonl file.
+// The first line is defined in Metadata
+// The second line is defined in CyclestartLine
+// The third line is defined in TracelbLine
+// The fourth line is defined in CyclestopLine
+
+type Metadata struct {
+	UUID                    string
+	TracerouteCallerVersion string
+	CachedResult            bool
+	CachedUUID              string
+}
+
+type CyclestartLine struct {
+	Type       string  `json:"type"`
+	List_name  string  `json:"list_name"`
+	ID         float64 `json:"id"`
+	Hostname   string  `json:"hostname"`
+	Start_time float64 `json:"start_time"`
+}
+
 type TracelbLine struct {
 	Type         string        `json:"type"`
 	Version      string        `json:"version"`
@@ -113,27 +134,12 @@ type TracelbLine struct {
 	Nodes        []ScamperNode `json:"nodes"`
 }
 
-type CyclestartLine struct {
-	Type       string  `json:"type"`
-	List_name  string  `json:"list_name"`
-	ID         float64 `json:"id"`
-	Hostname   string  `json:"hostname"`
-	Start_time float64 `json:"start_time"`
-}
-
 type CyclestopLine struct {
 	Type      string  `json:"type"`
 	List_name string  `json:"list_name"`
 	ID        float64 `json:"id"`
 	Hostname  string  `json:"hostname"`
 	Stop_time float64 `json:"stop_time"`
-}
-
-type Metadata struct {
-	UUID                    string
-	TracerouteCallerVersion string
-	CachedResult            bool
-	CachedUUID              string
 }
 
 // ParseJSON the raw jsonl test file into schema.PTTest.
@@ -156,54 +162,35 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	var tracelb TracelbLine
 	var cycleStop CyclestopLine
 
-	for index, oneLine := range strings.Split(string(rawContent[:]), "\n") {
-		oneLine = strings.TrimSuffix(oneLine, "\n")
-		if len(oneLine) == 0 {
+	jsonStrings := strings.Split(string(rawContent[:]), "\n")
+
+	if len(jsonStrings) != 4 {
+		log.Println("Invalid test")
+		return schema.PTTest{}, err
+	}
+
+	// Parse the first line for meta info.
+	err = json.Unmarshal([]byte(jsonStrings[0]), &meta)
+	if err != nil {
+		metrics.ErrorCount.WithLabelValues(
+			tableName, "pt", "corrupted json content").Inc()
+		metrics.TestCount.WithLabelValues(
+			tableName, "pt", "corrupted json content").Inc()
+		return schema.PTTest{}, errors.New("empty UUID")
+	}
+	uuid = meta.UUID
+	version = meta.TracerouteCallerVersion
+	resultFromCache = meta.CachedResult
+
+	for index := 1; index < 4; index++ {
+		jsonLine := jsonStrings[index]
+		if len(jsonLine) == 0 {
 			continue
 		}
 
-		// The first line should always be UUID line.
-		if index == 0 {
-			// extract uuid from {"UUID": "ndt-74mqr_1565960097_000000000006DBCC"}
-			err := json.Unmarshal([]byte(oneLine), &meta)
-			if err != nil {
-				metrics.ErrorCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				metrics.TestCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				return schema.PTTest{}, errors.New("empty UUID")
-			}
-			uuid = meta.UUID
-			version = meta.TracerouteCallerVersion
-			resultFromCache = meta.CachedResult
-			continue
-		}
-
-		var scamperResult map[string]interface{}
-		err := json.Unmarshal([]byte(oneLine), &scamperResult)
-
-		if err != nil {
-			// use jsonnett to do extra reprocessing
-			vm := jsonnet.MakeVM()
-			output, err := vm.EvaluateSnippet("file", oneLine)
-			err = json.Unmarshal([]byte(output), &scamperResult)
-			if err != nil {
-				// fail and return here.
-				log.Printf("extra jsonnet processing failed for %s, %s", testName, taskFilename)
-				return schema.PTTest{}, err
-			}
-		}
-
-		var entryType string
-		_, ok := scamperResult["type"]
-		if !ok {
-			continue
-		}
-		entryType = scamperResult["type"].(string)
-		if entryType == "cycle-start" {
-			// extract start_time
-			// {"type":"cycle-start", "list_name":"/tmp/scamperctrl:62485", "id":1, "hostname":"ndt-74mqr", "start_time":1567900908}
-			err := json.Unmarshal([]byte(oneLine), &cycleStart)
+		switch index {
+		case 1:
+			err := json.Unmarshal([]byte(jsonLine), &cycleStart)
 			if err != nil {
 				metrics.ErrorCount.WithLabelValues(
 					tableName, "pt", "corrupted json content").Inc()
@@ -211,23 +198,14 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 					tableName, "pt", "corrupted json content").Inc()
 				return schema.PTTest{}, err
 			}
-		} else if entryType == "cycle-stop" {
-			err := json.Unmarshal([]byte(oneLine), &cycleStop)
-			if err != nil {
-				metrics.ErrorCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				metrics.TestCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				return schema.PTTest{}, err
-			}
-		} else if entryType == "tracelb" {
+		case 2:
 			// Parse the line in struct
-			err := json.Unmarshal([]byte(oneLine), &tracelb)
+			err := json.Unmarshal([]byte(jsonLine), &tracelb)
 			if err != nil {
 				// use jsonnett to do extra reprocessing
 				// TODO: this is a hack. We should see if this can be simplified.
 				vm := jsonnet.MakeVM()
-				output, err := vm.EvaluateSnippet("file", oneLine)
+				output, err := vm.EvaluateSnippet("file", jsonLine)
 				err = json.Unmarshal([]byte(output), &tracelb)
 				//log.Printf("%+v\n", tracelb)
 				if err != nil {
@@ -267,13 +245,15 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 					Links:  links,
 				})
 			}
-		} else {
-			// Invalid entry
-			metrics.ErrorCount.WithLabelValues(
-				tableName, "pt", "corrupted json content").Inc()
-			metrics.TestCount.WithLabelValues(
-				tableName, "pt", "corrupted json content").Inc()
-			return schema.PTTest{}, errors.New("invalid type entry")
+		case 3:
+			err := json.Unmarshal([]byte(jsonLine), &cycleStop)
+			if err != nil {
+				metrics.ErrorCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
+				metrics.TestCount.WithLabelValues(
+					tableName, "pt", "corrupted json content").Inc()
+				return schema.PTTest{}, err
+			}
 		}
 	}
 
@@ -284,19 +264,19 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	}
 
 	return schema.PTTest{
-		UUID:                    uuid,
-		TestTime:                logTime,
-		Parseinfo:               parseInfo,
-		StartTime:               int64(cycleStart.Start_time),
-		StopTime:                int64(cycleStop.Stop_time),
-		ScamperVersion:          tracelb.Version,
-		Source:                  schema.ServerInfo{IP: tracelb.Src},
-		Destination:             schema.ClientInfo{IP: tracelb.Dst},
-		ProbeSize:               int64(tracelb.Probe_size),
-		ProbeC:                  int64(tracelb.Probec),
-		Hop:                     hops,
-		TracerouteCallerVersion: version,
-		CachedResult:            resultFromCache,
+		UUID:           uuid,
+		TestTime:       logTime,
+		Parseinfo:      parseInfo,
+		StartTime:      int64(cycleStart.Start_time),
+		StopTime:       int64(cycleStop.Stop_time),
+		ScamperVersion: tracelb.Version,
+		Source:         schema.ServerInfo{IP: tracelb.Src},
+		Destination:    schema.ClientInfo{IP: tracelb.Dst},
+		ProbeSize:      int64(tracelb.Probe_size),
+		ProbeC:         int64(tracelb.Probec),
+		Hop:            hops,
+		ExpVersion:     version,
+		CachedResult:   resultFromCache,
 	}, nil
 }
 

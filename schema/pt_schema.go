@@ -36,19 +36,19 @@ type ScamperHop struct {
 }
 
 type PTTest struct {
-	UUID                    string       `json:"uuid,string" bigquery:"uuid"`
-	TestTime                time.Time    `json:"testtime"`
-	Parseinfo               ParseInfo    `json:"parseinfo"`
-	StartTime               int64        `json:"start_time,int64" bigquery:"start_time"`
-	StopTime                int64        `json:"stop_time,int64" bigquery:"stop_time"`
-	ScamperVersion          string       `json:"scamper_version,string" bigquery:"scamper_version"`
-	Source                  ServerInfo   `json:"source"`
-	Destination             ClientInfo   `json:"destination"`
-	ProbeSize               int64        `json:"probe_size,int64"`
-	ProbeC                  int64        `json:"probec,int64"`
-	Hop                     []ScamperHop `json:"hop"`
-	TracerouteCallerVersion string       `json:"traceroute_caller_version,string" bigquery:"traceroute_caller_version"`
-	CachedResult            bool         `json:"cached_result,bool" bigquery:"cached_result"`
+	UUID           string       `json:"uuid,string" bigquery:"uuid"`
+	TestTime       time.Time    `json:"testtime"`
+	Parseinfo      ParseInfo    `json:"parseinfo"`
+	StartTime      int64        `json:"start_time,int64" bigquery:"start_time"`
+	StopTime       int64        `json:"stop_time,int64" bigquery:"stop_time"`
+	ScamperVersion string       `json:"scamper_version,string" bigquery:"scamper_version"`
+	Source         ServerInfo   `json:"source"`
+	Destination    ClientInfo   `json:"destination"`
+	ProbeSize      int64        `json:"probe_size,int64"`
+	ProbeC         int64        `json:"probec,int64"`
+	Hop            []ScamperHop `json:"hop"`
+	ExpVersion     string       `json:"traceroute_caller_version,string" bigquery:"traceroute_caller_version"`
+	CachedResult   bool         `json:"cached_result,bool" bigquery:"cached_result"`
 }
 
 // Schema returns the Bigquery schema for PTTest.
