@@ -141,15 +141,7 @@ deploy:
 ######################################################################
 
 ## Service: queue-pusher -- AppEngine Standard Environment.
-- provider: script
-  script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/queue_pusher
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_BRANCH == qp-sandbox-* || $TRAVIS_BRANCH == sandbox-* || $TRAVIS_BRANCH == batch-sandbox-*
+## Removed for issue https://github.com/m-lab/etl/issues/751
 
 ## Service: cloud function -- AppEngine Flexible Environment.
 - provider: script
@@ -322,8 +314,6 @@ deploy:
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker fast-sidestream.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
     && cd $TRAVIS_BUILD_DIR/functions
     && gcloud functions deploy createStagingTaskOnFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-staging
     && gcloud functions deploy createStagingTaskOnEmbargoFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-staging
@@ -388,8 +378,6 @@ deploy:
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-sidestream.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-disco.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
   on:
     repo: m-lab/etl
