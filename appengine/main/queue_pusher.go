@@ -11,7 +11,6 @@ import (
 	"os"
 
 	"github.com/m-lab/etl/etl"
-	"google.golang.org/appengine"
 	applog "google.golang.org/appengine/log"
 	"google.golang.org/appengine/taskqueue"
 )
@@ -53,7 +52,7 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 
 	if queuename == "" {
 		http.Error(w, `{"message": "Bad request parameters"}`, http.StatusBadRequest)
-		ctx := appengine.NewContext(r)
+		ctx := r.Context()
 		applog.Errorf(ctx, "%+v\n", w)
 		return
 	}
@@ -64,7 +63,7 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get stats.
-	ctx := appengine.NewContext(r)
+	ctx := r.Context()
 	stats, err := taskqueue.QueueStats(ctx, []string{queuename})
 	if err != nil {
 		log.Println(err)
@@ -102,7 +101,7 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 	// Validate filename.
 	fnData, err := etl.ValidateTestPath(decodedFilename)
 	if err != nil {
-		ctx := appengine.NewContext(r)
+		ctx := r.Context()
 		applog.Errorf(ctx, "%v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"message": "Invalid filename."}`)
@@ -133,7 +132,7 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 		test := r.FormValue("test-bypass")
 		if test == "" {
 			// Skip queuing if bypass for test.
-			ctx := appengine.NewContext(r)
+			ctx := r.Context()
 			if _, err := taskqueue.Add(ctx, t, queuename); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
