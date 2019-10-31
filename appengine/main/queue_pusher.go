@@ -67,6 +67,7 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	stats, err := taskqueue.QueueStats(ctx, []string{queuename})
 	if err != nil {
+		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -74,6 +75,7 @@ func queueStats(w http.ResponseWriter, r *http.Request) {
 	// Return stats to client.
 	b, err := json.Marshal(stats)
 	if err != nil {
+		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
