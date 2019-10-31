@@ -55,11 +55,10 @@ cache:
 script:
 # Tool to generate and embed binary assets.
 - go get -u github.com/go-bindata/go-bindata
-- export PATH=$PATH:$HOME/gopath/bin
 
 # Enforce that the local binary assets match the generated ones.
 - cp schema/bindata.go /tmp/current-bindata.go
-- go generate ./schema
+- PATH=$PATH:$HOME/gopath/bin go generate ./schema
 - diff -q schema/bindata.go /tmp/current-bindata.go || (
   echo "Files do not match; run 'go generate ./schema' and commit changes" )
 
