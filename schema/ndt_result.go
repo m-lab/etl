@@ -6,25 +6,25 @@ import (
 	"github.com/m-lab/ndt-server/data"
 )
 
-// NDTResult defines the BQ schema for the NDT Result produced by the
-// ndt-server for the NDT clients.
-type NDTResult struct {
+// NDTRow defines the BQ schema for the data.NDTResult produced by the
+// ndt-server for NDT client measurements.
+type NDTRow struct {
 	ParseInfo *ParseInfo
 	TestID    string         `json:"test_id,string" bigquery:"test_id"`
 	LogTime   int64          `json:"log_time,int64" bigquery:"log_time"`
 	Result    data.NDTResult `json:"result" bigquery:"result"`
 }
 
-// Schema returns the BigQuery schema for NDTResult.
-func (row *NDTResult) Schema() (bigquery.Schema, error) {
+// Schema returns the BigQuery schema for NDTRow.
+func (row *NDTRow) Schema() (bigquery.Schema, error) {
 	sch, err := bigquery.InferSchema(row)
 	if err != nil {
 		return bigquery.Schema{}, err
 	}
-	docs := bqx.NewSchemaDoc(MustAsset("toplevel.yaml"))
-	bqx.UpdateSchemaDescription(sch, docs)
-	docs = bqx.NewSchemaDoc(MustAsset("ndt_result.yaml"))
-	bqx.UpdateSchemaDescription(sch, docs)
+	docs := findSchemaDocsFor(row)
+	for _, doc := range docs {
+		bqx.UpdateSchemaDescription(sch, doc)
+	}
 	rr := bqx.RemoveRequired(sch)
 	return rr, err
 }
