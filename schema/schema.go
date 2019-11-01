@@ -12,9 +12,9 @@ import (
 //
 //go:generate go-bindata -pkg schema -nometadata -prefix descriptions descriptions
 
-// findSchemaDocsFor should be used by parser row types to associate bigquery
+// FindSchemaDocsFor should be used by parser row types to associate bigquery
 // field descriptions with a schema generated from a row type.
-func findSchemaDocsFor(value interface{}) []bqx.SchemaDoc {
+func FindSchemaDocsFor(value interface{}) []bqx.SchemaDoc {
 	docs := []bqx.SchemaDoc{}
 	// Always include top level schema docs (should be common across row types).
 	docs = append(docs, bqx.NewSchemaDoc(MustAsset("toplevel.yaml")))

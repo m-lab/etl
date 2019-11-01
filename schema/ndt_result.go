@@ -21,7 +21,7 @@ func (row *NDTRow) Schema() (bigquery.Schema, error) {
 	if err != nil {
 		return bigquery.Schema{}, err
 	}
-	docs := findSchemaDocsFor(row)
+	docs := FindSchemaDocsFor(row)
 	for _, doc := range docs {
 		bqx.UpdateSchemaDescription(sch, doc)
 	}
