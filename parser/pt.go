@@ -182,81 +182,77 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	version = meta.TracerouteCallerVersion
 	resultFromCache = meta.CachedResult
 
-	for index := 1; index < 4; index++ {
-		jsonLine := jsonStrings[index]
-		if len(jsonLine) == 0 {
+	
+	// Some early stage tests only has UUID field in this meta line.
+	err := json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
+	if err != nil {
+		metrics.ErrorCount.WithLabelValues(
+			tableName, "pt", "corrupted json content").Inc()
+		metrics.TestCount.WithLabelValues(
+			tableName, "pt", "corrupted json content").Inc()
+                return schema.PTTest{}, err
+	}
+		
+	// Parse the line in struct
+	err := json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
+	if err != nil {
+		// Some early stage scamper output has JSON grammar errors that can be fixed by
+		// extra reprocessing using jsonnett
+		// TODO: this is a hack. We should see if this can be simplified.
+		vm := jsonnet.MakeVM()
+		output, err := vm.EvaluateSnippet("file", jsonStrings[2])
+		err = json.Unmarshal([]byte(output), &tracelb)
+		if err != nil {
+			// fail and return here.
+			metrics.ErrorCount.WithLabelValues(
+				tableName, "pt", "corrupted json content").Inc()
+			metrics.TestCount.WithLabelValues(
+				tableName, "pt", "corrupted json content").Inc()
+			return schema.PTTest{}, err
+		}
+	}
+	for i, _ := range tracelb.Nodes {
+		oneNode := &tracelb.Nodes[i]
+		var links []schema.HopLink
+		if len(oneNode.Links) == 0 {
+			hops = append(hops, schema.ScamperHop{
+				Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
+				Linkc:  oneNode.Linkc,
+			})
 			continue
 		}
-
-		switch index {
-		case 1:
-			// Some early stage tests only has UUID field in this meta line.
-			err := json.Unmarshal([]byte(jsonLine), &cycleStart)
-			if err != nil {
-				metrics.ErrorCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				metrics.TestCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				return schema.PTTest{}, err
+		if len(oneNode.Links) != 1 {
+			continue
+		}
+		// Links is an array containing a single array of HopProbes.
+		for _, oneLink := range oneNode.Links[0] {
+			var probes []schema.HopProbe
+			var ttl int64
+			for _, oneProbe := range oneLink.Probes {
+				var rtt []float64
+				for _, oneReply := range oneProbe.Replies {
+					rtt = append(rtt, oneReply.Rtt)
+				}
+				probes = append(probes, schema.HopProbe{Flowid: int64(oneProbe.Flowid), Rtt: rtt})
+					ttl = int64(oneProbe.Ttl)
+				}
+				links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
 			}
-		case 2:
-			// Parse the line in struct
-			err := json.Unmarshal([]byte(jsonLine), &tracelb)
-			if err != nil {
-				// use jsonnett to do extra reprocessing
-				// TODO: this is a hack. We should see if this can be simplified.
-				vm := jsonnet.MakeVM()
-				output, err := vm.EvaluateSnippet("file", jsonLine)
-				err = json.Unmarshal([]byte(output), &tracelb)
-				//log.Printf("%+v\n", tracelb)
-				if err != nil {
-					// fail and return here.
-					metrics.ErrorCount.WithLabelValues(
-						tableName, "pt", "corrupted json content").Inc()
-					metrics.TestCount.WithLabelValues(
-						tableName, "pt", "corrupted json content").Inc()
-					return schema.PTTest{}, err
-				}
-			}
-			for _, oneNode := range tracelb.Nodes {
-				var links []schema.HopLink
-				if len(oneNode.Links) == 0 {
-					hops = append(hops, schema.ScamperHop{
-						Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
-						Linkc:  oneNode.Linkc,
-					})
-					continue
-				}
-				// This is Links[0] special processing is due to scamper adding extra "{}" here
-				for _, oneLink := range oneNode.Links[0] {
-					var probes []schema.HopProbe
-					var ttl int64
-					for _, oneProbe := range oneLink.Probes {
-						var rtt []float64
-						for _, oneReply := range oneProbe.Replies {
-							rtt = append(rtt, oneReply.Rtt)
-						}
-						probes = append(probes, schema.HopProbe{Flowid: int64(oneProbe.Flowid), Rtt: rtt})
-						ttl = int64(oneProbe.Ttl)
-					}
-					links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
-				}
-				hops = append(hops, schema.ScamperHop{
+			hops = append(hops, schema.ScamperHop{
 					Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
 					Linkc:  oneNode.Linkc,
 					Links:  links,
-				})
-			}
-		case 3:
-			err := json.Unmarshal([]byte(jsonLine), &cycleStop)
-			if err != nil {
-				metrics.ErrorCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				metrics.TestCount.WithLabelValues(
-					tableName, "pt", "corrupted json content").Inc()
-				return schema.PTTest{}, err
-			}
+			})
 		}
+	}
+		
+	err := json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
+	if err != nil {
+		metrics.ErrorCount.WithLabelValues(
+			tableName, "pt", "corrupted json content").Inc()
+		metrics.TestCount.WithLabelValues(
+			tableName, "pt", "corrupted json content").Inc()
+                return schema.PTTest{}, err
 	}
 
 	parseInfo := schema.ParseInfo{
