@@ -10,7 +10,7 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
-func TestNDTResultParser_ParseAndInsert(t *testing.T) {
+func TestNDTRowParser_ParseAndInsert(t *testing.T) {
 	tests := []struct {
 		name           string
 		testName       string
@@ -31,9 +31,9 @@ func TestNDTResultParser_ParseAndInsert(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ins := newInMemoryInserter()
-			n := parser.NewNDTResultParser(ins)
+			n := parser.NewNDTRowParser(ins)
 
-			resultData, err := ioutil.ReadFile(`testdata/NDTResult/` + tt.testName)
+			resultData, err := ioutil.ReadFile(`testdata/NDTRow/` + tt.testName)
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
@@ -42,12 +42,12 @@ func TestNDTResultParser_ParseAndInsert(t *testing.T) {
 			}
 
 			if err := n.ParseAndInsert(meta, tt.testName, resultData); (err != nil) != tt.wantErr {
-				t.Errorf("NDTResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NDTRowParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if ins.Accepted() != 1 {
 				t.Fatalf("Failed to insert snaplog data.")
 			}
-			actualValues := ins.data[0].(schema.NDTResult)
+			actualValues := ins.data[0].(schema.NDTRow)
 			if actualValues.Result.Control == nil {
 				t.Fatal("Result.Control is nil, expected value")
 			}
@@ -66,7 +66,7 @@ func TestNDTResultParser_ParseAndInsert(t *testing.T) {
 	}
 }
 
-func TestNDTResultParser_IsParsable(t *testing.T) {
+func TestNDTRowParser_IsParsable(t *testing.T) {
 	tests := []struct {
 		name     string
 		testName string
@@ -85,14 +85,14 @@ func TestNDTResultParser_IsParsable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, err := ioutil.ReadFile(`testdata/NDTResult/` + tt.testName)
+			data, err := ioutil.ReadFile(`testdata/NDTRow/` + tt.testName)
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
-			p := &parser.NDTResultParser{}
+			p := &parser.NDTRowParser{}
 			_, got := p.IsParsable(tt.testName, data)
 			if got != tt.want {
-				t.Errorf("NDTResultParser.IsParsable() got1 = %v, want %v", got, tt.want)
+				t.Errorf("NDTRowParser.IsParsable() got1 = %v, want %v", got, tt.want)
 			}
 		})
 	}

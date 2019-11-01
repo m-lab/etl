@@ -98,7 +98,7 @@ func main() {
 	flagx.ArgsFromEnv(flag.CommandLine)
 
 	generators := []schemaGenerator{
-		&schema.NDTResult{},
+		&schema.NDTRow{},
 		// TODO(https://github.com/m-lab/etl/issues/745): Add additional types once
 		// "standard columns" are resolved.
 	}
