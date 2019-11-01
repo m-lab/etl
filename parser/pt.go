@@ -184,7 +184,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 
 	
 	// Some early stage tests only has UUID field in this meta line.
-	err := json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
+	err = json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
@@ -194,7 +194,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	}
 		
 	// Parse the line in struct
-	err := json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
+	err = json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
 	if err != nil {
 		// Some early stage scamper output has JSON grammar errors that can be fixed by
 		// extra reprocessing using jsonnett
@@ -235,15 +235,15 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 				}
 				probes = append(probes, schema.HopProbe{Flowid: int64(oneProbe.Flowid), Rtt: rtt})
 					ttl = int64(oneProbe.Ttl)
-				}
-				links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
 			}
-			hops = append(hops, schema.ScamperHop{
-					Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
-					Linkc:  oneNode.Linkc,
-					Links:  links,
-			})
+				links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
 		}
+		hops = append(hops, schema.ScamperHop{
+			Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
+			Linkc:  oneNode.Linkc,
+			Links:  links,
+		})
+
 	}
 		
 	err := json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
