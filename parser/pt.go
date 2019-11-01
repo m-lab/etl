@@ -246,7 +246,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 
 	}
 		
-	err := json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
+	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
