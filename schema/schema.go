@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"log"
 	"reflect"
 
 	"github.com/m-lab/go/bqx"
@@ -21,7 +22,12 @@ func findSchemaDocsFor(value interface{}) []bqx.SchemaDoc {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	// Look for schema docs based on the given row type.
-	docs = append(docs, bqx.NewSchemaDoc(MustAsset(t.Name()+".yaml")))
+	// Look for schema docs based on the given row type. Ignore missing schema docs.
+	b, err := Asset(t.Name() + ".yaml")
+	if err == nil {
+		docs = append(docs, bqx.NewSchemaDoc(b))
+	} else {
+		log.Printf("WARNING: no file for schema field description: %s.yaml", t.Name())
+	}
 	return docs
 }
