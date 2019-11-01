@@ -19,10 +19,12 @@ func TestNDTRow_Schema(t *testing.T) {
 	count := 0
 	for _, field := range fields {
 		for _, name := range []string{"test_id", "ParseInfo", "GitShortCommit"} {
-			if field.Name == name && field.Description == "" {
-				t.Errorf("NDTRow.Schema() missing field.Description for %q", field.Name)
-			} else {
-				count++
+			if field.Name == name {
+				if field.Description == "" {
+					t.Errorf("NDTRow.Schema() missing field.Description for %q", field.Name)
+				} else {
+					count++
+				}
 			}
 		}
 	}
