@@ -47,7 +47,7 @@ type PTTest struct {
 	ProbeSize      int64        `json:"probe_size,int64"`
 	ProbeC         int64        `json:"probec,int64"`
 	Hop            []ScamperHop `json:"hop"`
-	ExpVersion     string       `json:"traceroute_caller_version,string" bigquery:"traceroute_caller_version"`
+	ExpVersion     string       `json:"traceroute_caller_version,string" bigquery:"exp_version"`
 	CachedResult   bool         `json:"cached_result,bool" bigquery:"cached_result"`
 }
 
