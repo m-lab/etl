@@ -33,7 +33,7 @@ func TestNDTRowParser_ParseAndInsert(t *testing.T) {
 			ins := newInMemoryInserter()
 			n := parser.NewNDTRowParser(ins)
 
-			resultData, err := ioutil.ReadFile(`testdata/NDTRow/` + tt.testName)
+			resultData, err := ioutil.ReadFile(`testdata/NDTResult/` + tt.testName)
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
@@ -85,7 +85,7 @@ func TestNDTRowParser_IsParsable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, err := ioutil.ReadFile(`testdata/NDTRow/` + tt.testName)
+			data, err := ioutil.ReadFile(`testdata/NDTResult/` + tt.testName)
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
