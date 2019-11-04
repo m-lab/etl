@@ -47,6 +47,8 @@ type PTTest struct {
 	ProbeSize      int64        `json:"probe_size,int64"`
 	ProbeC         int64        `json:"probec,int64"`
 	Hop            []ScamperHop `json:"hop"`
+	ExpVersion     string       `json:"exp_version,string" bigquery:"exp_version"`
+	CachedResult   bool         `json:"cached_result,bool" bigquery:"cached_result"`
 }
 
 // Schema returns the Bigquery schema for PTTest.
