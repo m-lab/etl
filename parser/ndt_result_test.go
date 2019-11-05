@@ -47,7 +47,7 @@ func TestNDTResultParser_ParseAndInsert(t *testing.T) {
 			if ins.Accepted() != 1 {
 				t.Fatalf("Failed to insert snaplog data.")
 			}
-			actualValues := ins.data[0].(schema.NDTResult)
+			actualValues := ins.data[0].(schema.NDTResultRow)
 			if actualValues.Result.Control == nil {
 				t.Fatal("Result.Control is nil, expected value")
 			}

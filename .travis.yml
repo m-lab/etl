@@ -19,6 +19,9 @@ language: go
 go:
  - 1.12
 
+env:
+- PATH=$PATH:$HOME/gopath/bin
+
 before_install:
 - sudo apt-get install -y jq  # Dependency for sync_tables_with_schema.sh.
 # Install javascript libraries
@@ -31,6 +34,9 @@ before_install:
 # Coverage tools
 - go get github.com/mattn/goveralls
 - go get github.com/wadey/gocovmerge
+
+# Tool to generate and embed binary assets.
+- go get github.com/go-bindata/go-bindata/go-bindata
 
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
@@ -53,6 +59,12 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 script:
+# Enforce that the local binary assets match the generated ones.
+- cp schema/bindata.go /tmp/current-bindata.go
+- go generate ./schema
+- diff -q schema/bindata.go /tmp/current-bindata.go || (
+  echo "Files do not match; run 'go generate ./schema' and commit changes" && false )
+
 # Run all javascript tests.
 - pushd $TRAVIS_BUILD_DIR/functions
 - npm test
@@ -249,7 +261,7 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_BRANCH == pt-sandbox-* || $TRAVIS_BRANCH == sandbox-*
-    
+
 ## Service: etl-scamper-parser -- AppEngine Flexible Environment.
 - provider: script
   script:

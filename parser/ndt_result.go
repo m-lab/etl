@@ -45,11 +45,11 @@ func (dp *NDTResultParser) IsParsable(testName string, data []byte) (string, boo
 	return "unknown", false
 }
 
-// NOTE: NDTResult data is a JSON object that should be pushed directly into BigQuery.
+// NOTE: data.NDTResult is a JSON object that should be pushed directly into BigQuery.
 // We read the value into a struct, for compatibility with current inserter
 // backend and to eventually rely on the schema inference in m-lab/go/bqx.CreateTable().
 
-// ParseAndInsert decodes the NDT Result JSON data and inserts it into BQ.
+// ParseAndInsert decodes the data.NDTResult JSON and inserts it into BQ.
 func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Inc()
@@ -68,7 +68,7 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 	rowCount := 0
 
 	for dec.More() {
-		stats := schema.NDTResult{
+		stats := schema.NDTResultRow{
 			TestID: testName,
 			ParseInfo: &schema.ParseInfo{
 				TaskFileName:  meta["filename"].(string),

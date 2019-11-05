@@ -1,0 +1,13 @@
+ParseInfo:
+  Description: Metadata about how the parser processed the measurement.
+ParseInfo.TaskFileName:
+  Description: GCS URL to the archive containing the test_id for this row.
+ParseInfo.ParseTime:
+  Description: Time that the parser processed this row.
+ParseInfo.ParserVersion:
+  Description: Version of the parser that processed this row.
+test_id:
+  Description: Original filename of measurement as written to disk and in the
+    GCS archive.
+log_time:
+  Description: Original measurement collection timestamp.
