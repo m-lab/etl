@@ -89,7 +89,8 @@ type schemaGenerator interface {
 }
 
 func shortNameOf(g schemaGenerator) string {
-	// NOTE: this assumes the generator is a pointer type.
+	// NOTE: the generator must reference an underlying pointer type,
+	// e.g. `&schema.NDTRow{}` not `schema.NDTRow{}`
 	return strings.ToLower(reflect.TypeOf(g).Elem().Name())
 }
 
@@ -113,7 +114,7 @@ func main() {
 		case "md":
 			b = generateMarkdown(schema)
 		default:
-			panic(fmt.Sprintf("Unsupported output format: %q", outputFormat))
+			log.Fatalf("Unsupported output format: %q", outputFormat)
 		}
 
 		file := path.Join(outputDirectory, "schema_"+name+"."+outputFormat)
