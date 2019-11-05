@@ -23,18 +23,18 @@ func Test_findSchemaDocsFor(t *testing.T) {
 	}{
 		{
 			name:  "literal",
-			value: schema.NDTRow{},
+			value: schema.NDTResultRow{},
 			want: []bqx.SchemaDoc{
 				bqx.NewSchemaDoc(schema.MustAsset("toplevel.yaml")),
-				bqx.NewSchemaDoc(schema.MustAsset("NDTRow.yaml")),
+				bqx.NewSchemaDoc(schema.MustAsset("NDTResultRow.yaml")),
 			},
 		},
 		{
 			name:  "pointer",
-			value: &schema.NDTRow{},
+			value: &schema.NDTResultRow{},
 			want: []bqx.SchemaDoc{
 				bqx.NewSchemaDoc(schema.MustAsset("toplevel.yaml")),
-				bqx.NewSchemaDoc(schema.MustAsset("NDTRow.yaml")),
+				bqx.NewSchemaDoc(schema.MustAsset("NDTResultRow.yaml")),
 			},
 		},
 		{

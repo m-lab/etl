@@ -88,9 +88,10 @@ type schemaGenerator interface {
 	Schema() (bigquery.Schema, error)
 }
 
+// shortNameOf returns the short type name of the underlying schemaGenerator type.
+// NOTE: the generator must reference an underlying pointer type,
+// e.g. `&schema.NDTResultRow{}` not `schema.NDTResultRow{}`
 func shortNameOf(g schemaGenerator) string {
-	// NOTE: the generator must reference an underlying pointer type,
-	// e.g. `&schema.NDTRow{}` not `schema.NDTRow{}`
 	return strings.ToLower(reflect.TypeOf(g).Elem().Name())
 }
 
@@ -99,7 +100,7 @@ func main() {
 	flagx.ArgsFromEnv(flag.CommandLine)
 
 	generators := []schemaGenerator{
-		&schema.NDTRow{},
+		&schema.NDTResultRow{},
 		// TODO(https://github.com/m-lab/etl/issues/745): Add additional types once
 		// "standard columns" are resolved.
 	}

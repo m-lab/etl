@@ -43,10 +43,10 @@ func CreateOrUpdatePT(project string, dataset string, table string) error {
 	return CreateOrUpdate(schema, project, dataset, table)
 }
 
-func CreateOrUpdateNDTRow(project string, dataset string, table string) error {
-	row := schema.NDTRow{}
+func CreateOrUpdateNDTResultRow(project string, dataset string, table string) error {
+	row := schema.NDTResultRow{}
 	schema, err := row.Schema()
-	rtx.Must(err, "NDTRow.Schema")
+	rtx.Must(err, "NDTResultRow.Schema")
 	return CreateOrUpdate(schema, project, dataset, table)
 }
 
@@ -119,10 +119,10 @@ func main() {
 		if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDTRow(project, "base_tables", "ndt5"); err != nil {
+		if err := CreateOrUpdateNDTResultRow(project, "base_tables", "ndt5"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDTRow(project, "batch", "ndt5"); err != nil {
+		if err := CreateOrUpdateNDTResultRow(project, "batch", "ndt5"); err != nil {
 			errCount++
 		}
 
@@ -143,10 +143,10 @@ func main() {
 		}
 
 	case "ndt5":
-		if err := CreateOrUpdateNDTRow(project, "base_tables", "ndt5"); err != nil {
+		if err := CreateOrUpdateNDTResultRow(project, "base_tables", "ndt5"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDTRow(project, "batch", "ndt5"); err != nil {
+		if err := CreateOrUpdateNDTResultRow(project, "batch", "ndt5"); err != nil {
 			errCount++
 		}
 

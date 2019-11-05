@@ -1,6 +1,6 @@
 package parser
 
-// This file defines the Parser subtype that handles NDTRow data.
+// This file defines the Parser subtype that handles NDTResult data.
 
 import (
 	"bytes"
@@ -18,26 +18,26 @@ import (
 )
 
 //=====================================================================================
-//                       NDTRow Parser
+//                       NDTResult Parser
 //=====================================================================================
-type NDTRowParser struct {
+type NDTResultParser struct {
 	inserter     etl.Inserter
-	etl.RowStats // RowStats implemented for NDTRowParser with an embedded struct.
+	etl.RowStats // RowStats implemented for NDTResultParser with an embedded struct.
 }
 
-func NewNDTRowParser(ins etl.Inserter) etl.Parser {
-	return &NDTRowParser{
+func NewNDTResultParser(ins etl.Inserter) etl.Parser {
+	return &NDTResultParser{
 		inserter: ins,
 		RowStats: ins, // Delegate RowStats functions to the Inserter.
 	}
 }
 
-func (dp *NDTRowParser) TaskError() error {
+func (dp *NDTResultParser) TaskError() error {
 	return nil
 }
 
 // IsParsable returns the canonical test type and whether to parse data.
-func (dp *NDTRowParser) IsParsable(testName string, data []byte) (string, bool) {
+func (dp *NDTResultParser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like: "<UUID>.json"
 	if strings.HasSuffix(testName, "json") {
 		return "ndt_result", true
@@ -50,7 +50,7 @@ func (dp *NDTRowParser) IsParsable(testName string, data []byte) (string, bool) 
 // backend and to eventually rely on the schema inference in m-lab/go/bqx.CreateTable().
 
 // ParseAndInsert decodes the data.NDTResult JSON and inserts it into BQ.
-func (dp *NDTRowParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Dec()
@@ -68,7 +68,7 @@ func (dp *NDTRowParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	rowCount := 0
 
 	for dec.More() {
-		stats := schema.NDTRow{
+		stats := schema.NDTResultRow{
 			TestID: testName,
 			ParseInfo: &schema.ParseInfo{
 				TaskFileName:  meta["filename"].(string),
@@ -113,16 +113,16 @@ func (dp *NDTRowParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 }
 
 // NB: These functions are also required to complete the etl.Parser interface.
-// For NDTRow, we just forward the calls to the Inserter.
+// For NDTResult, we just forward the calls to the Inserter.
 
-func (dp *NDTRowParser) Flush() error {
+func (dp *NDTResultParser) Flush() error {
 	return dp.inserter.Flush()
 }
 
-func (dp *NDTRowParser) TableName() string {
+func (dp *NDTResultParser) TableName() string {
 	return dp.inserter.TableBase()
 }
 
-func (dp *NDTRowParser) FullTableName() string {
+func (dp *NDTResultParser) FullTableName() string {
 	return dp.inserter.FullTableName()
 }
