@@ -658,7 +658,7 @@ queue:
   target: etl-batch-parser
   rate: 2/s
   bucket_size: 10
-  max_concurrent_requests: 50
+  max_concurrent_requests: 80
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
@@ -668,12 +668,33 @@ queue:
   target: etl-batch-parser
   rate: 2/s
   bucket_size: 10
-  max_concurrent_requests: 50
+  max_concurrent_requests: 80
   retry_parameters:
     task_age_limit: 12h
     min_backoff_seconds: 20
     max_backoff_seconds: 20
 
+- name: etl-tcpinfo-batch-2
+  target: etl-batch-parser
+  rate: 2/s
+  bucket_size: 10
+  max_concurrent_requests: 80
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+
+- name: etl-tcpinfo-batch-3
+  target: etl-batch-parser
+  rate: 2/s
+  bucket_size: 10
+  max_concurrent_requests: 80
+  retry_parameters:
+    task_age_limit: 12h
+    min_backoff_seconds: 20
+    max_backoff_seconds: 20
+
+# NDT5
 - name: etl-ndt5-batch-0
   target: etl-batch-parser
   # At 0.2/sec, this was getting crowded out by ndt.
