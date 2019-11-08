@@ -13,3 +13,16 @@ bq mk --time_partitioning_type=DAY --schema=schema/repeated.json mlab-sandbox:ml
 
 Also see schema/README.md.
 
+## Generating Schema Docs
+
+To build a new docker image with the `generate_schema_docs` command, run:
+
+```sh
+$ docker build -t measurementlab/generate-schema-docs .
+$ docker run -v $PWD:/workspace -w /workspace \
+  -it measurementlab/generate-schema-docs
+
+Writing schema_ndtresultrow.md
+...
+
+```
