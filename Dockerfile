@@ -8,7 +8,7 @@ WORKDIR /go/src/github.com/m-lab/etl
 RUN go get -v github.com/m-lab/etl/cmd/generate_schema_docs
 
 # Build the image.
-FROM alpine:3.7
+FROM alpine
 COPY --from=build /go/bin/generate_schema_docs /
 WORKDIR /
 ENTRYPOINT ["/generate_schema_docs"]
