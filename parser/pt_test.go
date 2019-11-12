@@ -161,6 +161,22 @@ func TestParseLegacyFormatData(t *testing.T) {
 	}
 }
 
+func TestJSONParser(t *testing.T) {
+	rawData, err := ioutil.ReadFile("testdata/PT/20190927T070859Z_ndt-qtfh8_1565996043_0000000000003B64.jsonl")
+	if err != nil {
+		t.Fatalf(err.Error())
+		return
+	}
+	ptTest, err := parser.ParseJSON("20190927T070859Z_ndt-qtfh8_1565996043_0000000000003B64.jsonl", []byte(rawData), "", "")
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if ptTest.UUID != "ndt-qtfh8_1565996043_0000000000003B64" {
+		t.Fatalf("UUID parsing error %s", ptTest.UUID)
+	}
+}
+
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	cachedTest, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
