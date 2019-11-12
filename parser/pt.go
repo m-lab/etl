@@ -164,9 +164,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 
 	jsonStrings := strings.Split(string(rawContent[:]), "\n")
 
-	if len(jsonStrings) != 4 {
-		log.Println("Invalid test", taskFilename, "  ", testName)
-		log.Println(len(jsonStrings))
+	if len(jsonStrings) != 5 {
 		return schema.PTTest{}, err
 	}
 
