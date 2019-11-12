@@ -1,0 +1,4 @@
+{"UUID": "ndt-qtfh8_1565996043_0000000000003B64"}
+{"type":"cycle-start", "list_name":"/tmp/scamperctrl:2173", "id":1, "hostname":"ndt-qtfh8", "start_time":1569568139}
+{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:91.213.30.229", "dst":"::ffff:91.169.126.135", "start":{"sec":1569568139, "usec":873851, "ftime":"2019-09-27 07:08:59"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
+{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:2173", "id":1, "hostname":"ndt-qtfh8", "stop_time":1569568139}

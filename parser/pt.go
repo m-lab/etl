@@ -164,8 +164,9 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 
 	jsonStrings := strings.Split(string(rawContent[:]), "\n")
 
-	if len(jsonStrings) != 4 {
-		log.Println("Invalid test")
+	if len(jsonStrings) != 5 {
+		log.Println("Invalid test", taskFilename, "  ", testName)
+		log.Println(len(jsonStrings))
 		return schema.PTTest{}, err
 	}
 
@@ -182,7 +183,6 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	version = meta.TracerouteCallerVersion
 	resultFromCache = meta.CachedResult
 
-	
 	// Some early stage tests only has UUID field in this meta line.
 	err = json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
 	if err != nil {
@@ -190,9 +190,9 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			tableName, "pt", "corrupted json content").Inc()
 		metrics.TestCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
-                return schema.PTTest{}, err
+		return schema.PTTest{}, err
 	}
-		
+
 	// Parse the line in struct
 	err = json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
 	if err != nil {
@@ -234,9 +234,9 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 					rtt = append(rtt, oneReply.Rtt)
 				}
 				probes = append(probes, schema.HopProbe{Flowid: int64(oneProbe.Flowid), Rtt: rtt})
-					ttl = int64(oneProbe.Ttl)
+				ttl = int64(oneProbe.Ttl)
 			}
-				links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
+			links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
 		}
 		hops = append(hops, schema.ScamperHop{
 			Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
@@ -245,14 +245,14 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 		})
 
 	}
-		
+
 	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
 		metrics.TestCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
-                return schema.PTTest{}, err
+		return schema.PTTest{}, err
 	}
 
 	parseInfo := schema.ParseInfo{
