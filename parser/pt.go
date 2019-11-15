@@ -167,7 +167,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	if len(jsonStrings) != 5 {
 		log.Println("Invalid test", taskFilename, "  ", testName)
 		log.Println(len(jsonStrings))
-		return schema.PTTest{}, err
+		return schema.PTTest{}, errors.New("Invalid test")
 	}
 
 	// Parse the first line for meta info.
