@@ -70,17 +70,18 @@ type FileSource struct {
 	prefix     string
 	retryLimit int // number of retries for failed tasks.
 
+	// The function that processes each task.
+	process func(*TaskFile) error
+
 	// Channel to handle cleanup when a task is completed.
 	done chan *TaskFile
 
-	// Remaining fields should only be accessed by the ProcessAll function.
+	// Remaining fields should only be accessed while holding the lock.
+	lock       sync.Mutex
 	lastUpdate time.Time // Time of last call to UpdatePending
 	allFiles   map[string]*TaskFile
 	pending    []*TaskFile // Ordered list - TODO make this a channel?
 	inFlight   map[string]*TaskFile
-
-	// The function that processes each task.
-	process func(*TaskFile) error
 
 	err []*TaskFile
 }
@@ -109,8 +110,13 @@ func (fs *FileSource) Errors() []*TaskFile {
 }
 
 // updatePending should be called when there are no more pending tasks.
-// Not thread-safe - should only be called by ProcessAll.
 func (fs *FileSource) updatePending(ctx context.Context) error {
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
+	if len(fs.pending) > 0 {
+		return nil
+	}
+
 	// Allow for a little clock skew.
 	updateTime := time.Now().Add(-time.Second)
 	files, _, err := gcs.GetFilesSince(context.Background(), fs.client, fs.project, fs.prefix, fs.lastUpdate)
@@ -145,12 +151,12 @@ func (fs *FileSource) updatePending(ctx context.Context) error {
 // Caller should have already obtained a semaphore.
 // Returns an error iff updatePending errored.
 func (fs *FileSource) next(ctx context.Context) (*TaskFile, error) {
-	if len(fs.pending) == 0 {
-		err := fs.updatePending(ctx)
-		if err != nil {
-			return nil, err
-		}
+	err := fs.updatePending(ctx)
+	if err != nil {
+		return nil, err
 	}
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
 	if len(fs.pending) > 0 {
 		tf := fs.pending[0]
 		fs.pending = fs.pending[1:]
@@ -162,12 +168,13 @@ func (fs *FileSource) next(ctx context.Context) (*TaskFile, error) {
 // ErrTaskNotFound is returned if an inflight task is not found in inFlight.
 var ErrTaskNotFound = errors.New("task not found")
 
-// NOT THREAD-SAFE.  Should be called only by ProcessAll (through doneHandler)
 // updateState updates the FileSource to reflect the completion of
 // a processing attempt.
 // If the processing ends in an error, the task will be moved to
 // the end of the pending list, unless the task has already been retried fs.retry times.
 func (fs *FileSource) updateState(tf *TaskFile) error {
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
 	_, exists := fs.inFlight[tf.path]
 	if !exists {
 		log.Println("Did not find", tf.path)
@@ -194,79 +201,67 @@ func processTask(tf *TaskFile) error {
 
 func (fs *FileSource) startDoneHandler(tokens chan struct{}) *sync.WaitGroup {
 	wg := sync.WaitGroup{}
-	wg.Add(1)
 	go func() {
-		for t := range fs.done {
-			fs.updateState(t) // This removes the task from inFlight.
-			<-tokens          // return the token
+		for tf := range fs.done {
+			log.Println("received", tf)
+			err := fs.updateState(tf) // This removes the task from inFlight.
+			if err != nil {
+				log.Println(tf.Path(), err)
+			}
+			<-tokens // return the token
+			log.Println(len(tokens), "tokens")
+			wg.Done()
 		}
-		// Signal when done is empty and closed.
-		wg.Done()
 	}()
 
 	return &wg
 }
 
+func (fs *FileSource) startTask(tf *TaskFile) {
+	// Add the task to inFlight map and start the task.
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
+	fs.inFlight[tf.path] = tf
+	go func() {
+		tf.lastErr = fs.process(tf)
+		fs.done <- tf
+	}()
+}
+
 // startDoneHandler starts the handler that handles all the done channel returns.
-// It returns a sync.WaitGroup.
-// It signals wg.Done() when there are no more pending tasks.
+// It returns a sync.WaitGroup that will signal only when all jobs have completed.
 // When all items have been processed, it closes the done channel.
 func (fs *FileSource) startLauncher(ctx context.Context, tokens chan struct{}) *sync.WaitGroup {
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	wg := fs.startDoneHandler(tokens)
+	wg.Add(1) // To prevent early Done() detection.
 
-	go func(ctx context.Context, tokens chan struct{}, wg *sync.WaitGroup) {
-	PROCESS:
+	go func() {
 		for {
-			select {
-			// When a job is completed, update the state.
-			case tf := <-fs.done:
-				err := fs.updateState(tf) // This removes the task from inFlight.
-				if err != nil {
-					log.Println(tf.Path(), err)
-				}
-				<-tokens // return the token
+			// Wait for a token
+			tokens <- struct{}{}
+			log.Println(len(tokens), "tokens")
 
 			// If there are tokens available, start another job
-			case tokens <- struct{}{}:
-				tf, err := fs.next(ctx)
-				if err != nil {
-					log.Println(err)
-				}
-				if tf == nil {
-					// return the token
-					<-tokens
-					break PROCESS
-				}
-
-				// Add the task to inFlight map and start the task.
-				fs.inFlight[tf.path] = tf
-				go func() {
-					tf.lastErr = fs.process(tf)
-					fs.done <- tf
-				}()
+			tf, err := fs.next(ctx)
+			if err != nil {
+				log.Println(err)
 			}
-		}
-
-		if wg != nil {
-			wg.Done() // Signal to caller that there are no more pending tasks.
-		}
-
-		// Now drain any remaining tasks in flight.
-		if len(fs.inFlight) > 0 {
-			for t := range fs.done {
-				fs.updateState(t) // This removes the task from inFlight.
-				<-tokens          // return the token
-				if len(fs.inFlight) == 0 {
-					break
-				}
+			if tf == nil {
+				// return the token and quit
+				log.Println("No more tasks")
+				<-tokens
+				log.Println(len(tokens), "tokens")
+				break
 			}
-		}
-		// Update FileSource state to indicate that all processing has been completed.
-		close(fs.done)
-	}(ctx, tokens, &wg)
 
-	return &wg
+			log.Println("starting", tf)
+			wg.Add(1)
+			fs.startTask(tf)
+		}
+		wg.Done()
+	}()
+
+	return wg
 }
 
 // ProcessAll iterates through all the TaskFiles, processing each one.
