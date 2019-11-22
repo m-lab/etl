@@ -228,13 +228,11 @@ func (fs *FileSource) startTask(tf *TaskFile) {
 	}()
 }
 
-// startDoneHandler starts the handler that handles all the done channel returns.
+// startLauncher starts the goroutines to start new tasks, and handle completions.
 // It returns a sync.WaitGroup that will signal only when all jobs have completed.
-// When all items have been processed, it closes the done channel.
 func (fs *FileSource) startLauncher(ctx context.Context, tokens chan struct{}) *sync.WaitGroup {
 	wg := fs.startDoneHandler(tokens)
 	wg.Add(1) // To prevent early Done() detection.
-
 	go func() {
 		for {
 			// Wait for a token

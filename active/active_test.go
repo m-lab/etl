@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ func init() {
 }
 
 type counter struct {
+	lock    sync.Mutex
 	t       *testing.T
 	fail    int
 	success int
@@ -29,6 +31,8 @@ type counter struct {
 
 func (c *counter) processTask(tf *active.TaskFile) error {
 	time.Sleep(10 * time.Millisecond)
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	if !strings.HasPrefix(tf.Path(), "gs://foobar/") {
 		c.t.Error("Invalid path:", tf.Path())
 	}
