@@ -1,4 +1,4 @@
-// The active package provides code for managing processing of an entire
+// Package active provides code for managing processing of an entire
 // directory of task files.
 package active
 
@@ -41,17 +41,6 @@ import (
 	"github.com/m-lab/etl/worker"
 )
 
-type DatastoreRecord struct {
-	Name string // The prefix for the data source.
-
-	// If the job has to be restarted, it will start with next file after this one.
-	CompletedUpTo string
-
-	// This is the next file to be started when there is a worker available.
-	Next       string
-	UpdateTime time.Time
-}
-
 // TaskFile maintains the status of a single file.
 // These are NOT thread-safe, and should only be read and modified by
 // a single goroutine.
@@ -85,8 +74,6 @@ type FileSource struct {
 	done chan *TaskFile
 
 	// Remaining fields should only be accessed by the ProcessAll function.
-	status DatastoreRecord
-
 	lastUpdate time.Time // Time of last call to UpdatePending
 	allFiles   map[string]*TaskFile
 	pending    []*TaskFile // Ordered list - TODO make this a channel?
@@ -104,7 +91,6 @@ func NewFileSource(sc stiface.Client, project string, prefix string, retryLimit 
 		client:     sc,
 		project:    project,
 		prefix:     prefix,
-		status:     DatastoreRecord{Name: prefix},
 		pending:    make([]*TaskFile, 0, 1),
 		allFiles:   make(map[string]*TaskFile, 100),
 		inFlight:   make(map[string]*TaskFile, 100),
@@ -206,67 +192,93 @@ func processTask(tf *TaskFile) error {
 	return err
 }
 
-// doneHandler handles all the done channel returns.
-// It returns when there are no more pending tasks,
-// When all items have been processed, it closes the done channel.
-func (fs *FileSource) doneHandler(ctx context.Context, tokens chan struct{}, wg *sync.WaitGroup) {
-PROCESS:
-	for {
-		select {
-		case tf := <-fs.done:
-			err := fs.updateState(tf) // This removes the task from inFlight.
-			if err != nil {
-				log.Println(tf.Path(), err)
-			}
-			<-tokens // return the token
-		case tokens <- struct{}{}:
-			tf, err := fs.next(ctx)
-			if err != nil {
-				log.Println(err)
-			}
-			if tf == nil {
-				// return the token
-				<-tokens
-				break PROCESS
-			}
-
-			// This adds the task to inFlight.
-			fs.inFlight[tf.path] = tf
-			go func() {
-				tf.lastErr = fs.process(tf)
-				fs.done <- tf
-			}()
-		}
-	}
-
-	if wg != nil {
-		wg.Done() // Signal that there are no more pending tasks.
-	}
-
-	// Now drain any remaining tasks in flight.
-	if len(fs.inFlight) > 0 {
+func (fs *FileSource) startDoneHandler(tokens chan struct{}) *sync.WaitGroup {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
 		for t := range fs.done {
 			fs.updateState(t) // This removes the task from inFlight.
 			<-tokens          // return the token
-			if len(fs.inFlight) == 0 {
-				break
+		}
+		// Signal when done is empty and closed.
+		wg.Done()
+	}()
+
+	return &wg
+}
+
+// startDoneHandler starts the handler that handles all the done channel returns.
+// It returns a sync.WaitGroup.
+// It signals wg.Done() when there are no more pending tasks.
+// When all items have been processed, it closes the done channel.
+func (fs *FileSource) startLauncher(ctx context.Context, tokens chan struct{}) *sync.WaitGroup {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func(ctx context.Context, tokens chan struct{}, wg *sync.WaitGroup) {
+	PROCESS:
+		for {
+			select {
+			// When a job is completed, update the state.
+			case tf := <-fs.done:
+				err := fs.updateState(tf) // This removes the task from inFlight.
+				if err != nil {
+					log.Println(tf.Path(), err)
+				}
+				<-tokens // return the token
+
+			// If there are tokens available, start another job
+			case tokens <- struct{}{}:
+				tf, err := fs.next(ctx)
+				if err != nil {
+					log.Println(err)
+				}
+				if tf == nil {
+					// return the token
+					<-tokens
+					break PROCESS
+				}
+
+				// Add the task to inFlight map and start the task.
+				fs.inFlight[tf.path] = tf
+				go func() {
+					tf.lastErr = fs.process(tf)
+					fs.done <- tf
+				}()
 			}
 		}
-	}
-	close(fs.done)
+
+		if wg != nil {
+			wg.Done() // Signal to caller that there are no more pending tasks.
+		}
+
+		// Now drain any remaining tasks in flight.
+		if len(fs.inFlight) > 0 {
+			for t := range fs.done {
+				fs.updateState(t) // This removes the task from inFlight.
+				<-tokens          // return the token
+				if len(fs.inFlight) == 0 {
+					break
+				}
+			}
+		}
+		// Update FileSource state to indicate that all processing has been completed.
+		close(fs.done)
+	}(ctx, tokens, &wg)
+
+	return &wg
 }
 
 // ProcessAll iterates through all the TaskFiles, processing each one.
 // It may also retry any that failed the first time.
-func (fs *FileSource) ProcessAll(ctx context.Context, tokens chan struct{}, wg *sync.WaitGroup) error {
+func (fs *FileSource) ProcessAll(ctx context.Context, tokens chan struct{}) (*sync.WaitGroup, error) {
 	err := fs.updatePending(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Handle tasks in parallel.
-	// When this returns, there are still tasks in flight, but no more
+	// When the returned wg is signaled, there may still be tasks in flight, but no more
 	// will be started.
-	go fs.doneHandler(ctx, tokens, wg)
+	return fs.startLauncher(ctx, tokens), nil
 
-	return nil
 }

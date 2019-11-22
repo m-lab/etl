@@ -9,7 +9,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -255,9 +254,7 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 	}
 	// Allow 60 concurrent tasks.
 	tokens := make(chan struct{}, 60)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	err = fs.ProcessAll(context.Background(), tokens, &wg)
+	wg, err := fs.ProcessAll(context.Background(), tokens)
 	if err != nil {
 		rwr.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(rwr, fmt.Sprintf(`{"message": "Invalid path: %s %s"}`, path, err.Error()))
