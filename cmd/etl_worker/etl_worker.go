@@ -106,7 +106,7 @@ func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 	// This will add metric count and log message from any panic.
 	// The panic will still propagate, and http will report it.
 	defer func() {
-		metrics.CountPanics(recover(), "worker")
+		metrics.CountPanics(recover(), "handleRequest")
 	}()
 
 	// Throttle by grabbing a semaphore from channel.
