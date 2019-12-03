@@ -3,7 +3,7 @@
 
 runtime: custom
 env: flex
-service: etl-active-parser
+service: etl-universal-parser
 
 # Resource and scaling options. For more background, see:
 #   https://cloud.google.com/appengine/docs/flexible/go/configuring-your-app-with-app-yaml
@@ -27,8 +27,8 @@ automatic_scaling:
   cpu_utilization:
     target_utilization: 0.70  # In reality, it should be more like 98%
 
-# Note: add a public port for GCE auto discovery by prometheus.
-# TODO(dev): are any values redundant or irrelevant?
+# Note: GCE auto-discovery is likely broken by the private network, so prometheus
+# scraping won't work.
 network:
   instance_tag: etl-parser
   name: data-processing
