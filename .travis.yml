@@ -84,7 +84,7 @@ script:
 - EC=0
 # Note that for modules in subdirectories, this replaces separating slashes with _.
 - for module in $MODULES; do
-    go test -v -coverprofile=${module//\//_}.cov github.com/m-lab/etl/$module ;
+    go test -v -coverpkg=$COVER_PKGS -coverprofile=${module//\//_}.cov github.com/m-lab/etl/$module ;
     EC=$[ $EC || $? ] ;
   done
 - echo "summary status $EC" ;
@@ -99,7 +99,7 @@ script:
 # Note that for modules in subdirectories, this replaces separating slashes with _.
 - if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
   for module in metrics ; do
-    go test -v -coverprofile=${module//\//_}.cov github.com/m-lab/etl/$module -tags=integration ;
+    go test -v -coverpkg=$COVER_PKGS -coverprofile=${module//\//_}.cov github.com/m-lab/etl/$module -tags=integration ;
     EC=$[ $EC || $? ] ;
   done ;
   echo "summary status $EC" ;
