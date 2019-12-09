@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+
 	"github.com/m-lab/etl/cloud/gcs"
 	"github.com/m-lab/go/cloudtest"
 )
@@ -75,5 +76,39 @@ func TestGetFilesSince(t *testing.T) {
 	}
 	if bytes != 2121 {
 		t.Error("Expected total 2121 bytes, got", bytes)
+	}
+}
+
+func TestGetFilesSince_Context(t *testing.T) {
+	fc := cloudtest.GCSClient{}
+	fc.AddTestBucket("foobar",
+		cloudtest.BucketHandle{
+			ObjAttrs: []*storage.ObjectAttrs{
+				&storage.ObjectAttrs{Name: "ndt/2019/01/01/obj1", Size: 101, Updated: time.Now()},
+			}})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	files, _, err := gcs.GetFilesSince(ctx, fc, "project", "gs://foobar/ndt/2019/01/01/", time.Now().Add(-time.Minute))
+
+	if err != context.Canceled {
+		t.Error("Should return context.Canceled", err)
+	}
+	if files != nil {
+		t.Error("Should return nil files", files)
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), 0)
+	defer cancel()
+	time.Sleep(time.Millisecond)
+
+	files, _, err = gcs.GetFilesSince(ctx, fc, "project", "gs://foobar/ndt/2019/01/01/", time.Now().Add(-time.Minute))
+
+	if err != context.DeadlineExceeded {
+		t.Error("Should return context.Canceled", err)
+	}
+	if files != nil {
+		t.Error("Should return nil files", files)
 	}
 }

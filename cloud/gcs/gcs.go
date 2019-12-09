@@ -3,6 +3,7 @@ package gcs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"regexp"
 	"time"
@@ -13,16 +14,18 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// getFilesAfter returns list of all normal file objects with prefix and mTime > after.
+// getFilesSince returns list of all normal file objects with prefix and mTime > after.
 // returns (objects, byteCount, error)
-func getFilesSince(ctx context.Context, bh stiface.BucketHandle, prefix string, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
+func getFilesSince(ctx context.Context, bh stiface.BucketHandle, prefix string, after time.Time) ([]*storage.ObjectAttrs, int64, error) {
 	qry := storage.Query{
 		Delimiter: "/", // This prevents traversing subdirectories.
 		Prefix:    prefix,
 	}
-	// TODO - handle timeout errors?
-	// TODO - should we add a deadline?
 	it := bh.Objects(ctx, &qry)
+	if it == nil {
+		log.Println("Nil object iterator for", bh)
+		return nil, 0, fmt.Errorf("Object iterator is nil.  BucketHandle: %v Prefix: %s", bh, prefix)
+	}
 
 	files := make([]*storage.ObjectAttrs, 0, 1000)
 
@@ -30,18 +33,21 @@ func getFilesSince(ctx context.Context, bh stiface.BucketHandle, prefix string, 
 	gcsErrCount := 0
 	for o, err := it.Next(); err != iterator.Done; o, err = it.Next() {
 		if err != nil {
-			// TODO - should this retry?
-			// log the underlying error, with added context
-			log.Println(err, "when attempting it.Next()")
+			// These errors are not recoverable.
+			if err == context.Canceled || err == context.DeadlineExceeded {
+				return nil, 0, err
+			}
 			gcsErrCount++
 			if gcsErrCount > 5 {
 				log.Printf("Failed after %d files.\n", len(files))
 				return files, byteCount, err
 			}
+			// log the underlying error, with added context
+			log.Println(err, "when attempting it.Next()")
 			continue
 		}
 
-		if o.Updated.Before(since) {
+		if !o.Updated.After(after) {
 			continue
 		}
 		byteCount += o.Size
@@ -84,16 +90,14 @@ func GetFilesSince(ctx context.Context, sClient stiface.Client, project string, 
 	}
 
 	// Use a real storage bucket.
-	// TODO - add a persistent storageClient to the rex object?
-	// TODO - try cancelling the context instead?
 	bucket, err := getBucket(ctx, sClient, project, p.Bucket)
 	if err != nil {
-		// if err == io.EOF && env.TestMode {
-		// 	log.Println("Using fake client, ignoring EOF error")
-		// 	return nil, 0, nil
-		// }
 		log.Println(err)
 		return nil, 0, err
+	}
+	if bucket == nil {
+		log.Println("Nil bucket for", project, prefix)
+		return nil, 0, fmt.Errorf("Nil bucket for %s %s", project, prefix)
 	}
 
 	return getFilesSince(ctx, bucket, p.Path(), since)
