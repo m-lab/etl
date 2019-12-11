@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/go/logx"
+
 	"cloud.google.com/go/storage"
 	"github.com/m-lab/etl/active"
 	"github.com/m-lab/go/cloudtest"
@@ -18,6 +20,7 @@ import (
 func init() {
 	// Always prepend the filename and line number.
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	logx.LogxDebug.Set("true")
 }
 
 type counter struct {

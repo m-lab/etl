@@ -19,16 +19,18 @@ package active
 import (
 	"context"
 	"errors"
-	"log"
 	"sync"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/GoogleCloudPlatform/google-cloud-go-testing/storage/stiface"
 	"google.golang.org/api/iterator"
 
+	"cloud.google.com/go/storage"
 	"github.com/m-lab/etl/cloud/gcs"
+	"github.com/m-lab/go/logx"
 )
+
+var debug = logx.Debug
 
 /* Discussion:
  Challenges:
@@ -118,7 +120,7 @@ func (fs *FileSource) CancelStreaming() {
 }
 
 func (fs *FileSource) stop(err error) {
-	log.Output(2, "stopping")
+	debug.Output(2, "stopping")
 	select {
 	case <-fs.done:
 	default:
@@ -128,7 +130,8 @@ func (fs *FileSource) stop(err error) {
 }
 
 // streamToPending feeds tasks to the pending queue until all files have been submitted.
-// It fetches the list of files repeatedly until there are no new files.
+// It fetches the list of files repeatedly until there are no new files, or until the context is canceled or expires.
+// The tasks are pulled from the queue by Next().
 func (fs *FileSource) streamToPending(ctx context.Context) {
 	// Files submitted to pending.  May not have been completed.
 	submitted := make(map[string]struct{}, 100)
@@ -137,7 +140,7 @@ func (fs *FileSource) streamToPending(ctx context.Context) {
 	for {
 		files, _, err := fs.fileLister(ctx, lastUpdate)
 		if err != nil {
-			log.Println("Error streaming", err)
+			debug.Println("Error streaming", err)
 			if ctx.Err() != nil {
 				fs.stop(ctx.Err())
 				return
@@ -157,7 +160,7 @@ func (fs *FileSource) streamToPending(ctx context.Context) {
 				return
 			}
 			if f.Prefix != "" {
-				log.Println("Skipping subdirectory:", f.Prefix)
+				debug.Println("Skipping subdirectory:", f.Prefix)
 				continue // skip directories
 			}
 			// Append any new files that haven't already been dispatched.
@@ -168,7 +171,7 @@ func (fs *FileSource) streamToPending(ctx context.Context) {
 				}
 
 				tf := Task{path: "gs://" + f.Bucket + "/" + f.Name, obj: f}
-				log.Println("Adding", tf.path)
+				debug.Println("Adding", tf.path)
 				submitted[f.Name] = struct{}{}
 				fs.pendingChan <- fs.runFunc(&tf)
 			}
@@ -185,26 +188,26 @@ func (fs *FileSource) Next(ctx context.Context) (Runnable, error) {
 	select {
 	// Check done states first.  No more than one value will sneak through.
 	case <-ctx.Done():
-		log.Println("early", ctx.Err())
+		debug.Println("early", ctx.Err())
 		return nil, ctx.Err()
 	case <-fs.done:
-		log.Println("internally detected", fs.doneState)
+		debug.Println("internally detected", fs.doneState)
 		return nil, fs.doneState
 	case next, ok := <-fs.pendingChan:
 		if !ok {
-			log.Println("iterator.Done")
+			debug.Println("iterator.Done")
 			return nil, iterator.Done
 		}
 		// Check again whether something expired
 		select {
 		case <-ctx.Done():
-			log.Println("late", ctx.Err())
+			debug.Println("late", ctx.Err())
 			return nil, ctx.Err()
 		case <-fs.done:
-			log.Println("internally detected", fs.doneState)
+			debug.Println("internally detected", fs.doneState)
 			return nil, fs.doneState
 		default:
-			log.Println("normal")
+			debug.Println("normal")
 			return next, nil
 		}
 	}
@@ -219,11 +222,11 @@ func (fs *FileSource) RunAll(ctx context.Context) {
 	for {
 		run, err := fs.Next(ctx)
 		if err != nil {
-			log.Println(err)
+			debug.Println(err)
 			break
 		}
 		wg.Add(1)
-		log.Println("Starting func")
+		debug.Println("Starting func")
 		go func() error {
 			defer wg.Done()
 			return run()
