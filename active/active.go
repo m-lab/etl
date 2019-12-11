@@ -19,6 +19,7 @@ package active
 import (
 	"context"
 	"errors"
+	"log"
 	"sync"
 	"time"
 
@@ -145,8 +146,8 @@ func (fs *FileSource) streamToPending(ctx context.Context) {
 				fs.stop(ctx.Err())
 				return
 			}
-			// TODO count errors and abort?
-			continue // Retry.
+			fs.stop(err)
+			return
 		}
 
 		if len(files) == 0 {
@@ -155,6 +156,10 @@ func (fs *FileSource) streamToPending(ctx context.Context) {
 		}
 
 		for _, f := range files {
+			if f == nil {
+				log.Println("Nil file!!")
+				continue //
+			}
 			if ctx.Err() != nil {
 				fs.stop(ctx.Err())
 				return
@@ -184,6 +189,8 @@ func (fs *FileSource) streamToPending(ctx context.Context) {
 //    iterator.Done OR
 //    ctx.Err() OR
 //    other error OR
+// The select logic here is a little messy, in order to produce consistent
+// behavior when the context expires.
 func (fs *FileSource) Next(ctx context.Context) (Runnable, error) {
 	select {
 	// Check done states first.  No more than one value will sneak through.
@@ -198,6 +205,7 @@ func (fs *FileSource) Next(ctx context.Context) (Runnable, error) {
 			debug.Println("iterator.Done")
 			return nil, iterator.Done
 		}
+		time.Sleep(time.Millisecond)
 		// Check again whether something expired
 		select {
 		case <-ctx.Done():
