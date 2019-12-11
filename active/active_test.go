@@ -167,3 +167,97 @@ func TestFileSourceWithFailures(t *testing.T) {
 		t.Error("Fail", p.fail)
 	}
 }
+
+func ErroringLister(ctx context.Context, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
+	return nil, 0, os.ErrInvalid
+}
+
+func TestStorageError(t *testing.T) {
+	p := NewCounter(t)
+
+	ctx := context.Background()
+	fs, err := active.NewFileSource(ctx, ErroringLister, 5, p.runFunc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = fs.Next(ctx)
+	if err != os.ErrInvalid {
+		t.Error("Should return os.ErrInvalid")
+	}
+
+	// RunAll should do nothing, and return quickly.
+	fs.RunAll(ctx)
+
+	if p.success != 0 {
+		t.Error("1 test should have succeeded.", p.success)
+	}
+	if p.fail != 0 {
+		t.Error("Fail", p.fail)
+	}
+}
+
+func ErrorAfterCtxDone(ctx context.Context, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
+	// Wait for context to expire.
+	<-ctx.Done()
+	return nil, 0, ctx.Err()
+}
+
+func TestExpiredContextOnFileLister(t *testing.T) {
+	p := NewCounter(t)
+
+	ctx := context.Background()
+	fs, err := active.NewFileSource(ctx, ErrorAfterCtxDone, 5, p.runFunc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fs.CancelStreaming()
+
+	_, err = fs.Next(ctx)
+	if err != context.Canceled {
+		t.Error("Should return os.ErrInvalid")
+	}
+
+	// RunAll should do nothing, and return quickly.
+	fs.RunAll(ctx)
+
+	if p.success != 0 {
+		t.Error("1 test should have succeeded.", p.success)
+	}
+	if p.fail != 0 {
+		t.Error("Fail", p.fail)
+	}
+}
+
+// To test the nested select, we need to place something in the pending queue, and immediately
+// invoke the stop() function.
+
+var count = 0
+
+func ErrorAfterFirstObject(ctx context.Context, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
+	if count < 1 {
+		count++
+		return []*storage.ObjectAttrs{
+			&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj2", Updated: time.Now()},
+		}, 123, nil
+	}
+
+	time.Sleep(time.Microsecond)
+	return nil, 0, os.ErrInvalid
+}
+
+func TestErrorAfterFirst(t *testing.T) {
+	p := NewCounter(t)
+
+	ctx := context.Background()
+	fs, err := active.NewFileSource(ctx, ErrorAfterFirstObject, 5, p.runFunc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = fs.Next(ctx)
+	if err != os.ErrInvalid {
+		t.Error(err)
+	}
+}
