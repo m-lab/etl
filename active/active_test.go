@@ -46,7 +46,7 @@ func (c *counter) err() error {
 	}
 }
 
-func (c *counter) runFunc(tf *active.Task) active.Runnable {
+func (c *counter) runFunc(tf *storage.ObjectAttrs) active.Runnable {
 	log.Println("Creating runnable for", tf)
 	return func() error {
 		log.Println(tf)
@@ -63,7 +63,7 @@ func NewCounter(t *testing.T) *counter {
 	return &counter{t: t, outcome: make(chan error, 100)}
 }
 
-func TestFileSourceBasic(t *testing.T) {
+func standardLister() active.FileLister {
 	client := cloudtest.GCSClient{}
 	client.AddTestBucket("foobar",
 		cloudtest.BucketHandle{
@@ -75,37 +75,50 @@ func TestFileSourceBasic(t *testing.T) {
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/subdir/obj5", Updated: time.Now()},
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "obj6", Updated: time.Now()},
 			}})
+	return active.FileListerFunc(client, "fake", "gs://foobar/ndt/2019/01/01/")
+}
 
+func TestGCSSourceBasic(t *testing.T) {
 	p := NewCounter(t)
 	ctx := context.Background()
-	lister := active.FileListerFunc(client, "fake", "gs://foobar/ndt/2019/01/01/")
-	fs, err := active.NewFileSource(ctx, lister, 5, p.runFunc)
+	fs, err := active.NewGCSSource(ctx, standardLister(), p.runFunc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fs.RunAll(ctx)
+	active.RunAll(ctx, fs)
 
 	if p.success != 3 {
 		t.Error("All 3 tests should have succeeded.", p)
 	}
 }
 
-func TestFileSourceExpiredContext(t *testing.T) {
-	client := cloudtest.GCSClient{}
-	client.AddTestBucket("foobar",
-		cloudtest.BucketHandle{
-			ObjAttrs: []*storage.ObjectAttrs{
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj1", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj2", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj3", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj4", Updated: time.Now()},
-			}})
+func TestWithRunFailures(t *testing.T) {
+	// First two will fail.
+	p := NewCounter(t)
+	p.AddOutcome(os.ErrInvalid)
+	p.AddOutcome(os.ErrInvalid)
 
+	ctx := context.Background()
+	fs, err := active.NewGCSSource(ctx, standardLister(), p.runFunc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	active.RunAll(ctx, fs)
+
+	if p.success != 1 {
+		t.Error("1 test should have succeeded.", p.success)
+	}
+	if p.fail != 2 {
+		t.Error("Fail", p.fail)
+	}
+}
+
+func TestExpiredContext(t *testing.T) {
 	p := NewCounter(t)
 	ctx := context.Background()
-	lister := active.FileListerFunc(client, "fake", "gs://foobar/ndt/2019/01/01/")
-	fs, err := active.NewFileSource(ctx, lister, 0, p.runFunc)
+	fs, err := active.NewGCSSource(ctx, standardLister(), p.runFunc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,144 +133,51 @@ func TestFileSourceExpiredContext(t *testing.T) {
 	if err != context.Canceled {
 		t.Fatal("Expected context canceled:", err)
 	}
-
-	fs.CancelStreaming()
-	// One item may arrive before cancel is detected.
-	_, err = fs.Next(ctx)
-	if err != context.Canceled {
-		// This should return error.
-		_, err = fs.Next(ctx)
-		if err != context.Canceled {
-			t.Fatal(err)
-		}
-	}
 }
 
-func TestFileSourceWithFailures(t *testing.T) {
-	client := cloudtest.GCSClient{}
-	client.AddTestBucket("foobar",
-		cloudtest.BucketHandle{
-			ObjAttrs: []*storage.ObjectAttrs{
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj1", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj2", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/subdir/obj4", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/subdir/obj5", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "obj6", Updated: time.Now()},
-			}})
-
-	// First two will fail.
-	p := NewCounter(t)
-	p.AddOutcome(os.ErrInvalid)
-	p.AddOutcome(os.ErrInvalid)
-
-	ctx := context.Background()
-	lister := active.FileListerFunc(client, "fake", "gs://foobar/ndt/2019/01/01/")
-	fs, err := active.NewFileSource(ctx, lister, 5, p.runFunc)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fs.RunAll(ctx)
-
-	if p.success != 1 {
-		t.Error("1 test should have succeeded.", p.success)
-	}
-	if p.fail != 2 {
-		t.Error("Fail", p.fail)
-	}
-}
-
-func ErroringLister(ctx context.Context, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
+func ErroringLister(ctx context.Context) ([]*storage.ObjectAttrs, int64, error) {
 	return nil, 0, os.ErrInvalid
 }
 
-func TestStorageError(t *testing.T) {
+func TestWithStorageError(t *testing.T) {
 	p := NewCounter(t)
 
 	ctx := context.Background()
-	fs, err := active.NewFileSource(ctx, ErroringLister, 5, p.runFunc)
+	fs, err := active.NewGCSSource(ctx, ErroringLister, p.runFunc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, err = fs.Next(ctx)
 	if err != os.ErrInvalid {
-		t.Error("Should return os.ErrInvalid")
-	}
-
-	// RunAll should do nothing, and return quickly.
-	fs.RunAll(ctx)
-
-	if p.success != 0 {
-		t.Error("1 test should have succeeded.", p.success)
-	}
-	if p.fail != 0 {
-		t.Error("Fail", p.fail)
+		t.Fatal("Should return os.ErrInvalid")
 	}
 }
 
-func ErrorAfterCtxDone(ctx context.Context, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
-	// Wait for context to expire.
-	<-ctx.Done()
-	return nil, 0, ctx.Err()
-}
-
-func TestExpiredContextOnFileLister(t *testing.T) {
+func TestExpiredFileListerContext(t *testing.T) {
 	p := NewCounter(t)
 
 	ctx := context.Background()
-	fs, err := active.NewFileSource(ctx, ErrorAfterCtxDone, 5, p.runFunc)
+	fs, err := active.NewGCSSource(ctx, standardLister(), p.runFunc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// This just ensures that the streaming goroutine has started.
+	_, err = fs.Next(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Race here!!
 	fs.CancelStreaming()
 
-	_, err = fs.Next(ctx)
+	// This may succeed, or may error, depending on when the streaming goroutine
+	// is scheduled before or after the CancelStreaming.  So just keep retrying
+	// until it errors.  Should be only once or twice.
+	for ; err == nil; _, err = fs.Next(ctx) {
+	}
 	if err != context.Canceled {
-		t.Error("Should return os.ErrInvalid")
-	}
-
-	// RunAll should do nothing, and return quickly.
-	fs.RunAll(ctx)
-
-	if p.success != 0 {
-		t.Error("1 test should have succeeded.", p.success)
-	}
-	if p.fail != 0 {
-		t.Error("Fail", p.fail)
-	}
-}
-
-// To test the nested select, we need to place something in the pending queue, and immediately
-// invoke the stop() function.
-
-var count = 0
-
-func ErrorAfterFirstObject(ctx context.Context, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
-	if count < 1 {
-		count++
-		return []*storage.ObjectAttrs{
-			&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj2", Updated: time.Now()},
-		}, 123, nil
-	}
-
-	time.Sleep(time.Microsecond)
-	return nil, 0, os.ErrInvalid
-}
-
-func TestErrorAfterFirst(t *testing.T) {
-	p := NewCounter(t)
-
-	ctx := context.Background()
-	fs, err := active.NewFileSource(ctx, ErrorAfterFirstObject, 5, p.runFunc)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = fs.Next(ctx)
-	if err != os.ErrInvalid {
-		t.Error(err)
+		t.Error("Should return os.ErrInvalid", err)
 	}
 }
