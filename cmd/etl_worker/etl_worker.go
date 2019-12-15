@@ -2,8 +2,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -11,11 +13,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/m-lab/go/prometheusx"
+	"github.com/m-lab/etl/active"
+
+	"cloud.google.com/go/storage"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
+	"github.com/m-lab/go/prometheusx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
@@ -44,6 +49,7 @@ func init() {
 //   X-AppEngine-TaskRetryCount
 //   X-AppEngine-TaskExecutionCount
 
+// Status writes a status summary to a ResponseWriter, and can be used as a Handler.
 // TODO(gfr) Add either a black list or a white list for the environment
 // variables, so we can hide sensitive vars. https://github.com/m-lab/etl/issues/384
 func Status(w http.ResponseWriter, r *http.Request) {
@@ -206,6 +212,38 @@ func setMaxInFlight() {
 	}
 }
 
+type runnable struct {
+	storage.ObjectAttrs
+}
+
+func (r *runnable) Run() error {
+	path := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
+	log.Println("Processing", path)
+	_, err := worker.ProcessTask(path)
+	return err
+}
+
+func (r *runnable) Info() string {
+	// Should truncate this to exclude the date, maybe include the year?
+	return r.Name
+}
+
+func toRunnable(obj *storage.ObjectAttrs) active.Runnable {
+	return &runnable{*obj}
+}
+
+func startActiveProcessor(ipString string, workers int) {
+	ip := net.ParseIP(ipString)
+	if ip == nil {
+		log.Println("Gardener IP parse error", ipString)
+		return
+	}
+
+	url := fmt.Sprintf("http://%s:8080/job", ipString)
+	// Note that this does not currently track duration metric.
+	go active.PollGardener(context.Background(), url, toRunnable, workers)
+}
+
 func main() {
 	// Expose prometheus and pprof metrics on a separate port.
 	prometheusx.MustStartPrometheus(":9090")
@@ -224,5 +262,10 @@ func main() {
 	// path name will be accessible through the AppEngine service address,
 	// however it will be served by a random instance.
 	http.Handle("/random-metrics", promhttp.Handler())
+
+	ipString := os.Getenv("GARDENER_IP")
+	if len(ipString) > 0 {
+		startActiveProcessor(ipString, 120)
+	}
 	http.ListenAndServe(":8080", nil)
 }
