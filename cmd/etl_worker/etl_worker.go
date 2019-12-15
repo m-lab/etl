@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,11 +12,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/m-lab/go/prometheusx"
+	"github.com/m-lab/etl/active"
+
+	"cloud.google.com/go/storage"
+	"github.com/GoogleCloudPlatform/google-cloud-go-testing/storage/stiface"
+	"google.golang.org/api/option"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
+	"github.com/m-lab/go/prometheusx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
@@ -206,6 +212,67 @@ func setMaxInFlight() {
 	}
 }
 
+func runFunc(o *storage.ObjectAttrs) active.Runnable {
+	path := "gs://" + o.Bucket + "/" + o.Name
+	return func() error {
+		log.Println(path)
+		_, err := worker.ProcessTask(path)
+
+		return err
+	}
+}
+
+// This is a hack, and should not generally be used.
+// It has no admission control.
+func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
+	// This will add metric count and log message from any panic.
+	// The panic will still propagate, and http will report it.
+	defer func() {
+		metrics.CountPanics(recover(), "handleActiveRequest")
+	}()
+
+	path := rq.FormValue("path")
+	if len(path) == 0 {
+		// TODO add metric
+		rwr.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(rwr, `{"message": "Missing path"}`)
+		return
+	}
+
+	client, err := storage.NewClient(context.Background(), option.WithScopes(storage.ScopeReadOnly))
+	if err != nil {
+		// TODO add metric
+		rwr.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(rwr, "Error creating storage client")
+		return
+	}
+	lister := active.FileListerFunc(stiface.AdaptClient(client), path)
+	ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
+	fileSource, err := active.NewGCSSource(ctx, lister, runFunc)
+	if err != nil {
+		cancel()
+		rwr.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(rwr, fmt.Sprintf(`{"message": "Invalid path: %s %s"}`, path, err.Error()))
+		return
+	}
+
+	throttle := active.NewWSTokenSource(60)
+
+	// Run all tasks, and log error on completion.
+	go func() {
+		err := active.RunAll(ctx, active.Throttle(fileSource, throttle))
+		cancel()
+
+		if err != nil {
+			// TODO add metric
+			log.Println(path, "Had errors:", err)
+		}
+	}()
+
+	rwr.WriteHeader(http.StatusOK)
+	fmt.Fprintf(rwr, fmt.Sprintf(`{"message": "Processing %s"}`, path))
+}
+
 func main() {
 	// Expose prometheus and pprof metrics on a separate port.
 	prometheusx.MustStartPrometheus(":9090")
@@ -213,6 +280,7 @@ func main() {
 	http.HandleFunc("/", Status)
 	http.HandleFunc("/status", Status)
 	http.HandleFunc("/worker", metrics.DurationHandler("generic", handleRequest))
+	http.HandleFunc("/active", metrics.DurationHandler("generic", handleActiveRequest))
 	http.HandleFunc("/_ah/health", healthCheckHandler)
 
 	// Enable block profiling
