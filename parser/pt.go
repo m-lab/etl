@@ -528,7 +528,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			}
 		} else {
 			// Modify metrics
-			log.Printf("JSON parsing failed with error %v for %s", err, testName)
+			log.Printf("JSON parsing failed with error %v for %s, %s", err, testName, pt.taskFileName)
 		}
 		return nil
 	}
