@@ -67,7 +67,7 @@ func getFilesSince(ctx context.Context, bh stiface.BucketHandle, prefix string, 
 // getBucket gets a storage bucket.
 // TODO - this is currently duplicated in etl-gardener/state/state.go
 //   opts       - ClientOptions, e.g. credentials, for tests that need to access storage buckets.
-func getBucket(ctx context.Context, sClient stiface.Client, project, bucketName string) (stiface.BucketHandle, error) {
+func getBucket(ctx context.Context, sClient stiface.Client, bucketName string) (stiface.BucketHandle, error) {
 	bucket := sClient.Bucket(bucketName)
 	if bucket == nil {
 		return nil, errors.New("Nil bucket")
@@ -83,7 +83,7 @@ func getBucket(ctx context.Context, sClient stiface.Client, project, bucketName 
 
 // GetFilesSince gets list of all storage objects with prefix, created or updated since given date.
 // TODO - similar to code in etl-gardener/cloud/tq/tq.go.  Should move to go/cloud/gcs
-func GetFilesSince(ctx context.Context, sClient stiface.Client, project string, prefix string, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
+func GetFilesSince(ctx context.Context, sClient stiface.Client, prefix string, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
 	// Submit all files from the bucket that match the prefix.
 	p, err := ParsePrefix(prefix)
 	if err != nil {
@@ -93,14 +93,14 @@ func GetFilesSince(ctx context.Context, sClient stiface.Client, project string, 
 	}
 
 	// Use a real storage bucket.
-	bucket, err := getBucket(ctx, sClient, project, p.Bucket)
+	bucket, err := getBucket(ctx, sClient, p.Bucket)
 	if err != nil {
 		log.Println(err)
 		return nil, 0, err
 	}
 	if bucket == nil {
-		log.Println("Nil bucket for", project, prefix)
-		return nil, 0, fmt.Errorf("Nil bucket for %s %s", project, prefix)
+		log.Println("Nil bucket for", prefix)
+		return nil, 0, fmt.Errorf("Nil bucket for %s", prefix)
 	}
 
 	return getFilesSince(ctx, bucket, p.Path(), since)
