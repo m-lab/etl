@@ -45,7 +45,7 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   BATCH_SERVICE: 'true'   # Allow instances to discover they are BATCH instances.
-  MAX_WORKERS: 80
+  MAX_WORKERS: 10 # Singleton workers, in addition to the active workers. 
   BIGQUERY_PROJECT: '${INJECTED_PROJECT}'  # Overrides GCLOUD_PROJECT
   # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
   NDT_OMIT_DELTAS: 'true'
