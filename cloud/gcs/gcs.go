@@ -47,7 +47,10 @@ func getFilesSince(ctx context.Context, bh stiface.BucketHandle, prefix string, 
 			continue
 		}
 
-		if !o.Updated.After(after) {
+		// Prefixes have empty Updated fields, so the first clause would
+		// generally skip prefixes, but we add the second clause just in
+		// case someone passes in an ancient *after* date.
+		if !o.Updated.After(after) || len(o.Prefix) > 0 {
 			continue
 		}
 		byteCount += o.Size

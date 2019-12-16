@@ -52,22 +52,22 @@ func FileListerFunc(sc stiface.Client, project string, prefix string) FileLister
 type GCSSource struct {
 	// The fileLister produces the list of source files.
 	fileLister FileLister
-	// runFunc creates a Runnable from ObjectAttrs.
-	runFunc func(*storage.ObjectAttrs) Runnable
+	// toRunnable creates a Runnable from ObjectAttrs.
+	toRunnable func(*storage.ObjectAttrs) Runnable
 
 	pendingChan chan Runnable
 
 	cancel    func()        // Function to cancel the streaming feeder.
-	done      chan struct{} // streaming func terminated
-	doneState error         // streaming func final state.
+	done      chan struct{} // closed when streamToPending terminates.
+	doneState error         // streamToPending final error, if any.
 }
 
 // NewGCSSource creates a new source for active processing.
-func NewGCSSource(ctx context.Context, fl FileLister, runFunc func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
+func NewGCSSource(ctx context.Context, fl FileLister, toRunnable func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	fs := GCSSource{
 		fileLister: fl,
-		runFunc:    runFunc,
+		toRunnable: toRunnable,
 
 		pendingChan: make(chan Runnable, 0),
 		cancel:      cancel,
@@ -148,12 +148,8 @@ func (fs *GCSSource) streamToPending(ctx context.Context) {
 			fs.stop(ctx.Err())
 			break
 		}
-		if f.Prefix != "" {
-			debug.Println("Skipping subdirectory:", f.Prefix)
-			continue // skip directories
-		}
 		debug.Printf("Adding gs://%s/%s", f.Bucket, f.Name)
 		// Blocks until consumer reads channel.
-		fs.pendingChan <- fs.runFunc(f)
+		fs.pendingChan <- fs.toRunnable(f)
 	}
 }

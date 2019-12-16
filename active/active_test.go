@@ -71,6 +71,7 @@ func standardLister() active.FileLister {
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj1", Updated: time.Now()},
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj2", Updated: time.Now()},
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
+				// Some deliberate non-conforming files, to ensure they don't cause failures.
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/subdir/obj4", Updated: time.Now()},
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/subdir/obj5", Updated: time.Now()},
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "obj6", Updated: time.Now()},

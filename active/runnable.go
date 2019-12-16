@@ -12,7 +12,7 @@ import (
 // TODO - should this instead be and interface, with Run() and ShouldRetry()?
 type Runnable = func() error
 
-// Source provides a Next function that returns Next functions.
+// Source provides a Next function that returns Runnables.
 type Source interface {
 	// Next should return iterator.Done when there are no more Runnables.
 	// It may block if there are no more runnables available right now,
