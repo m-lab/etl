@@ -57,9 +57,9 @@ type GCSSource struct {
 
 	pendingChan chan Runnable
 
-	cancel    func()        // Function to cancel the streaming feeder.
-	done      chan struct{} // closed when streamToPending terminates.
-	doneState error         // streamToPending final error, if any.
+	cancel  func()        // Function to cancel the streaming feeder.
+	done    chan struct{} // closed when streamToPending terminates.
+	doneErr error         // streamToPending final error, if any.
 }
 
 // NewGCSSource creates a new source for active processing.
@@ -100,8 +100,8 @@ func (fs *GCSSource) Next(ctx context.Context) (Runnable, error) {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-fs.done:
-			debug.Println(fs.doneState)
-			return nil, fs.doneState
+			debug.Println(fs.doneErr)
+			return nil, fs.doneErr
 		default:
 			if ok {
 				return next, nil
@@ -117,7 +117,7 @@ func (fs *GCSSource) stop(err error) {
 	select {
 	case <-fs.done:
 	default:
-		fs.doneState = err
+		fs.doneErr = err
 		close(fs.done)
 	}
 }
