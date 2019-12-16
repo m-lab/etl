@@ -13,6 +13,7 @@ package active
 import (
 	"context"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/google-cloud-go-testing/storage/stiface"
@@ -48,30 +49,63 @@ func FileListerFunc(sc stiface.Client, prefix string) FileLister {
 	}
 }
 
+// Context implements context.Context, but allows injection of an alternate Err().
+type Context struct {
+	context.Context
+	cancel   func()
+	lock     sync.Mutex
+	otherErr error // Should access with atomics.
+}
+
+// Err returns nil, otherErr, or Context.Err()
+func (c *Context) Err() error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	select {
+	case <-c.Done():
+		if c.otherErr != nil {
+			return c.otherErr
+		}
+		return c.Context.Err()
+	default:
+		return nil
+	}
+}
+
+// Fail cancels the context, and sets the result of context.Err()
+func (c *Context) Fail(err error) {
+	debug.Output(2, "stopping")
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.otherErr = err
+	c.cancel()
+}
+
+// WithFail wraps a context to allow specifying custom error with Fail()
+func WithFail(ctx context.Context) *Context {
+	ctx, cancel := context.WithCancel(ctx)
+	return &Context{Context: ctx, cancel: cancel}
+}
+
 // GCSSource implements RunnableSource for a GCS bucket/prefix.
 type GCSSource struct {
+	ctx *Context
 	// The fileLister produces the list of source files.
 	fileLister FileLister
 	// toRunnable creates a Runnable from ObjectAttrs.
 	toRunnable func(*storage.ObjectAttrs) Runnable
 
 	pendingChan chan Runnable
-
-	cancel  func()        // Function to cancel the streaming feeder.
-	done    chan struct{} // closed when streamToPending terminates.
-	doneErr error         // streamToPending final error, if any.
 }
 
 // NewGCSSource creates a new source for active processing.
 func NewGCSSource(ctx context.Context, fl FileLister, toRunnable func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
-	ctx, cancel := context.WithCancel(ctx)
 	fs := GCSSource{
+		ctx:        WithFail(ctx),
 		fileLister: fl,
 		toRunnable: toRunnable,
 
 		pendingChan: make(chan Runnable, 0),
-		cancel:      cancel,
-		done:        make(chan struct{}),
 	}
 
 	go fs.streamToPending(ctx)
@@ -81,7 +115,7 @@ func NewGCSSource(ctx context.Context, fl FileLister, toRunnable func(*storage.O
 
 // CancelStreaming terminates the streaming goroutine context.
 func (fs *GCSSource) CancelStreaming() {
-	fs.cancel()
+	fs.ctx.cancel()
 }
 
 // Next implements RunnableSource.  It returns
@@ -99,9 +133,9 @@ func (fs *GCSSource) Next(ctx context.Context) (Runnable, error) {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-fs.done:
-			debug.Println(fs.doneErr)
-			return nil, fs.doneErr
+		case <-fs.ctx.Done():
+			debug.Println(fs.ctx.Err())
+			return nil, fs.ctx.Err()
 		default:
 			if ok {
 				return next, nil
@@ -109,16 +143,6 @@ func (fs *GCSSource) Next(ctx context.Context) (Runnable, error) {
 			debug.Println("iterator.Done")
 			return nil, iterator.Done
 		}
-	}
-}
-
-func (fs *GCSSource) stop(err error) {
-	debug.Output(2, "stopping")
-	select {
-	case <-fs.done:
-	default:
-		fs.doneErr = err
-		close(fs.done)
 	}
 }
 
@@ -133,7 +157,7 @@ func (fs *GCSSource) streamToPending(ctx context.Context) {
 	files, _, err := fs.fileLister(ctx)
 	if err != nil {
 		debug.Println("Error streaming", err)
-		fs.stop(err)
+		fs.ctx.Fail(err)
 		return
 	}
 
@@ -145,7 +169,6 @@ func (fs *GCSSource) streamToPending(ctx context.Context) {
 		}
 		// We abandon remaining items if context expires.
 		if ctx.Err() != nil {
-			fs.stop(ctx.Err())
 			break
 		}
 		debug.Printf("Adding gs://%s/%s", f.Bucket, f.Name)
