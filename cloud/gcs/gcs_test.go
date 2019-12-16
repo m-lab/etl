@@ -48,7 +48,7 @@ func TestLegacyPrefix(t *testing.T) {
 }
 
 func TestGetFilesSince_BadPrefix(t *testing.T) {
-	_, _, err := gcs.GetFilesSince(context.Background(), nil, "project", "gs://foobar/2019/01/01/", time.Now().Add(-time.Minute))
+	_, _, err := gcs.GetFilesSince(context.Background(), nil, "gs://foobar/2019/01/01/", time.Now().Add(-time.Minute))
 	if err == nil || !strings.Contains(err.Error(), "Invalid test path:") {
 		t.Fatal("Should return error", err)
 	}
@@ -67,7 +67,7 @@ func TestGetFilesSince(t *testing.T) {
 				&storage.ObjectAttrs{Name: "obj6", Updated: time.Now()},
 			}})
 
-	files, bytes, err := gcs.GetFilesSince(context.Background(), fc, "project", "gs://foobar/ndt/2019/01/01/", time.Now().Add(-time.Minute))
+	files, bytes, err := gcs.GetFilesSince(context.Background(), fc, "gs://foobar/ndt/2019/01/01/", time.Now().Add(-time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestGetFilesSince_Context(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	files, _, err := gcs.GetFilesSince(ctx, fc, "project", "gs://foobar/ndt/2019/01/01/", time.Now().Add(-time.Minute))
+	files, _, err := gcs.GetFilesSince(ctx, fc, "gs://foobar/ndt/2019/01/01/", time.Now().Add(-time.Minute))
 
 	if err != context.Canceled {
 		t.Error("Should return context.Canceled", err)
@@ -103,7 +103,7 @@ func TestGetFilesSince_Context(t *testing.T) {
 	defer cancel()
 	time.Sleep(time.Millisecond)
 
-	files, _, err = gcs.GetFilesSince(ctx, fc, "project", "gs://foobar/ndt/2019/01/01/", time.Now().Add(-time.Minute))
+	files, _, err = gcs.GetFilesSince(ctx, fc, "gs://foobar/ndt/2019/01/01/", time.Now().Add(-time.Minute))
 
 	if err != context.DeadlineExceeded {
 		t.Error("Should return context.Canceled", err)

@@ -42,9 +42,9 @@ type FileLister func(ctx context.Context) ([]*storage.ObjectAttrs, int64, error)
 
 // FileListerFunc creates a function that returns a slice of *storage.ObjectAttrs.
 // On certain GCS errors, it may return partial result and an error.
-func FileListerFunc(sc stiface.Client, project string, prefix string) FileLister {
+func FileListerFunc(sc stiface.Client, prefix string) FileLister {
 	return func(ctx context.Context) ([]*storage.ObjectAttrs, int64, error) {
-		return gcs.GetFilesSince(ctx, sc, project, prefix, time.Time{})
+		return gcs.GetFilesSince(ctx, sc, prefix, time.Time{})
 	}
 }
 

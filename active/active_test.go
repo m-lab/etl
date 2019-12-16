@@ -68,15 +68,15 @@ func standardLister() active.FileLister {
 	client.AddTestBucket("foobar",
 		cloudtest.BucketHandle{
 			ObjAttrs: []*storage.ObjectAttrs{
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj1", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj2", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
-				// Some deliberate non-conforming files, to ensure they don't cause failures.
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/subdir/obj4", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/2019/01/01/subdir/obj5", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj1", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj2", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/subdir/obj4", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/subdir/obj5", Updated: time.Now()},
+				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/tcpinfo/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "obj6", Updated: time.Now()},
 			}})
-	return active.FileListerFunc(client, "fake", "gs://foobar/ndt/2019/01/01/")
+	return active.FileListerFunc(client, "gs://foobar/ndt/ndt5/2019/01/01/")
 }
 
 func TestGCSSourceBasic(t *testing.T) {
