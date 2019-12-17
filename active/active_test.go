@@ -46,13 +46,23 @@ func (c *counter) err() error {
 	}
 }
 
-func (c *counter) runFunc(tf *storage.ObjectAttrs) active.Runnable {
-	log.Println("Creating runnable for", tf)
-	return func() error {
-		log.Println(tf)
-		time.Sleep(10 * time.Millisecond)
-		return c.err()
-	}
+type runnable struct {
+	c   *counter
+	obj *storage.ObjectAttrs
+}
+
+func (r *runnable) Run() error {
+	log.Println(r.obj.Name)
+	time.Sleep(10 * time.Millisecond)
+	return r.c.err()
+}
+func (r *runnable) Info() string {
+	return "test"
+}
+
+func (c *counter) toRunnable(obj *storage.ObjectAttrs) active.Runnable {
+	log.Println("Creating runnable for", obj.Name)
+	return &runnable{c, obj}
 }
 
 func (c *counter) AddOutcome(err error) {
@@ -82,7 +92,7 @@ func standardLister() active.FileLister {
 func TestGCSSourceBasic(t *testing.T) {
 	p := NewCounter(t)
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, standardLister(), p.runFunc)
+	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +111,7 @@ func TestWithRunFailures(t *testing.T) {
 	p.AddOutcome(os.ErrInvalid)
 
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, standardLister(), p.runFunc)
+	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +129,7 @@ func TestWithRunFailures(t *testing.T) {
 func TestExpiredContext(t *testing.T) {
 	p := NewCounter(t)
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, standardLister(), p.runFunc)
+	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +154,7 @@ func TestWithStorageError(t *testing.T) {
 	p := NewCounter(t)
 
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, ErroringLister, p.runFunc)
+	fs, err := active.NewGCSSource(ctx, "test", ErroringLister, p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +169,7 @@ func TestExpiredFileListerContext(t *testing.T) {
 	p := NewCounter(t)
 
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, standardLister(), p.runFunc)
+	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}

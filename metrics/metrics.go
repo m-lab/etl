@@ -32,7 +32,7 @@ var (
 		prometheus.CounterOpts{
 			Name: "etl_active_error_total",
 			Help: "The current number of errors encountered while attempting to add annotation data.",
-		}, []string{"type"})
+		}, []string{"source", "type"})
 
 	// ActiveTasks tracks the number of active tasks in flight.
 	ActiveTasks = promauto.NewGaugeVec(
