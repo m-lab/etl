@@ -27,6 +27,22 @@ import (
 //
 
 var (
+	// ActiveErrors measures the errors encountered during active processing
+	ActiveErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "etl_active_error_total",
+			Help: "The current number of errors encountered while attempting to add annotation data.",
+		}, []string{"type"})
+
+	// ActiveTasks tracks the number of active tasks in flight.
+	ActiveTasks = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "etl_active_task_total",
+			Help: "Number of active tasks in flight.",
+		},
+		// GCS source prefix, e.g. gs://archive-measurement-lab/ndt/tcp-info
+		[]string{"source"})
+
 	// AnnotationTimeSummary measures the latencies of requests to the Annotation Service as measured by the pipeline
 	// Provides metrics:
 	//    etl_annotator_Annotation_Time_Summary

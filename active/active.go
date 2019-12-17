@@ -21,6 +21,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/m-lab/etl/cloud/gcs"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/logx"
 )
 
@@ -132,9 +133,11 @@ func (fs *GCSSource) Next(ctx context.Context) (Runnable, error) {
 		// This ensures that context expirations and errors are respected.
 		select {
 		case <-ctx.Done():
+			log.Println("Next timeout")
+			metrics.ActiveErrors.WithLabelValues("next timeout").Inc()
 			return nil, ctx.Err()
 		case <-fs.ctx.Done():
-			debug.Println(fs.ctx.Err())
+			log.Println(fs.ctx.Err())
 			return nil, fs.ctx.Err()
 		default:
 			if ok {
@@ -156,7 +159,8 @@ func (fs *GCSSource) streamToPending(ctx context.Context) {
 
 	files, _, err := fs.fileLister(ctx)
 	if err != nil {
-		debug.Println("Error streaming", err)
+		log.Println("Error streaming", err)
+		metrics.ActiveErrors.WithLabelValues("filelister").Inc()
 		fs.ctx.Fail(err)
 		return
 	}
@@ -165,10 +169,12 @@ func (fs *GCSSource) streamToPending(ctx context.Context) {
 		debug.Println(f)
 		if f == nil {
 			log.Println("Nil file!!")
+			metrics.ActiveErrors.WithLabelValues("nil file").Inc()
 			continue
 		}
 		// We abandon remaining items if context expires.
 		if ctx.Err() != nil {
+			metrics.ActiveErrors.WithLabelValues("streamToPending").Inc()
 			break
 		}
 		debug.Printf("Adding gs://%s/%s", f.Bucket, f.Name)
