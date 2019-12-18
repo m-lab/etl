@@ -291,7 +291,7 @@ func startActiveProcessor(ipString string, workers int) {
 		return
 	}
 
-	url := fmt.Sprintf("https://%s/job", ipString)
+	url := fmt.Sprintf("http://%s:8080/job", ipString)
 	go active.PollGardener(context.Background(), url, toRunnable, workers)
 }
 
