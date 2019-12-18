@@ -24,7 +24,7 @@ type Source interface {
 	// (or if throttling is applied)
 	Next(ctx context.Context) (Runnable, error)
 
-	// Name returns a string for use in metrics and debug logs'
+	// Label returns a string for use in metrics and debug logs'
 	Label() string
 }
 
@@ -41,15 +41,9 @@ func RunAll(ctx context.Context, rSrc Source) error {
 		debug.Println("Starting func")
 		f := func() error {
 			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Inc()
+			// TestCount and other metrics should be handled within Run().
 			err := run.Run()
 			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Dec()
-			switch err {
-			case nil:
-				metrics.TestCount.WithLabelValues(rSrc.Label(), "", "ok").Inc()
-			default:
-				metrics.TestCount.WithLabelValues(rSrc.Label(), "", "error").Inc()
-			}
-
 			return err
 		}
 		eg.Go(f)

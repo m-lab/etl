@@ -2,7 +2,10 @@ package active_test
 
 import (
 	"context"
+	"log"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/m-lab/etl/active"
 	"google.golang.org/api/iterator"
@@ -17,10 +20,24 @@ type tRunnable struct {
 	c *counter
 }
 
+// accessed with atomics.
+var running int32
+var maxRunning int32
+
 func (tr *tRunnable) Run() error {
+	now := atomic.AddInt32(&running, 1)
+	log.Println(now)
+	defer atomic.AddInt32(&running, -1)
+	max := atomic.LoadInt32(&maxRunning)
+	// This will try to update until some thread makes maxRunning > now.
+	for now > max && !atomic.CompareAndSwapInt32(&maxRunning, max, now) {
+		max = atomic.LoadInt32(&maxRunning)
+	}
+	time.Sleep(1 * time.Millisecond)
+
 	tr.c.lock.Lock()
-	defer tr.c.lock.Unlock()
 	tr.c.success++
+	tr.c.lock.Unlock()
 	return nil
 }
 
@@ -48,5 +65,13 @@ func TestThrottledSource(t *testing.T) {
 
 	if src.c.success != 5 {
 		t.Error("Should have been 5 runnables", src.c.success)
+	}
+	runningNow := atomic.LoadInt32(&running)
+	if runningNow != 0 {
+		t.Error("running should be 0:", runningNow)
+	}
+	max := atomic.LoadInt32(&maxRunning)
+	if max != 2 {
+		t.Error("Max running != 2", max)
 	}
 }

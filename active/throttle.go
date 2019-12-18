@@ -6,46 +6,54 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+// TokenSource specifies the interface for a source of tokens for throttling.
 type TokenSource interface {
 	Acquire(ctx context.Context) error
 	Release()
 }
 
-// TokenSource is a simple token source for initial testing.
-type WSTokenSource struct {
+// wsTokenSource is a simple token source for initial testing.
+type wsTokenSource struct {
 	sem *semaphore.Weighted
 }
 
 // Acquire acquires an admission token.
-func (ts *WSTokenSource) Acquire(ctx context.Context) error {
+func (ts *wsTokenSource) Acquire(ctx context.Context) error {
 	return ts.sem.Acquire(ctx, 1)
 }
 
 // Release releases an admission token.
-func (ts *WSTokenSource) Release() {
+func (ts *wsTokenSource) Release() {
 	ts.sem.Release(1)
 }
 
+// NewWSTokenSource returns a TokenSource based on semaphore.Weighted.
 func NewWSTokenSource(n int64) TokenSource {
-	return &WSTokenSource{semaphore.NewWeighted(n)}
+	return &wsTokenSource{semaphore.NewWeighted(n)}
 }
 
-type ThrottledSource struct {
+// throttedSource encapsulates a Source and a throttling mechanism.
+type throttledSource struct {
 	Source
 	throttle TokenSource
 }
 
+// throttledRunnable encapsulates a Runnable and a token release function.
 type throttledRunnable struct {
 	Runnable
 	release func()
 }
 
+// Run implements Source.Run
 func (tr *throttledRunnable) Run() error {
+	// The run function must release the token when it completes.
 	defer tr.release()
 	return tr.Runnable.Run()
 }
 
-func (ts *ThrottledSource) Next(ctx context.Context) (Runnable, error) {
+// Next implements Source.Next
+func (ts *throttledSource) Next(ctx context.Context) (Runnable, error) {
+	// We want Next to block here until a throttle token is available.
 	err := ts.throttle.Acquire(ctx)
 	if err != nil {
 		return nil, err
@@ -55,9 +63,12 @@ func (ts *ThrottledSource) Next(ctx context.Context) (Runnable, error) {
 		ts.throttle.Release()
 		return nil, err
 	}
+	// The Run() function must eventually release the token, so
+	// the throttle.Release function is saved here.
 	return &throttledRunnable{next, ts.throttle.Release}, nil
 }
 
+// Throttle applies a provided TokenSource to throttle a Source.
 func Throttle(src Source, tokens TokenSource) Source {
-	return &ThrottledSource{src, tokens}
+	return &throttledSource{src, tokens}
 }

@@ -37,7 +37,7 @@ var (
 	// ActiveTasks tracks the number of active tasks in flight.
 	ActiveTasks = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "etl_active_task_total",
+			Name: "etl_active_tasks",
 			Help: "Number of active tasks in flight.",
 		},
 		// GCS source prefix, e.g. gs://archive-measurement-lab/ndt/tcp-info
