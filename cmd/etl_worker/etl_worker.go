@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -212,14 +213,24 @@ func setMaxInFlight() {
 	}
 }
 
-func runFunc(o *storage.ObjectAttrs) active.Runnable {
-	path := "gs://" + o.Bucket + "/" + o.Name
-	return func() error {
-		log.Println(path)
-		_, err := worker.ProcessTask(path)
+type runnable struct {
+	storage.ObjectAttrs
+}
 
-		return err
-	}
+func (r *runnable) Run() error {
+	path := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
+	log.Println("Processing", path)
+	_, err := worker.ProcessTask(path)
+	return err
+}
+
+func (r *runnable) Info() string {
+	// Should truncate this to exclude the date, maybe include the year?
+	return r.Name
+}
+
+func toRunnable(obj *storage.ObjectAttrs) active.Runnable {
+	return &runnable{*obj}
 }
 
 // This is a hack, and should not generally be used.
@@ -248,7 +259,7 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 	}
 	lister := active.FileListerFunc(stiface.AdaptClient(client), path)
 	ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
-	fileSource, err := active.NewGCSSource(ctx, lister, runFunc)
+	fileSource, err := active.NewGCSSource(ctx, path, lister, toRunnable)
 	if err != nil {
 		cancel()
 		rwr.WriteHeader(http.StatusBadRequest)
@@ -273,6 +284,17 @@ func handleActiveRequest(rwr http.ResponseWriter, rq *http.Request) {
 	fmt.Fprintf(rwr, fmt.Sprintf(`{"message": "Processing %s"}`, path))
 }
 
+func startActiveProcessor(ipString string, workers int) {
+	ip := net.ParseIP(ipString)
+	if ip == nil {
+		log.Println("Gardener IP parse error", ipString)
+		return
+	}
+
+	url := fmt.Sprintf("https://%s/job", ipString)
+	go active.PollGardener(context.Background(), url, toRunnable, workers)
+}
+
 func main() {
 	// Expose prometheus and pprof metrics on a separate port.
 	prometheusx.MustStartPrometheus(":9090")
@@ -292,5 +314,10 @@ func main() {
 	// path name will be accessible through the AppEngine service address,
 	// however it will be served by a random instance.
 	http.Handle("/random-metrics", promhttp.Handler())
+
+	ipString := os.Getenv("GARDENER_IP")
+	if len(ipString) > 0 {
+		startActiveProcessor(ipString, 80)
+	}
 	http.ListenAndServe(":8080", nil)
 }
