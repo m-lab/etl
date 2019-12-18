@@ -44,6 +44,7 @@ env_variables:
   RELEASE_TAG: ${TRAVIS_TAG}
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
+  GARDENER_IP: "10.100.1.2"
   BATCH_SERVICE: 'true'   # Allow instances to discover they are BATCH instances.
   MAX_WORKERS: 10 # Singleton workers, in addition to the active workers. 
   BIGQUERY_PROJECT: '${INJECTED_PROJECT}'  # Overrides GCLOUD_PROJECT
