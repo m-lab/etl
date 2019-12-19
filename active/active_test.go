@@ -65,11 +65,11 @@ func (c *counter) toRunnable(obj *storage.ObjectAttrs) active.Runnable {
 	return &runnable{c, obj}
 }
 
-func (c *counter) AddOutcome(err error) {
+func (c *counter) addOutcome(err error) {
 	c.outcome <- err
 }
 
-func NewCounter(t *testing.T) *counter {
+func newCounter(t *testing.T) *counter {
 	return &counter{t: t, outcome: make(chan error, 100)}
 }
 
@@ -90,7 +90,7 @@ func standardLister() active.FileLister {
 }
 
 func TestGCSSourceBasic(t *testing.T) {
-	p := NewCounter(t)
+	p := newCounter(t)
 	ctx := context.Background()
 	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
 	if err != nil {
@@ -106,9 +106,9 @@ func TestGCSSourceBasic(t *testing.T) {
 
 func TestWithRunFailures(t *testing.T) {
 	// First two will fail.
-	p := NewCounter(t)
-	p.AddOutcome(os.ErrInvalid)
-	p.AddOutcome(os.ErrInvalid)
+	p := newCounter(t)
+	p.addOutcome(os.ErrInvalid)
+	p.addOutcome(os.ErrInvalid)
 
 	ctx := context.Background()
 	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
@@ -127,7 +127,7 @@ func TestWithRunFailures(t *testing.T) {
 }
 
 func TestExpiredContext(t *testing.T) {
-	p := NewCounter(t)
+	p := newCounter(t)
 	ctx := context.Background()
 	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
 	if err != nil {
@@ -151,7 +151,7 @@ func ErroringLister(ctx context.Context) ([]*storage.ObjectAttrs, int64, error) 
 }
 
 func TestWithStorageError(t *testing.T) {
-	p := NewCounter(t)
+	p := newCounter(t)
 
 	ctx := context.Background()
 	fs, err := active.NewGCSSource(ctx, "test", ErroringLister, p.toRunnable)
@@ -166,7 +166,7 @@ func TestWithStorageError(t *testing.T) {
 }
 
 func TestExpiredFileListerContext(t *testing.T) {
-	p := NewCounter(t)
+	p := newCounter(t)
 
 	ctx := context.Background()
 	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)

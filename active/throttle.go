@@ -34,7 +34,7 @@ func NewWSTokenSource(n int64) TokenSource {
 
 // throttedSource encapsulates a Source and a throttling mechanism.
 type throttledSource struct {
-	Source
+	RunnableSource
 	throttle TokenSource
 }
 
@@ -58,7 +58,7 @@ func (ts *throttledSource) Next(ctx context.Context) (Runnable, error) {
 	if err != nil {
 		return nil, err
 	}
-	next, err := ts.Source.Next(ctx)
+	next, err := ts.RunnableSource.Next(ctx)
 	if err != nil {
 		ts.throttle.Release()
 		return nil, err
@@ -69,6 +69,11 @@ func (ts *throttledSource) Next(ctx context.Context) (Runnable, error) {
 }
 
 // Throttle applies a provided TokenSource to throttle a Source.
-func Throttle(src Source, tokens TokenSource) Source {
-	return &throttledSource{src, tokens}
+// This returns an interface, which is discouraged by Go advocates, but
+// seems like the right thing to do here, as there is no reason to export
+// the concrete type.
+func Throttle(src RunnableSource, tokens TokenSource) RunnableSource {
+	return &throttledSource{
+		RunnableSource: src,
+		throttle:       tokens}
 }

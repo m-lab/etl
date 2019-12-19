@@ -57,7 +57,7 @@ func (s *source) Label() string {
 }
 
 func TestThrottledSource(t *testing.T) {
-	src := source{5, NewCounter(t)}
+	src := source{5, newCounter(t)}
 	// throttle to handle two at a time.
 	ts := active.Throttle(&src, active.NewWSTokenSource(2))
 

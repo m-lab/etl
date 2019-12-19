@@ -17,8 +17,8 @@ type Runnable interface {
 	Info() string
 }
 
-// Source provides a Next function that returns Runnables.
-type Source interface {
+// RunnableSource provides a Next function that returns Runnables.
+type RunnableSource interface {
 	// Next should return iterator.Done when there are no more Runnables.
 	// It may block if there are no more runnables available right now,
 	// (or if throttling is applied)
@@ -30,7 +30,7 @@ type Source interface {
 
 // RunAll will execute functions provided by Next() until there are no more,
 // or the context is canceled.
-func RunAll(ctx context.Context, rSrc Source) error {
+func RunAll(ctx context.Context, rSrc RunnableSource) error {
 	eg := errgroup.Group{}
 	for {
 		run, err := rSrc.Next(ctx)
