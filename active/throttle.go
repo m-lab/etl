@@ -65,7 +65,9 @@ func (ts *throttledSource) Next(ctx context.Context) (Runnable, error) {
 	}
 	// The Run() function must eventually release the token, so
 	// the throttle.Release function is saved here.
-	return &throttledRunnable{next, ts.throttle.Release}, nil
+	return &throttledRunnable{
+		Runnable: next,
+		release:  ts.throttle.Release}, nil
 }
 
 // Throttle applies a provided TokenSource to throttle a Source.
