@@ -30,15 +30,17 @@ type RunnableSource interface {
 
 // RunAll will execute functions provided by Next() until there are no more,
 // or the context is canceled.
-func RunAll(ctx context.Context, rSrc RunnableSource) error {
-	eg := errgroup.Group{}
+func RunAll(ctx context.Context, rSrc RunnableSource) (eg *errgroup.Group, err error) {
+	eg = &errgroup.Group{}
 	for {
-		run, err := rSrc.Next(ctx)
+		var run Runnable
+		run, err = rSrc.Next(ctx)
 		if err != nil {
 			debug.Println(err)
 			break
 		}
 		debug.Println("Starting func")
+
 		f := func() error {
 			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Inc()
 			// TestCount and other metrics should be handled within Run().
@@ -46,7 +48,8 @@ func RunAll(ctx context.Context, rSrc RunnableSource) error {
 			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Dec()
 			return err
 		}
+
 		eg.Go(f)
 	}
-	return eg.Wait()
+	return
 }

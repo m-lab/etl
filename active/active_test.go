@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/m-lab/go/logx"
+	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/storage"
 	"github.com/m-lab/etl/active"
@@ -97,7 +98,11 @@ func TestGCSSourceBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	active.RunAll(ctx, fs)
+	eg, err := active.RunAll(ctx, fs)
+	if err != iterator.Done {
+		t.Fatal(err)
+	}
+	eg.Wait()
 
 	if p.success != 3 {
 		t.Error("All 3 tests should have succeeded.", p)
@@ -116,7 +121,11 @@ func TestWithRunFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	active.RunAll(ctx, fs)
+	eg, err := active.RunAll(ctx, fs)
+	if err != iterator.Done {
+		t.Fatal(err)
+	}
+	eg.Wait()
 
 	if p.success != 1 {
 		t.Error("1 test should have succeeded.", p.success)
