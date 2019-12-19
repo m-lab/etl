@@ -3,7 +3,7 @@ package active_test
 import (
 	"context"
 	"log"
-	"sync/atomic"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,44 +11,62 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-type source struct {
-	count int
-	c     *counter
+type maxTracker struct {
+	running   chan struct{}
+	doneCount chan struct{}
+
+	lock       sync.Mutex
+	maxRunning int
 }
 
-type tRunnable struct {
-	c *counter
-}
+func (mt *maxTracker) add() int {
+	mt.running <- struct{}{} // Add to the count.
+	now := len(mt.running)
 
-// accessed with atomics.
-var running int32
-var maxRunning int32
-
-func (tr *tRunnable) Run() error {
-	now := atomic.AddInt32(&running, 1)
-	log.Println(now)
-	defer atomic.AddInt32(&running, -1)
-	max := atomic.LoadInt32(&maxRunning)
-	// This will try to update until some thread makes maxRunning > now.
-	for now > max && !atomic.CompareAndSwapInt32(&maxRunning, max, now) {
-		max = atomic.LoadInt32(&maxRunning)
+	mt.lock.Lock()
+	defer mt.lock.Unlock()
+	if mt.maxRunning < now {
+		mt.maxRunning = now
 	}
-	time.Sleep(1 * time.Millisecond)
 
-	tr.c.lock.Lock()
-	tr.c.success++
-	tr.c.lock.Unlock()
-	return nil
+	return now
 }
 
-func (tr *tRunnable) Info() string {
-	return "info"
+func (mt *maxTracker) end() {
+	// decrement inFlight, and increment doneCount.
+	mt.doneCount <- <-mt.running
+}
+
+func (mt *maxTracker) done() int {
+	return len(mt.doneCount)
+}
+
+func (mt *maxTracker) max() int {
+	mt.lock.Lock()
+	defer mt.lock.Unlock()
+	return mt.maxRunning
+}
+
+func newMaxTracker(n int) *maxTracker {
+	return &maxTracker{
+		running:   make(chan struct{}, n),
+		doneCount: make(chan struct{}, n),
+	}
+}
+
+type source struct {
+	count   int
+	tracker *maxTracker
+}
+
+type maxRunnable struct {
+	tracker *maxTracker
 }
 
 func (s *source) Next(ctx context.Context) (active.Runnable, error) {
 	if s.count > 0 {
 		s.count--
-		return &tRunnable{s.c}, nil
+		return &maxRunnable{s.tracker}, nil
 	}
 	return nil, iterator.Done
 }
@@ -56,22 +74,35 @@ func (s *source) Label() string {
 	return "label"
 }
 
+func (mr *maxRunnable) Run() error {
+	now := mr.tracker.add()
+	defer mr.tracker.end()
+
+	log.Println(now, "running")
+
+	time.Sleep(1 * time.Millisecond)
+
+	return nil
+}
+
+func (tr *maxRunnable) Info() string {
+	return "info"
+}
+
 func TestThrottledSource(t *testing.T) {
-	src := source{5, newCounter(t)}
+	src := source{count: 5, tracker: newMaxTracker(100)}
 	// throttle to handle two at a time.
 	ts := active.Throttle(&src, active.NewWSTokenSource(2))
 
 	active.RunAll(context.Background(), ts)
 
-	if src.c.success != 5 {
-		t.Error("Should have been 5 runnables", src.c.success)
+	if src.tracker.done() != 5 {
+		t.Error("Should have been 5 runnables", src.tracker.done())
 	}
-	runningNow := atomic.LoadInt32(&running)
-	if runningNow != 0 {
-		t.Error("running should be 0:", runningNow)
+	if len(src.tracker.running) != 0 {
+		t.Error("running should be 0:", len(src.tracker.running))
 	}
-	max := atomic.LoadInt32(&maxRunning)
-	if max != 2 {
-		t.Error("Max running != 2", max)
+	if src.tracker.max() != 2 {
+		t.Error("Max running != 2", src.tracker.max())
 	}
 }
