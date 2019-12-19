@@ -36,20 +36,6 @@ func jobFileSource(ctx context.Context, job tracker.Job,
 	return gcsSource, nil
 }
 
-// JobSource processes an entire Job's task files.
-func JobSource(ctx context.Context, job tracker.Job,
-	toRunnable func(o *storage.ObjectAttrs) Runnable, ts TokenSource) (RunnableSource, error) {
-
-	gcsSource, err := jobFileSource(ctx, job, toRunnable)
-
-	if err == nil {
-		return nil, err
-	}
-
-	// Run all tasks, and return errgroup when all source is empty.
-	return Throttle(gcsSource, ts), nil
-}
-
 // PollGardener requests work items from gardener, and processes them.
 func PollGardener(ctx context.Context, url string,
 	toRunnable func(o *storage.ObjectAttrs) Runnable, workers int) {
@@ -81,14 +67,14 @@ func PollGardener(ctx context.Context, url string,
 				break // from the select
 			}
 
-			// We wait until the source is drained, but we ignore the errgroup.Group.
-			src, err := JobSource(ctx, job, toRunnable, throttle)
+			gcsSource, err := jobFileSource(ctx, job, toRunnable)
 			if err != nil {
 				log.Println(err)
 				break // from the select
 			}
+			src := Throttle(gcsSource, throttle)
 
-			// We check for error, but we can ignore the errgroup.
+			// We wait until the source is drained, but we ignore the errgroup.Group.
 			_, err = RunAll(ctx, src)
 			if err != nil {
 				log.Println(err)

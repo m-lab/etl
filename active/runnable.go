@@ -33,7 +33,6 @@ type RunnableSource interface {
 func RunAll(ctx context.Context, rSrc RunnableSource) (*errgroup.Group, error) {
 	eg := &errgroup.Group{}
 	for {
-		var run Runnable
 		run, err := rSrc.Next(ctx)
 		if err != nil {
 			debug.Println(err)
