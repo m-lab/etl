@@ -30,14 +30,14 @@ type RunnableSource interface {
 
 // RunAll will execute functions provided by Next() until there are no more,
 // or the context is canceled.
-func RunAll(ctx context.Context, rSrc RunnableSource) (eg *errgroup.Group, err error) {
-	eg = &errgroup.Group{}
+func RunAll(ctx context.Context, rSrc RunnableSource) (*errgroup.Group, error) {
+	eg := &errgroup.Group{}
 	for {
 		var run Runnable
-		run, err = rSrc.Next(ctx)
+		run, err := rSrc.Next(ctx)
 		if err != nil {
 			debug.Println(err)
-			break
+			return eg, err
 		}
 		debug.Println("Starting func")
 
@@ -51,5 +51,4 @@ func RunAll(ctx context.Context, rSrc RunnableSource) (eg *errgroup.Group, err e
 
 		eg.Go(f)
 	}
-	return
 }
