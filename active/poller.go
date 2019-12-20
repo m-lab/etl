@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 
@@ -36,49 +35,47 @@ func jobFileSource(ctx context.Context, job tracker.Job,
 	return gcsSource, nil
 }
 
+func pollAndRun(ctx context.Context, url string,
+	toRunnable func(o *storage.ObjectAttrs) Runnable, tokens TokenSource) error {
+	resp, err := http.Post(url, "application/x-www-form-urlencoded", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	var job tracker.Job
+	err = json.Unmarshal(b, &job)
+	if err != nil {
+		return err
+	}
+
+	gcsSource, err := jobFileSource(ctx, job, toRunnable)
+	if err != nil {
+		return err
+	}
+	src := Throttle(gcsSource, tokens)
+
+	// We wait until the source is drained, but we ignore the errgroup.Group.
+	_, err = RunAll(ctx, src)
+	return err
+}
+
 // PollGardener requests work items from gardener, and processes them.
 func PollGardener(ctx context.Context, url string,
 	toRunnable func(o *storage.ObjectAttrs) Runnable, workers int) {
-	// Poll at most once every 30 seconds.
-	ticker := time.NewTicker(30 * time.Second)
+	// Poll at most once every 10 seconds.
+	ticker := time.NewTicker(10 * time.Second)
 	throttle := NewWSTokenSource(int64(workers))
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			http.NewRequest("POST", url, nil)
-			resp, err := http.Post(url, "application/x-www-form-urlencoded", nil)
-			if err != nil {
-				log.Println(err)
-				break // from the select
-			}
-			defer resp.Body.Close()
-			b, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				log.Println(err)
-				break // from the select
-			}
-
-			var job tracker.Job
-			err = json.Unmarshal(b, &job)
-			if err != nil {
-				log.Println(err)
-				break // from the select
-			}
-
-			gcsSource, err := jobFileSource(ctx, job, toRunnable)
-			if err != nil {
-				log.Println(err)
-				break // from the select
-			}
-			src := Throttle(gcsSource, throttle)
-
-			// We wait until the source is drained, but we ignore the errgroup.Group.
-			_, err = RunAll(ctx, src)
-			if err != nil {
-				log.Println(err)
-			}
+			pollAndRun(ctx, url, toRunnable, throttle)
 		}
 
 		<-ticker.C // Wait for next tick, to avoid fast spinning on errors.
