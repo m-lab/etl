@@ -24,3 +24,15 @@ Writing schema_ndtresultrow.md
 ...
 
 ```
+
+## Moving to GKE
+
+The universal parser will run in GKE, using parser-pool node pools, defined like this:
+
+```sh
+gcloud --project=mlab-sandbox container node-pools create parser-pool-1 \
+--cluster=data-processing   --num-nodes=3   --region=us-east1 --scopes \
+"https://www.googleapis.com/auth/cloud-platform",storage-ro,compute-rw,bigquery,datastore \
+--node-labels=parser-node=true   --enable-autorepair --enable-autoupgrade \
+--machine-type=n1-standard-16
+```
