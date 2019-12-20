@@ -102,7 +102,10 @@ func TestGCSSourceBasic(t *testing.T) {
 	if err != iterator.Done {
 		t.Fatal(err)
 	}
-	eg.Wait()
+	err = eg.Wait()
+	if err != nil {
+		t.Error(err)
+	}
 
 	if p.success != 3 {
 		t.Error("All 3 tests should have succeeded.", p)
@@ -125,7 +128,10 @@ func TestWithRunFailures(t *testing.T) {
 	if err != iterator.Done {
 		t.Fatal(err)
 	}
-	eg.Wait()
+	err = eg.Wait()
+	if err != os.ErrInvalid {
+		t.Error(err, "should be invalid argument")
+	}
 
 	if p.success != 1 {
 		t.Error("1 test should have succeeded.", p.success)
