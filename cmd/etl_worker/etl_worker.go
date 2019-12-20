@@ -265,7 +265,7 @@ func main() {
 
 	ipString := os.Getenv("GARDENER_IP")
 	if len(ipString) > 0 {
-		startActiveProcessor(ipString, 200)
+		startActiveProcessor(ipString, 120)
 	}
 	http.ListenAndServe(":8080", nil)
 }
