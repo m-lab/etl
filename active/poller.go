@@ -69,10 +69,10 @@ func pollAndRun(ctx context.Context, url string,
 
 // PollGardener requests work items from gardener, and processes them.
 func PollGardener(ctx context.Context, url string,
-	toRunnable func(o *storage.ObjectAttrs) Runnable, workers int) {
+	toRunnable func(o *storage.ObjectAttrs) Runnable, maxWorkers int) {
 	// Poll at most once every 10 seconds.
 	ticker := time.NewTicker(10 * time.Second)
-	throttle := NewWSTokenSource(int64(workers))
+	throttle := NewWSTokenSource(maxWorkers)
 	for {
 		select {
 		case <-ctx.Done():

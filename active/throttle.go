@@ -28,8 +28,8 @@ func (ts *wsTokenSource) Release() {
 }
 
 // NewWSTokenSource returns a TokenSource based on semaphore.Weighted.
-func NewWSTokenSource(n int64) TokenSource {
-	return &wsTokenSource{semaphore.NewWeighted(n)}
+func NewWSTokenSource(n int) TokenSource {
+	return &wsTokenSource{semaphore.NewWeighted(int64(n))}
 }
 
 // throttedSource encapsulates a Source and a throttling mechanism.
