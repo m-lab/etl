@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"time"
 
@@ -58,6 +59,8 @@ func pollAndRun(ctx context.Context, url string,
 		return err
 	}
 	src := Throttle(gcsSource, tokens)
+
+	log.Println("Running", job.Path())
 
 	// We wait until the source is drained, but we ignore the errgroup.Group.
 	_, err = RunAll(ctx, src)
