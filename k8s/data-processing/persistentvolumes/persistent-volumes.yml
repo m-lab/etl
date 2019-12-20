@@ -1,0 +1,14 @@
+# Not clear if this is useful, but might want to use it instead of datastore for
+# maintaining persistent state.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: etl-parser 
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "fast"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
