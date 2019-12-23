@@ -20,7 +20,7 @@ CLUSTER=${CLUSTER:?Please provide cluster name: $USAGE}
 CFG=/tmp/${CLUSTER}-${PROJECT}.yml
 kexpand expand --ignore-missing-keys k8s/${CLUSTER}/*/*.yml \
     --value GCLOUD_PROJECT=${PROJECT} \
-    --value RELEASE_TAG=${TRAVIS_TAG} \
+    --value TRAVIS_TAG=${TRAVIS_TAG} \
     --value GIT_COMMIT=${TRAVIS_COMMIT} \
     > ${CFG}
 cat ${CFG}
