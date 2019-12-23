@@ -44,6 +44,8 @@ spec:
           value: "{{GIT_COMMIT}}"
         - name: PROJECT
           value: "{{GCLOUD_PROJECT}}"
+        - name: BIGQUERY_PROJECT
+          value: "{{BIGQUERY_PROJECT}}"
 
         - name: GARDENER_IP
           value: "10.100.1.2"
