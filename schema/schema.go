@@ -1,10 +1,14 @@
 package schema
 
 import (
+	"flag"
+	"io/ioutil"
 	"log"
+	"path"
 	"reflect"
 
 	"github.com/m-lab/go/bqx"
+	"github.com/m-lab/go/rtx"
 )
 
 // Requires go-bindata tool in environment:
@@ -17,17 +21,33 @@ import (
 func FindSchemaDocsFor(value interface{}) []bqx.SchemaDoc {
 	docs := []bqx.SchemaDoc{}
 	// Always include top level schema docs (should be common across row types).
-	docs = append(docs, bqx.NewSchemaDoc(MustAsset("toplevel.yaml")))
+	b, err := readAsset("toplevel.yaml")
+	rtx.Must(err, "Failed to read toplevel.yaml")
+	docs = append(docs, bqx.NewSchemaDoc(b))
 	t := reflect.TypeOf(value)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 	// Look for schema docs based on the given row type. Ignore missing schema docs.
-	b, err := Asset(t.Name() + ".yaml")
+	b, err = readAsset(t.Name() + ".yaml")
 	if err == nil {
 		docs = append(docs, bqx.NewSchemaDoc(b))
 	} else {
 		log.Printf("WARNING: no file for schema field description: %s.yaml", t.Name())
 	}
 	return docs
+}
+
+// assetDir provides a mechanism to override the embedded schema files.
+var assetDir string
+
+func init() {
+	flag.StringVar(&assetDir, "schema-asset-dir", "", "Read description files from the given directory instead of embedded files.")
+}
+
+func readAsset(name string) ([]byte, error) {
+	if assetDir == "" {
+		return Asset(name)
+	}
+	return ioutil.ReadFile(path.Join(assetDir, name))
 }
