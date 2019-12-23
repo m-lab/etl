@@ -57,6 +57,10 @@ func (row *PTTest) Schema() (bigquery.Schema, error) {
 	if err != nil {
 		return bigquery.Schema{}, err
 	}
+	docs := FindSchemaDocsFor(row)
+	for _, doc := range docs {
+		bqx.UpdateSchemaDescription(sch, doc)
+	}
 	rr := bqx.RemoveRequired(sch)
 	return rr, nil
 }
