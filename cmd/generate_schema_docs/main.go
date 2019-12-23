@@ -101,6 +101,8 @@ func main() {
 
 	generators := []schemaGenerator{
 		&schema.NDTResultRow{},
+		&schema.TCPRow{},
+		&schema.PTTest{},
 		// TODO(https://github.com/m-lab/etl/issues/745): Add additional types once
 		// "standard columns" are resolved.
 	}
