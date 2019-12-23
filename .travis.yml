@@ -327,8 +327,6 @@ deploy:
     && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging batch nodryrun
     && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging base_tables nodryrun
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker universal.yaml
-    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
