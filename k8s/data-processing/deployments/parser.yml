@@ -50,7 +50,7 @@ spec:
         - name: BATCH_SERVICE
           value: 'true'   # Allow instances to discover they are BATCH instances.
         - name: MAX_WORKERS
-          value: 10 # Singleton workers, in addition to the active workers. 
+          value: '10' # Singleton workers, in addition to the active workers. 
         - name: NDT_OMIT_DELTAS
           value: 'true'
 
@@ -78,10 +78,10 @@ spec:
         resources:
           requests:
             memory: "24Gi"
-            cpu: "16"
+            cpu: "14"
           limits:
             memory: "24Gi"
-            cpu: "16"
+            cpu: "14"
 
       nodeSelector:
         parser-node: "true"

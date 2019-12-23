@@ -64,6 +64,8 @@ cache:
     - "$HOME/google-cloud-sdk/"
 
 install:
+  # Install kexpand templating tool. Only works from HEAD.
+- go get github.com/kopeio/kexpand
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh kubectl
 
 # Get dependencies
