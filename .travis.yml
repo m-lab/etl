@@ -41,10 +41,15 @@ before_install:
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
 # Install gcloud, for integration tests.
+# TODO: maybe just use travis apt: packages: ?
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
 - source "${HOME}/google-cloud-sdk/path.bash.inc"
 
 # Install test credentials.
+# The service account variables are uploaded to travis by running,
+# from root of repo directory:
+#  travis/setup_service_accounts_for_travis.sh
+#
 # Note that anyone with github ACLs to push to a branch can hack .travis.yml
 # and discover these credentials in the travis logs.
 - if [[ -n "$TEST_SERVICE_ACCOUNT_mlab_testing" ]] ; then
@@ -57,6 +62,13 @@ before_install:
 cache:
   directories:
     - "$HOME/google-cloud-sdk/"
+
+install:
+- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh kubectl
+
+# Get dependencies
+- cd $TRAVIS_BUILD_DIR
+- go get -v -t ./...
 
 script:
 # Enforce that the local binary assets match the generated ones.
@@ -89,7 +101,6 @@ script:
   done
 - echo "summary status $EC" ;
 - if [[ $EC != 0 ]]; then false; fi ;
-
 
 # Rerun modules with integration tests.  This means that some tests are repeated, but otherwise
 # we lose some coverage.  The corresponding cov files are overwritten, but that is OK since
