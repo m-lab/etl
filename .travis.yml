@@ -303,8 +303,7 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
-    && 
-    $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-sandbox data-processing ./apply-cluster.sh
+    && $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-sandbox data-processing $TRAVIS_BUILD_DIR/apply-cluster.sh
   skip_cleanup: true
   on:
     repo: m-lab/etl
