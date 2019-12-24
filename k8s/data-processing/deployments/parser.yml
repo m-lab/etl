@@ -34,7 +34,7 @@ spec:
       # For more background, see:
       # https://github.com/kubernetes/community/blob/master/contributors/design-proposals/resource-qos.md
       containers:
-      - image: gcr.io/{{GCLOUD_PROJECT}}/github-m-lab-etl-parser:{{GIT_COMMIT}}
+      - image: gcr.io/{{GCLOUD_PROJECT}}/github.com/m-lab/etl:{{GIT_COMMIT}}
         name: etl-parser
         args: ["--prometheusx.listen-address=:9090"]
         env:
