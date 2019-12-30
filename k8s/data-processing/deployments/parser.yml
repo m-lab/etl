@@ -46,7 +46,7 @@ spec:
           value: "{{GCLOUD_PROJECT}}"
 
         - name: GARDENER_IP
-          value: "10.100.1.2"
+          value: "etl-gardener-service.default.svc.cluster.local"
         - name: BATCH_SERVICE
           value: 'true'   # Allow instances to discover they are BATCH instances.
         - name: MAX_WORKERS
