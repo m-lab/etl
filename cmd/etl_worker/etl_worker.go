@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -232,14 +231,8 @@ func toRunnable(obj *storage.ObjectAttrs) active.Runnable {
 	return &runnable{*obj}
 }
 
-func startActiveProcessor(ipString string, workers int) {
-	ip := net.ParseIP(ipString)
-	if ip == nil {
-		log.Println("Gardener IP parse error", ipString)
-		return
-	}
-
-	url := fmt.Sprintf("http://%s:8080/job", ipString)
+func startActiveProcessor(jobServer string, workers int) {
+	url := fmt.Sprintf("http://%s:8080/job", jobServer)
 	// Note that this does not currently track duration metric.
 	go active.PollGardener(context.Background(), url, toRunnable, workers)
 }
@@ -263,9 +256,12 @@ func main() {
 	// however it will be served by a random instance.
 	http.Handle("/random-metrics", promhttp.Handler())
 
-	ipString := os.Getenv("GARDENER_IP")
-	if len(ipString) > 0 {
-		startActiveProcessor(ipString, 120)
+	gardener := os.Getenv("GARDENER_HOST")
+	if len(gardener) > 0 {
+		log.Println("Using", gardener)
+		startActiveProcessor(gardener, 120)
+	} else {
+		log.Println("GARDENER_HOST not specified or empty")
 	}
 	http.ListenAndServe(":8080", nil)
 }
