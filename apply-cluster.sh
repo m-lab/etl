@@ -12,9 +12,11 @@ set -x
 set -e
 set -u
 
-USAGE="PROJECT=<projectid> CLUSTER=<cluster> $0"
+USAGE="PROJECT=<projectid> CLUSTER=<cluster> TRAVIS_TAG=<tag> TRAVIS_COMMIT=<commit> $0"
 PROJECT=${PROJECT:?Please provide project id: $USAGE}
 CLUSTER=${CLUSTER:?Please provide cluster name: $USAGE}
+TRAVIS_TAG=${TRAVIS_TAG:?Please provide travis tag: $USAGE}
+TRAVIS_COMMIT=${TRAVIS_COMMIT:?Please provide travis commit: $USAGE}
 
 # Apply templates
 CFG=/tmp/${CLUSTER}-${PROJECT}.yml
