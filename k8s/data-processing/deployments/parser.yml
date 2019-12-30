@@ -39,7 +39,7 @@ spec:
         args: ["--prometheusx.listen-address=:9090"]
         env:
         - name: RELEASE_TAG
-          value: {{TRAVIS_TAG}}
+          value: {{RELEASE_TAG}}
         - name: GIT_COMMIT
           value: "{{GIT_COMMIT}}"
         - name: PROJECT
