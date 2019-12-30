@@ -22,7 +22,7 @@ TRAVIS_COMMIT=${TRAVIS_COMMIT:?Please provide travis commit: $USAGE}
 CFG=/tmp/${CLUSTER}-${PROJECT}.yml
 kexpand expand --ignore-missing-keys k8s/${CLUSTER}/*/*.yml \
     --value GCLOUD_PROJECT=${PROJECT} \
-    --value TRAVIS_TAG=${TRAVIS_TAG} \
+    --value RELEASE_TAG=${TRAVIS_TAG} \
     --value GIT_COMMIT=${TRAVIS_COMMIT} \
     > ${CFG}
 cat ${CFG}
