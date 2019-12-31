@@ -129,12 +129,6 @@ script:
 - $HOME/gopath/bin/gocovmerge *.cov > merge.cov
 - $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
 
-# Clean build and prepare for deployment
-- cd $TRAVIS_BUILD_DIR/cmd/etl_worker &&
-  go build -v -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" .
-
-- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
-
 #################################################################################
 # Deployment Section
 #
@@ -341,7 +335,7 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_staging
     && gcloud app deploy --project=mlab-staging $TRAVIS_BUILD_DIR/appengine/queue.yaml
     &&
-    $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
+    travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
     &&
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
