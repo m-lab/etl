@@ -42,7 +42,7 @@ spec:
           value: {{RELEASE_TAG}}
         - name: GIT_COMMIT
           value: "{{GIT_COMMIT}}"
-        - name: PROJECT
+        - name: GCLOUD_PROJECT
           value: "{{GCLOUD_PROJECT}}"
 
         - name: GARDENER_HOST
