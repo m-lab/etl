@@ -258,7 +258,10 @@ func main() {
 
 	gardener := os.Getenv("GARDENER_HOST")
 	if len(gardener) > 0 {
+		log.Println("Using", gardener)
 		startActiveProcessor(gardener, 120)
+	} else {
+		log.Println("GARDENER_HOST not specified or empty")
 	}
 	http.ListenAndServe(":8080", nil)
 }
