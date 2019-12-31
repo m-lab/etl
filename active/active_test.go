@@ -5,12 +5,14 @@ package active_test
 import (
 	"context"
 	"log"
+	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/m-lab/go/logx"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/storage"
@@ -90,6 +92,24 @@ func standardLister() active.FileLister {
 	return active.FileListerFunc(client, "gs://foobar/ndt/ndt5/2019/01/01/")
 }
 
+func runAll(ctx context.Context, rSrc active.RunnableSource) (*errgroup.Group, error) {
+	eg := &errgroup.Group{}
+	for {
+		run, err := rSrc.Next(ctx)
+		if err != nil {
+			log.Println(err)
+			return eg, err
+		}
+		log.Println("Starting func")
+
+		f := func() error {
+			err := run.Run()
+			return err
+		}
+
+		eg.Go(f)
+	}
+}
 func TestGCSSourceBasic(t *testing.T) {
 	p := newCounter(t)
 	ctx := context.Background()
@@ -98,7 +118,10 @@ func TestGCSSourceBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eg, err := active.RunAll(ctx, fs)
+	server := httptest.NewServer(nil)
+	defer server.Close()
+
+	eg, err := runAll(ctx, fs)
 	if err != iterator.Done {
 		t.Fatal(err)
 	}
@@ -124,7 +147,7 @@ func TestWithRunFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eg, err := active.RunAll(ctx, fs)
+	eg, err := runAll(ctx, fs)
 	if err != iterator.Done {
 		t.Fatal(err)
 	}

@@ -94,7 +94,7 @@ func TestThrottledSource(t *testing.T) {
 	// throttle to handle two at a time.
 	ts := active.Throttle(&src, active.NewWSTokenSource(2))
 
-	eg, err := active.RunAll(context.Background(), ts)
+	eg, err := runAll(context.Background(), ts)
 	if err != iterator.Done {
 		t.Fatal("Expected iterator.Done", err)
 	}
