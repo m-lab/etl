@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strconv"
@@ -20,6 +21,7 @@ import (
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
 	"github.com/m-lab/go/prometheusx"
+	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
@@ -232,9 +234,12 @@ func toRunnable(obj *storage.ObjectAttrs) active.Runnable {
 }
 
 func startActiveProcessor(jobServer string, workers int) {
-	url := fmt.Sprintf("http://%s:8080/job", jobServer)
+	rawBase := fmt.Sprintf("http://%s:8080", jobServer)
+	base, err := url.Parse(rawBase)
+	rtx.Must(err, "Invalid jobServer: "+rawBase)
+
 	// Note that this does not currently track duration metric.
-	go active.PollGardener(context.Background(), url, toRunnable, workers)
+	go active.PollGardener(context.Background(), *base, toRunnable, workers)
 }
 
 func main() {

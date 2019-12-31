@@ -4,9 +4,6 @@ package active
 
 import (
 	"context"
-
-	"github.com/m-lab/etl/metrics"
-	"golang.org/x/sync/errgroup"
 )
 
 // Runnable is just a function that does something and returns an error.
@@ -26,28 +23,4 @@ type RunnableSource interface {
 
 	// Label returns a string for use in metrics and debug logs'
 	Label() string
-}
-
-// RunAll will execute functions provided by Next() until there are no more,
-// or the context is canceled.
-func RunAll(ctx context.Context, rSrc RunnableSource) (*errgroup.Group, error) {
-	eg := &errgroup.Group{}
-	for {
-		run, err := rSrc.Next(ctx)
-		if err != nil {
-			debug.Println(err)
-			return eg, err
-		}
-		debug.Println("Starting func")
-
-		f := func() error {
-			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Inc()
-			// TestCount and other metrics should be handled within Run().
-			err := run.Run()
-			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Dec()
-			return err
-		}
-
-		eg.Go(f)
-	}
 }
