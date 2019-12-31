@@ -19,7 +19,7 @@ import (
 )
 
 func postNoResponse(url *url.URL) error {
-	resp, postErr := http.Post(url.RequestURI(), "", nil)
+	resp, postErr := http.Post(url.String(), "", nil)
 	if postErr != nil {
 		log.Println(postErr)
 	} else {
@@ -30,7 +30,7 @@ func postNoResponse(url *url.URL) error {
 
 // RunAll will execute functions provided by Next() until there are no more,
 // or the context is canceled.
-// The tk URL is used for reported status back to the tracker.
+// The tk URL is used for reporting status back to the tracker.
 func RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job, tk url.URL) (*errgroup.Group, error) {
 	eg := &errgroup.Group{}
 	for {
@@ -44,23 +44,15 @@ func RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job, tk url.UR
 		f := func() error {
 			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Inc()
 			defer metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Dec()
-			update := tracker.UpdateURL(tk, job, tracker.Parsing, run.Info())
-			if postErr := postNoResponse(update); postErr != nil {
-				return postErr
-			}
 
-			// TestCount and other metrics should be handled within Run().
-			err = run.Run()
-			if err != nil {
-				errURL := tracker.ErrorURL(tk, job, err.Error())
-				postNoResponse(errURL)
-				return err
+			err := run.Run()
+			if err == nil {
+				update := tracker.HeartbeatURL(tk, job)
+				if postErr := postNoResponse(update); postErr != nil {
+					log.Println(postErr, "on heartbeat for", job.Path())
+				}
 			}
-			update = tracker.UpdateURL(tk, job, tracker.ParseComplete, run.Info())
-			if postErr := postNoResponse(update); postErr != nil {
-				return postErr
-			}
-			return nil
+			return err
 		}
 
 		eg.Go(f)
@@ -92,9 +84,8 @@ func pollAndRun(ctx context.Context, base url.URL,
 
 	jobURL := base
 	jobURL.Path = "job"
-	log.Println("job query:", jobURL.RequestURI())
 
-	resp, err := http.Post(jobURL.RequestURI(), "application/x-www-form-urlencoded", nil)
+	resp, err := http.Post(jobURL.String(), "application/x-www-form-urlencoded", nil)
 	if err != nil {
 		return err
 	}
@@ -118,8 +109,26 @@ func pollAndRun(ctx context.Context, base url.URL,
 
 	log.Println("Running", job.Path())
 
-	// We wait until the source is drained, but we ignore the errgroup.Group.
-	_, err = RunAll(ctx, src, job, base)
+	update := tracker.UpdateURL(base, job, tracker.Parsing, "starting tasks")
+	if postErr := postNoResponse(update); postErr != nil {
+		log.Println(postErr)
+	}
+
+	eg, err := RunAll(ctx, src, job, base)
+
+	// Once all are dispatched, we want to wait until all have completed
+	// before posting the state change.
+	go func() {
+		log.Println("all tasks dispatched for", job.Path())
+		eg.Wait()
+		log.Println("finished", job.Path())
+		update := tracker.UpdateURL(base, job, tracker.ParseComplete, "")
+		// TODO - should this have a retry?
+		if postErr := postNoResponse(update); postErr != nil {
+			log.Println(postErr)
+		}
+	}()
+
 	return err
 }
 
