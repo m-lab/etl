@@ -39,6 +39,12 @@ func RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job, tk url.UR
 			debug.Println(err)
 			return eg, err
 		}
+
+		heartbeat := tracker.HeartbeatURL(tk, job)
+		if postErr := postNoResponse(heartbeat); postErr != nil {
+			log.Println(postErr, "on heartbeat for", job.Path())
+		}
+
 		debug.Println("Starting func")
 
 		f := func() error {
@@ -47,7 +53,7 @@ func RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job, tk url.UR
 
 			err := run.Run()
 			if err == nil {
-				update := tracker.HeartbeatURL(tk, job)
+				update := tracker.UpdateURL(tk, job, tracker.Parsing, run.Info())
 				if postErr := postNoResponse(update); postErr != nil {
 					log.Println(postErr, "on heartbeat for", job.Path())
 				}
