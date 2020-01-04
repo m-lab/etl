@@ -20,9 +20,7 @@ import (
 
 func postNoResponse(url *url.URL) error {
 	resp, postErr := http.Post(url.String(), "", nil)
-	if postErr != nil {
-		log.Println(postErr)
-	} else {
+	if postErr == nil {
 		resp.Body.Close()
 	}
 	return postErr
@@ -55,7 +53,7 @@ func RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job, tk url.UR
 			if err == nil {
 				update := tracker.UpdateURL(tk, job, tracker.Parsing, run.Info())
 				if postErr := postNoResponse(update); postErr != nil {
-					log.Println(postErr, "on heartbeat for", job.Path())
+					log.Println(postErr, "on update for", job.Path())
 				}
 			}
 			return err
