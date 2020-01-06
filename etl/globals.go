@@ -254,12 +254,12 @@ var (
 	dataTypeToBQBufferSize = map[DataType]int{
 		NDT:             10,
 		NDT_OMIT_DELTAS: 50,
-		TCPINFO:         10,
+		TCPINFO:         5,
 		SS:              500, // Average json size is 2.5K
 		PT:              20,
 		SW:              100,
-		NDT5:            50,
-		NDT7:            50,
+		NDT5:            200,
+		NDT7:            200,
 		INVALID:         0,
 	}
 	// There is also a mapping of data types to queue names in
@@ -271,7 +271,8 @@ var (
 *  In not to distant future we need a better solution.
 *  See https://github.com/m-lab/etl/issues/519
 ********************************************************************************/
-// Translate gs dir to BQ tablename.
+
+// DirToTablename translates gs dir to BQ tablename.
 func DirToTablename(dir string) string {
 	return dataTypeToTable[dirToDataType[dir]]
 }
