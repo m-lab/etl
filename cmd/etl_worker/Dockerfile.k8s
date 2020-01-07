@@ -5,14 +5,13 @@ COPY . .
 
 # Get the requirements and put the produced binaries in /go/bin
 RUN go get -v ./...
+
 RUN go install \
       -v \
-      -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
+      -ldflags "-linkmode external -extldflags -static -X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
       ./...
 
 FROM alpine
-RUN apk add --no-cache ca-certificates
-RUN apk add glibc-2.30-r0.apk
 
 COPY --from=builder /go/bin/etl_worker /bin/etl_worker
 
