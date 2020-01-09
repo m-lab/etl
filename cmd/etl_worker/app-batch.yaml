@@ -21,12 +21,12 @@ resources:
 automatic_scaling:
   # This is intended for batch jobs.
   min_num_instances: 20
-  max_num_instances: 100
+  max_num_instances: 80
   # Very long cool down period, to reduce the likelihood of tasks being truncated.
   cool_down_period_sec: 1800
   # We don't care much about latency, so a high utilization is desireable.
   cpu_utilization:
-    target_utilization: 0.70
+    target_utilization: 0.50
 
 # Note: add a public port for GCE auto discovery by prometheus.
 # TODO(dev): are any values redundant or irrelevant?
@@ -45,7 +45,7 @@ env_variables:
   COMMIT_HASH: ${TRAVIS_COMMIT}
 
   BATCH_SERVICE: 'true'   # Allow instances to discover they are BATCH instances.
-  MAX_WORKERS: 15
+  MAX_WORKERS: 20
   BIGQUERY_PROJECT: '${INJECTED_PROJECT}'  # Overrides GCLOUD_PROJECT
   # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
   NDT_OMIT_DELTAS: 'true'
