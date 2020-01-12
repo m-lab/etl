@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/google-cloud-go-testing/storage/stiface"
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/storage"
