@@ -401,10 +401,13 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 		if index == 0 {
 			segments := strings.Split(part, " ")
 			if len(segments) == 4 {
-				portIndex := strings.IndexByte(segments[1], ':')
-				serverIP = segments[1][2:portIndex]
-				portIndex = strings.IndexByte(segments[3], ':')
-				destIP = segments[3][1:portIndex]
+				portIndexS := strings.IndexByte(segments[1], ':')
+				portIndexD = strings.IndexByte(segments[3], ':')
+				if portIndexS < 0 || portIndexD < 0 {
+					return "", "", "", errors.New("Invalid data format in the first line.")
+				}
+				serverIP = segments[1][2:portIndexS]
+				destIP = segments[3][1:portIndexD]
 				if serverIP == "" || destIP == "" {
 					return "", "", "", errors.New("Invalid IP address in the first line.")
 				}

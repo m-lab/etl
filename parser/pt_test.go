@@ -125,7 +125,13 @@ func TestParseFirstLine(t *testing.T) {
 
 	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("Exception : [ERROR](Probe.cc, 109)Can't send the probe : Invalid argument")
 	if err == nil {
-		t.Errorf("Error in parsing the first line!\n")
+		t.Errorf("Should return error for err message on the first line!\n")
+		return
+	}
+
+	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute to 35.243.216.203 (35.243.216.203), 30 hops max, 30 bytes packets")
+	if err == nil {
+		t.Errorf("Should return error for unknown first line format!\n")
 		return
 	}
 
