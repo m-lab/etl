@@ -402,7 +402,7 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 			segments := strings.Split(part, " ")
 			if len(segments) == 4 {
 				portIndexS := strings.IndexByte(segments[1], ':')
-				portIndexD = strings.IndexByte(segments[3], ':')
+				portIndexD := strings.IndexByte(segments[3], ':')
 				if portIndexS < 0 || portIndexD < 0 {
 					return "", "", "", errors.New("Invalid data format in the first line.")
 				}
