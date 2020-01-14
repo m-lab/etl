@@ -405,13 +405,13 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 				if len(segments[1]) <= 2 || !strings.HasPrefix(segments[1], "[(") || len(segments[3]) <= 2 || !strings.HasPrefix(segments[3], "(") {
 					return "", "", "", errors.New("Invalid data format in the first line.")
 				}
-				serverIPParts := strings.Split(segments[1], ":")
-				destIPParts := strings.Split(segments[3], ":")
-				if len(serverIPParts) != 2 || len(destIPParts) != 2 {
+				serverIPIndex := strings.LastIndex(segments[1], ":")
+				destIPIndex := strings.LastIndex(segments[3], ":")
+				if serverIPIndex < 0 || destIPIndex < 0 {
 					return "", "", "", errors.New("Invalid data format in the first line.")
 				}
-				serverIP = serverIPParts[0][2:]
-				destIP = destIPParts[0][1:]
+				serverIP = segments[1][2:serverIPIndex]
+				destIP = segments[3][1:destIPIndex]
 				if net.ParseIP(serverIP) == nil || net.ParseIP(destIP) == nil {
 					return "", "", "", errors.New("Invalid IP address in the first line.")
 				}
