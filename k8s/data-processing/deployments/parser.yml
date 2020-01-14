@@ -1,0 +1,88 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: etl-parser
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      # Used to match pre-existing pods that may be affected during updates.
+      run: etl-parser
+  strategy:
+    rollingUpdate:
+      maxSurge: 3
+      maxUnavailable: 2
+    type: RollingUpdate
+  # Pod template.
+  template:
+    metadata:
+      labels:
+        # Note: run=etl-parser should match a service config with a public IP
+        # and port so that it is publicly accessible for prometheus scraping
+        run: etl-parser
+      annotations:
+        # Tell prometheus service discovery to collect metrics from the containers.
+        prometheus.io/scrape: 'true'
+    spec:
+      # When container receives SIGTERM, it begins a new checkpoint. This can
+      # take longer than the default grace period of 30s.
+      terminationGracePeriodSeconds: 120
+
+      # Place the pod into the Guaranteed QoS by setting equal resource
+      # requests and limits for *all* containers in the pod.
+      # For more background, see:
+      # https://github.com/kubernetes/community/blob/master/contributors/design-proposals/resource-qos.md
+      containers:
+      - image: gcr.io/{{GCLOUD_PROJECT}}/github.com/m-lab/etl:{{GIT_COMMIT}}
+        name: etl-parser
+        args: ["--prometheusx.listen-address=:9090"]
+        env:
+        - name: RELEASE_TAG
+          value: {{RELEASE_TAG}}
+        - name: GIT_COMMIT
+          value: "{{GIT_COMMIT}}"
+        - name: PROJECT
+          value: "{{GCLOUD_PROJECT}}"
+
+        - name: GARDENER_HOST
+          value: "etl-gardener-service.default.svc.cluster.local"
+        - name: BATCH_SERVICE
+          value: 'true'   # Allow instances to discover they are BATCH instances.
+        - name: MAX_WORKERS
+          value: '10' # Singleton workers, in addition to the active workers.
+        - name: NDT_OMIT_DELTAS
+          value: 'true'
+
+        ports:
+        - name: prometheus-port
+          containerPort: 9090
+        - name: service-port
+          containerPort: 8080
+
+        livenessProbe:
+          httpGet:
+            path: /alive
+            port: service-port
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 4
+          successThreshold: 1
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: service-port
+
+        resources:
+          requests:
+            memory: "24Gi"
+            cpu: "14"
+          limits:
+            memory: "24Gi"
+            cpu: "14"
+
+      nodeSelector:
+        parser-node: "true"
+

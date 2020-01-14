@@ -1,0 +1,22 @@
+FROM golang:1.13 as builder
+
+WORKDIR /go/src/github.com/m-lab/etl
+COPY . .
+
+# Get the requirements and put the produced binaries in /go/bin
+RUN go get -v ./...
+
+RUN go install \
+      -v \
+      -ldflags "-linkmode external -extldflags -static -X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
+      ./...
+
+# Even with static linking, for some reason this doesn't work with just alpine.
+FROM ubuntu
+
+COPY --from=builder /go/bin/etl_worker /bin/etl_worker
+
+EXPOSE 9090 8080
+
+WORKDIR /
+ENTRYPOINT [ "/bin/etl_worker" ]
