@@ -11,8 +11,9 @@ RUN go install \
       -ldflags "-linkmode external -extldflags -static -X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
       ./...
 
-FROM alpine
-RUN apk add --no-cache ca-certificates
+# Even with static linking, for some reason this doesn't work with just alpine.
+FROM ubuntu
+# RUN apk add --no-cache ca-certificates
 
 COPY --from=builder /go/bin/etl_worker /bin/etl_worker
 
