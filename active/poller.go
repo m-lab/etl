@@ -9,13 +9,13 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/m-lab/etl/metrics"
-	"golang.org/x/sync/errgroup"
-
 	"cloud.google.com/go/storage"
-	"github.com/GoogleCloudPlatform/google-cloud-go-testing/storage/stiface"
-	"github.com/m-lab/etl-gardener/tracker"
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
+
+	"github.com/m-lab/etl-gardener/tracker"
+	"github.com/m-lab/etl/metrics"
 )
 
 func postNoResponse(url *url.URL) error {
