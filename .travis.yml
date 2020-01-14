@@ -201,7 +201,6 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
-    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
   skip_cleanup: true
   on:
     repo: m-lab/etl
