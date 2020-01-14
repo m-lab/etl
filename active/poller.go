@@ -147,7 +147,10 @@ func PollGardener(ctx context.Context, base url.URL,
 		case <-ctx.Done():
 			return
 		default:
-			pollAndRun(ctx, base, toRunnable, throttle)
+			err := pollAndRun(ctx, base, toRunnable, throttle)
+			if err != nil {
+				log.Println(err)
+			}
 		}
 
 		<-ticker.C // Wait for next tick, to avoid fast spinning on errors.
