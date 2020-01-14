@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -401,14 +402,18 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 		if index == 0 {
 			segments := strings.Split(part, " ")
 			if len(segments) == 4 {
-				portIndexS := strings.IndexByte(segments[1], ':')
-				portIndexD := strings.IndexByte(segments[3], ':')
-				if portIndexS < 0 || portIndexD < 0 {
+				log.Println("here")
+				if len(segments[1]) <= 2 || !strings.HasPrefix(segments[1], "[(") || len(segments[3]) <= 2 || !strings.HasPrefix(segments[3], "(") {
 					return "", "", "", errors.New("Invalid data format in the first line.")
 				}
-				serverIP = segments[1][2:portIndexS]
-				destIP = segments[3][1:portIndexD]
-				if serverIP == "" || destIP == "" {
+				serverIPParts := strings.Split(segments[1], ":")
+				destIPParts := strings.Split(segments[3], ":")
+				if len(serverIPParts) != 2 || len(destIPParts) != 2 {
+					return "", "", "", errors.New("Invalid data format in the first line.")
+				}
+				serverIP = serverIPParts[0][2:]
+				destIP = destIPParts[0][1:]
+				if net.ParseIP(serverIP) == nil || net.ParseIP(destIP) == nil {
 					return "", "", "", errors.New("Invalid IP address in the first line.")
 				}
 			} else {
