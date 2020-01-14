@@ -123,9 +123,21 @@ func TestParseFirstLine(t *testing.T) {
 		return
 	}
 
+	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (2001:0db8:85a3:0000:0000:8a2e:0370:7334:53849)], protocol icmp, algo exhaustive, duration 19 s")
+	if dest_ip != "2001:0db8:85a3:0000:0000:8a2e:0370:7334" || server_ip != "64.86.132.76" || protocol != "icmp" || err != nil {
+		t.Errorf("Error in parsing the first line!\n")
+		return
+	}
+
 	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("Exception : [ERROR](Probe.cc, 109)Can't send the probe : Invalid argument")
 	if err == nil {
-		t.Errorf("Error in parsing the first line!\n")
+		t.Errorf("Should return error for err message on the first line!\n")
+		return
+	}
+
+	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute to 35.243.216.203 (35.243.216.203), 30 hops max, 30 bytes packets")
+	if err == nil {
+		t.Errorf("Should return error for unknown first line format!\n")
 		return
 	}
 
