@@ -12,12 +12,17 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"runtime"
 	"runtime/debug"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
+
+func init() {
+	NumCPU.Set(float64(runtime.NumCPU()))
+}
 
 // TODO
 // Want a goroutine that monitors the workers, and updates metrics to indicate how long the
@@ -27,6 +32,13 @@ import (
 //
 
 var (
+	// NumCPU makes the number of cpus available for prometheus calculations.
+	NumCPU = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "etl_num_cpu",
+			Help: "Number of cpus available to process.",
+		})
+
 	// ActiveErrors measures the errors encountered during active processing
 	ActiveErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
