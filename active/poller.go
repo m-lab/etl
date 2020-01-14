@@ -3,6 +3,7 @@ package active
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -94,6 +95,9 @@ func pollAndRun(ctx context.Context, base url.URL,
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return errors.New(resp.Status)
+	}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
