@@ -417,6 +417,7 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 			if net.ParseIP(serverIP) == nil || net.ParseIP(destIP) == nil {
 				return "", "", "", errors.New("Invalid IP address in the first line.")
 			}
+			continue
 		}
 		mm := strings.Split(strings.TrimSpace(part), " ")
 		if len(mm) > 1 {
