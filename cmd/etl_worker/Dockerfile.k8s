@@ -12,8 +12,8 @@ RUN go install \
       ./...
 
 # Even with static linking, for some reason this doesn't work with just alpine.
-FROM ubuntu
-RUN apk add --no-cache ca-certificates
+FROM frolvlad/alpine-glibc
+RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
 
 COPY --from=builder /go/bin/etl_worker /bin/etl_worker
 
