@@ -96,6 +96,14 @@ func pollAndRun(ctx context.Context, base url.URL,
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		if len(b) > 0 {
+			return errors.New(string(b))
+		}
+
 		return errors.New(resp.Status)
 	}
 	b, err := ioutil.ReadAll(resp.Body)
