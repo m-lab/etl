@@ -401,22 +401,21 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 	for index, part := range parts {
 		if index == 0 {
 			segments := strings.Split(part, " ")
-			if len(segments) == 4 {
-				if len(segments[1]) <= 2 || !strings.HasPrefix(segments[1], "[(") || len(segments[3]) <= 2 || !strings.HasPrefix(segments[3], "(") {
-					return "", "", "", errors.New("Invalid data format in the first line.")
-				}
-				serverIPIndex := strings.LastIndex(segments[1], ":")
-				destIPIndex := strings.LastIndex(segments[3], ":")
-				if serverIPIndex < 0 || destIPIndex < 0 {
-					return "", "", "", errors.New("Invalid data format in the first line.")
-				}
-				serverIP = segments[1][2:serverIPIndex]
-				destIP = segments[3][1:destIPIndex]
-				if net.ParseIP(serverIP) == nil || net.ParseIP(destIP) == nil {
-					return "", "", "", errors.New("Invalid IP address in the first line.")
-				}
-			} else {
+			if len(segments) != 4 {
 				return "", "", "", errors.New("corrupted first line.")
+			}
+			if len(segments[1]) <= 2 || !strings.HasPrefix(segments[1], "[(") || len(segments[3]) <= 2 || !strings.HasPrefix(segments[3], "(") {
+				return "", "", "", errors.New("Invalid data format in the first line.")
+			}
+			serverIPIndex := strings.LastIndex(segments[1], ":")
+			destIPIndex := strings.LastIndex(segments[3], ":")
+			if serverIPIndex < 0 || destIPIndex < 0 {
+				return "", "", "", errors.New("Invalid data format in the first line.")
+			}
+			serverIP = segments[1][2:serverIPIndex]
+			destIP = segments[3][1:destIPIndex]
+			if net.ParseIP(serverIP) == nil || net.ParseIP(destIP) == nil {
+				return "", "", "", errors.New("Invalid IP address in the first line.")
 			}
 		}
 		mm := strings.Split(strings.TrimSpace(part), " ")
