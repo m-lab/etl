@@ -409,7 +409,7 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 			}
 			serverIPIndex := strings.LastIndex(segments[1], ":")
 			destIPIndex := strings.LastIndex(segments[3], ":")
-			if serverIPIndex < 0 || destIPIndex < 0 {
+			if serverIPIndex < 3 || destIPIndex < 2 {
 				return "", "", "", errors.New("Invalid data format in the first line.")
 			}
 			serverIP = segments[1][2:serverIPIndex]
