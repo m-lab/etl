@@ -13,7 +13,6 @@ RUN go install \
 
 # Even with static linking, for some reason this doesn't work with just alpine.
 FROM ubuntu
-# RUN apk add --no-cache ca-certificates
 
 COPY --from=builder /go/bin/etl_worker /bin/etl_worker
 
