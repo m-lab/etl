@@ -94,7 +94,15 @@ func TestThrottledSource(t *testing.T) {
 	// throttle to handle two at a time.
 	ts := active.Throttle(&src, active.NewWSTokenSource(2))
 
-	active.RunAll(context.Background(), ts)
+	eg, err := runAll(context.Background(), ts)
+	if err != iterator.Done {
+		t.Fatal("Expected iterator.Done", err)
+	}
+
+	err = eg.Wait()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if src.tracker.done() != 5 {
 		t.Error("Should have been 5 runnables", src.tracker.done())
