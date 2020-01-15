@@ -12,6 +12,8 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 
@@ -19,7 +21,22 @@ import (
 	"github.com/m-lab/etl/metrics"
 )
 
-func postNoResponse(url *url.URL) error {
+// JobFailures counts the all errors that result in test loss.
+//
+// Provides metrics:
+//   etl_job_failures{prefix, year, kind}
+// Example usage:
+//   JobFailures.WithLabelValues("ndt/tcpinfo" "2019", "insert").Inc()
+var JobFailures = promauto.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "etl_job_failures",
+		Help: "Job level failures.",
+	},
+	// Parser type, error description.
+	[]string{"prefix", "year", "type"},
+)
+
+func postAndIgnoreResponse(url *url.URL) error {
 	resp, postErr := http.Post(url.String(), "", nil)
 	if postErr == nil {
 		resp.Body.Close()
@@ -40,7 +57,7 @@ func RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job, tk url.UR
 		}
 
 		heartbeat := tracker.HeartbeatURL(tk, job)
-		if postErr := postNoResponse(heartbeat); postErr != nil {
+		if postErr := postAndIgnoreResponse(heartbeat); postErr != nil {
 			log.Println(postErr, "on heartbeat for", job.Path())
 		}
 
@@ -53,7 +70,7 @@ func RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job, tk url.UR
 			err := run.Run()
 			if err == nil {
 				update := tracker.UpdateURL(tk, job, tracker.Parsing, run.Info())
-				if postErr := postNoResponse(update); postErr != nil {
+				if postErr := postAndIgnoreResponse(update); postErr != nil {
 					log.Println(postErr, "on update for", job.Path())
 				}
 			}
@@ -69,16 +86,16 @@ func jobFileSource(ctx context.Context, job tracker.Job,
 
 	client, err := storage.NewClient(ctx, option.WithScopes(storage.ScopeReadOnly))
 	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
-			job.Experiment+"/"+job.Datatype, "active", "nil storage client").Inc()
+		JobFailures.WithLabelValues(
+			job.Experiment+"/"+job.Datatype, job.Date.Format("2006"), "nil storage client").Inc()
 		return nil, err
 	}
 
 	lister := FileListerFunc(stiface.AdaptClient(client), job.Path())
 	gcsSource, err := NewGCSSource(ctx, job.Path(), lister, toRunnable)
 	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
-			job.Experiment+"/"+job.Datatype, "active", "filesource error").Inc()
+		JobFailures.WithLabelValues(
+			job.Experiment+"/"+job.Datatype, job.Date.Format("2006"), "filesource").Inc()
 		return nil, err
 	}
 	return gcsSource, nil
@@ -126,7 +143,7 @@ func pollAndRun(ctx context.Context, base url.URL,
 	log.Println("Running", job.Path())
 
 	update := tracker.UpdateURL(base, job, tracker.Parsing, "starting tasks")
-	if postErr := postNoResponse(update); postErr != nil {
+	if postErr := postAndIgnoreResponse(update); postErr != nil {
 		log.Println(postErr)
 	}
 
@@ -140,7 +157,7 @@ func pollAndRun(ctx context.Context, base url.URL,
 		log.Println("finished", job.Path())
 		update := tracker.UpdateURL(base, job, tracker.ParseComplete, "")
 		// TODO - should this have a retry?
-		if postErr := postNoResponse(update); postErr != nil {
+		if postErr := postAndIgnoreResponse(update); postErr != nil {
 			log.Println(postErr)
 		}
 	}()
