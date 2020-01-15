@@ -5,12 +5,12 @@ package active_test
 import (
 	"context"
 	"log"
-	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"github.com/m-lab/go/logx"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
@@ -76,7 +76,7 @@ func newCounter(t *testing.T) *counter {
 	return &counter{t: t, outcome: make(chan error, 100)}
 }
 
-func standardLister() active.FileLister {
+func testClient() stiface.Client {
 	client := cloudtest.GCSClient{}
 	client.AddTestBucket("foobar",
 		cloudtest.BucketHandle{
@@ -89,7 +89,11 @@ func standardLister() active.FileLister {
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/tcpinfo/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
 				&storage.ObjectAttrs{Bucket: "foobar", Name: "obj6", Updated: time.Now()},
 			}})
-	return active.FileListerFunc(client, "gs://foobar/ndt/ndt5/2019/01/01/")
+	return client
+}
+
+func standardLister() active.FileLister {
+	return active.FileListerFunc(testClient(), "gs://foobar/ndt/ndt5/2019/01/01/")
 }
 
 func runAll(ctx context.Context, rSrc active.RunnableSource) (*errgroup.Group, error) {
@@ -110,6 +114,7 @@ func runAll(ctx context.Context, rSrc active.RunnableSource) (*errgroup.Group, e
 		eg.Go(f)
 	}
 }
+
 func TestGCSSourceBasic(t *testing.T) {
 	p := newCounter(t)
 	ctx := context.Background()
@@ -117,9 +122,6 @@ func TestGCSSourceBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	server := httptest.NewServer(nil)
-	defer server.Close()
 
 	eg, err := runAll(ctx, fs)
 	if err != iterator.Done {

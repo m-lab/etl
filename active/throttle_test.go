@@ -11,6 +11,7 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// TODO maxTracker is a bad name.  It is unrelated to gardener tracker package.
 type maxTracker struct {
 	running   chan struct{}
 	doneCount chan struct{}
