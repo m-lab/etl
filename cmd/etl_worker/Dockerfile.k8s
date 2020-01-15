@@ -8,10 +8,11 @@ RUN go get -v ./...
 
 RUN go install \
       -v \
-      -ldflags "-linkmode external -extldflags -static -X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
+      -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
       ./...
 
-# Even with static linking, for some reason this doesn't work with just alpine.
+# With static linking, we were getting cgoLookupIPCNAME segfaults.  So return to normal glibc to see if that helps?
+
 FROM frolvlad/alpine-glibc
 RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
 
