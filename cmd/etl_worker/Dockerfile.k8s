@@ -6,6 +6,7 @@ COPY . .
 # Get the requirements and put the produced binaries in /go/bin
 RUN go get -v ./...
 
+# This seems to cause build to fail.
 # ENV CGO_ENABLED=0
 
 RUN go install \
@@ -14,10 +15,8 @@ RUN go install \
     -ldflags "-linkmode external -extldflags -static -X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
     ./...
 
-# Even with static linking, go tries to use libc for dns resolution.  -tags netgo may
-# fix this, but for now we provide the glibc.
-FROM frolvlad/alpine-glibc
-RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
+FROM ubuntu
+RUN apk add — no-cache ca-certificates
 
 COPY --from=builder /go/bin/etl_worker /bin/etl_worker
 
