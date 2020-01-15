@@ -11,10 +11,8 @@ RUN go install \
       -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
       ./...
 
-# With static linking, we were getting cgoLookupIPCNAME segfaults.  So return to normal glibc to see if that helps?
-
-FROM frolvlad/alpine-glibc
-RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
+FROM ubuntu
+RUN apk add — no-cache ca-certificates
 
 COPY --from=builder /go/bin/etl_worker /bin/etl_worker
 
