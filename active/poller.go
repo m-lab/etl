@@ -187,7 +187,7 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 // Poll requests work items from gardener, and processes them.
 func (g *GardenerAPI) Poll(ctx context.Context,
 	toRunnable func(o *storage.ObjectAttrs) Runnable, maxWorkers int, period time.Duration) {
-	// Poll at most once every 10 seconds.
+	// Poll no faster than period.
 	ticker := time.NewTicker(period)
 	throttle := NewWSTokenSource(maxWorkers)
 	for {
