@@ -141,8 +141,8 @@ func (src *GCSSource) Next(ctx context.Context) (Runnable, error) {
 		// This ensures that context expirations and errors are respected.
 		select {
 		case <-ctx.Done():
-			log.Println("Next timeout")
-			metrics.ActiveErrors.WithLabelValues(src.Label(), "next timeout").Inc()
+			log.Println("Context expired in Next")
+			metrics.ActiveErrors.WithLabelValues(src.Label(), "context expired in Next").Inc()
 			return nil, ctx.Err()
 		case <-src.ctx.Done():
 			log.Println(src.ctx.Err())
