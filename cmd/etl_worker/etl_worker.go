@@ -44,6 +44,7 @@ func init() {
 //   X-AppEngine-TaskRetryCount
 //   X-AppEngine-TaskExecutionCount
 
+// Status writes a status summary to a ResponseWriter, and can be used as a Handler.
 // TODO(gfr) Add either a black list or a white list for the environment
 // variables, so we can hide sensitive vars. https://github.com/m-lab/etl/issues/384
 func Status(w http.ResponseWriter, r *http.Request) {
