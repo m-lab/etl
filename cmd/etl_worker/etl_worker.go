@@ -219,8 +219,18 @@ type runnable struct {
 
 func (r *runnable) Run() error {
 	path := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
+	data, err := etl.ValidateTestPath(path)
+	if err != nil {
+		log.Printf("Invalid filename: %v\n", err)
+		return err
+	}
+
+	start := time.Now()
 	log.Println("Processing", path)
-	_, err := worker.ProcessTask(path)
+	statusCode, err := worker.ProcessTask(path)
+	defer metrics.DurationHistogram.WithLabelValues(
+		data.DataType, http.StatusText(statusCode)).Observe(
+		time.Since(start).Seconds())
 	return err
 }
 

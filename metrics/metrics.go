@@ -504,8 +504,10 @@ var (
 			Name: "etl_worker_duration_seconds",
 			Help: "Worker execution time distributions.",
 			Buckets: []float64{
-				0.001, 0.01, 0.1, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0,
-				600.0, 1800.0, 3600.0, 7200.0, math.Inf(+1),
+				1, 1.4, 2.0, 2.7, 3.7, 5.2, 7.2,
+				10, 14, 20, 27, 37, 52, 72,
+				100, 140, 200, 270, 370, 520, 720,
+				1000, 1400, 2000, 2700, 3700, 5200, 7200,
 			},
 		},
 		// Worker type, e.g. ndt, sidestream, ptr, etc.
@@ -585,13 +587,12 @@ func (cw *catchStatus) WriteHeader(code int) {
 }
 
 // DurationHandler wraps the call of an inner http.HandlerFunc and records the runtime.
-func DurationHandler(name string, inner http.HandlerFunc) http.HandlerFunc {
+func DurationHandler(table string, inner http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()
 		cw := &catchStatus{w, http.StatusOK} // Default status is OK.
 		inner.ServeHTTP(cw, r)
-		// TODO(soltesz): change 'name' to 'table' label based on request parameter.
-		DurationHistogram.WithLabelValues(name, http.StatusText(cw.status)).Observe(
+		DurationHistogram.WithLabelValues(table, http.StatusText(cw.status)).Observe(
 			time.Since(t).Seconds())
 	}
 }
