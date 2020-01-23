@@ -39,13 +39,13 @@ var JobFailures = promauto.NewCounterVec(
 
 // GardenerAPI encapsulates the backend paths and clients to connect to gardener and GCS.
 type GardenerAPI struct {
-	tracker url.URL
-	gcs     stiface.Client
+	trackerBase url.URL
+	gcs         stiface.Client
 }
 
 // NewGardenerAPI creates a GardenerAPI.
-func NewGardenerAPI(tracker url.URL, gcs stiface.Client) *GardenerAPI {
-	return &GardenerAPI{tracker: tracker, gcs: gcs}
+func NewGardenerAPI(trackerBase url.URL, gcs stiface.Client) *GardenerAPI {
+	return &GardenerAPI{trackerBase: trackerBase, gcs: gcs}
 }
 
 // MustStorageClient creates a default GCS client.
@@ -55,9 +55,17 @@ func MustStorageClient(ctx context.Context) stiface.Client {
 	return stiface.AdaptClient(c)
 }
 
-func postAndIgnoreResponse(url *url.URL) error {
-	resp, postErr := http.Post(url.String(), "", nil)
-	if postErr == nil {
+// TODO add retry in case gardener is offline (during redeployment)
+// TODO add metrics to track latency, retries, and errors.
+func postAndIgnoreResponse(ctx context.Context, url *url.URL) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	req, reqErr := http.NewRequestWithContext(ctx, "POST", url.String(), nil)
+	if reqErr != nil {
+		return reqErr
+	}
+	resp, postErr := http.DefaultClient.Do(req)
+	if resp != nil && resp.Body != nil {
 		resp.Body.Close()
 	}
 	return postErr
@@ -65,7 +73,6 @@ func postAndIgnoreResponse(url *url.URL) error {
 
 // RunAll will execute functions provided by Next() until there are no more,
 // or the context is canceled.
-// The tk URL is used for reporting status back to the tracker.
 func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job) (*errgroup.Group, error) {
 	eg := &errgroup.Group{}
 	for {
@@ -75,8 +82,8 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 			return eg, err
 		}
 
-		heartbeat := tracker.HeartbeatURL(g.tracker, job)
-		if postErr := postAndIgnoreResponse(heartbeat); postErr != nil {
+		heartbeat := tracker.HeartbeatURL(g.trackerBase, job)
+		if postErr := postAndIgnoreResponse(ctx, heartbeat); postErr != nil {
 			log.Println(postErr, "on heartbeat for", job.Path())
 		}
 
@@ -88,8 +95,8 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 
 			err := run.Run()
 			if err == nil {
-				update := tracker.UpdateURL(g.tracker, job, tracker.Parsing, run.Info())
-				if postErr := postAndIgnoreResponse(update); postErr != nil {
+				update := tracker.UpdateURL(g.trackerBase, job, tracker.Parsing, run.Info())
+				if postErr := postAndIgnoreResponse(ctx, update); postErr != nil {
 					log.Println(postErr, "on update for", job.Path())
 				}
 			}
@@ -114,36 +121,39 @@ func (g *GardenerAPI) JobFileSource(ctx context.Context, job tracker.Job,
 	return gcsSource, nil
 }
 
-func (g *GardenerAPI) NextJob(ctx context.Context) (job tracker.Job, err error) {
-	jobURL := g.tracker
+// NextJob requests a new job from Gardener service.
+func (g *GardenerAPI) NextJob(ctx context.Context) (tracker.Job, error) {
+	jobURL := g.trackerBase
 	jobURL.Path = "job"
+
+	job := tracker.Job{}
 
 	resp, err := http.Post(jobURL.String(), "application/x-www-form-urlencoded", nil)
 	if err != nil {
-		return
+		return job, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		var b []byte
 		b, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return
+			return job, err
 		}
 		if len(b) > 0 {
 			err = errors.New(string(b))
-			return
+			return job, err
 		}
 
 		err = errors.New(resp.Status)
-		return
+		return job, err
 	}
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return
+		return job, err
 	}
 
 	err = json.Unmarshal(b, &job)
-	return
+	return job, err
 }
 
 func (g *GardenerAPI) pollAndRun(ctx context.Context,
@@ -161,8 +171,8 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 
 	log.Println("Running", job.Path())
 
-	update := tracker.UpdateURL(g.tracker, job, tracker.Parsing, "starting tasks")
-	if postErr := postAndIgnoreResponse(update); postErr != nil {
+	update := tracker.UpdateURL(g.trackerBase, job, tracker.Parsing, "starting tasks")
+	if postErr := postAndIgnoreResponse(ctx, update); postErr != nil {
 		log.Println(postErr)
 	}
 
@@ -174,9 +184,9 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 		log.Println("all tasks dispatched for", job.Path())
 		eg.Wait()
 		log.Println("finished", job.Path())
-		update := tracker.UpdateURL(g.tracker, job, tracker.ParseComplete, "")
+		update := tracker.UpdateURL(g.trackerBase, job, tracker.ParseComplete, "")
 		// TODO - should this have a retry?
-		if postErr := postAndIgnoreResponse(update); postErr != nil {
+		if postErr := postAndIgnoreResponse(ctx, update); postErr != nil {
 			log.Println(postErr)
 		}
 	}()

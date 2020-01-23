@@ -17,6 +17,8 @@ import (
 )
 
 type fakeGardener struct {
+	t *testing.T // for logging
+
 	lock       sync.Mutex
 	jobs       []tracker.Job
 	heartbeats int
@@ -30,7 +32,7 @@ func (g *fakeGardener) AddJob(job tracker.Job) {
 func (g *fakeGardener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rtx.Must(r.ParseForm(), "bad request")
 	if r.Method != http.MethodPost {
-		log.Fatal("Should be POST")
+		log.Fatal("Should be POST") // Not t.Fatal because this is asynchronous.
 	}
 	g.lock.Lock()
 	g.lock.Unlock()
@@ -44,15 +46,15 @@ func (g *fakeGardener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		g.jobs = g.jobs[1:]
 		w.Write(j.Marshal())
 	case "/heartbeat":
-		log.Println(r.URL.Path, r.URL.Query())
+		g.t.Log(r.URL.Path, r.URL.Query())
 		g.heartbeats++
 
 	case "/update":
-		log.Println(r.URL.Path, r.URL.Query())
+		g.t.Log(r.URL.Path, r.URL.Query())
 		g.updates++
 
 	default:
-		log.Fatal(r.URL)
+		log.Fatal(r.URL) // Not t.Fatal because this is asynchronous.
 	}
 }
 
@@ -65,7 +67,7 @@ func TestGardenerAPI_JobFileSource(t *testing.T) {
 	c := testClient()
 
 	// set up a fake gardener service.
-	fg := fakeGardener{jobs: make([]tracker.Job, 0)}
+	fg := fakeGardener{t: t, jobs: make([]tracker.Job, 0)}
 	fg.AddJob(tracker.NewJob("foobar", "ndt", "ndt5", time.Date(2019, 01, 01, 0, 0, 0, 0, time.UTC)))
 	tracker := httptest.NewServer(&fg)
 	defer tracker.Close()
@@ -109,7 +111,7 @@ func TestGardenerAPI_RunAll(t *testing.T) {
 	c := testClient()
 
 	// set up a fake gardener service.
-	fg := fakeGardener{jobs: make([]tracker.Job, 0)}
+	fg := fakeGardener{t: t, jobs: make([]tracker.Job, 0)}
 	fg.AddJob(tracker.NewJob("foobar", "ndt", "ndt5", time.Date(2019, 01, 01, 0, 0, 0, 0, time.UTC)))
 	tracker := httptest.NewServer(&fg)
 	defer tracker.Close()
@@ -158,7 +160,7 @@ func TestGardenerAPI_Poll(t *testing.T) {
 	c := testClient()
 
 	// set up a fake gardener service.
-	fg := fakeGardener{jobs: make([]tracker.Job, 0)}
+	fg := fakeGardener{t: t, jobs: make([]tracker.Job, 0)}
 	fg.AddJob(tracker.NewJob("foobar", "ndt", "ndt5", time.Date(2019, 01, 01, 0, 0, 0, 0, time.UTC)))
 	tracker := httptest.NewServer(&fg)
 	defer tracker.Close()
