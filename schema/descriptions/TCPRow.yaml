@@ -1,0 +1,513 @@
+TCPInfo:
+  Description: Results from getsockopt(..TCP_INFO..)
+TCPInfo.State:
+  Description: TCP State
+  Discussion: In MLab data TCP state is nominally 1 (Established).
+    Other values reflect transient states having incomplete rows.
+  Reference: RFC 791
+  Kernel: See TCP_ESTABLISHED in include/net/tcp_states.h
+TCPInfo.CAState:
+  Description: Loss recovery state machine
+  Discussion: For traditional loss based congestion control algorithms, CAState is
+    also used to control window adjustments.
+  Reference:  Comments in net/ipv4/tcp_input.c
+  Kernel: tcp_set_ca_state in include/net/tcp.h
+TCPInfo.Retransmits:
+  Description: Number of timeouts (RTO based retransmissions) at this sequence.
+  Discussion: Reset to zero on forward progress
+  Kernel: icsk_retransmits in include/net/inet_connection_sock.h
+TCPInfo.Probes:
+  Description: Consecutive zero window probes that have gone unanswered
+  Reference: RFC 791
+  Kernel: icsk_probes_out in include/net/inet_connection_sock.h
+TCPInfo.Backoff:
+  Description: Exponential timeout backoff counter
+  Discussion: Increment on RTO, reset on successful RTT measurements.
+  Kernel: icsk_backoff in include/net/inet_connection_sock.h
+TCPInfo.Options:
+  Description: Bit encoded SYN options and other negotiations
+  Discussion: "
+    TIMESTAMPS 0x1;
+    SACK 0x2;
+    WSCALE 0x4;
+    ECN 0x8 - Was negotiated;
+    ECN_SEEN - At least one ECT seen;
+    SYN_DATA - SYN-ACK acknowledged data in SYN sent or rcvd"
+  Kernel: TCPI_OPT_TIMESTAMPS in include/uapi/linux/tcp.h
+TCPInfo.WScale:
+  Description: BUG Conflation of SndWScale and RcvWScale
+  Discussion: See github.com/m-lab/etl/issues/790
+TCPInfo.SndWScale:
+  Description: Window scale used by the local sender to decode seg.wnd
+    Visible as WScale, pending github.com/m-lab/etl/issues/790
+  Reference: RFC 7323
+  Kernel: snd_wscale in include/linux/tcp.h
+TCPInfo.RcvWScale:
+  Description: Window scale used by the local receiver to encode seg.wnd
+  Discussion: This is determined by the server config, and nearly constant for MLab
+    Currently not accessible github.com/m-lab/etl/issues/790
+  Reference: RFC 7323
+  Kernel: rcv_wscale in include/linux/tcp.h
+TCPInfo.AppLimited:
+  Description: Flag indicating that rate measurements reflect non-network bottlenecks
+  Discussion: Note that even very short application stalls invalidate max_BW measurements.
+  Kernel: rate_app_limited in include/linux/tcp.h
+TCPInfo.RTO:
+  Description: Retransmission Timeout
+  Discussion: Quantized to system jiffies
+  Units: Microseconds
+  Kernel: icsk_rto in include/net/inet_connection_sock.h
+TCPInfo.ATO:
+  Description: Delayed ACK Timeout
+  Discussion: Quantized to system jiffies
+  Units: Microseconds
+  Kernel: ato in icsk_ack in include/net/inet_connection_sock.h
+TCPInfo.SndMSS:
+  Description: Current Maximum Segment Size
+  Discussion: Note that this can be smaller than the negotiated MSS for various reasons
+  Units: Bytes
+  Kernel: mss_cache in include/linux/tcp.h
+TCPInfo.RcvMSS:
+  Description: Maximum observed segment size from the remote host
+  Discussion: Used to trigger delayed ACKs
+  Units: Bytes
+  Kernel: rcv_mss in icsk_ack in include/net/inet_connection_sock.h
+TCPInfo.Unacked:
+  Description: Number of segments between snd.nxt and snd.una
+  Discussion: Accounting for the Pipe algorithm
+  Units: Segments
+  Reference: RFC 6675
+  Kernel: packets_out in include/linux/tcp.h
+TCPInfo.Sacked:
+  Description: Scoreboard segment marked SACKED by sack blocks
+  Discussion: Accounting for the Pipe algorithm
+  Units: Segments
+  Reference: RFC 6675
+  Kernel: sacked_out in include/linux/tcp.h
+TCPInfo.Lost:
+  Description: Scoreboard segments marked lost by loss detection heuristics
+  Discussion: Accounting for the Pipe algorithm
+  Units: Segments
+  Reference: RFC 6675
+  Kernel: lost_out in include/linux/tcp.h
+TCPInfo.Retrans:
+  Description: Scoreboard segments marked retransmitted
+  Discussion: Accounting for the Pipe algorithm
+  Units: Segments
+  Reference: RFC 6675
+  Kernel: retrans_out in include/linux/tcp.h
+TCPInfo.Fackets:
+  Description: BUG This is gone now????  What field overlays it?
+TCPInfo.LastDataSent:
+  Description: Time since last data segment was sent
+  Discussion: Quantized to jiffies
+  Units: Microseconds
+  Kernel: lsndtime in include/linux/tcp.h
+TCPInfo.LastAckSent:
+  Description: Time since last ACK was sent (Not implemented)
+  Discussion: Present in TCP_INFO but not elsewhere in the kernel
+  Units: Microseconds
+TCPInfo.LastDataRecv:
+  Description: Time since last data segment was received
+  Discussion: Quantized to jiffies
+  Units: Microseconds
+  Kernel: lrcvtime in icsk_ack in include/net/inet_connection_sock.h
+TCPInfo.LastAckRecv:
+  Description: Time since last ACK was received
+  Discussion: Quantized to jiffies
+  Units: Microseconds
+  Kernel: rcv_tstamp in include/linux/tcp.h
+TCPInfo.PMTU:
+  Description: Maximum IP Transmission Unit for this path
+  Units: Bytes
+  Reference: RFC 1191, RFC 4821, RFC 8201
+  Kernel: icsk_pmtu_cookie in include/net/inet_connection_sock.h
+TCPInfo.RcvSsThresh:
+  Description: Current Window Clamp
+  Discussion: Receiver algorithm to avoid allocating excessive receive buffers
+  Units: Bytes
+  Kernel: rcv_ssthresh in include/linux/tcp.h
+TCPInfo.RTT:
+  Description: Smoothed Round Trip Time (RTT)
+  Discussion: The Linux implementation differs from the standard
+  Units: Microseconds
+  Reference: RFC 6298
+  Kernel: srtt_us in include/linux/tcp.h
+TCPInfo.RTTVar:
+  Description: RTT variance
+  Discussion: The Linux implementation differs from the standard
+  Units: Microseconds
+  Reference: RFC 6298
+  Kernel: mdev_us in include/linux/tcp.h
+TCPInfo.SndSsThresh:
+  Description: Slow Start Threshold
+  Discussion: Value controlled by the selected congestion control algorithm
+  Units: Bytes
+  Reference: RFC 5861
+  Kernel: snd_ssthresh in include/linux/tcp.h
+TCPInfo.SndCwnd:
+  Description: Congestion Window
+  Discussion: Value controlled by the selected congestion control algorithm
+  Units: Bytes
+  Reference: RFC 5861
+  Kernel: snd_cwnd in include/linux/tcp.h
+TCPInfo.AdvMSS:
+  Description: Advertised MSS
+  Units: Bytes
+  Kernel: advmss in include/linux/tcp.h
+TCPInfo.Reordering:
+  Description: Maximum observed reordering distance
+  Units: Segments
+  Kernel: reordering in include/linux/tcp.h
+TCPInfo.RcvRTT:
+  Description: Receiver Side RTT estimate
+  Units: Microseconds
+  Kernel: rcv_rtt_est.rtt_us in include/linux/tcp.h
+TCPInfo.RcvSpace:
+  Description: Space reserved for the receive queue
+  Discussion: Typically updated by receiver side auto-tuning
+  Units: Bytes
+  Kernel: space in rcvq_space in include/linux/tcp.h
+TCPInfo.TotalRetrans:
+  Description: Total number of segments containing retransmitted data
+  SMItype: Counter32
+  Kernel: total_retrans in include/linux/tcp.h
+TCPInfo.PacingRate:
+  Description: Current Pacing Rate, nominally updated by congestion control
+  Units: Bytes per second
+  Kernel: sk_pacing_rate in include/net/sock.h
+TCPInfo.MaxPacingRate:
+  Description: Settable pacing rate clamp
+  Discussion: Set with setsockopt( ..SO_MAX_PACING_RATE.. )
+  Units: Bytes per second
+  Kernel: sk_max_pacing_rate in include/net/sock.h
+TCPInfo.BytesAcked:
+  Description: The number of data bytes for which cumulative acknowledgments
+    have been received
+  SMItype: Counter64
+  Units: Bytes
+  Kernel: bytes_acked in include/linux/tcp.h
+TCPInfo.BytesReceived:
+  Description: The number of data bytes for which have been received
+  SMItype: Counter64
+  Units: Bytes
+  Kernel: bytes_received in include/linux/tcp.h
+TCPInfo.SegsOut:
+  Description: The number of segments transmitted
+  Discussion: Includes data and pure ACKs
+  SMItype: Counter32
+  Units: Segments
+  Kernel: segs_out in include/linux/tcp.h
+TCPInfo.SegsIn:
+  Description: The number of segments received
+  Discussion: Includes data and pure ACKs
+  SMItype: Counter32
+  Units: Segments
+  Kernel: segs_in in include/linux/tcp.h
+TCPInfo.NotsentBytes:
+  Description: Number of bytes queued in the send buffer that have not been sent
+  Units: Bytes
+  Kernel: tcpi_notsent_bytes() in net/ipv4/tcp.c
+TCPInfo.MinRTT:
+  Description: Minimum RTT
+  Discussion: From an older, pre-BBR algorithm
+  Units: Microseconds
+  Kernel: tcp_min_rtt in include/net/tcp.h
+TCPInfo.DataSegsIn:
+  Description: Input segments carrying data (len>0)
+  SMItype: Counter32
+  Units: Segments
+  Kernel: data_segs_in in include/net/tcp.h
+TCPInfo.DataSegsOut:
+  Description: Transmitted segments carrying data (len>0)
+  SMItype: Counter32
+  Units: Segments
+  Kernel: data_segs_out in include/net/tcp.h
+TCPInfo.DeliveryRate:
+  Description: Observed Maximum Delivery Rate
+  Units: Bytes per second
+  Kernel: tcp_compute_delivery_rate() in net/ipv4/tcp.c
+TCPInfo.BusyTime:
+  Description: Time with outstanding (unacknowledged) data
+  Discussion: Time when snd.una not equal to snd.next
+  SMItype: Counter64
+  Units: Microseconds
+  Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
+TCPInfo.RWndLimited:
+  Description: Time spend waiting for receiver window
+  SMItype: Counter64
+  Units: Microseconds
+  Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
+TCPInfo.SndBufLimited:
+  Description: Time spend waiting for sender buffer space
+  Discussion: This only includes the time when TCP transmissions
+    are starved for data, but the application has been stopped because
+    the buffer is full and can not be grown for some reason.
+  SMItype: Counter64
+  Units: Microseconds
+  Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
+TCPInfo.Delivered:
+  Description: Data segments delivered to the receiver including retransmits
+  Discussion: As reported by returning ACKs, used by ECN
+  SMItype: Counter32
+  Units: Segments
+  Kernel: delivered in include/linux/tcp.h
+TCPInfo.DeliveredCE:
+  Description: ECE marked data segments delivered to the receiver including retransmits
+  Discussion: As reported by returning ACKs, used by ECN
+  SMItype: Counter32
+  Units: Segments
+  Kernel: delivered_ce in include/linux/tcp.h
+TCPInfo.BytesSent:
+  Description: Payload bytes sent (excludes headers, includes retransmissions)
+  SMItype: Counter64
+  Units: Bytes
+  Kernel: bytes_sent
+TCPInfo.BytesRetrans:
+  Description: Bytes retransmitted
+  Discussion: May include headers and new data carried with a retransmission (for thin flows).
+  SMItype: Counter64
+  Units: Bytes
+  Kernel: bytes_retrans
+TCPInfo.DSackDups:
+  Description: Duplicate segments reported by DSACK
+  Discussion: Not reported by some OS
+  SMItype: Counter32
+  Units: Segments
+  Reference: RFC 2883
+  Kernel: dsack_dups
+TCPInfo.ReordSeen:
+  Description: Received ACKs that were out of order
+  Discussion: Estimates reordering on the return path
+  SMItype: Counter32
+  Units: Segments
+  Kernel: reord_seen
+TCPInfo.OutOfOrder:
+  Description: Received out-of-order segments
+  Discussion: NOT IN MLab yet
+  SMItype: Counter32
+  Units: Segments
+  Kernel: rcv_ooopack in include/linux/tcp.h
+TCPInfo.SenderWindow:
+  Description: Peer's advertised receive window after scaling
+  Discussion: NOT IN MLab yet
+  Units: Bytes
+  Kernel: snd_wnd in include/linux/tcp.h
+MemInfo:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+MemInfo.Rmem:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+MemInfo.Wmem:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+MemInfo.Fmem:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+MemInfo.Tmem:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem.RmemAlloc:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem.Rcvbuf:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem.WmemAlloc:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem.Sndbuf:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem.FwdAlloc:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem.WmemQueued:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem.Optmem:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem.Backlog:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+SocketMem.Drops:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+VegasInfo:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+VegasInfo.Enabled:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+VegasInfo.RTTCount:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+VegasInfo.RTT:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+VegasInfo.MinRTT:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+DCTCPInfo:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+DCTCPInfo.Enabled:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+DCTCPInfo.CEState:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+DCTCPInfo.Alpha:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+DCTCPInfo.ABEcn:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+DCTCPInfo.ABTot:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+BBRInfo:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+BBRInfo.BW:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+BBRInfo.MinRTT:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+BBRInfo.PacingGain:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+BBRInfo.CwndGain:
+  Description:
+  Discussion:
+  SMItype: Counter32
+  Units:
+  Reference:
+  Kernel:
+
