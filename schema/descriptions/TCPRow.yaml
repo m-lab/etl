@@ -47,7 +47,7 @@ TCPInfo.RcvWScale:
   Discussion: This is determined by the server config, and nearly constant for MLab
     Currently not accessible github.com/m-lab/etl/issues/790
   Reference: RFC 7323
- Kernel: rcv_wscale in include/linux/tcp.h
+  Kernel: rcv_wscale in include/linux/tcp.h
 TCPInfo.AppLimited:
   Description: Flag indicating that rate measurements reflect non-network bottlenecks
   Discussion: Note that even very short application stalls invalidate max_BW measurements.
