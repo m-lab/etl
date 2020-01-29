@@ -2,7 +2,6 @@ package active
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -17,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 
+	"github.com/m-lab/etl-gardener/job-service"
 	"github.com/m-lab/etl-gardener/tracker"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/rtx"
@@ -55,20 +55,35 @@ func MustStorageClient(ctx context.Context) stiface.Client {
 	return stiface.AdaptClient(c)
 }
 
-// TODO add retry in case gardener is offline (during redeployment)
-// TODO add metrics to track latency, retries, and errors.
-func postAndIgnoreResponse(ctx context.Context, url *url.URL) error {
+func post(ctx context.Context, url url.URL) ([]byte, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	req, reqErr := http.NewRequestWithContext(ctx, "POST", url.String(), nil)
 	if reqErr != nil {
-		return reqErr
+		return nil, 0, reqErr
 	}
 	resp, postErr := http.DefaultClient.Do(req)
-	if resp != nil && resp.Body != nil {
-		resp.Body.Close()
+	if postErr != nil {
+		return nil, 0, postErr // Documentation says we can ignore body.
 	}
-	return postErr
+
+	// Gauranteed to have a non-nil response and body.
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body) // Documentation recommends reading body.
+	return b, resp.StatusCode, err
+}
+
+// TODO add retry in case gardener is offline (during redeployment)
+// TODO add metrics to track latency, retries, and errors.
+func postAndIgnoreResponse(ctx context.Context, url url.URL) error {
+	_, status, err := post(ctx, url)
+	if err != nil {
+		return err
+	}
+	if status != http.StatusOK {
+		return errors.New(http.StatusText(status))
+	}
+	return nil
 }
 
 // RunAll will execute functions provided by Next() until there are no more,
@@ -83,7 +98,7 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 		}
 
 		heartbeat := tracker.HeartbeatURL(g.trackerBase, job)
-		if postErr := postAndIgnoreResponse(ctx, heartbeat); postErr != nil {
+		if postErr := postAndIgnoreResponse(ctx, *heartbeat); postErr != nil {
 			log.Println(postErr, "on heartbeat for", job.Path())
 		}
 
@@ -96,7 +111,7 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 			err := run.Run()
 			if err == nil {
 				update := tracker.UpdateURL(g.trackerBase, job, tracker.Parsing, run.Info())
-				if postErr := postAndIgnoreResponse(ctx, update); postErr != nil {
+				if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {
 					log.Println(postErr, "on update for", job.Path())
 				}
 			}
@@ -123,37 +138,7 @@ func (g *GardenerAPI) JobFileSource(ctx context.Context, job tracker.Job,
 
 // NextJob requests a new job from Gardener service.
 func (g *GardenerAPI) NextJob(ctx context.Context) (tracker.Job, error) {
-	jobURL := g.trackerBase
-	jobURL.Path = "job"
-
-	job := tracker.Job{}
-
-	resp, err := http.Post(jobURL.String(), "application/x-www-form-urlencoded", nil)
-	if err != nil {
-		return job, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		var b []byte
-		b, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return job, err
-		}
-		if len(b) > 0 {
-			err = errors.New(string(b))
-			return job, err
-		}
-
-		err = errors.New(resp.Status)
-		return job, err
-	}
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return job, err
-	}
-
-	err = json.Unmarshal(b, &job)
-	return job, err
+	return job.NextJob(ctx, g.trackerBase)
 }
 
 func (g *GardenerAPI) pollAndRun(ctx context.Context,
@@ -172,7 +157,7 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 	log.Println("Running", job.Path())
 
 	update := tracker.UpdateURL(g.trackerBase, job, tracker.Parsing, "starting tasks")
-	if postErr := postAndIgnoreResponse(ctx, update); postErr != nil {
+	if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {
 		log.Println(postErr)
 	}
 
@@ -186,7 +171,7 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 		log.Println("finished", job.Path())
 		update := tracker.UpdateURL(g.trackerBase, job, tracker.ParseComplete, "")
 		// TODO - should this have a retry?
-		if postErr := postAndIgnoreResponse(ctx, update); postErr != nil {
+		if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {
 			log.Println(postErr)
 		}
 	}()
