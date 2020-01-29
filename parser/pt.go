@@ -797,6 +797,10 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 		currentLeaves = newLeaves
 	} // Done with a test file
 
+	if len(allNodes) == 0 {
+		// Empty test, stop here.
+		return cachedPTData{}, errors.New("Empty test")
+	}
 	// Check whether the last hop is the destIP
 	fileName := ""
 	if meta["filename"] != nil {
@@ -810,10 +814,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
 	// reach destIP at the last hop.
 	lastHop := destIP
-	if len(allNodes) == 0 {
-		// Empty test, stop here.  Not an error.
-		return cachedPTData{}, nil
-	}
+
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
 		lastHop = allNodes[len(allNodes)-1].ip
