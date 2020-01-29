@@ -55,6 +55,7 @@ func MustStorageClient(ctx context.Context) stiface.Client {
 	return stiface.AdaptClient(c)
 }
 
+// TODO migrate this to m-lab/go
 func post(ctx context.Context, url url.URL) ([]byte, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
