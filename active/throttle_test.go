@@ -11,8 +11,7 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// TODO maxTracker is a bad name.  It is unrelated to gardener tracker package.
-type maxTracker struct {
+type throttleStats struct {
 	running   chan struct{}
 	doneCount chan struct{}
 
@@ -20,7 +19,7 @@ type maxTracker struct {
 	maxRunning int
 }
 
-func (mt *maxTracker) add() int {
+func (mt *throttleStats) add() int {
 	mt.running <- struct{}{} // Add to the count.
 	now := len(mt.running)
 
@@ -33,41 +32,41 @@ func (mt *maxTracker) add() int {
 	return now
 }
 
-func (mt *maxTracker) end() {
+func (mt *throttleStats) end() {
 	// decrement inFlight, and increment doneCount.
 	mt.doneCount <- <-mt.running
 }
 
-func (mt *maxTracker) done() int {
+func (mt *throttleStats) done() int {
 	return len(mt.doneCount)
 }
 
-func (mt *maxTracker) max() int {
+func (mt *throttleStats) max() int {
 	mt.lock.Lock()
 	defer mt.lock.Unlock()
 	return mt.maxRunning
 }
 
-func newMaxTracker(n int) *maxTracker {
-	return &maxTracker{
+func newThrottleStats(n int) *throttleStats {
+	return &throttleStats{
 		running:   make(chan struct{}, n),
 		doneCount: make(chan struct{}, n),
 	}
 }
 
 type source struct {
-	count   int
-	tracker *maxTracker
+	count int
+	stats *throttleStats
 }
 
-type maxRunnable struct {
-	tracker *maxTracker
+type statsRunnable struct {
+	stats *throttleStats
 }
 
 func (s *source) Next(ctx context.Context) (active.Runnable, error) {
 	if s.count > 0 {
 		s.count--
-		return &maxRunnable{s.tracker}, nil
+		return &statsRunnable{s.stats}, nil
 	}
 	return nil, iterator.Done
 }
@@ -75,9 +74,9 @@ func (s *source) Label() string {
 	return "label"
 }
 
-func (mr *maxRunnable) Run() error {
-	now := mr.tracker.add()
-	defer mr.tracker.end()
+func (sr *statsRunnable) Run() error {
+	now := sr.stats.add()
+	defer sr.stats.end()
 
 	log.Println(now, "running")
 
@@ -86,12 +85,12 @@ func (mr *maxRunnable) Run() error {
 	return nil
 }
 
-func (tr *maxRunnable) Info() string {
+func (sr *statsRunnable) Info() string {
 	return "info"
 }
 
 func TestThrottledSource(t *testing.T) {
-	src := source{count: 5, tracker: newMaxTracker(100)}
+	src := source{count: 5, stats: newThrottleStats(100)}
 	// throttle to handle two at a time.
 	ts := active.Throttle(&src, active.NewWSTokenSource(2))
 
@@ -105,13 +104,13 @@ func TestThrottledSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if src.tracker.done() != 5 {
-		t.Error("Should have been 5 runnables", src.tracker.done())
+	if src.stats.done() != 5 {
+		t.Error("Should have been 5 runnables", src.stats.done())
 	}
-	if len(src.tracker.running) != 0 {
-		t.Error("running should be 0:", len(src.tracker.running))
+	if len(src.stats.running) != 0 {
+		t.Error("running should be 0:", len(src.stats.running))
 	}
-	if src.tracker.max() != 2 {
-		t.Error("Max running != 2", src.tracker.max())
+	if src.stats.max() != 2 {
+		t.Error("Max running != 2", src.stats.max())
 	}
 }
