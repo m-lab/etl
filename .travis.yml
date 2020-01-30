@@ -129,6 +129,11 @@ script:
 - $HOME/gopath/bin/gocovmerge *.cov > merge.cov
 - $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
 
+# Clean build and prepare for deployment
+- cd $TRAVIS_BUILD_DIR/cmd/etl_worker &&
+  go build -v -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" .
+- cd $TRAVIS_BUILD_DIR
+
 #################################################################################
 # Deployment Section
 #
