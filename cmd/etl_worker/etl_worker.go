@@ -2,20 +2,26 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strconv"
 	"sync/atomic"
 	"time"
 
-	"github.com/m-lab/go/prometheusx"
+	"github.com/m-lab/etl/active"
+
+	"cloud.google.com/go/storage"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
+	"github.com/m-lab/go/prometheusx"
+	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
@@ -207,7 +213,49 @@ func setMaxInFlight() {
 	}
 }
 
+type runnable struct {
+	storage.ObjectAttrs
+}
+
+func (r *runnable) Run() error {
+	path := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
+	data, err := etl.ValidateTestPath(path)
+	if err != nil {
+		log.Printf("Invalid filename: %v\n", err)
+		return err
+	}
+
+	start := time.Now()
+	log.Println("Processing", path)
+	statusCode, err := worker.ProcessTask(path)
+	metrics.DurationHistogram.WithLabelValues(
+		data.DataType, http.StatusText(statusCode)).Observe(
+		time.Since(start).Seconds())
+	return err
+}
+
+func (r *runnable) Info() string {
+	// Should truncate this to exclude the date, maybe include the year?
+	return r.Name
+}
+
+func toRunnable(obj *storage.ObjectAttrs) active.Runnable {
+	return &runnable{*obj}
+}
+
+func mustGardenerAPI(ctx context.Context, jobServer string) *active.GardenerAPI {
+	rawBase := fmt.Sprintf("http://%s:8080", jobServer)
+	base, err := url.Parse(rawBase)
+	rtx.Must(err, "Invalid jobServer: "+rawBase)
+
+	return active.NewGardenerAPI(*base, active.MustStorageClient(ctx))
+}
+
+var mainCtx, mainCancel = context.WithCancel(context.Background())
+
 func main() {
+	defer mainCancel()
+
 	// Expose prometheus and pprof metrics on a separate port.
 	prometheusx.MustStartPrometheus(":9090")
 
@@ -225,5 +273,17 @@ func main() {
 	// path name will be accessible through the AppEngine service address,
 	// however it will be served by a random instance.
 	http.Handle("/random-metrics", promhttp.Handler())
+
+	gardener := os.Getenv("GARDENER_HOST")
+	if len(gardener) > 0 {
+		log.Println("Using", gardener)
+		maxWorkers := 120
+		minPollingInterval := 10 * time.Second
+		gapi := mustGardenerAPI(mainCtx, gardener)
+		// Note that this does not currently track duration metric.
+		go gapi.Poll(mainCtx, toRunnable, maxWorkers, minPollingInterval)
+	} else {
+		log.Println("GARDENER_HOST not specified or empty")
+	}
 	http.ListenAndServe(":8080", nil)
 }
