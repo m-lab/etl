@@ -260,6 +260,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 		TaskFileName:  taskFilename,
 		ParseTime:     time.Now(),
 		ParserVersion: Version(),
+		Filename:      testName,
 	}
 
 	return schema.PTTest{
@@ -452,6 +453,7 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 		TaskFileName:  pt.taskFileName,
 		ParseTime:     time.Now(),
 		ParserVersion: Version(),
+		Filename:      oneTest.TestID,
 	}
 
 	ptTest := schema.PTTest{
@@ -814,7 +816,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
 	// reach destIP at the last hop.
 	lastHop := destIP
-	
+
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
 		lastHop = allNodes[len(allNodes)-1].ip
