@@ -37,6 +37,7 @@ type ParseInfo struct {
 	TaskFileName  string // The tar file containing this test.
 	ParseTime     time.Time
 	ParserVersion string
+	Filename      string
 }
 
 // TCPRow describes a single BQ row of TCPInfo data.
