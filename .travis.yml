@@ -207,7 +207,7 @@ deploy:
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema/update-schema
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox batch nodryrun
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
   skip_cleanup: true
