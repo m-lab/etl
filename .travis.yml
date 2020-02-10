@@ -204,8 +204,8 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
-    && gcloud config set core/project mlab-sandbox
-    && GCLOUD_PROJECT=mlab-sandbox $TRAVIS_BUILD_DIR/cmd/update-schema/update-schema
+    $$ $TRAVIS_BUILD_DIR/cmd/general_cmd.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox batch nodryrun
