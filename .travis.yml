@@ -355,7 +355,7 @@ deploy:
     travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
     &&
     $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-staging
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     &&
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
@@ -407,7 +407,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && cd $TRAVIS_BUILD_DIR/functions
     && gcloud functions deploy createProdTaskOnFileNotification --project=mlab-oti --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-oti
     && gcloud functions deploy createProdTaskOnEmbargoFileNotification --project=mlab-oti --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-oti
@@ -431,7 +431,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
@@ -452,7 +452,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
@@ -470,7 +470,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
