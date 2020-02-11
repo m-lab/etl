@@ -9,10 +9,6 @@ PROJECT=${1:?Please provide the GCP project id}
 KEYNAME=${2:?Please provide the service account keyname}
 BASEDIR=${3:?Please provide the path to the command to run}
 CMD=${4:?Please provide the binary name to run}
-TRAVIS_COMMIT=${TRAVIS_COMMIT:-unknown}
-TRAVIS_TAG=${TRAVIS_TAG:-empty_tag}
-# TODO - should make the default empty, after updating all dependencies.
-SUBST_TAGS=${SUBST_TAGS:-'$TRAVIS_TAG, $TRAVIS_COMMIT, $INJECTED_BUCKET, $INJECTED_PROJECT, $INJECTED_DATASET'}
 
 # Add gcloud to PATH.
 source "${HOME}/google-cloud-sdk/path.bash.inc"
