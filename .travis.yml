@@ -132,6 +132,8 @@ script:
 # Clean build and prepare for deployment
 - cd $TRAVIS_BUILD_DIR/cmd/etl_worker &&
   go build -v -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" .
+- cd $TRAVIS_BUILD_DIR/cmd/update-schema &&
+  go build -v
 - cd $TRAVIS_BUILD_DIR
 
 #################################################################################
@@ -204,6 +206,8 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox batch nodryrun
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
   skip_cleanup: true
@@ -216,6 +220,8 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
 #   && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
   skip_cleanup: true
   on:
@@ -233,6 +239,8 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
   skip_cleanup: true
@@ -269,7 +277,9 @@ deploy:
 ## Service: etl-traceroute-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
   skip_cleanup: true
   on:
@@ -280,7 +290,9 @@ deploy:
 ## Service: etl-scamper-parser -- AppEngine Flexible Environment.
 - provider: script
   script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-scamper.yaml
   skip_cleanup: true
   on:
@@ -342,6 +354,9 @@ deploy:
     &&
     travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
     &&
+    $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-staging
+    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    &&
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
@@ -391,6 +406,8 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && cd $TRAVIS_BUILD_DIR/functions
     && gcloud functions deploy createProdTaskOnFileNotification --project=mlab-oti --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-oti
     && gcloud functions deploy createProdTaskOnEmbargoFileNotification --project=mlab-oti --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-oti
@@ -413,6 +430,8 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-traceroute.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
@@ -432,6 +451,8 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
@@ -448,6 +469,8 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
+    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
     SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
