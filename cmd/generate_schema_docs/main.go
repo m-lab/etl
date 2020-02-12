@@ -94,7 +94,7 @@ func generateRichMarkdown(s bigquery.Schema, t schemaGenerator) []byte {
 				return nil
 			}
 
-			// We found relevnt documentation, now concatenate the fields when found.
+			// We found relevant documentation, now concatenate the fields when found.
 			richDesc := d["Description"]
 			if val, ok := d["Discussion"]; ok && val != "" {
 				richDesc += "<br>" + val
