@@ -65,6 +65,59 @@ func init() {
 	}
 }
 
+func generateRichMarkdown(s bigquery.Schema, t schemaGenerator) []byte {
+	// Load raw docs for the given schema type so that we can extract all fields.
+	docs := schema.FindSchemaDocsFor(t)
+	combo := map[string]map[string]string{}
+	for _, doc := range docs {
+		for k, v := range doc {
+			combo[k] = v
+		}
+	}
+
+	buf := &bytes.Buffer{}
+	fmt.Fprintln(buf, "| Field name       | Type       | Description    |")
+	fmt.Fprintln(buf, "| :----------------|:----------:|:---------------|")
+	bqx.WalkSchema(
+		s, func(prefix []string, field *bigquery.FieldSchema) error {
+
+			// Search for the path in the given doc.
+			var ok bool
+			var d map[string]string
+			// Starting with the longest prefix, stop looking for descriptions on first match.
+			for start := 0; start < len(prefix) && !ok; start++ {
+				path := strings.Join(prefix[start:], ".")
+				d, ok = combo[path]
+			}
+			if !ok {
+				// This is not an error, the field simply doesn't have extra description.
+				return nil
+			}
+
+			// We found relevnt documentation, now concatenate the fields when found.
+			richDesc := d["Description"]
+			if val, ok := d["Discussion"]; ok && val != "" {
+				richDesc += "<br>" + val
+			}
+			if val, ok := d["Kernel"]; ok && val != "" {
+				richDesc += "<br>Kernel: " + val
+			}
+
+			var path string
+			if len(prefix) == 1 {
+				path = ""
+			} else {
+				path = strings.Join(prefix[:len(prefix)-1], ".") + "."
+			}
+
+			fmt.Fprintf(buf, "| %s**%s** | %s | %s |\n", path, prefix[len(prefix)-1], field.Type, richDesc)
+			return nil
+		},
+	)
+	return buf.Bytes()
+}
+
+// TODO: remove this function if it turns out to be replaced by generateRichMarkdown.
 func generateMarkdown(schema bigquery.Schema) []byte {
 	buf := &bytes.Buffer{}
 	fmt.Fprintln(buf, "| Field name       | Type       | Description    |")
@@ -115,7 +168,7 @@ func main() {
 		var b []byte
 		switch outputFormat {
 		case "md":
-			b = generateMarkdown(schema)
+			b = generateRichMarkdown(schema, current)
 		default:
 			log.Fatalf("Unsupported output format: %q", outputFormat)
 		}
