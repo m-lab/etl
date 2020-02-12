@@ -135,7 +135,6 @@ script:
 - cd $TRAVIS_BUILD_DIR/cmd/update-schema &&
   go build -v
 - cd $TRAVIS_BUILD_DIR
-- chmod +x $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh
 
 #################################################################################
 # Deployment Section
