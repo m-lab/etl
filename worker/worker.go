@@ -33,14 +33,6 @@ func ProcessTask(fn string) (int, error) {
 	}
 	tableBase := path.TableBase()
 
-	// Count number of workers operating on each table.
-	metrics.WorkerCount.WithLabelValues(tableBase).Inc()
-	defer metrics.WorkerCount.WithLabelValues(tableBase).Dec()
-
-	// These keep track of the (nested) state of the worker.
-	metrics.WorkerState.WithLabelValues(tableBase, "worker").Inc()
-	defer metrics.WorkerState.WithLabelValues(tableBase, "worker").Dec()
-
 	// Move this into Validate function
 	dataType := path.GetDataType()
 	if dataType == etl.INVALID {
@@ -62,11 +54,25 @@ func ProcessTask(fn string) (int, error) {
 	return process(*path, dataType, ins, fn)
 }
 
-// process allows injection of arbitrary inserter.
-func process(path etl.DataPath, dt etl.DataType, ins etl.Inserter, fn string) (int, error) {
+// ProcessTaskWithInserter interprets a filename to create a Task, Parser, and Inserter,
+// and processes the file content.
+// Returns an http status code and an error if the task did not complete successfully.
+// TODO - add comprehensive unit test??
+func ProcessTaskWithInserter(fn string, ins etl.Inserter) (int, error) {
+	path, err := etl.ValidateTestPath(fn)
+	if err != nil {
+		log.Printf("Invalid filename: %v\n", err)
+		return http.StatusBadRequest, err
+	}
 	tableBase := path.TableBase()
-	dateFormat := "20060102"
-	date, _ := time.Parse(dateFormat, path.PackedDate)
+
+	// Move this into Validate function
+	dataType := path.GetDataType()
+	if dataType == etl.INVALID {
+		metrics.TaskCount.WithLabelValues(tableBase, "worker", "BadRequest").Inc()
+		log.Printf("Invalid filename: %s\n", fn)
+		return http.StatusBadRequest, ErrBadDataType
+	}
 
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
@@ -78,7 +84,7 @@ func process(path etl.DataPath, dt etl.DataType, ins etl.Inserter, fn string) (i
 	// TODO - add a timer for reading the file.
 	tr, err := storage.NewETLSource(client, fn)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(tableBase, string(dt), "ETLSourceError").Inc()
+		metrics.TaskCount.WithLabelValues(tableBase, string(dataType), "ETLSourceError").Inc()
 		log.Printf("Error opening gcs file: %v", err)
 		return http.StatusInternalServerError, err
 		// TODO - anything better we could do here?
@@ -86,6 +92,24 @@ func process(path etl.DataPath, dt etl.DataType, ins etl.Inserter, fn string) (i
 	defer tr.Close()
 	// Label storage metrics with the expected table name.
 	tr.TableBase = tableBase
+
+	return process(fn, *path, dataType, tr, ins)
+}
+
+// process allows injection of arbitrary etlSource and inserter.
+// TODO - add test with fake source and inserter.
+func process(fn string, path etl.DataPath, dt etl.DataType, tr *storage.ETLSource, ins etl.Inserter) (int, error) {
+	tableBase := path.TableBase()
+	// Count number of workers operating on each table.
+	metrics.WorkerCount.WithLabelValues(tableBase).Inc()
+	defer metrics.WorkerCount.WithLabelValues(tableBase).Dec()
+
+	// These keep track of the (nested) state of the worker.
+	metrics.WorkerState.WithLabelValues(tableBase, "worker").Inc()
+	defer metrics.WorkerState.WithLabelValues(tableBase, "worker").Dec()
+
+	dateFormat := "20060102"
+	date, _ := time.Parse(dateFormat, path.PackedDate)
 
 	// Create parser, injecting Inserter
 	p := parser.NewParser(dt, ins)
