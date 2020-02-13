@@ -19,6 +19,19 @@ var (
 	ErrBadDataType = errors.New("unknown data type")
 )
 
+func etlSource(fn string, tableBase string) (*storage.ETLSource, error) {
+	client, err := storage.GetStorageClient(false)
+	// TODO - add a timer for reading the file.
+	tr, err := storage.NewETLSource(client, fn)
+	if err != nil {
+		return nil, err
+		// TODO - anything better we could do here?
+	}
+	// Label storage metrics with the expected table name.
+	tr.TableBase = tableBase
+	return tr, nil
+}
+
 // ProcessTask interprets a filename to create a Task, Parser, and Inserter,
 // and processes the file content.
 // Returns an http status code and an error if the task did not complete successfully.
@@ -51,7 +64,15 @@ func ProcessTask(fn string) (int, error) {
 		// TODO - anything better we could do here?
 	}
 
-	return process(*path, dataType, ins, fn)
+	tr, err := etlSource(fn, tableBase)
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(tableBase, "worker", "ServiceUnavailable").Inc()
+		log.Printf("Error getting storage client: %v\n", err)
+		return http.StatusServiceUnavailable, err
+	}
+	defer tr.Close()
+
+	return process(fn, *path, dataType, tr, ins)
 }
 
 // ProcessTaskWithInserter interprets a filename to create a Task, Parser, and Inserter,
@@ -74,24 +95,13 @@ func ProcessTaskWithInserter(fn string, ins etl.Inserter) (int, error) {
 		return http.StatusBadRequest, ErrBadDataType
 	}
 
-	client, err := storage.GetStorageClient(false)
+	tr, err := etlSource(fn, tableBase)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(tableBase, "worker", "ServiceUnavailable").Inc()
 		log.Printf("Error getting storage client: %v\n", err)
 		return http.StatusServiceUnavailable, err
 	}
-
-	// TODO - add a timer for reading the file.
-	tr, err := storage.NewETLSource(client, fn)
-	if err != nil {
-		metrics.TaskCount.WithLabelValues(tableBase, string(dataType), "ETLSourceError").Inc()
-		log.Printf("Error opening gcs file: %v", err)
-		return http.StatusInternalServerError, err
-		// TODO - anything better we could do here?
-	}
 	defer tr.Close()
-	// Label storage metrics with the expected table name.
-	tr.TableBase = tableBase
 
 	return process(fn, *path, dataType, tr, ins)
 }
