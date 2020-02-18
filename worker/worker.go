@@ -19,7 +19,7 @@ var (
 	ErrBadDataType = errors.New("unknown data type")
 )
 
-func etlSource(fn string, tableBase string) (*storage.ETLSource, error) {
+func makeEtlSource(fn string, tableBase string) (*storage.ETLSource, error) {
 	client, err := storage.GetStorageClient(false)
 	// TODO - add a timer for reading the file.
 	tr, err := storage.NewETLSource(client, fn)
@@ -64,7 +64,7 @@ func ProcessTask(fn string) (int, error) {
 		// TODO - anything better we could do here?
 	}
 
-	tr, err := etlSource(fn, tableBase)
+	tr, err := makeEtlSource(fn, tableBase)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(tableBase, "worker", "ServiceUnavailable").Inc()
 		log.Printf("Error getting storage client: %v\n", err)
@@ -72,7 +72,7 @@ func ProcessTask(fn string) (int, error) {
 	}
 	defer tr.Close()
 
-	return process(fn, *path, dataType, tr, ins)
+	return ProcessSource(fn, *path, dataType, tr, ins)
 }
 
 // ProcessTaskWithInserter interprets a filename to create a Task, Parser, and Inserter,
@@ -95,20 +95,20 @@ func ProcessTaskWithInserter(fn string, ins etl.Inserter) (int, error) {
 		return http.StatusBadRequest, ErrBadDataType
 	}
 
-	tr, err := etlSource(fn, tableBase)
+	src, err := makeEtlSource(fn, tableBase)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(tableBase, "worker", "ServiceUnavailable").Inc()
 		log.Printf("Error getting storage client: %v\n", err)
 		return http.StatusServiceUnavailable, err
 	}
-	defer tr.Close()
+	defer src.Close()
 
-	return process(fn, *path, dataType, tr, ins)
+	return ProcessSource(fn, *path, dataType, src, ins)
 }
 
-// process allows injection of arbitrary etlSource and inserter.
+// ProcessSource allows injection of arbitrary etlSource and inserter.
 // TODO - add test with fake source and inserter.
-func process(fn string, path etl.DataPath, dt etl.DataType, tr *storage.ETLSource, ins etl.Inserter) (int, error) {
+func ProcessSource(fn string, path etl.DataPath, dt etl.DataType, tr *storage.ETLSource, ins etl.Inserter) (int, error) {
 	tableBase := path.TableBase()
 	// Count number of workers operating on each table.
 	metrics.WorkerCount.WithLabelValues(tableBase).Inc()
