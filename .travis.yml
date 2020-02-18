@@ -42,7 +42,7 @@ before_install:
 
 # Install gcloud, for integration tests.
 # TODO: maybe just use travis apt: packages: ?
-- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
+- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh app-engine-python app-engine-go cloud-datastore-emulator
 - source "${HOME}/google-cloud-sdk/path.bash.inc"
 
 # Install test credentials.
