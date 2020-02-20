@@ -19,6 +19,7 @@ import (
 	"github.com/m-lab/etl-gardener/job-service"
 	"github.com/m-lab/etl-gardener/tracker"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/rtx"
 )
 
@@ -125,10 +126,10 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 
 // JobFileSource creates a gcsSource for the job.
 func (g *GardenerAPI) JobFileSource(ctx context.Context, job tracker.Job,
-	toRunnable func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
+	toRunnable func(*storage.ObjectAttrs, bqx.PDT) Runnable) (*GCSSource, error) {
 
 	lister := FileListerFunc(g.gcs, job.Path())
-	gcsSource, err := NewGCSSource(ctx, job.Path(), lister, toRunnable)
+	gcsSource, err := NewGCSSource(ctx, job.Path(), job.DestinationTable, lister, toRunnable)
 	if err != nil {
 		JobFailures.WithLabelValues(
 			job.Experiment+"/"+job.Datatype, job.Date.Format("2006"), "filesource").Inc()
@@ -143,7 +144,7 @@ func (g *GardenerAPI) NextJob(ctx context.Context) (tracker.Job, error) {
 }
 
 func (g *GardenerAPI) pollAndRun(ctx context.Context,
-	toRunnable func(o *storage.ObjectAttrs) Runnable, tokens TokenSource) error {
+	toRunnable func(*storage.ObjectAttrs, bqx.PDT) Runnable, tokens TokenSource) error {
 	job, err := g.NextJob(ctx)
 	if err != nil {
 		return err
@@ -182,7 +183,7 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 
 // Poll requests work items from gardener, and processes them.
 func (g *GardenerAPI) Poll(ctx context.Context,
-	toRunnable func(o *storage.ObjectAttrs) Runnable, maxWorkers int, period time.Duration) {
+	toRunnable func(*storage.ObjectAttrs, bqx.PDT) Runnable, maxWorkers int, period time.Duration) {
 	// Poll no faster than period.
 	ticker := time.NewTicker(period)
 	throttle := NewWSTokenSource(maxWorkers)

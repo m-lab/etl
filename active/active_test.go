@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
+	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/logx"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
@@ -63,7 +64,7 @@ func (r *runnable) Info() string {
 	return "test"
 }
 
-func (c *counter) toRunnable(obj *storage.ObjectAttrs) active.Runnable {
+func (c *counter) toRunnable(obj *storage.ObjectAttrs, pdt bqx.PDT) active.Runnable {
 	log.Println("Creating runnable for", obj.Name)
 	return &runnable{c, obj}
 }
@@ -118,7 +119,7 @@ func runAll(ctx context.Context, rSrc active.RunnableSource) (*errgroup.Group, e
 func TestGCSSourceBasic(t *testing.T) {
 	p := newCounter(t)
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, "test", bqx.PDT{}, standardLister(), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +145,7 @@ func TestWithRunFailures(t *testing.T) {
 	p.addOutcome(os.ErrInvalid)
 
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, "test", bqx.PDT{}, standardLister(), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +170,7 @@ func TestWithRunFailures(t *testing.T) {
 func TestExpiredContext(t *testing.T) {
 	p := newCounter(t)
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, "test", bqx.PDT{}, standardLister(), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +195,7 @@ func TestWithStorageError(t *testing.T) {
 	p := newCounter(t)
 
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", ErroringLister, p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, "test", bqx.PDT{}, ErroringLister, p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +210,7 @@ func TestExpiredFileListerContext(t *testing.T) {
 	p := newCounter(t)
 
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, "test", bqx.PDT{}, standardLister(), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}

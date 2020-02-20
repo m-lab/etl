@@ -16,13 +16,15 @@ import (
 	"sync"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"google.golang.org/api/iterator"
 
-	"cloud.google.com/go/storage"
+	"github.com/m-lab/go/bqx"
+	"github.com/m-lab/go/logx"
+
 	"github.com/m-lab/etl/cloud/gcs"
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/go/logx"
 )
 
 var debug = logx.Debug
@@ -94,8 +96,12 @@ type GCSSource struct {
 	ctx *Context
 	// The fileLister produces the list of source files.
 	fileLister FileLister
+
+	// destination table.
+	destTable bqx.PDT
+
 	// toRunnable creates a Runnable from ObjectAttrs.
-	toRunnable func(*storage.ObjectAttrs) Runnable
+	toRunnable func(*storage.ObjectAttrs, bqx.PDT) Runnable
 
 	pendingChan chan Runnable
 
@@ -103,10 +109,12 @@ type GCSSource struct {
 }
 
 // NewGCSSource creates a new source for active processing.
-func NewGCSSource(ctx context.Context, label string, fl FileLister, toRunnable func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
+// It incorporates a bqx.PDT which is used to create the inserter.
+func NewGCSSource(ctx context.Context, label string, destTable bqx.PDT, fl FileLister, toRunnable func(*storage.ObjectAttrs, bqx.PDT) Runnable) (*GCSSource, error) {
 	src := GCSSource{
 		ctx:        WithFail(ctx),
 		fileLister: fl,
+		destTable:  destTable,
 		toRunnable: toRunnable,
 
 		pendingChan: make(chan Runnable, 0),
@@ -188,6 +196,6 @@ func (src *GCSSource) streamToPending(ctx context.Context) {
 		}
 		debug.Printf("Adding gs://%s/%s", f.Bucket, f.Name)
 		// Blocks until consumer reads channel.
-		src.pendingChan <- src.toRunnable(f)
+		src.pendingChan <- src.toRunnable(f, src.destTable)
 	}
 }

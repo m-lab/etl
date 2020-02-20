@@ -8,7 +8,7 @@ import (
 
 // Runnable is just a function that does something and returns an error.
 // A Runnable may return ErrShouldRetry if there was a non-persistent error.
-// TODO - should this instead be and interface, with Run() and ShouldRetry()?
+// TODO - should this provide ShouldRetry()?
 type Runnable interface {
 	Run() error
 	Info() string
