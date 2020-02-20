@@ -103,7 +103,7 @@ func standardInsertParams(bufferSize int) etl.InserterParams {
 func fakeETLSource(rdr *tar.Reader) (*storage.ETLSource, error) {
 
 	baseTimeout := 16 * time.Millisecond
-	return &storage.ETLSource{rdr, nil, baseTimeout, "invalid"}, nil
+	return &storage.ETLSource{TarReader: rdr, Closer: nil, RetryBaseTime: baseTimeout, TableBase: "invalid"}, nil
 }
 
 func TestProcessSource(t *testing.T) {
