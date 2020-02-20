@@ -31,6 +31,7 @@ import (
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/go/bqx"
 )
 
 // insertsBeforeRowJSONCount controls how often we perform a wasted JSON marshal
@@ -53,6 +54,15 @@ const (
 	// typically complete in one or two seconds.
 	putContextTimeout = 60 * time.Second
 )
+
+// NewPDTInserter creates a new BQInserter to a specific column partitioned table.
+func NewPDTInserter(destTable bqx.PDT) (etl.Inserter, error) {
+	return NewBQInserter(
+		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: suffix,
+			PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
+			BufferSize: dt.BQBufferSize()},
+		nil)
+}
 
 // NewInserter creates a new BQInserter with appropriate characteristics.
 func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
