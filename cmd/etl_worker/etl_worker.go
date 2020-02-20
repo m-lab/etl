@@ -1,4 +1,3 @@
-// Sample
 package main
 
 import (
@@ -14,12 +13,12 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/active"
+	"github.com/m-lab/etl/worker"
 
-	"cloud.google.com/go/storage"
+	storage "cloud.google.com/go/storage"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/etl/worker"
 	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
@@ -214,34 +213,8 @@ func setMaxInFlight() {
 	}
 }
 
-type runnable struct {
-	storage.ObjectAttrs
-}
-
-func (r *runnable) Run() error {
-	path := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
-	data, err := etl.ValidateTestPath(path)
-	if err != nil {
-		log.Printf("Invalid filename: %v\n", err)
-		return err
-	}
-
-	start := time.Now()
-	log.Println("Processing", path)
-	statusCode, err := worker.ProcessTask(path)
-	metrics.DurationHistogram.WithLabelValues(
-		data.DataType, http.StatusText(statusCode)).Observe(
-		time.Since(start).Seconds())
-	return err
-}
-
-func (r *runnable) Info() string {
-	// Should truncate this to exclude the date, maybe include the year?
-	return r.Name
-}
-
 func toRunnable(obj *storage.ObjectAttrs, pdt bqx.PDT) active.Runnable {
-	return &runnable{*obj}
+	return &worker.Runnable{ObjectAttrs: *obj, DestTable: pdt}
 }
 
 func mustGardenerAPI(ctx context.Context, jobServer string) *active.GardenerAPI {
