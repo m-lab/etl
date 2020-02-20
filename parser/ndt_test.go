@@ -114,8 +114,8 @@ func TestNDTParser(t *testing.T) {
 	// Completely fake annotation data.
 	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
 		"Annotations":{
-				   "45.56.98.222":{"Geo":{"postal_code":"45569"}, "Network":{"Systems":[{"ASNs":[123]}]}},
-				   "213.208.152.37":{"Geo":{"postal_code":"21320"}, "Network":{"Systems":[{"ASNs":[456]}]}}
+				   "45.56.98.222":{"Geo":{"PostalCode":"45569"}, "Network":{"Systems":[{"ASNs":[123]}]}},
+				   "213.208.152.37":{"Geo":{"PostalCode":"21320"}, "Network":{"Systems":[{"ASNs":[456]}]}}
 				   }}`
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, responseJSON)
