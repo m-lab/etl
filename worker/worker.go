@@ -7,22 +7,26 @@ import (
 	"net/http"
 	"time"
 
+	"cloud.google.com/go/storage"
+
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/storage"
+	etlstorage "github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
+	"github.com/m-lab/go/bqx"
 )
 
+// Error types returned through public API.
 var (
 	ErrBadDataType = errors.New("unknown data type")
 )
 
-func makeEtlSource(fn string, tableBase string) (*storage.ETLSource, error) {
-	client, err := storage.GetStorageClient(false)
+func makeEtlSource(fn string, tableBase string) (*etlstorage.ETLSource, error) {
+	client, err := etlstorage.GetStorageClient(false)
 	// TODO - add a timer for reading the file.
-	tr, err := storage.NewETLSource(client, fn)
+	tr, err := etlstorage.NewETLSource(client, fn)
 	if err != nil {
 		return nil, err
 		// TODO - anything better we could do here?
@@ -108,7 +112,7 @@ func ProcessTaskWithInserter(fn string, ins etl.Inserter) (int, error) {
 
 // ProcessSource allows injection of arbitrary etlSource and inserter.
 // TODO - add test with fake source and inserter.
-func ProcessSource(fn string, path etl.DataPath, dt etl.DataType, tr *storage.ETLSource, ins etl.Inserter) (int, error) {
+func ProcessSource(fn string, path etl.DataPath, dt etl.DataType, tr *etlstorage.ETLSource, ins etl.Inserter) (int, error) {
 	tableBase := path.TableBase()
 	// Count number of workers operating on each table.
 	metrics.WorkerCount.WithLabelValues(tableBase).Inc()
@@ -152,4 +156,65 @@ func ProcessSource(fn string, path etl.DataPath, dt etl.DataType, tr *storage.ET
 
 	metrics.TaskCount.WithLabelValues(tableBase, string(dt), "OK").Inc()
 	return http.StatusOK, nil
+}
+
+// Runnable implements active.Runnable interface for a GCS object and BQ destination table.
+// Is there a better place for this?
+// TODO needs a unit test.
+type Runnable struct {
+	storage.ObjectAttrs
+	DestTable bqx.PDT
+}
+
+// Run implements active.Runnable.Run()
+func (r *Runnable) Run() error {
+	fn := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
+	path, err := etl.ValidateTestPath(fn)
+	if err != nil {
+		log.Printf("Invalid filename: %v\n", err)
+		return err
+	}
+
+	tableBase := path.TableBase()
+
+	// Move this into Validate function
+	dataType := path.GetDataType()
+	if dataType == etl.INVALID {
+		metrics.TaskCount.WithLabelValues(tableBase, "worker", "BadRequest").Inc()
+		log.Printf("Invalid filename: %s\n", fn)
+		return ErrBadDataType
+	}
+
+	dateFormat := "20060102"
+	date, _ := time.Parse(dateFormat, path.PackedDate)
+	// TODO This should use the DestTable field!!!
+	ins, err := bq.NewInserter(dataType, date)
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(tableBase, string(dataType), "NewInserterError").Inc()
+		log.Printf("Error creating BQ Inserter:  %v", err)
+		return err
+		// TODO - anything better we could do here?
+	}
+
+	tr, err := makeEtlSource(fn, tableBase)
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(tableBase, "worker", "ServiceUnavailable").Inc()
+		log.Printf("Error getting storage client: %v\n", err)
+		return err
+	}
+	defer tr.Close()
+
+	start := time.Now()
+	log.Println("Processing", path)
+	statusCode, err := ProcessSource(fn, *path, dataType, tr, ins)
+	metrics.DurationHistogram.WithLabelValues(
+		path.DataType, http.StatusText(statusCode)).Observe(
+		time.Since(start).Seconds())
+	return err
+}
+
+// Info implements active.Runnable.Info()
+func (r *Runnable) Info() string {
+	// Should truncate this to exclude the date, maybe include the year?
+	return r.Name
 }
