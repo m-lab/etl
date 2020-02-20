@@ -20,6 +20,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
+	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -239,7 +240,7 @@ func (r *runnable) Info() string {
 	return r.Name
 }
 
-func toRunnable(obj *storage.ObjectAttrs) active.Runnable {
+func toRunnable(obj *storage.ObjectAttrs, pdt bqx.PDT) active.Runnable {
 	return &runnable{*obj}
 }
 
