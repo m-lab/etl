@@ -60,9 +60,9 @@ func TestBase(t *testing.T) {
 
 	// Set up fake annotation service
 	r1 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-	                  "Annotations":{"1.2.3.4":{"Geo":{"PostalCode":"10583"}}}}`
+	                  "Annotations":{"1.2.3.4":{"Geo":{"postal_code":"10583"}}}}`
 	r2 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-					  "Annotations":{"4.3.2.1":{"Geo":{"PostalCode":"10584"}}}}`
+					  "Annotations":{"4.3.2.1":{"Geo":{"postal_code":"10584"}}}}`
 
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -128,9 +128,9 @@ func TestAsyncPut(t *testing.T) {
 
 	// Set up fake annotation service
 	r1 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-	                  "Annotations":{"1.2.3.4":{"Geo":{"PostalCode":"10583"}}}}`
+	                  "Annotations":{"1.2.3.4":{"Geo":{"postal_code":"10583"}}}}`
 	r2 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-					  "Annotations":{"4.3.2.1":{"Geo":{"PostalCode":"10584"}}}}`
+					  "Annotations":{"4.3.2.1":{"Geo":{"postal_code":"10584"}}}}`
 
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

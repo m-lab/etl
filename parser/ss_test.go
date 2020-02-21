@@ -73,12 +73,12 @@ func TestSSInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
 	// Completely fake annotation data.
 	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-		"Annotations":{"5.228.253.100":{"Geo":{"PostalCode":"52282"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "178.141.112.12":{"Geo":{"PostalCode":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "193.169.96.33":{"Geo":{"PostalCode":"19316"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "178.141.112.12":{"Geo":{"PostalCode":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "45.56.98.222":{"Geo":{"PostalCode":"45569"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "213.248.112.75":{"Geo":{"PostalCode":"213248"}, "Network":{"Systems":[{"ASNs":[456]}]}}
+		"Annotations":{"5.228.253.100":{"Geo":{"postal_code":"52282"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "178.141.112.12":{"Geo":{"postal_code":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "193.169.96.33":{"Geo":{"postal_code":"19316"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "178.141.112.12":{"Geo":{"postal_code":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "45.56.98.222":{"Geo":{"postal_code":"45569"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+				   "213.248.112.75":{"Geo":{"postal_code":"213248"}, "Network":{"Systems":[{"ASNs":[456]}]}}
 				   }}`
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, responseJSON)
