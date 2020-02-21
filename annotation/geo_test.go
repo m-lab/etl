@@ -57,8 +57,8 @@ func TestAddGeoAnnotations(t *testing.T) {
 		},
 	}
 	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-	                  "Annotations":{"127.0.0.1":{"Geo":{"PostalCode":"10583"}},
-	                                 "127.0.0.2":{"Geo":{"PostalCode":"10584"}}}}`
+	                  "Annotations":{"127.0.0.1":{"Geo":{"postal_code":"10583"}},
+	                                 "127.0.0.2":{"Geo":{"postal_code":"10584"}}}}`
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, responseJSON)
 	}))
@@ -147,7 +147,7 @@ func TestGetAndInsertGeolocationIPStruct(t *testing.T) {
 		},
 	}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"Geo":{"PostalCode":"10583"},"ASN":{}}`)
+		fmt.Fprint(w, `{"Geo":{"postal_code":"10583"},"ASN":{}}`)
 	}))
 	for _, test := range tests {
 		annotation.BaseURL = ts.URL + test.url
