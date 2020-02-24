@@ -233,6 +233,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		}
 		// If ALL rows failed...
 		if len(typedErr) == in.pending {
+			log.Printf("%v %v\n", err, typedErr.Error()) // Log the first RowInsertionError detail
 			metrics.BackendFailureCount.WithLabelValues(
 				in.TableBase(), "failed insert").Inc()
 			in.failures++
