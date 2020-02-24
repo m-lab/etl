@@ -229,7 +229,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 			log.Println("Inconsistent state error!!")
 		}
 		if len(typedErr) == in.pending {
-			log.Printf("%v\n", err)
+			log.Printf("%v %v\n", err, typedErr[0]) // Log the first RowInsertionError detail
 			metrics.BackendFailureCount.WithLabelValues(
 				in.TableBase(), "failed insert").Inc()
 			in.failures++
