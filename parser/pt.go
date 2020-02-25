@@ -479,6 +479,11 @@ func (pt *PTParser) ProcessLastTests() error {
 	for _, oneTest := range pt.previousTests {
 		pt.InsertOneTest(oneTest)
 	}
+
+	// Force async for the last few tests.
+	pt.Annotate(pt.TableName())
+	pt.PutAsync(pt.TakeRows())
+
 	pt.previousTests = []cachedPTData{}
 	return nil
 }
