@@ -243,11 +243,11 @@ func (in *BQInserter) updateMetrics(err error) error {
 			// Handle each error individually.
 			for i, rowError := range typedErr {
 				// These are rowInsertionErrors
-				log.Printf("Insert error: %d %v on %s\n", i, rowError, in.FullTableName())
+				log.Printf("Insert error: %d %s on %s\n", i, rowError.Error(), in.FullTableName())
 			}
 		} else if len(typedErr) > 0 {
 			// Otherwise, just log the first RowInsertionError detail
-			log.Printf("Insert error: %v %v on %s\n", err, typedErr[0], in.FullTableName())
+			log.Printf("%d insert errors: %v %s on %s\n", len(typedErr), err, typedErr[0].Error(), in.FullTableName())
 		}
 
 		metrics.ErrorCount.WithLabelValues(
