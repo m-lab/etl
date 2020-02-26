@@ -69,6 +69,18 @@ func (p *TCPInfoParser) IsParsable(testName string, data []byte) (string, bool) 
 	return "", false
 }
 
+func thinSnaps(orig []*snapshot.Snapshot) []*snapshot.Snapshot {
+	n := len(orig)
+	out := make([]*snapshot.Snapshot, 0, 1+n/10)
+	for i := 0; i < n; i += 10 {
+		out = append(out, orig[i])
+	}
+	if n%10 != 0 {
+		out = append(out, orig[n-1])
+	}
+	return out
+}
+
 // ParseAndInsert extracts all ArchivalRecords from the rawContent and inserts into a single row.
 // Approximately 15 usec/snapshot.
 func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
@@ -125,7 +137,8 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 	}
 
 	row := schema.TCPRow{}
-	row.Snapshots = snaps
+	// TODO - restore full snapshots, or implement smarter filtering.
+	row.Snapshots = thinSnaps(snaps)
 	row.FinalSnapshot = snaps[len(snaps)-1]
 	if row.FinalSnapshot.InetDiagMsg != nil {
 		row.SockID = row.FinalSnapshot.InetDiagMsg.ID.GetSockID()
