@@ -271,6 +271,34 @@ func TestPTInserter(t *testing.T) {
 	}
 }
 
+func TestPTInserterLastTest(t *testing.T) {
+	ins := newInMemoryInserter()
+	pt := parser.NewPTParser(ins)
+	rawData, err := ioutil.ReadFile("testdata/PT/20130524T00:04:44Z_ALL5729.paris")
+	if err != nil {
+		t.Fatalf("cannot read testdata.")
+	}
+	meta := map[string]bigquery.Value{"filename": "gs://fake-bucket/fake-archive.tgz"}
+	err = pt.ParseAndInsert(meta, "testdata/PT/20130524T00:04:44Z_ALL5729.paris", rawData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if pt.NumRowsForTest() != 0 {
+		fmt.Println(pt.NumRowsForTest())
+		t.Fatalf("The data is not inserted, in buffer now.")
+	}
+	pt.Flush()
+
+	if len(ins.data) != 1 {
+		fmt.Println(len(ins.data))
+		t.Fatalf("Number of rows in inserter is wrong.")
+	}
+	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
+		t.Fatalf("Task filename is wrong.")
+	}
+}
+
 func TestPTPollutionCheck(t *testing.T) {
 	ins := &inMemoryInserter{}
 	pt := parser.NewPTParser(ins)
@@ -345,7 +373,7 @@ func TestPTPollutionCheck(t *testing.T) {
 	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
 	if pt.NumRowsForTest() != 4 {
-		t.Fatalf("Number of tests in buffer not correct, expect 4, actually %d.", ins.RowsInBuffer())
+		t.Fatalf("Number of tests in buffer not correct, expect 0, actually %d.", ins.RowsInBuffer())
 	}
 }
 

@@ -479,12 +479,15 @@ func (pt *PTParser) ProcessLastTests() error {
 	for _, oneTest := range pt.previousTests {
 		pt.InsertOneTest(oneTest)
 	}
+
 	pt.previousTests = []cachedPTData{}
 	return nil
 }
 
 func (pt *PTParser) Flush() error {
 	pt.ProcessLastTests()
+	pt.Annotate(pt.TableName())
+	pt.Put(pt.TakeRows())
 	return pt.Inserter.Flush()
 }
 
