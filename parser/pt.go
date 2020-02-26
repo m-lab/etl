@@ -480,16 +480,14 @@ func (pt *PTParser) ProcessLastTests() error {
 		pt.InsertOneTest(oneTest)
 	}
 
-	// Force async for the last few tests.
-	pt.Annotate(pt.TableName())
-	pt.PutAsync(pt.TakeRows())
-
 	pt.previousTests = []cachedPTData{}
 	return nil
 }
 
 func (pt *PTParser) Flush() error {
 	pt.ProcessLastTests()
+	pt.Annotate(pt.TableName())
+	pt.Put(pt.TakeRows())
 	return pt.Inserter.Flush()
 }
 

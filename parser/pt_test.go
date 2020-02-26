@@ -372,7 +372,7 @@ func TestPTPollutionCheck(t *testing.T) {
 
 	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
-	if pt.NumRowsForTest() != 0 {
+	if pt.NumRowsForTest() != 4 {
 		t.Fatalf("Number of tests in buffer not correct, expect 0, actually %d.", ins.RowsInBuffer())
 	}
 }
