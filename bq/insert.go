@@ -11,7 +11,6 @@
 //
 // Passing in slice of structs makes memory pressure a bit worse, but probably isn't
 // worth worrying about.
-
 package bq
 
 import (
@@ -137,6 +136,7 @@ func assertSaver(ms MapSaver) {
 
 //----------------------------------------------------------------------------
 
+// BQInserter provides an API for inserting rows into a specific BQ Table.
 type BQInserter struct {
 	// These are either constant or threadsafe.
 	params     etl.InserterParams
@@ -159,8 +159,9 @@ type BQInserter struct {
 	failures int // Number of complete insert failures.
 }
 
+// InsertRow adds one row to the insert buffer, and flushes if necessary.
 // Caller should check error, and take appropriate action before calling again.
-// Not threadsafe.  Should only be called by owning thread.
+// NOT THREADSAFE.  Should only be called by owning thread/goroutine.
 // Deprecated:  Please use external buffer, Put, and PutAsync instead.
 func (in *BQInserter) InsertRow(data interface{}) error {
 	return in.InsertRows([]interface{}{data})
@@ -192,8 +193,9 @@ func (in *BQInserter) maybeCountRowSize(data []interface{}) {
 		in.TableBase()).Observe(float64(len(jsonRow)))
 }
 
+// InsertRows adds rows to the insert buffer, and flushes if necessary.
 // Caller should check error, and take appropriate action before calling again.
-// Not threadsafe.  Should only be called by owning thread.
+// NOT THREADSAFE.  Should only be called by owning thread/goroutine.
 // Deprecated:  Please use external buffer, Put, and PutAsync instead.
 func (in *BQInserter) InsertRows(data []interface{}) error {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "insert").Inc()
@@ -217,6 +219,7 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 	return nil
 }
 
+// TODO for some error types, should retry the insert.
 func (in *BQInserter) updateMetrics(err error) error {
 	if in.pending == 0 {
 		log.Println("Unexpected state error!!")
@@ -228,38 +231,33 @@ func (in *BQInserter) updateMetrics(err error) error {
 		if len(typedErr) > in.pending {
 			log.Println("Inconsistent state error!!")
 		}
+		// If ALL rows failed...
 		if len(typedErr) == in.pending {
-			log.Printf("%v\n", err)
 			metrics.BackendFailureCount.WithLabelValues(
 				in.TableBase(), "failed insert").Inc()
 			in.failures++
 		}
-		// If ALL rows failed, and number of rows is large, just report single failure.
-		if len(typedErr) > 10 && len(typedErr) == in.pending {
-			log.Printf("Insert error: %v\n", err)
-			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "PutMultiError", "insert row error").
-				Add(float64(len(typedErr)))
-		} else {
+
+		// If only a partial failure, or no more than 10 rows, then write log for every row.
+		if len(typedErr) <= 10 || len(typedErr) < in.pending {
 			// Handle each error individually.
-			// TODO Should we try to handle large numbers of row errors?
-			for _, rowError := range typedErr {
+			for i, rowError := range typedErr {
 				// These are rowInsertionErrors
-				log.Printf("%v\n", rowError)
-				// rowError.Errors is a MultiError
-				for _, oneErr := range rowError.Errors {
-					log.Printf("Insert error: %v\n", oneErr)
-					metrics.ErrorCount.WithLabelValues(
-						in.TableBase(), "PutMultiError", "insert row error").Inc()
-				}
+				log.Printf("Insert error: %d %s on %s\n", i, rowError.Error(), in.FullTableName())
 			}
+		} else if len(typedErr) > 0 {
+			// Otherwise, just log the first RowInsertionError detail
+			log.Printf("%d insert errors: %v %s on %s\n", len(typedErr), err, typedErr[0].Error(), in.FullTableName())
 		}
+
+		metrics.ErrorCount.WithLabelValues(
+			in.TableBase(), "PutMultiError", "insert row error").
+			Add(float64(len(typedErr)))
 		in.inserted -= len(typedErr)
 		in.badRows += len(typedErr)
 		err = nil
 	case *url.Error:
-		log.Printf("Unhandled url.Error on insert %v Project: %s, Dataset: %s, Table: %s\n",
-			typedErr, in.Project(), in.Dataset(), in.FullTableName())
+		log.Printf("Insert url.Error: %v on %s", typedErr, in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
@@ -270,7 +268,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		in.badRows += in.pending
 		err = nil
 	case *googleapi.Error:
-		log.Printf("%s %v", in.TableBase(), typedErr)
+		log.Printf("Insert error: %v on %s", typedErr, in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
@@ -283,8 +281,8 @@ func (in *BQInserter) updateMetrics(err error) error {
 
 	default:
 		// With Elem(), this was causing panics.
-		log.Printf("Unhandled %v on insert %v Project: %s, Table: %s\n", reflect.TypeOf(typedErr),
-			typedErr, in.Project(), in.FullTableName())
+		log.Printf("Unhandled %v: %v on %s\n", reflect.TypeOf(typedErr),
+			typedErr, in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
