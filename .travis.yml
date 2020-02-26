@@ -17,7 +17,7 @@
 
 language: go
 go:
- - 1.13
+ - "1.13.8"
 
 env:
 - PATH=$PATH:$HOME/gopath/bin
@@ -37,6 +37,7 @@ before_install:
 
 # Tool to generate and embed binary assets.
 - go get github.com/go-bindata/go-bindata/go-bindata
+- go-bindata -version
 
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
@@ -79,8 +80,8 @@ script:
 # Enforce that the local binary assets match the generated ones.
 - cp schema/bindata.go /tmp/current-bindata.go
 - go generate ./schema
-- diff -q schema/bindata.go /tmp/current-bindata.go || (
-  echo "Files do not match; run 'go generate ./schema' and commit changes" && false )
+- diff /tmp/current-bindata.go schema/bindata.go || (
+  echo "Files do not match; run 'update go-bindata, go generate ./schema' and commit changes" && false )
 
 # Run all javascript tests.
 - pushd $TRAVIS_BUILD_DIR/functions

@@ -56,6 +56,7 @@ func (p *TCPInfoParser) TableName() string {
 
 // Flush synchronously flushes any pending rows.
 func (p *TCPInfoParser) Flush() error {
+	p.Annotate(p.TableName())
 	p.Put(p.TakeRows())
 	return p.Inserter.Flush()
 }
