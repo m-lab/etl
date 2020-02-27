@@ -548,7 +548,8 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Process the legacy Paris Traceroute txt output
 	cachedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
 	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
+		// These are happening at a high rate, so demote them to warnings until we can fix them.
+		metrics.WarningCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
 		metrics.TestCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()

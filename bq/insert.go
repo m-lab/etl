@@ -268,11 +268,19 @@ func (in *BQInserter) updateMetrics(err error) error {
 		in.badRows += in.pending
 		err = nil
 	case *googleapi.Error:
+		// TODO add special handling for Quota Exceeded
 		log.Printf("Insert error: %v on %s", typedErr, in.FullTableName())
-		metrics.BackendFailureCount.WithLabelValues(
-			in.TableBase(), "failed insert").Inc()
-		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "googleapi.Error", "UNHANDLED insert error").Inc()
+		if strings.Contains(err.Error(), "Quota exceeded:") {
+			metrics.BackendFailureCount.WithLabelValues(
+				in.TableBase(), "quota exceeded").Inc()
+			metrics.ErrorCount.WithLabelValues(
+				in.TableBase(), "googleapi.Error", "Insert: Quota Exceeded").Inc()
+		} else {
+			metrics.BackendFailureCount.WithLabelValues(
+				in.TableBase(), "failed insert").Inc()
+			metrics.ErrorCount.WithLabelValues(
+				in.TableBase(), "googleapi.Error", "UNHANDLED insert error").Inc()
+		}
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
 		in.inserted -= in.pending
