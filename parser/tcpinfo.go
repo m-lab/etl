@@ -235,3 +235,17 @@ func NewTCPInfoParser(ins etl.Inserter, ann ...v2as.Annotator) *TCPInfoParser {
 		table:  ins.TableBase(),
 		suffix: ins.TableSuffix()}
 }
+
+// NewTCPInfoParser2 creates a new TCPInfoParser.  Duh.
+// Single annotator may be optionally passed in.
+// TODO change to required parameter.
+func NewTCPInfoParser2(sink row.Sink, table string, ann v2as.Annotator) *TCPInfoParser {
+	bufSize := etl.TCPINFO.BQBufferSize()
+	if ann == nil {
+		ann = v2as.GetAnnotator(annotation.BatchURL)
+	}
+
+	return &TCPInfoParser{
+		Base:  row.NewBase("foobar", sink, bufSize, ann),
+		table: table}
+}
