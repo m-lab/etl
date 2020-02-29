@@ -354,7 +354,7 @@ func (in *BQInserter) Flush() error {
 	return in.Put(rows)
 }
 
-// Commit implements row.Commit.
+// Commit implements row.Sink.
 // NOTE: the label is ignored, and the TableBase is used instead.
 func (in *BQInserter) Commit(rows []interface{}, label string) {
 	in.flushSlice(rows)
