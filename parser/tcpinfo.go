@@ -38,7 +38,8 @@ import (
 // TCPInfoParser handles parsing for TCPINFO datatype.
 type TCPInfoParser struct {
 	*row.Base
-	params etl.InserterParams // TODO - eliminate this.
+	table  string
+	suffix string
 }
 
 // RowsInBuffer returns the count of rows currently in the buffer.
@@ -61,35 +62,14 @@ func (p *TCPInfoParser) Failed() int {
 	return p.GetStats().Failed
 }
 
-// FullTableName implements etl.Inserter.FullTableName
+// FullTableName implements etl.Parser.FullTableName
 func (p *TCPInfoParser) FullTableName() string {
-	return p.params.Table + p.params.Suffix
+	return p.table + p.suffix
 }
 
-// TableBase implements etl.Inserter.TableBase
-func (p *TCPInfoParser) TableBase() string {
-	return p.params.Table
-}
-
-// TableSuffix implements etl.Inserter.TableSuffix
-// The $ or _ suffix.
-func (p *TCPInfoParser) TableSuffix() string {
-	return p.params.Suffix
-}
-
-// Project implements etl.Inserter.Project
-func (p *TCPInfoParser) Project() string {
-	return p.params.Project
-}
-
-// Dataset implements etl.Inserter.Dataset
-func (p *TCPInfoParser) Dataset() string {
-	return p.params.Dataset
-}
-
-// TableName implements etl.Inserter.TableName
+// TableName implements etl.Parser.TableName
 func (p *TCPInfoParser) TableName() string {
-	return p.params.Table
+	return p.table
 }
 
 // TaskError return the task level error, based on failed rows, or any other criteria.
@@ -236,10 +216,9 @@ func NewTCPInfoParser(ins etl.Inserter, ann ...v2as.Annotator) *TCPInfoParser {
 		log.Printf("%v is not a Sink\n", ins)
 		panic("")
 	}
-	bqi, ok := ins.(HasParams)
-	if !ok {
-		log.Fatalf("%v is not a HasParams\n", ins)
-	}
 
-	return &TCPInfoParser{row.NewBase("foobar", sink, bufSize, annotator), bqi.Params()}
+	return &TCPInfoParser{
+		Base:   row.NewBase("foobar", sink, bufSize, annotator),
+		table:  ins.TableBase(),
+		suffix: ins.TableSuffix()}
 }
