@@ -304,6 +304,14 @@ func newInMemoryInserter() *inMemoryInserter {
 	return &inMemoryInserter{data, 0, 0}
 }
 
+func (in *inMemoryInserter) Commit(data []interface{}, label string) error {
+	return in.Put(data)
+}
+
+func (in *inMemoryInserter) Params() etl.InserterParams {
+	return etl.InserterParams{}
+}
+
 func (in *inMemoryInserter) Put(data []interface{}) error {
 	in.data = append(in.data, data...)
 	in.committed = len(in.data)
