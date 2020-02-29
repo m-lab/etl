@@ -1,6 +1,6 @@
 package row
 
-// TODO integrate this functionality into the parser.go code.
+// TODO integrate this functionality into the go code.
 // Probably should have Base implement Parser.
 
 import (
@@ -11,17 +11,30 @@ import (
 	"sync"
 	"time"
 
+	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/etl/parser"
 )
 
 // Errors that may be returned by Buffer functions.
 var (
-	ErrBufferFull = errors.New("Buffer full")
+	ErrAnnotationError = errors.New("Annotation error")
+	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
+	ErrBufferFull      = errors.New("Buffer full")
 )
+
+// Annotatable interface enables integration of annotation into a
+// The row type should implement the interface, and the annotations will be added
+// prior to insertion.
+type Annotatable interface {
+	GetLogTime() time.Time
+	GetClientIPs() []string // This is a slice to support mutliple hops in traceroute data.
+	GetServerIP() string
+	AnnotateClients(map[string]*api.Annotations) error // Must properly handle missing annotations.
+	AnnotateServer(*api.Annotations) error             // Must properly handle nil parameter.
+}
 
 // Stats contains stats about buffer history.
 type Stats struct {
@@ -46,9 +59,14 @@ type Sink interface {
 // rows that implement Annotatable.
 // Buffer functions are THREAD-SAFE
 type Buffer struct {
-	lock       sync.Mutex
-	bufferSize int // Size before returning ErrFull
-	rows       []interface{}
+	lock sync.Mutex
+	size int // Size before returning ErrFull
+	rows []interface{}
+}
+
+// NewBuffer returns a new buffer of the desired size.
+func NewBuffer(size int) *Buffer {
+	return &Buffer{size: size, rows: make([]interface{}, 0, size)}
 }
 
 // AddRow simply inserts a row into the buffer.
@@ -57,12 +75,12 @@ type Buffer struct {
 func (buf *Buffer) AddRow(row interface{}) []interface{} {
 	buf.lock.Lock()
 	defer buf.lock.Unlock()
-	if len(buf.rows) < buf.bufferSize {
+	if len(buf.rows) < buf.size {
 		buf.rows = append(buf.rows, row)
 		return nil
 	}
 	rows := buf.rows
-	buf.rows = make([]interface{}, 0, buf.bufferSize)
+	buf.rows = make([]interface{}, 0, buf.size)
 	buf.rows = append(buf.rows, row)
 
 	return rows
@@ -79,7 +97,7 @@ func (buf *Buffer) TakeRows() []interface{} {
 	buf.lock.Lock()
 	defer buf.lock.Unlock()
 	res := buf.rows
-	buf.rows = make([]interface{}, 0, buf.bufferSize)
+	buf.rows = make([]interface{}, 0, buf.size)
 	return res
 }
 
@@ -92,9 +110,9 @@ func (ann *annotator) annotateServers(rows []interface{}, label string) error {
 	serverIPs := make(map[string]struct{})
 	logTime := time.Time{}
 	for i := range rows {
-		r, ok := rows[i].(parser.Annotatable)
+		r, ok := rows[i].(Annotatable)
 		if !ok {
-			return parser.ErrNotAnnotatable
+			return ErrNotAnnotatable
 		}
 
 		// Only ask for the IP if it is non-empty.
@@ -127,13 +145,13 @@ func (ann *annotator) annotateServers(rows []interface{}, label string) error {
 		log.Println("empty server annotation response")
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Server IP: empty response"}).Inc()
-		return parser.ErrAnnotationError
+		return ErrAnnotationError
 	}
 
 	for i := range rows {
-		r, ok := rows[i].(parser.Annotatable)
+		r, ok := rows[i].(Annotatable)
 		if !ok {
-			err = parser.ErrNotAnnotatable
+			err = ErrNotAnnotatable
 		} else {
 			ip := r.GetServerIP()
 			if ip != "" {
@@ -153,9 +171,9 @@ func (ann *annotator) annotateClients(rows []interface{}, label string) error {
 	ipSlice := make([]string, 0, 2*len(rows)) // This may be inadequate, but its a reasonable start.
 	logTime := time.Time{}
 	for i := range rows {
-		r, ok := rows[i].(parser.Annotatable)
+		r, ok := rows[i].(Annotatable)
 		if !ok {
-			return parser.ErrNotAnnotatable
+			return ErrNotAnnotatable
 		}
 		ipSlice = append(ipSlice, r.GetClientIPs()...)
 		if (logTime == time.Time{}) {
@@ -175,13 +193,13 @@ func (ann *annotator) annotateClients(rows []interface{}, label string) error {
 		log.Println("empty client annotation response")
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Client IP: empty response"}).Inc()
-		return parser.ErrAnnotationError
+		return ErrAnnotationError
 	}
 
 	for i := range rows {
-		r, ok := rows[i].(parser.Annotatable)
+		r, ok := rows[i].(Annotatable)
 		if !ok {
-			err = parser.ErrNotAnnotatable
+			err = ErrNotAnnotatable
 		} else {
 			// Will not error because we check for nil annMap above.
 			r.AnnotateClients(annMap)
@@ -228,10 +246,10 @@ type Base struct {
 	stats     Stats
 }
 
-// NewBase creates a new parser.Base.  This will generally be embedded in a type specific parser.
+// NewBase creates a new Base.  This will generally be embedded in a type specific
 func NewBase(label string, sink Sink, bufSize int, ann v2as.Annotator) *Base {
-	buf := Buffer{bufferSize: bufSize, rows: make([]interface{}, 0, bufSize)}
-	return &Base{sink: sink, ann: annotator{ann}, buf: &buf, label: label}
+	buf := NewBuffer(bufSize)
+	return &Base{sink: sink, ann: annotator{ann}, buf: buf, label: label}
 }
 
 // GetStats returns the buffer/sink stats.
@@ -272,9 +290,9 @@ func (pb *Base) Flush() error {
 // Annotates and commits existing rows iff the buffer is full.
 // TODO improve Annotatable architecture.  Maybe more Annotatable here??
 func (pb *Base) AddRow(row interface{}) error {
-	if !reflect.TypeOf(row).Implements(reflect.TypeOf((*parser.Annotatable)(nil)).Elem()) {
+	if !reflect.TypeOf(row).Implements(reflect.TypeOf((*Annotatable)(nil)).Elem()) {
 		log.Println(reflect.TypeOf(row), "not Annotatable")
-		return parser.ErrNotAnnotatable
+		return ErrNotAnnotatable
 	}
 	rows := pb.buf.AddRow(row)
 	pb.statsLock.Lock()
