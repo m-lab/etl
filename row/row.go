@@ -12,9 +12,10 @@ import (
 	"time"
 
 	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Errors that may be returned by Buffer functions.
