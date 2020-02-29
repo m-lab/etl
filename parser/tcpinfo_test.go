@@ -62,6 +62,7 @@ func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ip
 }
 
 // NOTE: This uses a fake annotator which returns no annotations.
+// TODO: This test seems to be flakey in travis - sometimes only 357 tests instead of 362
 func TestTCPParser(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parserVersion := parser.InitParserVersionForTest()
