@@ -501,3 +501,7 @@ func (in *BQInserter) Failed() int {
 	defer in.release()
 	return in.badRows
 }
+
+func (in *BQInserter) Params() etl.InserterParams {
+	return in.params
+}
