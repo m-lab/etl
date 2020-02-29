@@ -27,6 +27,7 @@ var (
 // Annotatable interface enables integration of annotation into a parser.
 // The row type should implement the interface, and the annotations will be added
 // prior to insertion.
+// Deprecated.  Use row.Annotatable.
 type Annotatable interface {
 	GetLogTime() time.Time
 	GetClientIPs() []string // This is a slice to support mutliple hops in traceroute data.
