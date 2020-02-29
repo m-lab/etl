@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"io"
 	"log"
+	"reflect"
 	"strings"
 	"time"
 
@@ -214,6 +215,7 @@ func NewTCPInfoParser(ins etl.Inserter, ann ...v2as.Annotator) *TCPInfoParser {
 	sink, ok := ins.(row.Sink)
 	if !ok {
 		log.Printf("%v is not a Sink\n", ins)
+		log.Println(reflect.TypeOf(ins))
 		return nil
 	}
 
