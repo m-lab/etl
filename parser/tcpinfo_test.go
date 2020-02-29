@@ -73,6 +73,7 @@ func TestTCPParser(t *testing.T) {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
+	// Inject fake inserter and annotator
 	ins := &inMemoryInserter{}
 	p := parser.NewTCPInfoParser(ins, &fakeAnnotator{})
 	task := task.NewTask(filename, src, p)
@@ -175,8 +176,9 @@ func TestTCPTask(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
 
+	// Inject fake inserter and annotator
 	ins := &inMemoryInserter{}
-	p := parser.NewTCPInfoParser(ins)
+	p := parser.NewTCPInfoParser(ins, &fakeAnnotator{})
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	src, err := localETLSource(filename)
@@ -199,8 +201,9 @@ func TestBQSaver(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
 
+	// Inject fake inserter and annotator
 	ins := &inMemoryInserter{}
-	p := parser.NewTCPInfoParser(ins)
+	p := parser.NewTCPInfoParser(ins, &fakeAnnotator{})
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	src, err := localETLSource(filename)
@@ -231,8 +234,9 @@ func BenchmarkTCPParser(b *testing.B) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
 
+	// Inject fake inserter and annotator
 	ins := &inMemoryInserter{}
-	p := parser.NewTCPInfoParser(ins)
+	p := parser.NewTCPInfoParser(ins, &fakeAnnotator{})
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	n := 0
