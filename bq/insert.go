@@ -354,6 +354,12 @@ func (in *BQInserter) Flush() error {
 	return in.Put(rows)
 }
 
+// Commit implements row.Commit.
+// NOTE: the label is ignored, and the TableBase is used instead.
+func (in *BQInserter) Commit(rows []interface{}, label string) {
+	in.flushSlice(rows)
+}
+
 // flushSlice flushes a slice of rows to BigQuery.
 // It is NOT threadsafe.
 func (in *BQInserter) flushSlice(rows []interface{}) error {
