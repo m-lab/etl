@@ -17,7 +17,6 @@ import (
 	"bytes"
 	"io"
 	"log"
-	"reflect"
 	"strings"
 	"time"
 
@@ -207,39 +206,9 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 >>>>>>> b6b5fce... Add tcpinfo test stats
 }
 
-// HasParams defines interface with Params()
-type HasParams interface {
-	Params() etl.InserterParams
-}
-
 // NewTCPInfoParser creates a new TCPInfoParser.  Duh.
-// Single annotator may be optionally passed in.
-// TODO change to required parameter.
-func NewTCPInfoParser(ins etl.Inserter, ann ...v2as.Annotator) *TCPInfoParser {
-	bufSize := etl.TCPINFO.BQBufferSize()
-	var annotator v2as.Annotator
-	if len(ann) > 0 && ann[0] != nil {
-		annotator = ann[0]
-	} else {
-		annotator = v2as.GetAnnotator(annotation.BatchURL)
-	}
-	sink, ok := ins.(row.Sink)
-	if !ok {
-		log.Printf("%v is not a Sink\n", ins)
-		log.Println(reflect.TypeOf(ins))
-		return nil
-	}
-
-	return &TCPInfoParser{
-		Base:   row.NewBase("foobar", sink, bufSize, annotator),
-		table:  ins.TableBase(),
-		suffix: ins.TableSuffix()}
-}
-
-// NewTCPInfoParser2 creates a new TCPInfoParser.  Duh.
-// Single annotator may be optionally passed in.
-// TODO change to required parameter.
-func NewTCPInfoParser2(sink row.Sink, table string, ann v2as.Annotator) *TCPInfoParser {
+// Annotator may be optionally passed in, or will be created if nil.
+func NewTCPInfoParser(sink row.Sink, table string, ann v2as.Annotator) *TCPInfoParser {
 	bufSize := etl.TCPINFO.BQBufferSize()
 	if ann == nil {
 		ann = v2as.GetAnnotator(annotation.BatchURL)
