@@ -61,7 +61,7 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 			log.Println(reflect.TypeOf(ins))
 			return nil
 		}
-		return NewTCPInfoParser2(sink, ins.TableBase(), nil)
+		return NewTCPInfoParser(sink, ins.TableBase(), nil)
 	default:
 		return nil
 	}
