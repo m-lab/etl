@@ -129,11 +129,6 @@ func TestBase(t *testing.T) {
 	if inserted.serverAnn == nil || inserted.serverAnn.Geo.PostalCode != "10584" {
 		t.Error("Failed server annotation")
 	}
-
-	err = b.Put(&BadRow{})
-	if err != row.ErrNotAnnotatable {
-		t.Error("Should return ErrNotAnnotatable")
-	}
 }
 
 func TestAsyncPut(t *testing.T) {

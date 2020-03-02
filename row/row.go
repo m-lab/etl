@@ -218,8 +218,10 @@ func (ann *annotator) Annotate(rows []interface{}, metricLabel string) error {
 	if len(rows) == 0 {
 		return nil
 	}
-	start := time.Now()
-	defer metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": metricLabel}).Observe(float64(time.Since(start).Nanoseconds()))
+	// TODO replace this with a histogram.
+	defer func(label string, start time.Time) {
+		metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": label}).Observe(float64(time.Since(start).Nanoseconds()))
+	}(metricLabel, time.Now())
 
 	// TODO Consider doing these in parallel?
 	clientErr := ann.annotateClients(rows, metricLabel)
@@ -248,7 +250,7 @@ type Base struct {
 	stats     Stats
 }
 
-// NewBase creates a new Base.  This will generally be embedded in a type specific
+// NewBase creates a new Base.  This will generally be embedded in a type specific parser.
 func NewBase(label string, sink Sink, bufSize int, ann v2as.Annotator) *Base {
 	buf := NewBuffer(bufSize)
 	return &Base{sink: sink, ann: annotator{ann}, buf: buf, label: label}
@@ -268,7 +270,8 @@ func (pb *Base) TaskError() error {
 
 func (pb *Base) commit(rows []interface{}) error {
 	// TODO - care about error?
-	pb.ann.Annotate(rows, pb.label)
+	_ = pb.ann.Annotate(rows, pb.label)
+	// TODO do we need these to be done in order.
 	err := pb.sink.Commit(rows, pb.label)
 
 	pb.statsLock.Lock()
@@ -290,8 +293,8 @@ func (pb *Base) Flush() error {
 
 // Put adds a row.
 // Annotates and commits existing rows iff the buffer is already full.
-// TODO improve Annotatable architecture.  Maybe move Annotatable here??
-func (pb *Base) Put(row interface{}) error {
+// TODO improve Annotatable architecture.
+func (pb *Base) Put(row Annotatable) error {
 	if !reflect.TypeOf(row).Implements(reflect.TypeOf((*Annotatable)(nil)).Elem()) {
 		log.Println(reflect.TypeOf(row), "not Annotatable")
 		return ErrNotAnnotatable
@@ -303,7 +306,10 @@ func (pb *Base) Put(row interface{}) error {
 	pb.stats.Pending++
 	if rows != nil {
 		go func(rows []interface{}) {
-			pb.commit(rows)
+			err := pb.commit(rows)
+			if err != nil {
+				log.Println(err)
+			}
 		}(rows)
 	}
 	return nil
