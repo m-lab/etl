@@ -190,20 +190,9 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 		}
 	}
 
-<<<<<<< HEAD
-	// TODO - handle metrics differently for error?
+	p.Put(&row)
 	metrics.TestCount.WithLabelValues(p.TableName(), "", "ok").Inc()
-	return p.Put(&row)
-=======
-	err = p.AddRow(&row)
-
-	if err != nil {
-		metrics.TestCount.WithLabelValues(p.TableName(), "", "ErrNotAnnotatable?").Inc()
-	} else {
-		metrics.TestCount.WithLabelValues(p.TableName(), "", "ok").Inc()
-	}
-	return err
->>>>>>> b6b5fce... Add tcpinfo test stats
+	return nil
 }
 
 // NewTCPInfoParser creates a new TCPInfoParser.  Duh.
