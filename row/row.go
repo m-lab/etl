@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"reflect"
 	"sync"
 	"time"
 
@@ -294,11 +293,7 @@ func (pb *Base) Flush() error {
 // Put adds a row.
 // Annotates and commits existing rows iff the buffer is already full.
 // TODO improve Annotatable architecture.
-func (pb *Base) Put(row Annotatable) error {
-	if !reflect.TypeOf(row).Implements(reflect.TypeOf((*Annotatable)(nil)).Elem()) {
-		log.Println(reflect.TypeOf(row), "not Annotatable")
-		return ErrNotAnnotatable
-	}
+func (pb *Base) Put(row Annotatable) {
 	rows := pb.buf.Append(row)
 	pb.statsLock.Lock()
 	defer pb.statsLock.Unlock()
@@ -312,5 +307,4 @@ func (pb *Base) Put(row Annotatable) error {
 			}
 		}(rows)
 	}
-	return nil
 }

@@ -96,16 +96,10 @@ func TestBase(t *testing.T) {
 
 	b := row.NewBase("test", ins, 10, v2as.GetAnnotator(ts.URL))
 
-	err := b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
-	if err != nil {
-		t.Error(err)
-	}
+	b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 
 	// Add a row with empty server IP
-	err = b.Put(&Row{"1.2.3.4", "", nil, nil})
-	if err != nil {
-		t.Error(err)
-	}
+	b.Put(&Row{"1.2.3.4", "", nil, nil})
 	if callCount != 0 {
 		t.Error("Callcount should be 0:", callCount)
 	}
@@ -156,17 +150,14 @@ func TestAsyncPut(t *testing.T) {
 
 	b := row.NewBase("test", ins, 1, v2as.GetAnnotator(ts.URL))
 
-	err := b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
-	if err != nil {
-		t.Error(err)
-	}
+	b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 
 	if b.GetStats().Committed != 0 {
 		t.Fatalf("Expected %d, Got %d.", 0, b.GetStats().Committed)
 	}
 
 	// This should trigger an async flush
-	err = b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
+	b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 	start := time.Now()
 	for time.Since(start) < 5*time.Second && b.GetStats().Committed < 1 {
 		time.Sleep(10 * time.Millisecond)
