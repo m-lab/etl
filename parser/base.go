@@ -10,11 +10,13 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/m-lab/annotation-service/api"
+	"github.com/prometheus/client_golang/prometheus"
+
 	v2as "github.com/m-lab/annotation-service/api/v2"
+
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/m-lab/etl/row"
 )
 
 // Errors that may be returned by BaseRowBuffer functions.
@@ -23,18 +25,6 @@ var (
 	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
 	ErrRowNotPointer   = errors.New("Row should be a pointer type")
 )
-
-// Annotatable interface enables integration of annotation into a parser.
-// The row type should implement the interface, and the annotations will be added
-// prior to insertion.
-// Deprecated.  Use row.Annotatable.
-type Annotatable interface {
-	GetLogTime() time.Time
-	GetClientIPs() []string // This is a slice to support mutliple hops in traceroute data.
-	GetServerIP() string
-	AnnotateClients(map[string]*api.Annotations) error // Must properly handle missing annotations.
-	AnnotateServer(*api.Annotations) error             // Must properly handle nil parameter.
-}
 
 // RowBuffer provides all basic functionality generally needed for buffering, annotating, and inserting
 // rows that implement Annotatable.
@@ -46,18 +36,19 @@ type RowBuffer struct {
 
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
 // Not thread-safe.  Should only be called by owning thread.
-func (buf *RowBuffer) AddRow(row interface{}) error {
-	if !reflect.TypeOf(row).Implements(reflect.TypeOf((*Annotatable)(nil)).Elem()) {
-		log.Println(reflect.TypeOf(row), "not Annotatable")
+func (buf *RowBuffer) AddRow(r interface{}) error {
+	if !reflect.TypeOf(r).Implements(reflect.TypeOf((*row.Annotatable)(nil)).Elem()) {
+		log.Println(reflect.TypeOf(r), "not Annotatable")
 		return ErrNotAnnotatable
 	}
 	for len(buf.rows) > buf.bufferSize-1 {
 		return etl.ErrBufferFull
 	}
-	buf.rows = append(buf.rows, row)
+	buf.rows = append(buf.rows, r)
 	return nil
 }
 
+// NumRowsForTest allows tests to find number of rows in buffer.
 func (buf *RowBuffer) NumRowsForTest() int {
 	return len(buf.rows)
 }
@@ -76,7 +67,7 @@ func (buf *RowBuffer) annotateServers(label string) error {
 	serverIPs := make(map[string]struct{})
 	logTime := time.Time{}
 	for i := range buf.rows {
-		r, ok := buf.rows[i].(Annotatable)
+		r, ok := buf.rows[i].(row.Annotatable)
 		if !ok {
 			return ErrNotAnnotatable
 		}
@@ -115,7 +106,7 @@ func (buf *RowBuffer) annotateServers(label string) error {
 	}
 
 	for i := range buf.rows {
-		r, ok := buf.rows[i].(Annotatable)
+		r, ok := buf.rows[i].(row.Annotatable)
 		if !ok {
 			err = ErrNotAnnotatable
 		} else {
@@ -137,7 +128,7 @@ func (buf *RowBuffer) annotateClients(label string) error {
 	ipSlice := make([]string, 0, 2*len(buf.rows)) // This may be inadequate, but its a reasonable start.
 	logTime := time.Time{}
 	for i := range buf.rows {
-		r, ok := buf.rows[i].(Annotatable)
+		r, ok := buf.rows[i].(row.Annotatable)
 		if !ok {
 			return ErrNotAnnotatable
 		}
@@ -163,7 +154,7 @@ func (buf *RowBuffer) annotateClients(label string) error {
 	}
 
 	for i := range buf.rows {
-		r, ok := buf.rows[i].(Annotatable)
+		r, ok := buf.rows[i].(row.Annotatable)
 		if !ok {
 			err = ErrNotAnnotatable
 		} else {

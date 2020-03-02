@@ -8,11 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/etl/etl"
-
 	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
+
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/row"
 )
 
 // Implement parser.Annotatable
@@ -49,7 +50,7 @@ func (row *Row) GetLogTime() time.Time {
 }
 
 func assertTestRowAnnotatable(r *Row) {
-	func(parser.Annotatable) {}(r)
+	func(row.Annotatable) {}(r)
 }
 
 func TestBase(t *testing.T) {

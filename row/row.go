@@ -11,9 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/m-lab/etl/metrics"
 )
@@ -25,7 +26,7 @@ var (
 	ErrBufferFull      = errors.New("Buffer full")
 )
 
-// Annotatable interface enables integration of annotation into a
+// Annotatable interface enables integration of annotation into parser.Base.
 // The row type should implement the interface, and the annotations will be added
 // prior to insertion.
 type Annotatable interface {
@@ -41,7 +42,7 @@ type Stats struct {
 	Pending   int
 	Committed int
 	Failed    int
-	Accepted  int // rows Accepted (Pending+Committed+Failed)
+	Total     int // total rows accepted (Pending+Committed+Failed)
 }
 
 // HasStats can provide stats
@@ -60,7 +61,7 @@ type Sink interface {
 // Buffer functions are THREAD-SAFE
 type Buffer struct {
 	lock sync.Mutex
-	size int // Size before returning ErrFull
+	size int // Number of rows before committing to
 	rows []interface{}
 }
 
@@ -69,10 +70,10 @@ func NewBuffer(size int) *Buffer {
 	return &Buffer{size: size, rows: make([]interface{}, 0, size)}
 }
 
-// AddRow simply inserts a row into the buffer.
+// Append simply appends a row to the buffer.
 // If buffer is full, this returns the buffered rows, and saves provided row
 // in new buffer.  Client MUST handle the returned rows.
-func (buf *Buffer) AddRow(row interface{}) []interface{} {
+func (buf *Buffer) Append(row interface{}) []interface{} {
 	buf.lock.Lock()
 	defer buf.lock.Unlock()
 	if len(buf.rows) < buf.size {
@@ -86,14 +87,15 @@ func (buf *Buffer) AddRow(row interface{}) []interface{} {
 	return rows
 }
 
-func (buf *Buffer) NumRowsForTest() int {
+// Pending returns the number of pending rows in the buffer.
+func (buf *Buffer) Pending() int {
 	buf.lock.Lock()
 	defer buf.lock.Unlock()
 	return len(buf.rows)
 }
 
-// TakeRows returns all rows in the buffer, and clears the buffer.
-func (buf *Buffer) TakeRows() []interface{} {
+// Reset clears the buffer, returning all pending rows.
+func (buf *Buffer) Reset() []interface{} {
 	buf.lock.Lock()
 	defer buf.lock.Unlock()
 	res := buf.rows
@@ -282,22 +284,22 @@ func (pb *Base) commit(rows []interface{}) error {
 
 // Flush synchronously flushes any pending rows.
 func (pb *Base) Flush() error {
-	rows := pb.buf.TakeRows()
+	rows := pb.buf.Reset()
 	return pb.commit(rows)
 }
 
-// AddRow adds row to buffer.
-// Annotates and commits existing rows iff the buffer is full.
-// TODO improve Annotatable architecture.  Maybe more Annotatable here??
-func (pb *Base) AddRow(row interface{}) error {
+// Put adds a row.
+// Annotates and commits existing rows iff the buffer is already full.
+// TODO improve Annotatable architecture.  Maybe move Annotatable here??
+func (pb *Base) Put(row interface{}) error {
 	if !reflect.TypeOf(row).Implements(reflect.TypeOf((*Annotatable)(nil)).Elem()) {
 		log.Println(reflect.TypeOf(row), "not Annotatable")
 		return ErrNotAnnotatable
 	}
-	rows := pb.buf.AddRow(row)
+	rows := pb.buf.Append(row)
 	pb.statsLock.Lock()
 	defer pb.statsLock.Unlock()
-	pb.stats.Accepted++
+	pb.stats.Total++
 	pb.stats.Pending++
 	if rows != nil {
 		go func(rows []interface{}) {

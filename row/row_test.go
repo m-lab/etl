@@ -11,7 +11,6 @@ import (
 
 	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/etl/parser"
 )
 
 // Implement parser.Annotatable
@@ -48,7 +47,7 @@ func (row *Row) GetLogTime() time.Time {
 }
 
 func assertTestRowAnnotatable(r *Row) {
-	func(parser.Annotatable) {}(r)
+	func(row.Annotatable) {}(r)
 }
 
 func assertSink(in row.Sink) {
@@ -97,13 +96,13 @@ func TestBase(t *testing.T) {
 
 	b := row.NewBase("test", ins, 10, v2as.GetAnnotator(ts.URL))
 
-	err := b.AddRow(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
+	err := b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 	if err != nil {
 		t.Error(err)
 	}
 
 	// Add a row with empty server IP
-	err = b.AddRow(&Row{"1.2.3.4", "", nil, nil})
+	err = b.Put(&Row{"1.2.3.4", "", nil, nil})
 	if err != nil {
 		t.Error(err)
 	}
@@ -131,7 +130,7 @@ func TestBase(t *testing.T) {
 		t.Error("Failed server annotation")
 	}
 
-	err = b.AddRow(&BadRow{})
+	err = b.Put(&BadRow{})
 	if err != row.ErrNotAnnotatable {
 		t.Error("Should return ErrNotAnnotatable")
 	}
@@ -162,7 +161,7 @@ func TestAsyncPut(t *testing.T) {
 
 	b := row.NewBase("test", ins, 1, v2as.GetAnnotator(ts.URL))
 
-	err := b.AddRow(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
+	err := b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 	if err != nil {
 		t.Error(err)
 	}
@@ -172,7 +171,7 @@ func TestAsyncPut(t *testing.T) {
 	}
 
 	// This should trigger an async flush
-	err = b.AddRow(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
+	err = b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 	start := time.Now()
 	for time.Since(start) < 5*time.Second && b.GetStats().Committed < 1 {
 		time.Sleep(10 * time.Millisecond)
