@@ -18,10 +18,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/m-lab/etl/metrics"
+	"cloud.google.com/go/storage"
 	"google.golang.org/api/option"
 
-	"cloud.google.com/go/storage"
+	"github.com/m-lab/etl/metrics"
 )
 
 // ErrOversizeFile is returned when exceptionally large files are skipped.
