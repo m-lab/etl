@@ -55,6 +55,9 @@ func (tt *Task) SetMaxFileSize(max int64) {
 // injected parser to parse them, and inserts them into bigquery. Returns the
 // number of files processed.
 func (tt *Task) ProcessAllTests() (int, error) {
+	if tt.Parser == nil {
+		panic("Parser is nil")
+	}
 	metrics.WorkerState.WithLabelValues(tt.TableName(), "task").Inc()
 	defer metrics.WorkerState.WithLabelValues(tt.TableName(), "task").Dec()
 	files := 0

@@ -3,12 +3,15 @@
 package parser
 
 import (
+	"log"
 	"os"
+	"reflect"
 
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 )
 
 func init() {
@@ -52,7 +55,13 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	case etl.SW:
 		return NewDiscoParser(ins)
 	case etl.TCPINFO:
-		return NewTCPInfoParser(ins)
+		sink, ok := ins.(row.Sink)
+		if !ok {
+			log.Printf("%v is not a Sink\n", ins)
+			log.Println(reflect.TypeOf(ins))
+			return nil
+		}
+		return NewTCPInfoParser(sink, ins.TableBase(), nil)
 	default:
 		return nil
 	}

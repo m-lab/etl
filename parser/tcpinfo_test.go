@@ -61,7 +61,47 @@ func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ip
 	return &v2.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
 }
 
+type inMemorySink struct {
+	data      []interface{}
+	committed int
+	failed    int
+	token     chan struct{}
+}
+
+func newInMemorySink() *inMemorySink {
+	data := make([]interface{}, 0)
+	token := make(chan struct{}, 1)
+	token <- struct{}{}
+	return &inMemorySink{data, 0, 0, token}
+}
+
+// acquire and release handle the single token that protects the FlushSlice and
+// access to the metrics.
+func (in *inMemorySink) acquire() {
+	<-in.token
+}
+func (in *inMemorySink) release() {
+	in.token <- struct{}{} // return the token.
+}
+
+func (in *inMemorySink) Commit(data []interface{}, label string) error {
+	in.acquire()
+	defer in.release()
+	in.data = append(in.data, data...)
+	in.committed = len(in.data)
+	return nil
+}
+
+func (in *inMemorySink) Flush() error {
+	in.committed = len(in.data)
+	return nil
+}
+func (in *inMemorySink) Committed() int {
+	return in.committed
+}
+
 // NOTE: This uses a fake annotator which returns no annotations.
+// TODO: This test seems to be flakey in travis - sometimes only 357 tests instead of 362
 func TestTCPParser(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parserVersion := parser.InitParserVersionForTest()
@@ -73,8 +113,9 @@ func TestTCPParser(t *testing.T) {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	ins := &inMemoryInserter{}
-	p := parser.NewTCPInfoParser(ins, &fakeAnnotator{})
+	// Inject fake inserter and annotator
+	ins := newInMemorySink()
+	p := parser.NewTCPInfoParser(ins, "test", &fakeAnnotator{})
 	task := task.NewTask(filename, src, p)
 
 	startDecode := time.Now()
@@ -175,8 +216,9 @@ func TestTCPTask(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
 
-	ins := &inMemoryInserter{}
-	p := parser.NewTCPInfoParser(ins)
+	// Inject fake inserter and annotator
+	ins := newInMemorySink()
+	p := parser.NewTCPInfoParser(ins, "test", &fakeAnnotator{})
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	src, err := localETLSource(filename)
@@ -199,8 +241,9 @@ func TestBQSaver(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
 
-	ins := &inMemoryInserter{}
-	p := parser.NewTCPInfoParser(ins)
+	// Inject fake inserter and annotator
+	ins := newInMemorySink()
+	p := parser.NewTCPInfoParser(ins, "test", &fakeAnnotator{})
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	src, err := localETLSource(filename)
@@ -231,8 +274,9 @@ func BenchmarkTCPParser(b *testing.B) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
 
-	ins := &inMemoryInserter{}
-	p := parser.NewTCPInfoParser(ins)
+	// Inject fake inserter and annotator
+	ins := newInMemorySink()
+	p := parser.NewTCPInfoParser(ins, "test", &fakeAnnotator{})
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	n := 0

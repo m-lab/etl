@@ -297,11 +297,31 @@ type inMemoryInserter struct {
 	data      []interface{}
 	committed int
 	failed    int
+	token     chan struct{}
 }
 
 func newInMemoryInserter() *inMemoryInserter {
 	data := make([]interface{}, 0)
-	return &inMemoryInserter{data, 0, 0}
+	token := make(chan struct{}, 1)
+	token <- struct{}{}
+	return &inMemoryInserter{data, 0, 0, token}
+}
+
+// acquire and release handle the single token that protects the FlushSlice and
+// access to the metrics.
+func (in *inMemoryInserter) acquire() {
+	<-in.token
+}
+func (in *inMemoryInserter) release() {
+	in.token <- struct{}{} // return the token.
+}
+
+func (in *inMemoryInserter) Commit(data []interface{}, label string) error {
+	return in.Put(data)
+}
+
+func (in *inMemoryInserter) Params() etl.InserterParams {
+	return etl.InserterParams{}
 }
 
 func (in *inMemoryInserter) Put(data []interface{}) error {
