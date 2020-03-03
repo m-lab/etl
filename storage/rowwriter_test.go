@@ -14,34 +14,37 @@ import (
 	"github.com/m-lab/etl/storage"
 )
 
-type foobar struct {
-	Time time.Time
-	Foo  string
-	Bar  string
-}
-
 func TestRowWriter(t *testing.T) {
+	type foobar struct {
+		Time time.Time
+		Foo  string
+		Bar  string
+	}
+
 	server := fgs.NewServer([]fgs.Object{})
 	defer server.Stop()
 
-	server.CreateBucket("bucket")
+	bucket := "fake-bucket"
+	server.CreateBucket(bucket)
 	c := server.Client()
 
-	rw, err := storage.NewRowWriter(context.Background(), stiface.AdaptClient(c), "bucket", "object")
+	file := "foobar-file"
+	rw, err := storage.NewRowWriter(context.Background(), stiface.AdaptClient(c), bucket, file)
 	if err != nil {
 		t.Fatal(err)
 	}
 	z, _ := time.LoadLocation("America/New_York")
 	t1 := time.Date(1999, 1, 2, 3, 4, 5, 123456789, z)
 	t2 := t1.UTC()
-	rw.Commit([]interface{}{foobar{t2, "foo", "bar"}, foobar{t1, "x", "y"}}, "test")
+	rows := []interface{}{foobar{t2, "foo", "bar"}, foobar{t1, "x", "y"}}
+	rw.Commit(rows, "fake-label")
 	rw.Close()
 
 	expect :=
 		`{"Time":"1999-01-02T08:04:05.123456789Z","Foo":"foo","Bar":"bar"}
 {"Time":"1999-01-02T03:04:05.123456789-05:00","Foo":"x","Bar":"y"}
 `
-	o := c.Bucket("bucket").Object("object")
+	o := c.Bucket(bucket).Object(file)
 	reader, err := o.NewReader(context.Background())
 	if err != nil {
 		t.Fatal(err)

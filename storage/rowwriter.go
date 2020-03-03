@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 )
@@ -43,24 +44,32 @@ func NewRowWriter(ctx context.Context, client stiface.Client, bucket string, pat
 
 // Acquire the encoding token.
 // TODO can we allow two encoders, and still sequence the writing?
-func (rw *RowWriter) encodeToken() {
+func (rw *RowWriter) acquireEncodingToken() {
 	<-rw.encoding
+}
+
+func (rw *RowWriter) releaseEncodingToken() {
+	if len(rw.encoding) > 0 {
+		log.Println("token error")
+		return
+	}
+	rw.encoding <- struct{}{}
 }
 
 // Swap the encoding token for the write token.
 // MUST already hold the write token.
-func (rw *RowWriter) writeToken() {
+func (rw *RowWriter) swapForWritingToken() {
 	<-rw.writing
-	rw.encoding <- struct{}{}
+	rw.releaseEncodingToken()
 }
 
-func (rw *RowWriter) release() {
+func (rw *RowWriter) releaseWritingToken() {
 	rw.writing <- struct{}{} // return the token.
 }
 
 // Commit commits rows, in order, to the GCS object.
 func (rw *RowWriter) Commit(rows []interface{}, label string) error {
-	rw.encodeToken()
+	rw.acquireEncodingToken()
 	// First, do the encoding.  Other calls to Commit will block here
 	// until encoding is done.
 	// NOTE: This can cause a fairly hefty memory footprint for
@@ -70,21 +79,19 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) error {
 	for i := range rows {
 		j, err := json.Marshal(rows[i])
 		if err != nil {
+			rw.releaseEncodingToken()
 			return err
 		}
-		json.Compact(buf, j)
+		buf.Write(j)
 		buf.WriteByte('\n')
 	}
-	// Exchange the encoding token for the writing token.  Another caller
-	// will be allowed to start encoding.
-	rw.writeToken()
+	rw.swapForWritingToken()
+	defer rw.releaseWritingToken()
 	_, err := buf.WriteTo(rw.w) // This is buffered (by 4MB chunks).  Are the writes to GCS synchronous?
 	if err != nil {
 		return err
 	}
 
-	// Release the write token.  Another caller will be allowed to start writing.
-	rw.release()
 	return nil
 }
 
