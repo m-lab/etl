@@ -354,10 +354,12 @@ func (in *BQInserter) Flush() error {
 	return in.Put(rows)
 }
 
-// Commit implements row.Commit.
+// Commit implements row.Sink.
 // NOTE: the label is ignored, and the TableBase is used instead.
-func (in *BQInserter) Commit(rows []interface{}, label string) {
-	in.flushSlice(rows)
+func (in *BQInserter) Commit(rows []interface{}, label string) error {
+	in.acquire()
+	defer in.release()
+	return in.flushSlice(rows)
 }
 
 // flushSlice flushes a slice of rows to BigQuery.

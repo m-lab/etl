@@ -25,40 +25,68 @@ import (
 	"github.com/valyala/gozstd"
 
 	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/tcp-info/netlink"
+	"github.com/m-lab/tcp-info/snapshot"
+
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
-	"github.com/m-lab/tcp-info/netlink"
-	"github.com/m-lab/tcp-info/snapshot"
 )
 
 // TCPInfoParser handles parsing for TCPINFO datatype.
 type TCPInfoParser struct {
-	Base
+	*row.Base
+	table  string
+	suffix string
+}
+
+// RowsInBuffer returns the count of rows currently in the buffer.
+func (p *TCPInfoParser) RowsInBuffer() int {
+	return p.GetStats().Pending
+}
+
+// Committed returns the count of rows successfully committed to BQ.
+func (p *TCPInfoParser) Committed() int {
+	return p.GetStats().Committed
+}
+
+// Accepted returns the count of all rows received through InsertRow(s)
+func (p *TCPInfoParser) Accepted() int {
+	return p.GetStats().Total
+}
+
+// Failed returns the count of all rows that could not be committed.
+func (p *TCPInfoParser) Failed() int {
+	return p.GetStats().Failed
+}
+
+// FullTableName implements etl.Parser.FullTableName
+func (p *TCPInfoParser) FullTableName() string {
+	return p.table + p.suffix
+}
+
+// TableName implements etl.Parser.TableName
+func (p *TCPInfoParser) TableName() string {
+	return p.table
 }
 
 // TaskError return the task level error, based on failed rows, or any other criteria.
 // TaskError returns non-nil if more than 10% of row inserts failed.
 func (p *TCPInfoParser) TaskError() error {
-	if p.Accepted() < 10*p.Failed() {
+	stats := p.GetStats()
+	if stats.Total < 10*stats.Failed {
 		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
-			p.Failed(), p.Accepted())
+			stats.Failed, stats.Total)
 		return etl.ErrHighInsertionFailureRate
 	}
 	return nil
 }
 
-// TableName of the table that this Parser inserts into.
-func (p *TCPInfoParser) TableName() string {
-	return p.TableBase()
-}
-
 // Flush synchronously flushes any pending rows.
 func (p *TCPInfoParser) Flush() error {
-	p.Annotate(p.TableName())
-	p.Put(p.TakeRows())
-	return p.Inserter.Flush()
+	return p.Base.Flush()
 }
 
 // IsParsable returns the canonical test type and whether to parse data.
@@ -84,7 +112,7 @@ func thinSnaps(orig []*snapshot.Snapshot) []*snapshot.Snapshot {
 // ParseAndInsert extracts all ArchivalRecords from the rawContent and inserts into a single row.
 // Approximately 15 usec/snapshot.
 func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
-	tableName := p.TableName()
+	tableName := p.FullTableName()
 	metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Dec()
 
@@ -162,28 +190,20 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 		}
 	}
 
-	err = p.AddRow(&row)
-	if err == etl.ErrBufferFull {
-		// Flush asynchronously, to improve throughput.
-		p.Annotate(p.TableName())
-		p.PutAsync(p.TakeRows())
-		err = p.AddRow(&row)
-	}
+	p.Put(&row)
 	metrics.TestCount.WithLabelValues(p.TableName(), "", "ok").Inc()
-
-	return err
+	return nil
 }
 
 // NewTCPInfoParser creates a new TCPInfoParser.  Duh.
-// Single annotator may be optionally passed in.
-// TODO change to required parameter.
-func NewTCPInfoParser(ins etl.Inserter, ann ...v2as.Annotator) *TCPInfoParser {
+// Annotator may be optionally passed in, or will be created if nil.
+func NewTCPInfoParser(sink row.Sink, table string, ann v2as.Annotator) *TCPInfoParser {
 	bufSize := etl.TCPINFO.BQBufferSize()
-	var annotator v2as.Annotator
-	if len(ann) > 0 && ann[0] != nil {
-		annotator = ann[0]
-	} else {
-		annotator = v2as.GetAnnotator(annotation.BatchURL)
+	if ann == nil {
+		ann = v2as.GetAnnotator(annotation.BatchURL)
 	}
-	return &TCPInfoParser{*NewBase(ins, bufSize, annotator)}
+
+	return &TCPInfoParser{
+		Base:  row.NewBase("foobar", sink, bufSize, ann),
+		table: table}
 }

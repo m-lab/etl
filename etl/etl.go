@@ -50,6 +50,8 @@ type Inserter interface {
 	// Deprecated:  Please use external buffer, Put, and PutAsync instead.
 	Flush() error
 
+	// TODO Replace this with Params()
+
 	// Base Table name of the BQ table that the uploader pushes to.
 	TableBase() string
 	// Table name suffix of the BQ table that the uploader pushes to.

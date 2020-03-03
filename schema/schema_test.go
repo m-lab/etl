@@ -4,9 +4,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/m-lab/go/bqx"
+
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
-	"github.com/m-lab/go/bqx"
 )
 
 func assertAnnotatable(r *schema.SS) {
