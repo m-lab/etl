@@ -7,19 +7,21 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-test/deep"
-	v2as "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/etl/etl"
-	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/schema"
+	"cloud.google.com/go/bigquery"
 
+	"github.com/go-test/deep"
 	"github.com/kr/pretty"
 
-	"cloud.google.com/go/bigquery"
+	v2as "github.com/m-lab/annotation-service/api/v2"
+
+	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/row"
+	"github.com/m-lab/etl/schema"
 )
 
 func assertNDTTestIsAnnotatable(r parser.NDTTest) {
-	func(parser.Annotatable) {}(r)
+	func(row.Annotatable) {}(r)
 }
 
 func assertNDTTestIsValueSaver(r parser.NDTTest) {

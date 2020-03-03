@@ -15,7 +15,7 @@ func init() {
 	initParserVersion()
 }
 
-var gParserVersion string
+var gParserVersion = "uninitialized"
 
 // initParserVersion initializes the gParserVersion variable for use by all parsers.
 func initParserVersion() string {

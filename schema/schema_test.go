@@ -4,13 +4,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/bqx"
 )
 
 func assertAnnotatable(r *schema.SS) {
-	func(parser.Annotatable) {}(r)
+	func(row.Annotatable) {}(r)
 }
 
 type unsupportedType struct{}

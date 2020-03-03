@@ -46,3 +46,13 @@ gcloud beta builds triggers list --filter=m-lab/etl
 
 Deployment requires adding cloud-kubernetes-deployer role to etl-travis-deploy@
 in IAM.  This is done for sandbox and staging.
+
+## Migrating to Sink interface
+
+The parsers currently use etl.Inserter as the backend for writing records.
+This API is overly shaped by bigquery, and complicates testing and extension.
+
+The row.Sink interface, and row.Buffer define cleaner APIs for the back end
+and for buffering and annotating.  This will streamline migration to
+Gardener driven table selection, column partitioned tables, and possibly
+future migration to BigQuery loads instead of streaming inserts.
