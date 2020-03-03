@@ -292,6 +292,9 @@ func (pb *Base) Flush() error {
 
 // Put adds a row.
 // Annotates and commits existing rows iff the buffer is already full.
+// NOTE: There is no guarantee about ordering of writes resulting from
+// sequential calls to Put.  However, once a block of rows is submitted
+// to pb.commit, it should be written in the same order to the Sink.
 // TODO improve Annotatable architecture.
 func (pb *Base) Put(row Annotatable) {
 	rows := pb.buf.Append(row)
@@ -301,6 +304,7 @@ func (pb *Base) Put(row Annotatable) {
 	pb.stats.Pending++
 	if rows != nil {
 		go func(rows []interface{}) {
+			// This allows pipelined parsing annotating, and writing.
 			err := pb.commit(rows)
 			if err != nil {
 				log.Println(err)
