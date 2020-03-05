@@ -2,6 +2,7 @@ package active
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -16,7 +17,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 
-	"github.com/m-lab/etl-gardener/job-service"
 	"github.com/m-lab/etl-gardener/tracker"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/rtx"
@@ -137,9 +137,31 @@ func (g *GardenerAPI) JobFileSource(ctx context.Context, job tracker.Job,
 	return gcsSource, nil
 }
 
+// nextJob is used by clients to fetch the next job from the service.
+// DEPRECATED - for transition only.  Should use job.NextJob once gardener is
+// has been updated with JobWithTarget
+func nextJob(ctx context.Context, base url.URL) (tracker.Job, error) {
+	jobURL := base
+	jobURL.Path = "job"
+
+	job := tracker.Job{}
+
+	b, status, err := post(ctx, jobURL)
+	if err != nil {
+		return job, err
+	}
+	if status != http.StatusOK {
+		return job, errors.New(http.StatusText(status))
+	}
+
+	err = json.Unmarshal(b, &job)
+	return job, err
+}
+
 // NextJob requests a new job from Gardener service.
 func (g *GardenerAPI) NextJob(ctx context.Context) (tracker.Job, error) {
-	return job.NextJob(ctx, g.trackerBase)
+	// TODO use job.NextJob from gardener.
+	return nextJob(ctx, g.trackerBase)
 }
 
 func (g *GardenerAPI) pollAndRun(ctx context.Context,
