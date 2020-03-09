@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,12 +21,15 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
+	"github.com/m-lab/go/flagx"
+	"github.com/m-lab/go/httpx"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	// Enable profiling. For more background and usage information, see:
 	//   https://blog.golang.org/profiling-go-programs
+	"net/http/pprof"
 	_ "net/http/pprof"
 
 	// Enable exported debug vars.  See https://golang.org/pkg/expvar/
@@ -251,14 +255,54 @@ func mustGardenerAPI(ctx context.Context, jobServer string) *active.GardenerAPI 
 	return active.NewGardenerAPI(*base, active.MustStorageClient(ctx))
 }
 
+// Used for testing.
+var statusServerAddr string
+var statusPort = flag.String("status_port", ":0", "The public interface port where status (and pprof) will be published")
+
+func startStatusServer() *http.Server {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", Status)
+	mux.HandleFunc("/status", Status)
+
+	// Also allow pprof through the status server.
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	// Start up the http server.
+	server := &http.Server{
+		Addr:    *statusPort,
+		Handler: mux,
+	}
+	rtx.Must(httpx.ListenAndServeAsync(server), "Could not start status server")
+
+	statusServerAddr = server.Addr
+
+	return server
+}
+
 var mainCtx, mainCancel = context.WithCancel(context.Background())
 
 func main() {
 	defer mainCancel()
 
-	// Expose prometheus and pprof metrics on a separate port.
-	prometheusx.MustStartPrometheus(":9090")
+	flag.Parse()
+	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from env")
 
+	// Expose prometheus and pprof metrics on a separate port.
+	// prometheusx.MustStartPrometheus(":9090")
+	promServer := prometheusx.MustServeMetrics()
+	defer promServer.Close()
+
+	// Set up a status server on a public IP.
+	// TODO - do we want prometheus metrics accessible here?
+	statusServer := startStatusServer()
+	defer statusServer.Close()
+	log.Println("Status server at", statusServer.Addr)
+
+	// This is the standard server on port 8080.
 	http.HandleFunc("/", Status)
 	http.HandleFunc("/status", Status)
 	http.HandleFunc("/worker", metrics.DurationHandler("generic", handleRequest))
@@ -285,5 +329,7 @@ func main() {
 	} else {
 		log.Println("GARDENER_HOST not specified or empty")
 	}
+
+	// TODO run the main server on mainCtx.
 	http.ListenAndServe(":8080", nil)
 }

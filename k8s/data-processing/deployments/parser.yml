@@ -47,6 +47,8 @@ spec:
 
         - name: GARDENER_HOST
           value: "etl-gardener-service.default.svc.cluster.local"
+        - name: STATUS_PORT
+          value: ":8081"
         - name: BATCH_SERVICE
           value: 'true'   # Allow instances to discover they are BATCH instances.
         - name: MAX_WORKERS
