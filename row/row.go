@@ -300,10 +300,12 @@ func (pb *Base) Flush() error {
 // TODO improve Annotatable architecture.
 func (pb *Base) Put(row Annotatable) {
 	rows := pb.buf.Append(row)
-	pb.statsLock.Lock()
-	defer pb.statsLock.Unlock()
-	pb.stats.Total++
-	pb.stats.Pending++
+	{
+		pb.statsLock.Lock()
+		pb.stats.Total++
+		pb.stats.Pending++
+		pb.statsLock.Unlock()
+	}
 	if rows != nil {
 		// This allows pipelined parsing annotating, and writing.
 		// Disabling for now, as it leads to large memory/goroutine footprint.
