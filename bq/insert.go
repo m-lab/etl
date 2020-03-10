@@ -233,7 +233,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		}
 		// If ALL rows failed...
 		if len(typedErr) == in.pending {
-			log.Printf("%v %v\n", err, typedErr.Error()) // Log the first RowInsertionError detail
+			log.Printf("InsertErr %v %v\n", err, typedErr.Error()) // Log the first RowInsertionError detail
 			// Backend failure counts failed RPCs.
 			metrics.BackendFailureCount.WithLabelValues(
 				in.TableBase(), "putmulti failed insert").Inc()
@@ -245,11 +245,11 @@ func (in *BQInserter) updateMetrics(err error) error {
 			// Handle each error individually.
 			for i, rowError := range typedErr {
 				// These are rowInsertionErrors
-				log.Printf("Insert error: %d %s on %s\n", i, rowError.Error(), in.FullTableName())
+				log.Printf("InsertErr %d %s on %s\n", i, rowError.Error(), in.FullTableName())
 			}
 		} else if len(typedErr) > 0 {
 			// Otherwise, just log the first RowInsertionError detail
-			log.Printf("%d insert errors: %v %s on %s\n", len(typedErr), err, typedErr[0].Error(), in.FullTableName())
+			log.Printf("InsertErr (%d) %v %s on %s\n", len(typedErr), err, typedErr[0].Error(), in.FullTableName())
 		}
 
 		// ErrorCount counts failed rows.
@@ -260,7 +260,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		in.badRows += len(typedErr)
 		err = nil
 	case *url.Error:
-		log.Printf("Insert url.Error: %v on %s", typedErr, in.FullTableName())
+		log.Printf("InsertErr url.Error: %v on %s", typedErr, in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "url failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
@@ -272,18 +272,16 @@ func (in *BQInserter) updateMetrics(err error) error {
 		err = nil
 	case *googleapi.Error:
 		// TODO add special handling for Quota Exceeded
-		log.Printf("Insert error: %v on %s", typedErr, in.FullTableName())
+		log.Printf("InsertErr %v on %s", typedErr, in.FullTableName())
 		if strings.Contains(err.Error(), "Quota exceeded:") {
 			metrics.BackendFailureCount.WithLabelValues(
 				in.TableBase(), "quota exceeded").Inc()
-			// TODO: This should count rows...
 			metrics.ErrorCount.WithLabelValues(
 				in.TableBase(), "googleapi.Error", "Insert: Quota Exceeded").
 				Add(float64(in.pending))
 		} else {
 			metrics.BackendFailureCount.WithLabelValues(
 				in.TableBase(), "googleapi failed insert").Inc()
-			// TODO: This should count rows...
 			metrics.ErrorCount.WithLabelValues(
 				in.TableBase(), "googleapi.Error", "UNHANDLED googleapi error").
 				Add(float64(in.pending))
@@ -296,7 +294,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 
 	default:
 		// With Elem(), this was causing panics.
-		log.Printf("Unhandled %v: %v on %s\n", reflect.TypeOf(typedErr),
+		log.Printf("InsertErr (Unhandled) %v: %v on %s\n", reflect.TypeOf(typedErr),
 			typedErr, in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
