@@ -363,7 +363,6 @@ func (in *BQInserter) Flush() error {
 // Commit implements row.Sink.
 // NOTE: the label is ignored, and the TableBase is used instead.
 func (in *BQInserter) Commit(rows []interface{}, label string) error {
-	// TODO - this causes large memory and large number of goroutines.
 	in.acquire()
 	defer in.release()
 	return in.flushSlice(rows)
