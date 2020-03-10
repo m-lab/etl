@@ -233,8 +233,10 @@ func (in *BQInserter) updateMetrics(err error) error {
 		}
 		// If ALL rows failed...
 		if len(typedErr) == in.pending {
+			log.Printf("%v %v\n", err, typedErr.Error()) // Log the first RowInsertionError detail
+			// Backend failure counts failed RPCs.
 			metrics.BackendFailureCount.WithLabelValues(
-				in.TableBase(), "failed insert").Inc()
+				in.TableBase(), "putmulti failed insert").Inc()
 			in.failures++
 		}
 
@@ -250,8 +252,9 @@ func (in *BQInserter) updateMetrics(err error) error {
 			log.Printf("%d insert errors: %v %s on %s\n", len(typedErr), err, typedErr[0].Error(), in.FullTableName())
 		}
 
+		// ErrorCount counts failed rows.
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "PutMultiError", "insert row error").
+			in.TableBase(), "PutMultiError", "putmulti error").
 			Add(float64(len(typedErr)))
 		in.inserted -= len(typedErr)
 		in.badRows += len(typedErr)
@@ -259,9 +262,9 @@ func (in *BQInserter) updateMetrics(err error) error {
 	case *url.Error:
 		log.Printf("Insert url.Error: %v on %s", typedErr, in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
-			in.TableBase(), "failed insert").Inc()
+			in.TableBase(), "url failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "url.Error", "UNHANDLED insert error").Inc()
+			in.TableBase(), "url.Error", "UNHANDLED url insert error").Inc()
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
 		in.inserted -= in.pending
@@ -273,13 +276,17 @@ func (in *BQInserter) updateMetrics(err error) error {
 		if strings.Contains(err.Error(), "Quota exceeded:") {
 			metrics.BackendFailureCount.WithLabelValues(
 				in.TableBase(), "quota exceeded").Inc()
+			// TODO: This should count rows...
 			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "googleapi.Error", "Insert: Quota Exceeded").Inc()
+				in.TableBase(), "googleapi.Error", "Insert: Quota Exceeded").
+				Add(float64(in.pending))
 		} else {
 			metrics.BackendFailureCount.WithLabelValues(
-				in.TableBase(), "failed insert").Inc()
+				in.TableBase(), "googleapi failed insert").Inc()
+			// TODO: This should count rows...
 			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "googleapi.Error", "UNHANDLED insert error").Inc()
+				in.TableBase(), "googleapi.Error", "UNHANDLED googleapi error").
+				Add(float64(in.pending))
 		}
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
@@ -293,10 +300,11 @@ func (in *BQInserter) updateMetrics(err error) error {
 			typedErr, in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
 			in.TableBase(), "failed insert").Inc()
-		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "unknown", "UNHANDLED insert error").Inc()
-		// TODO - Conservative, but possibly not correct.
+		// TODO - This accounting is conservative, but possibly overestimates failed rows.
 		// This at least preserves the count invariance.
+		metrics.ErrorCount.WithLabelValues(
+			in.TableBase(), "unknown", "UNHANDLED insert error").
+			Add(float64(in.pending))
 		in.inserted -= in.pending
 		in.badRows += in.pending
 		err = nil
@@ -357,6 +365,7 @@ func (in *BQInserter) Flush() error {
 // Commit implements row.Sink.
 // NOTE: the label is ignored, and the TableBase is used instead.
 func (in *BQInserter) Commit(rows []interface{}, label string) error {
+	// TODO - this causes large memory and large number of goroutines.
 	in.acquire()
 	defer in.release()
 	return in.flushSlice(rows)
