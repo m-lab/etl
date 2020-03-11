@@ -33,7 +33,7 @@ func TestNewTarReader(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping tests that access GCS")
 	}
-	src, err := NewETLSource(client, tarFile, "label")
+	src, err := NewTestSource(client, tarFile, "label")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestNewTarReaderGzip(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping tests that access GCS")
 	}
-	src, err := NewETLSource(client, tgzFile, "label")
+	src, err := NewTestSource(client, tgzFile, "label")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func init() {
 
 func BenchmarkNewTarReader(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		src, err := NewETLSource(client, tarFile, "label")
+		src, err := NewTestSource(client, tarFile, "label")
 		if err == nil {
 			src.Close()
 		}
@@ -95,7 +95,7 @@ func BenchmarkNewTarReader(b *testing.B) {
 
 func BenchmarkNewTarReaderGzip(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		src, err := NewETLSource(client, tgzFile, "label")
+		src, err := NewTestSource(client, tgzFile, "label")
 		if err == nil {
 			src.Close()
 		}

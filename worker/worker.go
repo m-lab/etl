@@ -56,7 +56,7 @@ func ProcessTask(fn string) (int, error) {
 	}
 
 	// TODO - add a timer for reading the file.
-	tr, err := storage.NewETLSource(client, fn, data.TableBase())
+	tr, err := storage.NewTestSource(client, fn, data.TableBase())
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "ETLSourceError").Inc()
 		log.Printf("Error opening gcs file: %v", err)

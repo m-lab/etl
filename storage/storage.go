@@ -21,6 +21,7 @@ import (
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/option"
 
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 )
 
@@ -33,21 +34,8 @@ type TarReader interface {
 	Read(b []byte) (int, error)
 }
 
-// ETLSource provides a source of testdata.
-type ETLSource interface {
-	// NextTest reads the next test object from the tar file.
-	// Skips reading contents of any file larger than maxSize, returning empty data
-	// and storage.ErrOversizeFile.
-	// Returns io.EOF when there are no more tests.
-	NextTest(maxSize int64) (string, []byte, error)
-	Close() error
-
-	Label() string // Label for logs and metrics
-}
-
-// ETLSourceImpl wraps a gsutil tar file containing tests.
-// TODO make this local, and create NewFileETLSource, NewGCSETLSource, etc.
-type ETLSourceImpl struct {
+// GCSSource wraps a gsutil tar file containing tests.
+type GCSSource struct {
 	TarReader                   // TarReader interface provided by an embedded struct.
 	io.Closer                   // Closer interface to be provided by an embedded struct.
 	RetryBaseTime time.Duration // The base time for backoff and retry.
@@ -56,7 +44,7 @@ type ETLSourceImpl struct {
 
 // Retrieve next file header.
 // Lots of error handling because of common faults in underlying GCS.
-func (rr *ETLSourceImpl) nextHeader(trial int) (*tar.Header, bool, error) {
+func (rr *GCSSource) nextHeader(trial int) (*tar.Header, bool, error) {
 	h, err := rr.Next()
 	if err != nil {
 		if err == io.EOF {
@@ -80,7 +68,7 @@ func (rr *ETLSourceImpl) nextHeader(trial int) (*tar.Header, bool, error) {
 // Retrieve the data for a single file.
 // Lots of error handling because of common faults in underlying GCS.
 // Returns data in byte array, error and boolean regarding whether to retry.
-func (rr *ETLSourceImpl) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
+func (rr *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 	var data []byte
 	var err error
 	var phase string
@@ -124,7 +112,7 @@ func (rr *ETLSourceImpl) nextData(h *tar.Header, trial int) ([]byte, bool, error
 }
 
 // Label returns a string for use in metrics and logs.
-func (rr *ETLSourceImpl) Label() string {
+func (rr *GCSSource) Label() string {
 	return rr.TableBase
 }
 
@@ -132,7 +120,7 @@ func (rr *ETLSourceImpl) Label() string {
 // Skips reading contents of any file larger than maxSize, returning empty data
 // and storage.ErrOversizeFile.
 // Returns io.EOF when there are no more tests.
-func (rr *ETLSourceImpl) NextTest(maxSize int64) (string, []byte, error) {
+func (rr *GCSSource) NextTest(maxSize int64) (string, []byte, error) {
 	metrics.WorkerState.WithLabelValues(rr.TableBase, "read").Inc()
 	defer metrics.WorkerState.WithLabelValues(rr.TableBase, "read").Dec()
 
@@ -216,12 +204,12 @@ func (t *Closer) Close() error {
 
 var errNoClient = errors.New("client should be non-null")
 
-// NewETLSource creates an ETLSource suitable for injecting into Task.
+// NewTestSource creates an TestSource suitable for injecting into Task.
 // Caller is responsible for calling Close on the returned object.
 //
 // uri should be of form gs://bucket/filename.tar or gs://bucket/filename.tgz
 // FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
-func NewETLSource(client *storage.Client, uri string, label string) (ETLSource, error) {
+func NewTestSource(client *storage.Client, uri string, label string) (etl.TestSource, error) {
 	if client == nil {
 		return nil, errNoClient
 	}
@@ -271,7 +259,7 @@ func NewETLSource(client *storage.Client, uri string, label string) (ETLSource, 
 	tarReader := tar.NewReader(rdr)
 
 	baseTimeout := 16 * time.Millisecond
-	return &ETLSourceImpl{tarReader, closer, baseTimeout, label}, nil
+	return &GCSSource{tarReader, closer, baseTimeout, label}, nil
 }
 
 // GetStorageClient provides a storage reader client.

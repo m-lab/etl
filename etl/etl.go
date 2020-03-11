@@ -122,6 +122,18 @@ type Parser interface {
 	RowStats // Parser must implement RowStats
 }
 
+// TestSource provides a source of test data.
+type TestSource interface {
+	// NextTest reads the next test object from the tar file.
+	// Skips reading contents of any file larger than maxSize, returning empty data
+	// and storage.ErrOversizeFile.
+	// Returns io.EOF when there are no more tests.
+	NextTest(maxSize int64) (string, []byte, error)
+	Close() error
+
+	Label() string // Label for logs and metrics
+}
+
 //========================================================================
 // Interface to allow fakes.
 //========================================================================

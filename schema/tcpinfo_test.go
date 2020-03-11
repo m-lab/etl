@@ -16,13 +16,14 @@ import (
 	"github.com/m-lab/tcp-info/inetdiag"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/tcp-info/snapshot"
 )
 
 // TODO - move this to storage for general use.
-func localETLSource(fn string) (storage.ETLSource, error) {
+func fileSource(fn string) (etl.TestSource, error) {
 	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
 		strings.HasSuffix(fn, ".tar.gz")) {
 		return nil, errors.New("not tar or tgz: " + fn)
@@ -47,7 +48,7 @@ func localETLSource(fn string) (storage.ETLSource, error) {
 	tarReader := tar.NewReader(rdr)
 
 	timeout := 16 * time.Millisecond
-	return &storage.ETLSourceImpl{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
+	return &storage.GCSSource{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
 }
 
 func TestBQSaver(t *testing.T) {
