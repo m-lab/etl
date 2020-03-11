@@ -271,6 +271,7 @@ func (pb *Base) commit(rows []interface{}) error {
 	// TODO - care about error?
 	_ = pb.ann.Annotate(rows, pb.label)
 	// TODO do we need these to be done in order.
+	// This is synchronous, blocking, and thread safe.
 	err := pb.sink.Commit(rows, pb.label)
 
 	pb.statsLock.Lock()
@@ -300,16 +301,18 @@ func (pb *Base) Flush() error {
 func (pb *Base) Put(row Annotatable) {
 	rows := pb.buf.Append(row)
 	pb.statsLock.Lock()
-	defer pb.statsLock.Unlock()
 	pb.stats.Total++
 	pb.stats.Pending++
+	pb.statsLock.Unlock()
+
 	if rows != nil {
-		go func(rows []interface{}) {
-			// This allows pipelined parsing annotating, and writing.
-			err := pb.commit(rows)
-			if err != nil {
-				log.Println(err)
-			}
-		}(rows)
+		// This allows pipelined parsing annotating, and writing.
+		// Disabling for now, as it leads to large memory/goroutine footprint.
+		//	go func(rows []interface{}) {
+		err := pb.commit(rows)
+		if err != nil {
+			log.Println(err)
+		}
+		//	}(rows)
 	}
 }
