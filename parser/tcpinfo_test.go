@@ -27,7 +27,7 @@ func assertTCPInfoParser(in *parser.TCPInfoParser) {
 	func(p etl.Parser) {}(in)
 }
 
-func localETLSource(fn string) (*storage.ETLSource, error) {
+func fileSource(fn string) (etl.TestSource, error) {
 	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
 		strings.HasSuffix(fn, ".tar.gz")) {
 		return nil, errors.New("not tar or tgz: " + fn)
@@ -52,7 +52,7 @@ func localETLSource(fn string) (*storage.ETLSource, error) {
 	tarReader := tar.NewReader(rdr)
 
 	timeout := 16 * time.Millisecond
-	return &storage.ETLSource{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
+	return &storage.GCSSource{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
 }
 
 type fakeAnnotator struct{}
@@ -108,7 +108,7 @@ func TestTCPParser(t *testing.T) {
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 
-	src, err := localETLSource(filename)
+	src, err := fileSource(filename)
 	if err != nil {
 		t.Fatal("Failed reading testdata from", filename)
 	}
@@ -221,7 +221,7 @@ func TestTCPTask(t *testing.T) {
 	p := parser.NewTCPInfoParser(ins, "test", &fakeAnnotator{})
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
-	src, err := localETLSource(filename)
+	src, err := fileSource(filename)
 	if err != nil {
 		t.Fatal("Failed reading testdata from", filename)
 	}
@@ -246,7 +246,7 @@ func TestBQSaver(t *testing.T) {
 	p := parser.NewTCPInfoParser(ins, "test", &fakeAnnotator{})
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
-	src, err := localETLSource(filename)
+	src, err := fileSource(filename)
 	if err != nil {
 		t.Fatal("Failed reading testdata from", filename)
 	}
@@ -281,7 +281,7 @@ func BenchmarkTCPParser(b *testing.B) {
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	n := 0
 	for i := 0; i < b.N; i += n {
-		src, err := localETLSource(filename)
+		src, err := fileSource(filename)
 		if err != nil {
 			b.Fatalf("cannot read testdata.")
 		}
