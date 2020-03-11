@@ -82,7 +82,7 @@ func TestGardenerAPI_JobFileSource(t *testing.T) {
 
 	// The test counter creates runnables for the jobs.
 	p := newCounter(t)
-	src, err := g.JobFileSource(ctx, job, p.toRunnable)
+	src, err := g.JobFileSource(ctx, job.Job, p.toRunnable)
 	rtx.Must(err, "file source")
 	log.Println(src)
 
@@ -126,9 +126,9 @@ func TestGardenerAPI_RunAll(t *testing.T) {
 
 	// The test counter creates runnables for the jobs.
 	p := newCounter(t)
-	src, err := g.JobFileSource(ctx, job, p.toRunnable)
+	src, err := g.JobFileSource(ctx, job.Job, p.toRunnable)
 	rtx.Must(err, "file source")
-	eg, err := g.RunAll(ctx, src, job)
+	eg, err := g.RunAll(ctx, src, job.Job)
 	if err != iterator.Done {
 		t.Fatal(err)
 	}

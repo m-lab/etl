@@ -159,12 +159,12 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 
 	log.Println("Running", job.Path())
 
-	update := tracker.UpdateURL(g.trackerBase, job, tracker.Parsing, "starting tasks")
+	update := tracker.UpdateURL(g.trackerBase, job.Job, tracker.Parsing, "starting tasks")
 	if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {
 		log.Println(postErr)
 	}
 
-	eg, err := g.RunAll(ctx, src, job)
+	eg, err := g.RunAll(ctx, src, job.Job)
 
 	// Once all are dispatched, we want to wait until all have completed
 	// before posting the state change.
@@ -172,7 +172,7 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 		log.Println("all tasks dispatched for", job.Path())
 		eg.Wait()
 		log.Println("finished", job.Path())
-		update := tracker.UpdateURL(g.trackerBase, job, tracker.ParseComplete, "")
+		update := tracker.UpdateURL(g.trackerBase, job.Job, tracker.ParseComplete, "")
 		// TODO - should this have a retry?
 		if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {
 			log.Println(postErr)
