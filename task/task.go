@@ -28,15 +28,15 @@ const DefaultMaxFileSize = 200 * 1024 * 1024
 type Task struct {
 	// ETLSource and Parser are both embedded, so their interfaces are delegated
 	// to the component structs.
-	*storage.ETLSource // Source from which to read tests.
-	etl.Parser         // Parser to parse the tests.
+	storage.ETLSource // Source from which to read tests.
+	etl.Parser        // Parser to parse the tests.
 
 	meta        map[string]bigquery.Value // Metadata about this task.
 	maxFileSize int64                     // Max file size to avoid OOM.
 }
 
 // NewTask constructs a task, injecting the source and the parser.
-func NewTask(filename string, src *storage.ETLSource, prsr etl.Parser) *Task {
+func NewTask(filename string, src storage.ETLSource, prsr etl.Parser) *Task {
 	// TODO - should the meta data be a nested type?
 	meta := make(map[string]bigquery.Value, 3)
 	meta["filename"] = filename

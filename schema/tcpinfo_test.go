@@ -21,7 +21,8 @@ import (
 	"github.com/m-lab/tcp-info/snapshot"
 )
 
-func localETLSource(fn string) (*storage.ETLSource, error) {
+// TODO - move this to storage for general use.
+func localETLSource(fn string) (storage.ETLSource, error) {
 	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
 		strings.HasSuffix(fn, ".tar.gz")) {
 		return nil, errors.New("not tar or tgz: " + fn)
@@ -46,7 +47,7 @@ func localETLSource(fn string) (*storage.ETLSource, error) {
 	tarReader := tar.NewReader(rdr)
 
 	timeout := 16 * time.Millisecond
-	return &storage.ETLSource{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
+	return &storage.ETLSourceImpl{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
 }
 
 func TestBQSaver(t *testing.T) {

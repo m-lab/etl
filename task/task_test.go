@@ -37,7 +37,7 @@ func (nc NullCloser) Close() error {
 
 // Create a TarReader with simple test contents.
 // TODO - could we break the dependency on storage here?
-func MakeTestSource(t *testing.T) *storage.ETLSource {
+func MakeTestSource(t *testing.T) storage.ETLSource {
 	b := new(bytes.Buffer)
 	tw := tar.NewWriter(b)
 	hdr := tar.Header{Name: "foo", Mode: 0666, Typeflag: tar.TypeReg, Size: int64(8)}
@@ -62,7 +62,7 @@ func MakeTestSource(t *testing.T) *storage.ETLSource {
 		t.Fatal(err)
 	}
 
-	return &storage.ETLSource{TarReader: tar.NewReader(b), Closer: NullCloser{}, RetryBaseTime: time.Millisecond}
+	return &storage.ETLSourceImpl{TarReader: tar.NewReader(b), Closer: NullCloser{}, RetryBaseTime: time.Millisecond}
 }
 
 type TestParser struct {
@@ -104,7 +104,7 @@ func (bs *badSource) Read(b []byte) (int, error) {
 
 // TODO - this test is very slow, because it triggers the backoff and retry mechanism.
 func TestBadTarFileInput(t *testing.T) {
-	rdr := &storage.ETLSource{TarReader: &badSource{}, Closer: NullCloser{}, RetryBaseTime: time.Millisecond}
+	rdr := &storage.ETLSourceImpl{TarReader: &badSource{}, Closer: NullCloser{}, RetryBaseTime: time.Millisecond}
 
 	tp := &TestParser{}
 

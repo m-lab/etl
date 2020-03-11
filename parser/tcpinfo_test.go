@@ -27,7 +27,7 @@ func assertTCPInfoParser(in *parser.TCPInfoParser) {
 	func(p etl.Parser) {}(in)
 }
 
-func localETLSource(fn string) (*storage.ETLSource, error) {
+func localETLSource(fn string) (storage.ETLSource, error) {
 	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
 		strings.HasSuffix(fn, ".tar.gz")) {
 		return nil, errors.New("not tar or tgz: " + fn)
@@ -52,7 +52,7 @@ func localETLSource(fn string) (*storage.ETLSource, error) {
 	tarReader := tar.NewReader(rdr)
 
 	timeout := 16 * time.Millisecond
-	return &storage.ETLSource{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
+	return &storage.ETLSourceImpl{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
 }
 
 type fakeAnnotator struct{}
