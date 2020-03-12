@@ -6,11 +6,16 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/m-lab/etl/etl"
 )
 
 var testBucket = "mlab-testing.appspot.com"
 var tarFile = "gs://" + testBucket + "/test.tar"
 var tgzFile = "gs://" + testBucket + "/test.tgz"
+
+func assertGCSourceIsTestSource(in etl.TestSource) {
+	func(in etl.TestSource) {}(&GCSSource{})
+}
 
 func TestGetReader(t *testing.T) {
 	if testing.Short() {

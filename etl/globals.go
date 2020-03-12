@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/m-lab/etl/metrics"
 )
 
 // IsBatch indicates this process is a batch processing service.
@@ -121,6 +123,14 @@ func ValidateTestPath(path string) (*DataPath, error) {
 		Embargo:    post[6],
 		Suffix:     post[7],
 	}
+	// Move this into Validate function
+	dataType := dp.GetDataType()
+	if dataType == INVALID {
+		metrics.TaskCount.WithLabelValues(dp.TableBase(), "worker", "BadRequest").Inc()
+		log.Printf("Invalid filename: %s\n", path)
+		return nil, ErrBadDataType
+	}
+
 	return dp, nil
 }
 
