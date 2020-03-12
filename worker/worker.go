@@ -23,6 +23,7 @@ import (
 func ProcessTask(fn string) (int, error) {
 	data, err := etl.ValidateTestPath(fn)
 	if err != nil {
+		metrics.TaskCount.WithLabelValues(data.TableBase(), "worker", "InvalidFilename").Inc()
 		log.Printf("Invalid filename: %v\n", err)
 		return http.StatusBadRequest, err
 	}
@@ -35,14 +36,6 @@ func ProcessTask(fn string) (int, error) {
 	metrics.WorkerState.WithLabelValues(data.TableBase(), "worker").Inc()
 	defer metrics.WorkerState.WithLabelValues(data.TableBase(), "worker").Dec()
 
-	// Move this into Validate function
-	dataType := data.GetDataType()
-	if dataType == etl.INVALID {
-		metrics.TaskCount.WithLabelValues(data.TableBase(), "worker", "BadRequest").Inc()
-		log.Printf("Invalid filename: %s\n", fn)
-		return http.StatusBadRequest, etl.ErrBadDataType
-	}
-
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(data.TableBase(), "worker", "ServiceUnavailable").Inc()
@@ -50,7 +43,7 @@ func ProcessTask(fn string) (int, error) {
 		return http.StatusServiceUnavailable, err
 	}
 
-	// TODO - add a timer for reading the file.
+	dataType := data.GetDataType()
 	tr, err := storage.NewTestSource(client, fn, data.TableBase())
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "ETLSourceError").Inc()
