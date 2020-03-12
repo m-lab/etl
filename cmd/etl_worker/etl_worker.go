@@ -14,9 +14,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/m-lab/etl/active"
 	"github.com/m-lab/etl/etl"
