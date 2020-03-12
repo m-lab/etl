@@ -69,7 +69,7 @@ func NewBuffer(size int) *Buffer {
 	return &Buffer{size: size, rows: make([]interface{}, 0, size)}
 }
 
-// Append simply appends a row to the buffer.
+// Append appends a row to the buffer.
 // If buffer is full, this returns the buffered rows, and saves provided row
 // in new buffer.  Client MUST handle the returned rows.
 func (buf *Buffer) Append(row interface{}) []interface{} {
@@ -299,6 +299,7 @@ func (pb *Base) Flush() error {
 // to pb.commit, it should be written in the same order to the Sink.
 // TODO improve Annotatable architecture.
 func (pb *Base) Put(row Annotatable) {
+	log.Println("append")
 	rows := pb.buf.Append(row)
 	pb.statsLock.Lock()
 	pb.stats.Total++
@@ -306,6 +307,7 @@ func (pb *Base) Put(row Annotatable) {
 	pb.statsLock.Unlock()
 
 	if rows != nil {
+		log.Println("commit")
 		// This allows pipelined parsing annotating, and writing.
 		// Disabling for now, as it leads to large memory/goroutine footprint.
 		//	go func(rows []interface{}) {

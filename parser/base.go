@@ -162,8 +162,8 @@ func (buf *RowBuffer) annotateClients(label string) error {
 			r.AnnotateClients(annMap)
 		}
 	}
-
 	return err
+
 }
 
 // Annotate fetches annotations for all rows in the buffer.
