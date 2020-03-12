@@ -94,21 +94,21 @@ type DataPath struct {
 }
 
 // ValidateTestPath validates a task filename.
-func ValidateTestPath(path string) (*DataPath, error) {
+func ValidateTestPath(path string) (DataPath, error) {
 	basic := basicTaskPattern.FindStringSubmatch(path)
 	if basic == nil {
-		return nil, errors.New("Path missing date-time string")
+		return DataPath{}, errors.New("Path missing date-time string")
 	}
 	preamble := startPattern.FindStringSubmatch(basic[1])
 	if preamble == nil {
-		return nil, errors.New("Invalid preamble: " + fmt.Sprint(basic))
+		return DataPath{}, errors.New("Invalid preamble: " + fmt.Sprint(basic))
 	}
 
 	post := endPattern.FindStringSubmatch(basic[5])
 	if post == nil {
-		return nil, errors.New("Invalid postamble: " + basic[5])
+		return DataPath{}, errors.New("Invalid postamble: " + basic[5])
 	}
-	dp := &DataPath{
+	dp := DataPath{
 		Bucket:     preamble[1],
 		ExpDir:     preamble[2],
 		DataType:   preamble[3],
@@ -123,20 +123,20 @@ func ValidateTestPath(path string) (*DataPath, error) {
 		Embargo:    post[6],
 		Suffix:     post[7],
 	}
-	// Move this into Validate function
+
 	dataType := dp.GetDataType()
 	if dataType == INVALID {
 		metrics.TaskCount.WithLabelValues(dp.TableBase(), "worker", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", path)
-		return nil, ErrBadDataType
+		return DataPath{}, ErrBadDataType
 	}
 
 	return dp, nil
 }
 
 // GetDataType finds the type of data stored in a file from its complete filename
-func (fn *DataPath) GetDataType() DataType {
-	dt, ok := dirToDataType[fn.DataType]
+func (dp DataPath) GetDataType() DataType {
+	dt, ok := dirToDataType[dp.DataType]
 	if !ok {
 		return INVALID
 	}
@@ -144,8 +144,8 @@ func (fn *DataPath) GetDataType() DataType {
 }
 
 // TableBase returns the base bigquery table name associated with the DataPath data type.
-func (fn *DataPath) TableBase() string {
-	return fn.GetDataType().Table()
+func (dp DataPath) TableBase() string {
+	return dp.GetDataType().Table()
 }
 
 // IsBatchService return true if this is a batch service.

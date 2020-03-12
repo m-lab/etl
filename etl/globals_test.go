@@ -21,34 +21,38 @@ func TestValidateTestPath(t *testing.T) {
 		name     string
 		path     string
 		wantType etl.DataType
-		want     *etl.DataPath
+		want     etl.DataPath
 		wantErr  bool
 	}{
 		{
-			name:    "error-bad-uri-prefix",
-			path:    `xgs://m-lab-sandbox/ndt/2016/01/26/20160126T123456Z-mlab1-prg01-ndt-0007.tgz`,
-			wantErr: true,
+			name:     "error-bad-uri-prefix",
+			path:     `xgs://m-lab-sandbox/ndt/2016/01/26/20160126T123456Z-mlab1-prg01-ndt-0007.tgz`,
+			wantErr:  true,
+			wantType: "invalid",
 		},
 		{
-			name:    "error-bad-extension",
-			path:    `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.gz.baz`,
-			wantErr: true,
+			name:     "error-bad-extension",
+			path:     `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.gz.baz`,
+			wantErr:  true,
+			wantType: "invalid",
 		},
 		{
-			name:    "error-bad-pod-name",
-			path:    `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg1-ndt-0007.tar.gz`,
-			wantErr: true,
+			name:     "error-bad-pod-name",
+			path:     `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg1-ndt-0007.tar.gz`,
+			wantErr:  true,
+			wantType: "invalid",
 		},
 		{
-			name:    "error-bad-date-path",
-			path:    `gs://m-lab-sandbox/ndt/2016/0126/20160126T000000Z-mlab1-prg01-ndt-0007.tar.gz`,
-			wantErr: true,
+			name:     "error-bad-date-path",
+			path:     `gs://m-lab-sandbox/ndt/2016/0126/20160126T000000Z-mlab1-prg01-ndt-0007.tar.gz`,
+			wantErr:  true,
+			wantType: "invalid",
 		},
 		{
 			name:     "success-tgz",
 			path:     `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz`,
 			wantType: etl.NDT,
-			want: &etl.DataPath{
+			want: etl.DataPath{
 				"m-lab-sandbox", "", "ndt", "2016/01/26", "20160126", "000000", "", "mlab1", "prg01", "ndt", "0007", "", ".tgz",
 			},
 		},
@@ -56,7 +60,7 @@ func TestValidateTestPath(t *testing.T) {
 			name:     "success-tar",
 			path:     `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar`,
 			wantType: etl.NDT,
-			want: &etl.DataPath{
+			want: etl.DataPath{
 				"m-lab-sandbox", "", "ndt", "2016/07/14", "20160714", "123456", "", "mlab1", "lax04", "ndt", "0001", "", ".tar",
 			},
 		},
@@ -64,7 +68,7 @@ func TestValidateTestPath(t *testing.T) {
 			name:     "success-tar-gz",
 			path:     `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar.gz`,
 			wantType: etl.NDT,
-			want: &etl.DataPath{
+			want: etl.DataPath{
 				"m-lab-sandbox", "", "ndt", "2016/07/14", "20160714", "123456", "", "mlab1", "lax04", "ndt", "0001", "", ".tar.gz",
 			},
 		},
@@ -72,7 +76,7 @@ func TestValidateTestPath(t *testing.T) {
 			name:     "success-embargo-tar-gz",
 			path:     `gs://embargo-mlab-oti/sidestream/2018/02/27/20180227T000010Z-mlab1-dfw02-sidestream-0000-e.tgz`,
 			wantType: etl.SS,
-			want: &etl.DataPath{
+			want: etl.DataPath{
 				"embargo-mlab-oti", "", "sidestream", "2018/02/27", "20180227", "000010", "", "mlab1", "dfw02", "sidestream", "0000", "-e", ".tgz",
 			},
 		},
@@ -80,7 +84,7 @@ func TestValidateTestPath(t *testing.T) {
 			name:     "pusher-tcpinfo-tgz",
 			path:     `gs://pusher-mlab-staging/ndt/tcpinfo/2019/05/25/20190525T020001.697396Z-tcpinfo-mlab4-ord01-ndt.tgz`,
 			wantType: etl.TCPINFO,
-			want: &etl.DataPath{
+			want: etl.DataPath{
 				"pusher-mlab-staging", "ndt", "tcpinfo", "2019/05/25", "20190525", "020001", "tcpinfo", "mlab4", "ord01", "ndt", "", "", ".tgz",
 			},
 		},
@@ -88,7 +92,7 @@ func TestValidateTestPath(t *testing.T) {
 			name:     "traceroute-tgz",
 			path:     `gs://archive-mlab-oti/paris-traceroute/2019/06/11/20190611T000002Z-mlab2-bom01-paris-traceroute-0000.tgz`,
 			wantType: etl.PT,
-			want: &etl.DataPath{
+			want: etl.DataPath{
 				"archive-mlab-oti", "", "paris-traceroute", "2019/06/11", "20190611", "000002", "", "mlab2", "bom01", "paris-traceroute", "0000", "", ".tgz",
 			},
 		},
@@ -96,7 +100,7 @@ func TestValidateTestPath(t *testing.T) {
 			name:     "scamper-tgz",
 			path:     `gs://archive-mlab-oti/ndt/traceroute/2019/06/20/20190620T224809.435046Z-traceroute-mlab1-den06-ndt.tgz`,
 			wantType: etl.PT,
-			want: &etl.DataPath{
+			want: etl.DataPath{
 				"archive-mlab-oti", "ndt", "traceroute", "2019/06/20", "20190620", "224809", "traceroute", "mlab1", "den06", "ndt", "", "", ".tgz",
 			},
 		},
@@ -109,12 +113,15 @@ func TestValidateTestPath(t *testing.T) {
 				t.Errorf("ValidateTestPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != nil && got.GetDataType() != tt.wantType {
+			if got.GetDataType() != tt.wantType {
 				t.Error(got.GetDataType(), "!=", tt.wantType)
+				return
 			}
-			if diff := deep.Equal(got, tt.want); diff != nil {
-				log.Println(tt.path)
-				t.Errorf("ValidateTestPath() = %v\n", diff)
+			if !tt.wantErr {
+				if diff := deep.Equal(got, tt.want); diff != nil {
+					log.Println(tt.path)
+					t.Errorf("ValidateTestPath() = %v\n", diff)
+				}
 			}
 		})
 	}

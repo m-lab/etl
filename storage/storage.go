@@ -68,7 +68,7 @@ func (src *GCSSource) nextHeader(trial int) (*tar.Header, bool, error) {
 
 // Retrieve the data for a single file.
 // Lots of error handling because of common faults in underlying GCS.
-// Returns data in byte asrcay, error and boolean regarding whether to retry.
+// Returns data in byte array, error and boolean regarding whether to retry.
 func (src *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 	var data []byte
 	var err error
@@ -124,7 +124,7 @@ func (src *GCSSource) Detail() string {
 
 // NextTest reads the next test object from the tar file.
 // Skips reading contents of any file larger than maxSize, returning empty data
-// and storage.EsrcOversizeFile.
+// and storage.ErrOversizeFile.
 // Returns io.EOF when there are no more tests.
 func (src *GCSSource) NextTest(maxSize int64) (string, []byte, error) {
 	metrics.WorkerState.WithLabelValues(src.TableBase, "read").Inc()

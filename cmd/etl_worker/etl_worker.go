@@ -13,16 +13,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/m-lab/etl/active"
-
 	"cloud.google.com/go/storage"
-
-	"github.com/m-lab/etl/etl"
-	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/etl/worker"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/m-lab/etl/active"
+	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/worker"
 
 	// Enable profiling. For more background and usage information, see:
 	//   https://blog.golang.org/profiling-go-programs
