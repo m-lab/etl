@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,10 +12,6 @@ import (
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
-)
-
-var (
-	ErrBadDataType = errors.New("unknown data type")
 )
 
 // ProcessTask interprets a filename to create a Task, Parser, and Inserter,
@@ -45,7 +40,7 @@ func ProcessTask(fn string) (int, error) {
 	if dataType == etl.INVALID {
 		metrics.TaskCount.WithLabelValues(data.TableBase(), "worker", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)
-		return http.StatusBadRequest, ErrBadDataType
+		return http.StatusBadRequest, etl.ErrBadDataType
 	}
 
 	client, err := storage.GetStorageClient(false)
