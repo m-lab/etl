@@ -36,6 +36,7 @@ type TarReader interface {
 
 // GCSSource wraps a gsutil tar file containing tests.
 type GCSSource struct {
+	FilePath      string
 	TarReader                   // TarReader interface provided by an embedded struct.
 	io.Closer                   // Closer interface to be provided by an embedded struct.
 	RetryBaseTime time.Duration // The base time for backoff and retry.
@@ -44,21 +45,21 @@ type GCSSource struct {
 
 // Retrieve next file header.
 // Lots of error handling because of common faults in underlying GCS.
-func (rr *GCSSource) nextHeader(trial int) (*tar.Header, bool, error) {
-	h, err := rr.Next()
+func (src *GCSSource) nextHeader(trial int) (*tar.Header, bool, error) {
+	h, err := src.Next()
 	if err != nil {
 		if err == io.EOF {
 			return nil, false, err
 		} else if strings.Contains(err.Error(), "unexpected EOF") {
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.TableBase, "next", strconv.Itoa(trial), "unexpected EOF").Inc()
+				src.TableBase, "next", strconv.Itoa(trial), "unexpected EOF").Inc()
 			// TODO: These are likely unrecoverable, so we should
 			// just return.
 		} else {
 			// Quite a few of these now, and they seem to be
 			// unrecoverable.
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.TableBase, "next", strconv.Itoa(trial), "other").Inc()
+				src.TableBase, "next", strconv.Itoa(trial), "other").Inc()
 		}
 		log.Printf("nextHeader: %v\n", err)
 	}
@@ -68,20 +69,20 @@ func (rr *GCSSource) nextHeader(trial int) (*tar.Header, bool, error) {
 // Retrieve the data for a single file.
 // Lots of error handling because of common faults in underlying GCS.
 // Returns data in byte array, error and boolean regarding whether to retry.
-func (rr *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
+func (src *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 	var data []byte
 	var err error
 	var phase string
 	if strings.HasSuffix(strings.ToLower(h.Name), "gz") {
 		// TODO add unit test
 		var zipReader *gzip.Reader
-		zipReader, err = gzip.NewReader(rr)
+		zipReader, err = gzip.NewReader(src)
 		if err != nil {
 			if err == io.EOF {
 				return nil, false, err
 			}
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.TableBase, "open zip", strconv.Itoa(trial), "zipReaderError").Inc()
+				src.TableBase, "open zip", strconv.Itoa(trial), "zipReaderError").Inc()
 			log.Printf("zipReaderError(%d): %v in file %s\n", trial, err, h.Name)
 			return nil, true, err
 		}
@@ -90,7 +91,7 @@ func (rr *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 		data, err = ioutil.ReadAll(zipReader)
 	} else {
 		phase = "read"
-		data, err = ioutil.ReadAll(rr)
+		data, err = ioutil.ReadAll(src)
 	}
 	if err != nil {
 		// These errors seem to be recoverable, at least with zip files.
@@ -98,11 +99,11 @@ func (rr *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			// We are seeing these very rarely, maybe 1 per hour.
 			// They are non-deterministic, so probably related to GCS problems.
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.TableBase, phase, strconv.Itoa(trial), "stream error").Inc()
+				src.TableBase, phase, strconv.Itoa(trial), "stream error").Inc()
 		} else {
 			// We haven't seen any of these so far (as of May 9)
 			metrics.GCSRetryCount.WithLabelValues(
-				rr.TableBase, phase, strconv.Itoa(trial), "other error").Inc()
+				src.TableBase, phase, strconv.Itoa(trial), "other error").Inc()
 		}
 		log.Printf("nextData(%d): %v\n", trial, err)
 		return nil, true, err
@@ -111,18 +112,23 @@ func (rr *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 	return data, false, nil
 }
 
-// Label returns a string for use in metrics and logs.
-func (rr *GCSSource) Label() string {
-	return rr.TableBase
+// Type returns a string for use in metrics and logs.
+func (src *GCSSource) Type() string {
+	return src.TableBase
+}
+
+// Detail returns a string for use in logs.
+func (src *GCSSource) Detail() string {
+	return src.FilePath
 }
 
 // NextTest reads the next test object from the tar file.
 // Skips reading contents of any file larger than maxSize, returning empty data
 // and storage.ErrOversizeFile.
 // Returns io.EOF when there are no more tests.
-func (rr *GCSSource) NextTest(maxSize int64) (string, []byte, error) {
-	metrics.WorkerState.WithLabelValues(rr.TableBase, "read").Inc()
-	defer metrics.WorkerState.WithLabelValues(rr.TableBase, "read").Dec()
+func (src *GCSSource) NextTest(maxSize int64) (string, []byte, error) {
+	metrics.WorkerState.WithLabelValues(src.TableBase, "read").Inc()
+	defer metrics.WorkerState.WithLabelValues(src.TableBase, "read").Dec()
 
 	// Try to get the next file.  We retry multiple times, because sometimes
 	// GCS stalls and produces stream errors.
@@ -134,11 +140,11 @@ func (rr *GCSSource) NextTest(maxSize int64) (string, []byte, error) {
 	// 16ms + 32ms + ... + 8192ms, or about 15 seconds.
 	// TODO - should add a random element to the backoff?
 	trial := 0
-	delay := rr.RetryBaseTime
+	delay := src.RetryBaseTime
 	for {
 		trial++
 		var retry bool
-		h, retry, err = rr.nextHeader(trial)
+		h, retry, err = src.nextHeader(trial)
 		if err == nil {
 			break
 		}
@@ -160,11 +166,11 @@ func (rr *GCSSource) NextTest(maxSize int64) (string, []byte, error) {
 	}
 
 	trial = 0
-	delay = rr.RetryBaseTime
+	delay = src.RetryBaseTime
 	for {
 		trial++
 		var retry bool
-		data, retry, err = rr.nextData(h, trial)
+		data, retry, err = src.nextData(h, trial)
 		if err == nil {
 			break
 		}
@@ -259,7 +265,7 @@ func NewTestSource(client *storage.Client, uri string, label string) (etl.TestSo
 	tarReader := tar.NewReader(rdr)
 
 	baseTimeout := 16 * time.Millisecond
-	return &GCSSource{tarReader, closer, baseTimeout, label}, nil
+	return &GCSSource{uri, tarReader, closer, baseTimeout, label}, nil
 }
 
 // GetStorageClient provides a storage reader client.

@@ -71,6 +71,9 @@ type Inserter interface {
 var (
 	// ErrBufferFull is returned when an InsertBuffer is full.
 	ErrBufferFull = errors.New("insert buffer is full")
+
+	// ErrBadDataType is returned when a path does not have a valid datatype.
+	ErrBadDataType = errors.New("unknown data type")
 )
 
 // InserterParams for NewInserter
@@ -131,7 +134,8 @@ type TestSource interface {
 	NextTest(maxSize int64) (string, []byte, error)
 	Close() error
 
-	Label() string // Label for logs and metrics
+	Detail() string // Detail for logs.
+	Type() string   // Data type for logs and metrics
 }
 
 //========================================================================
