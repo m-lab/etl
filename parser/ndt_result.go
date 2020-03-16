@@ -12,27 +12,45 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 )
 
 //=====================================================================================
 //                       NDTResult Parser
 //=====================================================================================
+
+// NDTResultParser
 type NDTResultParser struct {
-	inserter     etl.Inserter
-	etl.RowStats // RowStats implemented for NDTResultParser with an embedded struct.
+	*row.Base
+	table  string
+	suffix string
 }
 
-func NewNDTResultParser(ins etl.Inserter) etl.Parser {
+func NewNDTResultParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+	bufSize := etl.NDT5.BQBufferSize()
+	if ann == nil {
+		ann = v2as.GetAnnotator(annotation.BatchURL)
+	}
+
 	return &NDTResultParser{
-		inserter: ins,
-		RowStats: ins, // Delegate RowStats functions to the Inserter.
+		Base:   row.NewBase("foobar", sink, bufSize, ann),
+		table:  table,
+		suffix: suffix,
 	}
 }
 
 func (dp *NDTResultParser) TaskError() error {
+	stats := dp.GetStats()
+	if stats.Total() < 10*stats.Failed {
+		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
+			stats.Failed, stats.Total())
+		return etl.ErrHighInsertionFailureRate
+	}
 	return nil
 }
 
@@ -65,7 +83,6 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 
 	rdr := bytes.NewReader(test)
 	dec := json.NewDecoder(rdr)
-	rowCount := 0
 
 	for dec.More() {
 		stats := schema.NDTResultRow{
@@ -78,11 +95,11 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 		}
 		err := dec.Decode(&stats.Result)
 		if err != nil {
+			log.Println(err)
 			metrics.TestCount.WithLabelValues(
 				dp.TableName(), "ndt_result", "Decode").Inc()
 			return err
 		}
-		rowCount++
 
 		// Set the LogTime to the Result.StartTime
 		stats.LogTime = stats.Result.StartTime.Unix()
@@ -91,20 +108,7 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 		metrics.RowSizeHistogram.WithLabelValues(
 			dp.TableName()).Observe(float64(len(test)))
 
-		err = dp.inserter.InsertRow(stats)
-		if err != nil {
-			switch t := err.(type) {
-			case bigquery.PutMultiError:
-				// TODO improve error handling??
-				metrics.TestCount.WithLabelValues(
-					dp.TableName(), "ndt_result", "insert-multi").Inc()
-				log.Printf("%v\n", t[0].Error())
-			default:
-				metrics.TestCount.WithLabelValues(
-					dp.TableName(), "ndt_result", "insert-other").Inc()
-			}
-			return err
-		}
+		dp.Base.Put(&stats)
 		// Count successful inserts.
 		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt_result", "ok").Inc()
 	}
@@ -116,13 +120,33 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 // For NDTResult, we just forward the calls to the Inserter.
 
 func (dp *NDTResultParser) Flush() error {
-	return dp.inserter.Flush()
+	return dp.Base.Flush()
 }
 
 func (dp *NDTResultParser) TableName() string {
-	return dp.inserter.TableBase()
+	return dp.table
 }
 
 func (dp *NDTResultParser) FullTableName() string {
-	return dp.inserter.FullTableName()
+	return dp.table + dp.suffix
+}
+
+// RowsInBuffer returns the count of rows currently in the buffer.
+func (dp *NDTResultParser) RowsInBuffer() int {
+	return dp.GetStats().Pending
+}
+
+// Committed returns the count of rows successfully committed to BQ.
+func (dp *NDTResultParser) Committed() int {
+	return dp.GetStats().Committed
+}
+
+// Accepted returns the count of all rows received through InsertRow(s)
+func (dp *NDTResultParser) Accepted() int {
+	return dp.GetStats().Total()
+}
+
+// Failed returns the count of all rows that could not be committed.
+func (dp *NDTResultParser) Failed() int {
+	return dp.GetStats().Failed
 }
