@@ -33,6 +33,8 @@ func (row *NDTResultRow) Schema() (bigquery.Schema, error) {
 }
 
 // Implement row.Annotatable
+// This is a trivial implementation, as the schema does not yet include
+// annotations, and probably will not until we integrate UUID Annotator.
 func (row *NDTResultRow) GetLogTime() time.Time {
 	return time.Now()
 }
