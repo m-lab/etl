@@ -45,6 +45,10 @@ type Stats struct {
 	Failed    int
 }
 
+func (s Stats) Total() int {
+	return s.Buffered + s.Pending + s.Committed + s.Failed
+}
+
 // ActiveStats is a stats object that supports updates.
 type ActiveStats struct {
 	lock sync.RWMutex // Protects all Stats fields.
