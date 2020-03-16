@@ -70,7 +70,6 @@ func (as *ActiveStats) MoveToPending(n int) {
 	as.Buffered -= n
 	if as.Buffered < 0 {
 		log.Println("BROKEN - negative buffered")
-		panic("negative Buffered")
 	}
 	as.Pending += n
 }
@@ -90,7 +89,6 @@ func (as *ActiveStats) Done(n int, err error) {
 	as.Pending -= n
 	if as.Pending < 0 {
 		log.Println("BROKEN: negative Pending")
-		panic("negative Pending")
 	}
 	if err != nil {
 		as.Failed += n
