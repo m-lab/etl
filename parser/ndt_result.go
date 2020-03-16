@@ -1,6 +1,6 @@
 package parser
 
-// This file defines the Parser subtype that handles NDTResult data.
+// This file defines the Parser subtype that handles NDT5Result data.
 
 import (
 	"bytes"
@@ -21,30 +21,30 @@ import (
 )
 
 //=====================================================================================
-//                       NDTResult Parser
+//                       NDT5Result Parser
 //=====================================================================================
 
-// NDTResultParser
-type NDTResultParser struct {
+// NDT5ResultParser
+type NDT5ResultParser struct {
 	*row.Base
 	table  string
 	suffix string
 }
 
-func NewNDTResultParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+func NewNDT5ResultParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.NDT5.BQBufferSize()
 	if ann == nil {
 		ann = v2as.GetAnnotator(annotation.BatchURL)
 	}
 
-	return &NDTResultParser{
+	return &NDT5ResultParser{
 		Base:   row.NewBase("foobar", sink, bufSize, ann),
 		table:  table,
 		suffix: suffix,
 	}
 }
 
-func (dp *NDTResultParser) TaskError() error {
+func (dp *NDT5ResultParser) TaskError() error {
 	stats := dp.GetStats()
 	if stats.Total() < 10*stats.Failed {
 		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
@@ -55,7 +55,7 @@ func (dp *NDTResultParser) TaskError() error {
 }
 
 // IsParsable returns the canonical test type and whether to parse data.
-func (dp *NDTResultParser) IsParsable(testName string, data []byte) (string, bool) {
+func (dp *NDT5ResultParser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like: "<UUID>.json"
 	if strings.HasSuffix(testName, "json") {
 		return "ndt_result", true
@@ -63,12 +63,12 @@ func (dp *NDTResultParser) IsParsable(testName string, data []byte) (string, boo
 	return "unknown", false
 }
 
-// NOTE: data.NDTResult is a JSON object that should be pushed directly into BigQuery.
+// NOTE: data.NDT5Result is a JSON object that should be pushed directly into BigQuery.
 // We read the value into a struct, for compatibility with current inserter
 // backend and to eventually rely on the schema inference in m-lab/go/bqx.CreateTable().
 
-// ParseAndInsert decodes the data.NDTResult JSON and inserts it into BQ.
-func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+// ParseAndInsert decodes the data.NDT5Result JSON and inserts it into BQ.
+func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Dec()
@@ -85,7 +85,7 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 	dec := json.NewDecoder(rdr)
 
 	for dec.More() {
-		stats := schema.NDTResultRow{
+		stats := schema.NDT5ResultRow{
 			TestID: testName,
 			ParseInfo: &schema.ParseInfo{
 				TaskFileName:  meta["filename"].(string),
@@ -117,36 +117,36 @@ func (dp *NDTResultParser) ParseAndInsert(meta map[string]bigquery.Value, testNa
 }
 
 // NB: These functions are also required to complete the etl.Parser interface.
-// For NDTResult, we just forward the calls to the Inserter.
+// For NDT5Result, we just forward the calls to the Inserter.
 
-func (dp *NDTResultParser) Flush() error {
+func (dp *NDT5ResultParser) Flush() error {
 	return dp.Base.Flush()
 }
 
-func (dp *NDTResultParser) TableName() string {
+func (dp *NDT5ResultParser) TableName() string {
 	return dp.table
 }
 
-func (dp *NDTResultParser) FullTableName() string {
+func (dp *NDT5ResultParser) FullTableName() string {
 	return dp.table + dp.suffix
 }
 
 // RowsInBuffer returns the count of rows currently in the buffer.
-func (dp *NDTResultParser) RowsInBuffer() int {
+func (dp *NDT5ResultParser) RowsInBuffer() int {
 	return dp.GetStats().Pending
 }
 
 // Committed returns the count of rows successfully committed to BQ.
-func (dp *NDTResultParser) Committed() int {
+func (dp *NDT5ResultParser) Committed() int {
 	return dp.GetStats().Committed
 }
 
 // Accepted returns the count of all rows received through InsertRow(s)
-func (dp *NDTResultParser) Accepted() int {
+func (dp *NDT5ResultParser) Accepted() int {
 	return dp.GetStats().Total()
 }
 
 // Failed returns the count of all rows that could not be committed.
-func (dp *NDTResultParser) Failed() int {
+func (dp *NDT5ResultParser) Failed() int {
 	return dp.GetStats().Failed
 }

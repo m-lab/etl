@@ -9,17 +9,17 @@ import (
 	"github.com/m-lab/ndt-server/data"
 )
 
-// NDTResultRow defines the BQ schema for the data.NDTResult produced by the
+// NDT5ResultRow defines the BQ schema for the data.NDT5Result produced by the
 // ndt-server for NDT client measurements.
-type NDTResultRow struct {
+type NDT5ResultRow struct {
 	ParseInfo *ParseInfo
-	TestID    string         `json:"test_id,string" bigquery:"test_id"`
-	LogTime   int64          `json:"log_time,int64" bigquery:"log_time"`
-	Result    data.NDTResult `json:"result" bigquery:"result"`
+	TestID    string          `json:"test_id,string" bigquery:"test_id"`
+	LogTime   int64           `json:"log_time,int64" bigquery:"log_time"`
+	Result    data.NDT5Result `json:"result" bigquery:"result"`
 }
 
-// Schema returns the BigQuery schema for NDTResultRow.
-func (row *NDTResultRow) Schema() (bigquery.Schema, error) {
+// Schema returns the BigQuery schema for NDT5ResultRow.
+func (row *NDT5ResultRow) Schema() (bigquery.Schema, error) {
 	sch, err := bigquery.InferSchema(row)
 	if err != nil {
 		return bigquery.Schema{}, err
@@ -35,18 +35,18 @@ func (row *NDTResultRow) Schema() (bigquery.Schema, error) {
 // Implement row.Annotatable
 // This is a trivial implementation, as the schema does not yet include
 // annotations, and probably will not until we integrate UUID Annotator.
-func (row *NDTResultRow) GetLogTime() time.Time {
+func (row *NDT5ResultRow) GetLogTime() time.Time {
 	return time.Now()
 }
-func (row *NDTResultRow) GetClientIPs() []string {
+func (row *NDT5ResultRow) GetClientIPs() []string {
 	return []string{}
 }
-func (row *NDTResultRow) GetServerIP() string {
+func (row *NDT5ResultRow) GetServerIP() string {
 	return ""
 }
-func (row *NDTResultRow) AnnotateClients(map[string]*api.Annotations) error {
+func (row *NDT5ResultRow) AnnotateClients(map[string]*api.Annotations) error {
 	return nil
 }
-func (row *NDTResultRow) AnnotateServer(*api.Annotations) error {
+func (row *NDT5ResultRow) AnnotateServer(*api.Annotations) error {
 	return nil
 }

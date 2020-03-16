@@ -7,11 +7,11 @@ import (
 	"github.com/m-lab/go/bqx"
 )
 
-func TestNDTResult_Schema(t *testing.T) {
-	row := &NDTResultRow{}
+func TestNDT5Result_Schema(t *testing.T) {
+	row := &NDT5ResultRow{}
 	got, err := row.Schema()
 	if err != nil {
-		t.Errorf("NDTResult.Schema() error = %v, expected nil", err)
+		t.Errorf("NDT5Result.Schema() error = %v, expected nil", err)
 		return
 	}
 	count := 0
@@ -21,7 +21,7 @@ func TestNDTResult_Schema(t *testing.T) {
 		for _, name := range []string{"test_id", "ParseInfo", "GitShortCommit"} {
 			if field.Name == name {
 				if field.Description == "" {
-					t.Errorf("NDTResult.Schema() missing field.Description for %q", field.Name)
+					t.Errorf("NDT5Result.Schema() missing field.Description for %q", field.Name)
 				} else {
 					count++
 				}
@@ -30,6 +30,6 @@ func TestNDTResult_Schema(t *testing.T) {
 		return nil
 	})
 	if count != 3 {
-		t.Errorf("NDTResult.Schema() missing expected fields; got %d, want 3", count)
+		t.Errorf("NDT5Result.Schema() missing expected fields; got %d, want 3", count)
 	}
 }
