@@ -14,6 +14,7 @@ import (
 
 	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/go/logx"
 
 	"github.com/m-lab/etl/metrics"
 )
@@ -38,10 +39,60 @@ type Annotatable interface {
 
 // Stats contains stats about buffer history.
 type Stats struct {
+	Buffered  int // rows buffered but not yet sent.
 	Pending   int
 	Committed int
 	Failed    int
-	Total     int // total rows accepted (Pending+Committed+Failed)
+}
+
+// ActiveStats is a stats object that supports updates.
+type ActiveStats struct {
+	lock sync.RWMutex // Protects all Stats fields.
+	Stats
+}
+
+// GetStats implements HasStats()
+func (as *ActiveStats) GetStats() Stats {
+	as.lock.RLock()
+	defer as.lock.RUnlock()
+	return as.Stats
+}
+
+// MoveToPending increments the Pending field.
+func (as *ActiveStats) MoveToPending(n int) {
+	as.lock.Lock()
+	defer as.lock.Unlock()
+	as.Buffered -= n
+	if as.Buffered < 0 {
+		log.Println("BROKEN - negative buffered")
+		panic("negative Buffered")
+	}
+	as.Pending += n
+}
+
+// Inc increments the Buffered field
+func (as *ActiveStats) Inc() {
+	logx.Debug.Println("IncPending")
+	as.lock.Lock()
+	defer as.lock.Unlock()
+	as.Buffered++
+}
+
+// Done updates the pending to failed or committed.
+func (as *ActiveStats) Done(n int, err error) {
+	as.lock.Lock()
+	defer as.lock.Unlock()
+	as.Pending -= n
+	if as.Pending < 0 {
+		log.Println("BROKEN: negative Pending")
+		panic("negative Pending")
+	}
+	if err != nil {
+		as.Failed += n
+	} else {
+		as.Committed += n
+	}
+	logx.Debug.Printf("Done %d->%d %v\n", as.Pending+n, as.Pending, err)
 }
 
 // HasStats can provide stats
@@ -50,9 +101,10 @@ type HasStats interface {
 }
 
 // Sink defines the interface for committing rows.
+// Returns the number of rows successfully committed, and error.
 // These should be threadsafe.
 type Sink interface {
-	Commit(rows []interface{}, label string) error
+	Commit(rows []interface{}, label string) (int, error)
 }
 
 // Buffer provides all basic functionality generally needed for buffering, annotating, and inserting
@@ -60,7 +112,7 @@ type Sink interface {
 // Buffer functions are THREAD-SAFE
 type Buffer struct {
 	lock sync.Mutex
-	size int // Number of rows before committing to
+	size int // Number of rows before starting new buffer.
 	rows []interface{}
 }
 
@@ -69,7 +121,7 @@ func NewBuffer(size int) *Buffer {
 	return &Buffer{size: size, rows: make([]interface{}, 0, size)}
 }
 
-// Append simply appends a row to the buffer.
+// Append appends a row to the buffer.
 // If buffer is full, this returns the buffered rows, and saves provided row
 // in new buffer.  Client MUST handle the returned rows.
 func (buf *Buffer) Append(row interface{}) []interface{} {
@@ -84,13 +136,6 @@ func (buf *Buffer) Append(row interface{}) []interface{} {
 	buf.rows = append(buf.rows, row)
 
 	return rows
-}
-
-// Pending returns the number of pending rows in the buffer.
-func (buf *Buffer) Pending() int {
-	buf.lock.Lock()
-	defer buf.lock.Unlock()
-	return len(buf.rows)
 }
 
 // Reset clears the buffer, returning all pending rows.
@@ -245,8 +290,7 @@ type Base struct {
 	buf   *Buffer
 	label string // Used in metrics and errors.
 
-	statsLock sync.Mutex
-	stats     Stats
+	stats ActiveStats
 }
 
 // NewBase creates a new Base.  This will generally be embedded in a type specific parser.
@@ -257,9 +301,7 @@ func NewBase(label string, sink Sink, bufSize int, ann v2as.Annotator) *Base {
 
 // GetStats returns the buffer/sink stats.
 func (pb *Base) GetStats() Stats {
-	pb.statsLock.Lock()
-	defer pb.statsLock.Unlock()
-	return pb.stats
+	return pb.stats.GetStats()
 }
 
 // TaskError return the task level error, based on failed rows, or any other criteria.
@@ -272,22 +314,20 @@ func (pb *Base) commit(rows []interface{}) error {
 	_ = pb.ann.Annotate(rows, pb.label)
 	// TODO do we need these to be done in order.
 	// This is synchronous, blocking, and thread safe.
-	err := pb.sink.Commit(rows, pb.label)
-
-	pb.statsLock.Lock()
-	defer pb.statsLock.Unlock()
-	pb.stats.Pending -= len(rows)
-	if err != nil {
-		pb.stats.Failed += len(rows)
-		return err
+	done, err := pb.sink.Commit(rows, pb.label)
+	if done > 0 {
+		pb.stats.Done(done, nil)
 	}
-	pb.stats.Committed += len(rows)
-	return nil
+	if err != nil {
+		pb.stats.Done(len(rows)-done, err)
+	}
+	return err
 }
 
 // Flush synchronously flushes any pending rows.
 func (pb *Base) Flush() error {
 	rows := pb.buf.Reset()
+	pb.stats.MoveToPending(len(rows))
 	return pb.commit(rows)
 }
 
@@ -299,20 +339,17 @@ func (pb *Base) Flush() error {
 // to pb.commit, it should be written in the same order to the Sink.
 // TODO improve Annotatable architecture.
 func (pb *Base) Put(row Annotatable) {
+	log.Println("append")
 	rows := pb.buf.Append(row)
-	pb.statsLock.Lock()
-	pb.stats.Total++
-	pb.stats.Pending++
-	pb.statsLock.Unlock()
+	pb.stats.Inc()
 
 	if rows != nil {
-		// This allows pipelined parsing annotating, and writing.
-		// Disabling for now, as it leads to large memory/goroutine footprint.
-		//	go func(rows []interface{}) {
+		log.Println("commit")
+		pb.stats.MoveToPending(len(rows))
+		// TODO consider making this asynchronous.
 		err := pb.commit(rows)
 		if err != nil {
 			log.Println(err)
 		}
-		//	}(rows)
 	}
 }
