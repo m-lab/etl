@@ -1,7 +1,10 @@
 package schema
 
 import (
+	"time"
+
 	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/ndt-server/data"
 )
@@ -27,4 +30,23 @@ func (row *NDTResultRow) Schema() (bigquery.Schema, error) {
 	}
 	rr := bqx.RemoveRequired(sch)
 	return rr, err
+}
+
+// Implement row.Annotatable
+// This is a trivial implementation, as the schema does not yet include
+// annotations, and probably will not until we integrate UUID Annotator.
+func (row *NDTResultRow) GetLogTime() time.Time {
+	return time.Now()
+}
+func (row *NDTResultRow) GetClientIPs() []string {
+	return []string{}
+}
+func (row *NDTResultRow) GetServerIP() string {
+	return ""
+}
+func (row *NDTResultRow) AnnotateClients(map[string]*api.Annotations) error {
+	return nil
+}
+func (row *NDTResultRow) AnnotateServer(*api.Annotations) error {
+	return nil
 }

@@ -30,8 +30,8 @@ func TestNDTResultParser_ParseAndInsert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ins := newInMemoryInserter()
-			n := parser.NewNDTResultParser(ins)
+			ins := newInMemorySink()
+			n := parser.NewNDTResultParser(ins, "test", "_suffix", nil)
 
 			resultData, err := ioutil.ReadFile(`testdata/NDTResult/` + tt.testName)
 			if err != nil {
@@ -44,10 +44,11 @@ func TestNDTResultParser_ParseAndInsert(t *testing.T) {
 			if err := n.ParseAndInsert(meta, tt.testName, resultData); (err != nil) != tt.wantErr {
 				t.Errorf("NDTResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if ins.Accepted() != 1 {
-				t.Fatalf("Failed to insert snaplog data.")
+			if n.Accepted() != 1 {
+				t.Fatal("Failed to insert snaplog data.", ins)
 			}
-			actualValues := ins.data[0].(schema.NDTResultRow)
+			n.Flush()
+			actualValues := ins.data[0].(*schema.NDTResultRow)
 			if actualValues.Result.Control == nil {
 				t.Fatal("Result.Control is nil, expected value")
 			}
