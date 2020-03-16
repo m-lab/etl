@@ -40,11 +40,12 @@ type Annotatable interface {
 // Stats contains stats about buffer history.
 type Stats struct {
 	Buffered  int // rows buffered but not yet sent.
-	Pending   int
+	Pending   int // pending counts previously buffered rows that are being committed.
 	Committed int
 	Failed    int
 }
 
+// Total returns the total number of rows handled.
 func (s Stats) Total() int {
 	return s.Buffered + s.Pending + s.Committed + s.Failed
 }
