@@ -220,19 +220,21 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 }
 
 // TODO for some error types, should retry the insert.
-func (in *BQInserter) updateMetrics(err error) error {
+// Returns best estimate of number of rows successfully committed.
+func (in *BQInserter) handleErrors(err error) (int, error) {
 	if in.pending == 0 {
 		log.Println("Unexpected state error!!")
 	}
-	in.inserted += in.pending
+	rows := in.pending
+	in.pending = 0
 
 	switch typedErr := err.(type) {
 	case bigquery.PutMultiError:
-		if len(typedErr) > in.pending {
+		if len(typedErr) > rows {
 			log.Println("Inconsistent state error!!")
 		}
 		// If ALL rows failed...
-		if len(typedErr) == in.pending {
+		if len(typedErr) == rows {
 			log.Printf("InsertErr %v %v\n", err, typedErr.Error()) // Log the first RowInsertionError detail
 			// Backend failure counts failed RPCs.
 			metrics.BackendFailureCount.WithLabelValues(
@@ -241,7 +243,7 @@ func (in *BQInserter) updateMetrics(err error) error {
 		}
 
 		// If only a partial failure, or no more than 10 rows, then write log for every row.
-		if len(typedErr) <= 10 || len(typedErr) < in.pending {
+		if len(typedErr) <= 10 || len(typedErr) < rows {
 			// Handle each error individually.
 			for i, rowError := range typedErr {
 				// These are rowInsertionErrors
@@ -256,9 +258,10 @@ func (in *BQInserter) updateMetrics(err error) error {
 		metrics.ErrorCount.WithLabelValues(
 			in.TableBase(), "PutMultiError", "putmulti error").
 			Add(float64(len(typedErr)))
-		in.inserted -= len(typedErr)
+		in.inserted += rows - len(typedErr)
 		in.badRows += len(typedErr)
-		err = nil
+		// We return the number of successfully committed rows.
+		return rows - len(typedErr), nil
 	case *url.Error:
 		log.Printf("InsertErr url.Error: %v on %s", typedErr, in.FullTableName())
 		metrics.BackendFailureCount.WithLabelValues(
@@ -267,9 +270,8 @@ func (in *BQInserter) updateMetrics(err error) error {
 			in.TableBase(), "url.Error", "UNHANDLED url insert error").Inc()
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
-		in.inserted -= in.pending
-		in.badRows += in.pending
-		err = nil
+		in.badRows += rows
+		return 0, nil
 	case *googleapi.Error:
 		// TODO add special handling for Quota Exceeded
 		log.Printf("InsertErr %v on %s", typedErr, in.FullTableName())
@@ -278,19 +280,18 @@ func (in *BQInserter) updateMetrics(err error) error {
 				in.TableBase(), "quota exceeded").Inc()
 			metrics.ErrorCount.WithLabelValues(
 				in.TableBase(), "googleapi.Error", "Insert: Quota Exceeded").
-				Add(float64(in.pending))
+				Add(float64(rows))
 		} else {
 			metrics.BackendFailureCount.WithLabelValues(
 				in.TableBase(), "googleapi failed insert").Inc()
 			metrics.ErrorCount.WithLabelValues(
 				in.TableBase(), "googleapi.Error", "UNHANDLED googleapi error").
-				Add(float64(in.pending))
+				Add(float64(rows))
 		}
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
-		in.inserted -= in.pending
-		in.badRows += in.pending
-		err = nil
+		in.badRows += rows
+		return 0, nil
 
 	default:
 		// With Elem(), this was causing panics.
@@ -302,13 +303,10 @@ func (in *BQInserter) updateMetrics(err error) error {
 		// This at least preserves the count invariance.
 		metrics.ErrorCount.WithLabelValues(
 			in.TableBase(), "unknown", "UNHANDLED insert error").
-			Add(float64(in.pending))
-		in.inserted -= in.pending
-		in.badRows += in.pending
-		err = nil
+			Add(float64(rows))
+		in.badRows += rows
+		return 0, nil
 	}
-	in.pending = 0
-	return err
 }
 
 // acquire and release handle the single token that protects the FlushSlice and
@@ -329,7 +327,7 @@ func (in *BQInserter) release() {
 // It may block if there is already a Put or Flush in progress.
 func (in *BQInserter) Put(rows []interface{}) error {
 	in.acquire()
-	err := in.flushSlice(rows)
+	_, err := in.flushSlice(rows)
 	in.release()
 	return err
 }
@@ -361,23 +359,24 @@ func (in *BQInserter) Flush() error {
 }
 
 // Commit implements row.Sink.
+// It is thread safe, and returns the number of rows successfull committed.
 // NOTE: the label is ignored, and the TableBase is used instead.
-func (in *BQInserter) Commit(rows []interface{}, label string) error {
+func (in *BQInserter) Commit(rows []interface{}, label string) (int, error) {
 	in.acquire()
 	defer in.release()
 	return in.flushSlice(rows)
 }
 
 // flushSlice flushes a slice of rows to BigQuery.
+// It returns the number of rows successfully committed.
 // It is NOT threadsafe.
-func (in *BQInserter) flushSlice(rows []interface{}) error {
+func (in *BQInserter) flushSlice(rows []interface{}) (int, error) {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Dec()
 
 	if len(rows) == 0 {
-		return nil
+		return 0, nil
 	}
-
 	in.pending = len(rows)
 
 	// If we exceed the quota, this basically backs off and tries again.  When
@@ -437,19 +436,14 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 	}
 
 	// If there is still an error, then handle it.
-	if err == nil {
-		in.inserted += in.pending
-		in.pending = 0
-		metrics.InsertionHistogram.WithLabelValues(
-			in.TableBase(), "succeed").Observe(time.Since(start).Seconds())
-	} else {
+	if err != nil {
 		size := len(rows)
 		apiError, ok := err.(*googleapi.Error)
 		if !ok || size <= 1 || apiError.Code != 400 || !strings.Contains(apiError.Error(), "Request payload size exceeds the limit:") {
 			// This adjusts the inserted count, failure count, and updates in.rows.
 			metrics.InsertionHistogram.WithLabelValues(
 				in.TableBase(), "fail").Observe(time.Since(start).Seconds())
-			return in.updateMetrics(err)
+			return in.handleErrors(err)
 		}
 
 		// Explicitly handle "Request payload size exceeds ..."
@@ -457,20 +451,24 @@ func (in *BQInserter) flushSlice(rows []interface{}) error {
 		// all the data may be encoded log2(size) times.  So best if this only happens infrequently.
 		log.Printf("Splitting %d rows to avoid size limit for %s\n", size, in.TableBase())
 		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Splitting buffer").Inc()
-		in.pending = 0
-		err1 := in.flushSlice(rows[:size/2])
-		err2 := in.flushSlice(rows[size/2:])
+
+		n1, err1 := in.flushSlice(rows[:size/2])
+		n2, err2 := in.flushSlice(rows[size/2:])
 		// The recursive calls will have added various InsertionHistogram results, included successes
 		// and failures, so we don't need to add those here.
 		// Recursive calls also will have handled accounting for any errors not resolved by splitting,
 		// but we want to return any non-nil error up the stack WITHOUT repeating the accounting.
 		if err1 != nil {
-			err = err1
+			return n1 + n2, err1
 		} else {
-			err = err2
+			return n1 + n2, err2
 		}
 	}
-	return err
+	in.inserted += in.pending
+	in.pending = 0
+	metrics.InsertionHistogram.WithLabelValues(
+		in.TableBase(), "succeed").Observe(time.Since(start).Seconds())
+	return len(rows), nil
 }
 
 func (in *BQInserter) FullTableName() string {

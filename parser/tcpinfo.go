@@ -54,7 +54,7 @@ func (p *TCPInfoParser) Committed() int {
 
 // Accepted returns the count of all rows received through InsertRow(s)
 func (p *TCPInfoParser) Accepted() int {
-	return p.GetStats().Total
+	return p.GetStats().Total()
 }
 
 // Failed returns the count of all rows that could not be committed.
@@ -76,9 +76,9 @@ func (p *TCPInfoParser) TableName() string {
 // TaskError returns non-nil if more than 10% of row inserts failed.
 func (p *TCPInfoParser) TaskError() error {
 	stats := p.GetStats()
-	if stats.Total < 10*stats.Failed {
+	if stats.Total() < 10*stats.Failed {
 		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
-			stats.Failed, stats.Total)
+			stats.Failed, stats.Total())
 		return etl.ErrHighInsertionFailureRate
 	}
 	return nil

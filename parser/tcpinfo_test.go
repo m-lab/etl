@@ -84,12 +84,12 @@ func (in *inMemorySink) release() {
 	in.token <- struct{}{} // return the token.
 }
 
-func (in *inMemorySink) Commit(data []interface{}, label string) error {
+func (in *inMemorySink) Commit(data []interface{}, label string) (int, error) {
 	in.acquire()
 	defer in.release()
 	in.data = append(in.data, data...)
 	in.committed = len(in.data)
-	return nil
+	return len(data), nil
 }
 
 func (in *inMemorySink) Flush() error {

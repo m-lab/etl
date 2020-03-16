@@ -66,10 +66,10 @@ func newInMemorySink() *inMemorySink {
 	return &inMemorySink{data, 0, 0}
 }
 
-func (in *inMemorySink) Commit(data []interface{}, label string) error {
+func (in *inMemorySink) Commit(data []interface{}, label string) (int, error) {
 	in.data = append(in.data, data...)
 	in.committed = len(in.data)
-	return nil
+	return len(data), nil
 }
 
 func TestBase(t *testing.T) {
