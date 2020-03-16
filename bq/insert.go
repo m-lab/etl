@@ -220,6 +220,7 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 }
 
 // TODO for some error types, should retry the insert.
+// Returns best estimate of number of rows successfully committed.
 func (in *BQInserter) handleErrors(err error) (int, error) {
 	if in.pending == 0 {
 		log.Println("Unexpected state error!!")
@@ -358,6 +359,7 @@ func (in *BQInserter) Flush() error {
 }
 
 // Commit implements row.Sink.
+// It is thread safe, and returns the number of rows successfull committed.
 // NOTE: the label is ignored, and the TableBase is used instead.
 func (in *BQInserter) Commit(rows []interface{}, label string) (int, error) {
 	in.acquire()
@@ -366,6 +368,7 @@ func (in *BQInserter) Commit(rows []interface{}, label string) (int, error) {
 }
 
 // flushSlice flushes a slice of rows to BigQuery.
+// It returns the number of rows successfully committed.
 // It is NOT threadsafe.
 func (in *BQInserter) flushSlice(rows []interface{}) (int, error) {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Inc()

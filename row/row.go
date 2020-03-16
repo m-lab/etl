@@ -106,7 +106,7 @@ type HasStats interface {
 
 // Sink defines the interface for committing rows.
 // Returns the number of rows successfully committed, and error.
-// These should be threadsafe.
+// Implementations should be threadsafe.
 type Sink interface {
 	Commit(rows []interface{}, label string) (int, error)
 }
