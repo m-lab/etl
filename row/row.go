@@ -342,12 +342,10 @@ func (pb *Base) Flush() error {
 // to pb.commit, it should be written in the same order to the Sink.
 // TODO improve Annotatable architecture.
 func (pb *Base) Put(row Annotatable) {
-	log.Println("append")
 	rows := pb.buf.Append(row)
 	pb.stats.Inc()
 
 	if rows != nil {
-		log.Println("commit")
 		pb.stats.MoveToPending(len(rows))
 		// TODO consider making this asynchronous.
 		err := pb.commit(rows)
