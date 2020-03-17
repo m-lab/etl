@@ -53,7 +53,7 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 			log.Println(reflect.TypeOf(ins))
 			return nil
 		}
-		return NewNDTResultParser(sink, ins.TableBase(), ins.TableSuffix(), nil)
+		return NewNDT5ResultParser(sink, ins.TableBase(), ins.TableSuffix(), nil)
 
 	case etl.SS:
 		return NewDefaultSSParser(ins) // TODO fix this hack.

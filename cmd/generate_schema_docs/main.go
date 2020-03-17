@@ -143,7 +143,7 @@ type schemaGenerator interface {
 
 // shortNameOf returns the short type name of the underlying schemaGenerator type.
 // NOTE: the generator must reference an underlying pointer type,
-// e.g. `&schema.NDTResultRow{}` not `schema.NDTResultRow{}`
+// e.g. `&schema.NDT5ResultRow{}` not `schema.NDT5ResultRow{}`
 func shortNameOf(g schemaGenerator) string {
 	return strings.ToLower(reflect.TypeOf(g).Elem().Name())
 }
@@ -153,7 +153,7 @@ func main() {
 	flagx.ArgsFromEnv(flag.CommandLine)
 
 	generators := []schemaGenerator{
-		&schema.NDTResultRow{},
+		&schema.NDT5ResultRow{},
 		&schema.TCPRow{},
 		&schema.PTTest{},
 		// TODO(https://github.com/m-lab/etl/issues/745): Add additional types once
