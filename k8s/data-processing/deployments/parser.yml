@@ -44,6 +44,8 @@ spec:
           value: "{{GIT_COMMIT}}"
         - name: GCLOUD_PROJECT
           value: "{{GCLOUD_PROJECT}}"
+        - name: BIGQUERY_DATASET
+          value: "{{BIGQUERY_DATASET}}"
 
         - name: GARDENER_HOST
           value: "etl-gardener-service.default.svc.cluster.local"

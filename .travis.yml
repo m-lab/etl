@@ -319,6 +319,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     &&
+    BIGQUERY_DATASET="ndt_raw"
     $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-sandbox data-processing ./apply-cluster.sh
   skip_cleanup: true
   on:
@@ -358,6 +359,9 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     &&
+    BIGQUERY_DATASET="ndt_raw"
+    $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
+    &&
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-ndt.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
@@ -383,18 +387,6 @@ deploy:
   on:
     repo: m-lab/etl
     branch: master
-
-## Service: etl-fast-ss-parser -- AppEngine Flexible Environment.
-## Hack for demo
-- provider: script
-  script:
-    $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker fast-sidestream.yaml
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_BRANCH == fast-staging-*
 
 ######################################################################
 #  Prod deployments
