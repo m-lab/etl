@@ -30,6 +30,7 @@ import (
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 )
 
 // insertsBeforeRowJSONCount controls how often we perform a wasted JSON marshal
@@ -73,6 +74,25 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 			PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
 			BufferSize: dt.BQBufferSize()},
 		nil)
+}
+
+// NewColumnPartitionedInserter creates a new BQInserter with appropriate characteristics.
+func NewColumnPartitionedInserter(dt etl.DataType) (row.Sink, error) {
+	bqProject := dt.BigqueryProject()
+	dataset := dt.Dataset()
+	table := dt.Table()
+
+	// TODO create the inserter directly, instead of calling NewBQInserter
+	ins, err := NewBQInserter(
+		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: "",
+			PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
+			BufferSize: dt.BQBufferSize()},
+		nil)
+	sink, ok := ins.(row.Sink)
+	if !ok {
+		return nil, row.ErrInvalidSink
+	}
+	return sink, err
 }
 
 // NewBQInserter initializes a new BQInserter

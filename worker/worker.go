@@ -96,3 +96,84 @@ func ProcessTask(fn string) (int, error) {
 	metrics.TaskCount.WithLabelValues(data.TableBase(), string(dataType), "OK").Inc()
 	return http.StatusOK, nil
 }
+
+// ProcessGKETask interprets a filename to create a Task, Parser, and Inserter,
+// and processes the file content.  The inserter is customized to write to column partitioned tables.
+// Returns an http status code and an error if the task did not complete successfully.
+// This was previously a private function in etl_worker.go.
+func ProcessGKETask(fn string) (int, error) {
+	path, err := etl.ValidateTestPath(fn)
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(path.TableBase(), "worker", "InvalidFilename").Inc()
+		log.Printf("Invalid filename: %v\n", err)
+		return http.StatusBadRequest, err
+	}
+
+	// Count number of workers operating on each table.
+	metrics.WorkerCount.WithLabelValues(path.TableBase()).Inc()
+	defer metrics.WorkerCount.WithLabelValues(path.TableBase()).Dec()
+
+	// These keep track of the (nested) state of the worker.
+	metrics.WorkerState.WithLabelValues(path.TableBase(), "worker").Inc()
+	defer metrics.WorkerState.WithLabelValues(path.TableBase(), "worker").Dec()
+
+	client, err := storage.GetStorageClient(false)
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(path.TableBase(), "worker", "ServiceUnavailable").Inc()
+		log.Printf("Error getting storage client: %v\n", err)
+		return http.StatusServiceUnavailable, err
+	}
+
+	dataType := path.GetDataType()
+	tr, err := storage.NewTestSource(client, fn, path.TableBase())
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "ETLSourceError").Inc()
+		log.Printf("Error opening gcs file: %v", err)
+		return http.StatusInternalServerError, err
+		// TODO - anything better we could do here?
+	}
+	defer tr.Close()
+
+	dateFormat := "20060102"
+	date, err := time.Parse(dateFormat, path.PackedDate)
+
+	ins, err := bq.NewColumnPartitionedInserter(dataType)
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "NewInserterError").Inc()
+		log.Printf("Error creating BQ Inserter:  %v", err)
+		return http.StatusInternalServerError, err
+		// TODO - anything better we could do here?
+	}
+
+	// Create parser, injecting Inserter
+	p := parser.NewSinkParser(dataType, ins, path.TableBase())
+	if p == nil {
+		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "NewInserterError").Inc()
+		log.Printf("Error creating parser for %s", dataType)
+		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", dataType)
+	}
+	tsk := task.NewTask(fn, tr, p)
+
+	files, err := tsk.ProcessAllTests()
+
+	// Count the files processed per-host-module per-weekday.
+	// TODO(soltesz): evaluate separating hosts and pods as separate metrics.
+	metrics.FileCount.WithLabelValues(
+		path.Host+"-"+path.Site+"-"+path.Experiment,
+		date.Weekday().String()).Add(float64(files))
+
+	metrics.WorkerState.WithLabelValues(path.TableBase(), "finish").Inc()
+	defer metrics.WorkerState.WithLabelValues(path.TableBase(), "finish").Dec()
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "TaskError").Inc()
+		log.Printf("Error Processing Tests:  %v", err)
+		// NOTE: This may cause indefinite retries, and stalled task queue.  Task will eventually
+		// expire, but it might be better to have a different mechanism for retries, particularly
+		// for gardener, which waits for empty task queue.
+		return http.StatusInternalServerError, err
+		// TODO - anything better we could do here?
+	}
+
+	metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "OK").Inc()
+	return http.StatusOK, nil
+}
