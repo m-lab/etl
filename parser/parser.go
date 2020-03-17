@@ -41,6 +41,19 @@ func Version() string {
 	return gParserVersion
 }
 
+// NewSinkParser creates an appropriate parser for a given data type.
+func NewSinkParser(dt etl.DataType, sink row.Sink, table string) etl.Parser {
+	switch dt {
+	case etl.NDT5:
+		return NewNDT5ResultParser(sink, table, "", nil)
+
+	case etl.TCPINFO:
+		return NewTCPInfoParser(sink, table, "", nil)
+	default:
+		return nil
+	}
+}
+
 // NewParser creates an appropriate parser for a given data type.
 func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
