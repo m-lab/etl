@@ -137,7 +137,7 @@ func ProcessGKETask(fn string) (int, error) {
 	dateFormat := "20060102"
 	date, err := time.Parse(dateFormat, path.PackedDate)
 
-	ins, err := bq.NewColumnPartitionedInserter(dataType)
+	ins, err := bq.NewColumnPartitionedInserter(dataType, nil)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)
