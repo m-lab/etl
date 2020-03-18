@@ -238,7 +238,7 @@ func hasRecursiveType(t reflect.Type, seen *typeList) (bool, error) {
 // Stuff from uploader.go
 //---------------------------------------------------------------------------------------
 
-// This is an fake for Uploader, for use in debugging, and tests.
+// FakeUploader is a fake for Uploader, for use in debugging, and tests.
 // See bigquery.Uploader for field info.
 type FakeUploader struct {
 	t                   *bigquery.Table
@@ -246,6 +246,7 @@ type FakeUploader struct {
 	IgnoreUnknownValues bool
 	TableTemplateSuffix string
 
+	Total   int             // Total count of inserted rows.
 	Rows    []*InsertionRow // Most recently inserted rows, for testing/debugging.
 	Request *bqv2.TableDataInsertAllRequest
 	// Set this with SetErr to return an error.  Error is cleared on each call.
@@ -365,6 +366,7 @@ func (u *FakeUploader) putMulti(ctx context.Context, src []bigquery.ValueSaver) 
 			return err
 		}
 		rows = append(rows, &InsertionRow{InsertID: insertID, Row: row})
+		u.Total++
 	}
 
 	u.Rows = rows
