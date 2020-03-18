@@ -82,17 +82,26 @@ func NewColumnPartitionedInserter(dt etl.DataType) (row.Sink, error) {
 	dataset := dt.Dataset()
 	table := dt.Table()
 
-	// TODO create the inserter directly, instead of calling NewBQInserter
-	ins, err := NewBQInserter(
-		etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: "",
-			PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
-			BufferSize: dt.BQBufferSize()},
-		nil)
-	sink, ok := ins.(row.Sink)
-	if !ok {
-		return nil, row.ErrInvalidSink
+	params := etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: "",
+		PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
+		BufferSize: dt.BQBufferSize()}
+
+	client, err := GetClient(params.Project)
+	if err != nil {
+		return nil, err
 	}
-	return sink, err
+
+	uploader := client.Dataset(params.Dataset).Table(table).Uploader()
+	// This avoids problems when a single row of the insert has invalid
+	// data.  We then have to carefully parse the returned error object.
+	uploader.SkipInvalidRows = true
+	token := make(chan struct{}, 1)
+	token <- struct{}{}
+	rows := make([]interface{}, 0, params.BufferSize)
+	ins := &BQInserter{params: params, uploader: uploader, putTimeout: params.PutTimeout, rows: rows, token: token}
+
+	sink := (row.Sink)(ins)
+	return sink, nil
 }
 
 // NewBQInserter initializes a new BQInserter
