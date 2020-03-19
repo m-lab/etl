@@ -1,3 +1,4 @@
+# Capitalized ParseInfo for legacy schemas.
 ParseInfo:
   Description: Metadata about how the parser processed the measurement.
 ParseInfo.TaskFileName:
@@ -11,3 +12,13 @@ test_id:
     GCS archive.
 log_time:
   Description: Original measurement collection timestamp.
+
+# Lower case parseInfo for 'Standard Column' supporting schemas.
+parseInfo:
+  Description: Metadata about how the parser processed the measurement.
+parseInfo.TaskFileName:
+  Description: GCS URL to the archive containing the test_id for this row.
+parseInfo.ParseTime:
+  Description: Time that the parser processed this row.
+parseInfo.ParserVersion:
+  Description: Version of the parser that processed this row.
