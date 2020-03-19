@@ -6,10 +6,20 @@ import (
 	"log"
 	"path"
 	"reflect"
+	"time"
 
 	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/rtx"
 )
+
+// ParseInfo provides details about the parsed row. Uses 'Standard Column' names.
+type ParseInfo struct {
+	ParserVersion string
+	ParseTime     time.Time
+	ArchiveURL    string
+	Filename      string
+	Priority      int64
+}
 
 // Requires go-bindata tool in environment:
 //   go get -u github.com/go-bindata/go-bindata/go-bindata
