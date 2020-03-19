@@ -256,7 +256,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 		return schema.PTTest{}, err
 	}
 
-	parseInfo := schema.ParseInfo{
+	parseInfo := schema.ParseInfoV0{
 		TaskFileName:  taskFilename,
 		ParseTime:     time.Now(),
 		ParserVersion: Version(),
@@ -449,7 +449,7 @@ func (pt *PTParser) TableName() string {
 }
 
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
-	parseInfo := schema.ParseInfo{
+	parseInfo := schema.ParseInfoV0{
 		TaskFileName:  pt.taskFileName,
 		ParseTime:     time.Now(),
 		ParserVersion: Version(),
