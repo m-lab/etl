@@ -50,6 +50,13 @@ func CreateOrUpdateNDT5ResultRow(project string, dataset string, table string) e
 	return CreateOrUpdate(schema, project, dataset, table)
 }
 
+func CreateOrUpdateNDT7ResultRow(project string, dataset string, table string) error {
+	row := schema.NDT7ResultRow{}
+	schema, err := row.Schema()
+	rtx.Must(err, "NDT7ResultRow.Schema")
+	return CreateOrUpdate(schema, project, dataset, table)
+}
+
 // CreateOrUpdate will update or create a table from the given schema.
 func CreateOrUpdate(schema bigquery.Schema, project string, dataset string, table string) error {
 	name := project + "." + dataset + "." + table
@@ -148,6 +155,14 @@ func main() {
 			errCount++
 		}
 		if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
+			errCount++
+		}
+
+	case "ndt7":
+		if err := CreateOrUpdateNDT7ResultRow(project, "base_tables", "ndt7"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateNDT7ResultRow(project, "batch", "ndt7"); err != nil {
 			errCount++
 		}
 
