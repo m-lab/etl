@@ -1,0 +1,38 @@
+a:
+  Description: Fields summarizing or derived from the raw data.
+a.UUID:
+  Description: UUID for TCP connection.
+a.CongestionControl:
+  Description: Congestion control algorithm used for connection.
+a.MeanThroughputMbps:
+  Description: Server calculated average rate.
+a.MinRTT:
+  Description: The minimum RTT observed during the measurement.
+a.LossRate:
+  Description: Loss rate from the lifetime of the connection.
+
+GitShortCommit:
+  Description: GitShortCommit is the Git commit (short form) of the running
+    server code.
+Version:
+  Description: Version is the symbolic version (if any) of the running server
+    code.
+
+Download:
+  Description: Metadata for the NDT7 download protocol.
+Download.UUID:
+  Description: UUID for download TCP connection.
+
+Upload:
+  Description: Metadata for the NDT7 upload protocol.
+Upload.UUID:
+  Description: UUID for upload TCP connection.
+
+ServerMeasurements:
+  Description: Server calculated measurements collected throughout the
+    lifetime of the connection.
+ClientMeasurements:
+  Description: Client calculated measurements collected and reported
+    throughout the lifetime of the connection.
+ClientMetadata:
+  Description: The client reported metadata.

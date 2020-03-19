@@ -1,0 +1,165 @@
+package parser_test
+
+import (
+	"io/ioutil"
+	"strings"
+	"testing"
+
+	"cloud.google.com/go/bigquery"
+	"github.com/go-test/deep"
+
+	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/go/pretty"
+)
+
+func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
+	tests := []struct {
+		name     string
+		testName string
+		wantErr  bool
+	}{
+		{
+			name:     "success-download",
+			testName: `ndt7-download-20200318T000657.568382877Z.ndt-knwp4_1583603744_000000000000590E.json`,
+		},
+		{
+			name:     "success-upload",
+			testName: `ndt7-upload-20200318T001352.496224022Z.ndt-knwp4_1583603744_0000000000005CF2.json`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ins := newInMemorySink()
+			n := parser.NewNDT7ResultParser(ins, "test", "_suffix", &fakeAnnotator{})
+
+			resultData, err := ioutil.ReadFile(`testdata/NDT7Result/` + tt.testName)
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
+			meta := map[string]bigquery.Value{
+				"filename": "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
+			}
+
+			if err := n.ParseAndInsert(meta, tt.testName, resultData); (err != nil) != tt.wantErr {
+				t.Errorf("NDT7ResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if n.Accepted() != 1 {
+				t.Fatal("Failed to insert snaplog data.", ins)
+			}
+			n.Flush()
+			row := ins.data[0].(*schema.NDT7ResultRow)
+			if row.Raw.Download != nil {
+				exp := schema.NDT7Summary{
+					UUID:               "ndt-knwp4_1583603744_000000000000590E",
+					TestTime:           row.A.TestTime,
+					CongestionControl:  "bbr",
+					MeanThroughputMbps: 46.26645885913907,
+					MinRTT:             0.285804,
+					LossRate:           0.12029169202467564,
+				}
+				if diff := deep.Equal(row.A, exp); diff != nil {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
+				}
+
+				expPI := schema.ParseInfo{
+					ParserVersion: "https://github.com/m-lab/etl/tree/foobar", // "local development",
+					ParseTime:     row.ParseInfo.ParseTime,                    // cheat a little, since this value should be about now.
+					ArchiveURL:    "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
+					Filename:      "ndt7-download-20200318T000657.568382877Z.ndt-knwp4_1583603744_000000000000590E.json",
+					Priority:      0,
+				}
+				if diff := deep.Equal(row.ParseInfo, expPI); diff != nil {
+					pretty.Print(row.ParseInfo)
+					t.Errorf("NDT7ResultParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
+				}
+
+				dl := row.Raw.Download
+				if len(dl.ServerMeasurements) != 33 {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() found wrong download measurements; got %d, want %d", len(dl.ServerMeasurements), 33)
+				}
+				if dl.ServerMeasurements[0].TCPInfo == nil {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() download measurements with nil TCPInfo")
+				}
+				if dl.ServerMeasurements[0].BBRInfo == nil {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() download measurements with nil BBRInfo")
+				}
+				if len(dl.ClientMetadata) != 6 {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() found wrong client metadata; got %d, want %d", len(dl.ClientMetadata), 6)
+				}
+			}
+			if row.Raw.Upload != nil {
+				exp := schema.NDT7Summary{
+					UUID:               "ndt-knwp4_1583603744_0000000000005CF2",
+					TestTime:           row.A.TestTime,
+					CongestionControl:  "bbr",
+					MeanThroughputMbps: 2.6848341983403983,
+					MinRTT:             0.173733,
+					LossRate:           0,
+				}
+				if diff := deep.Equal(row.A, exp); diff != nil {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
+				}
+				expPI := schema.ParseInfo{
+					ParserVersion: "https://github.com/m-lab/etl/tree/foobar",
+					ParseTime:     row.ParseInfo.ParseTime,
+					ArchiveURL:    "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
+					Filename:      "ndt7-upload-20200318T001352.496224022Z.ndt-knwp4_1583603744_0000000000005CF2.json",
+					Priority:      0,
+				}
+				if diff := deep.Equal(row.ParseInfo, expPI); diff != nil {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
+				}
+				up := row.Raw.Upload
+				if len(up.ServerMeasurements) != 45 {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() found wrong upload measurements; got %d, want %d", len(up.ServerMeasurements), 45)
+				}
+				if up.ServerMeasurements[0].TCPInfo == nil {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() download measurements with nil TCPInfo")
+				}
+				if up.ServerMeasurements[0].BBRInfo == nil {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() download measurements with nil BBRInfo")
+				}
+				if len(up.ClientMetadata) != 6 {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() found wrong client metadata; got %d, want %d", len(up.ClientMetadata), 6)
+				}
+			}
+			if row.Raw.Download == nil && row.Raw.Upload == nil {
+				// We expect one or the other.
+				t.Error("NDT7ResultParser.ParseAndInsert() found neither upload nor download result")
+			}
+		})
+	}
+}
+
+func TestNDT7ResultParser_IsParsable(t *testing.T) {
+	tests := []struct {
+		name     string
+		testName string
+		want     bool
+	}{
+		{
+			name:     "success-json",
+			testName: `ndt7-download-20200318T002722.065323104Z.ndt-knwp4_1583603744_0000000000006213.json`,
+			want:     true,
+		},
+		{
+			name:     "error-bad-extension",
+			testName: `badfile.badextension`,
+			want:     false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := ioutil.ReadFile(`testdata/NDT7Result/` + tt.testName)
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
+			p := &parser.NDT7ResultParser{}
+			_, got := p.IsParsable(tt.testName, data)
+			if got != tt.want {
+				t.Errorf("NDT7ResultParser.IsParsable() got1 = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
