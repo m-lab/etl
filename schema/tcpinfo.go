@@ -32,8 +32,8 @@ type ClientInfo struct {
 	Network *api.ASData // NOTE: dominant ASN is available at top level.
 }
 
-// ParseInfo provides details about the parsing of this row.
-type ParseInfo struct {
+// ParseInfoV0 provides details about the parsing of this row.
+type ParseInfoV0 struct {
 	TaskFileName  string // The tar file containing this test.
 	ParseTime     time.Time
 	ParserVersion string
@@ -48,7 +48,7 @@ type TCPRow struct {
 	ClientASN uint32 // Top level for clustering
 	ServerASN uint32 // Top level for clustering
 
-	ParseInfo *ParseInfo
+	ParseInfo *ParseInfoV0
 
 	SockID inetdiag.SockID
 

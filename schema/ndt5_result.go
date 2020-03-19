@@ -12,7 +12,7 @@ import (
 // NDT5ResultRow defines the BQ schema for the data.NDT5Result produced by the
 // ndt-server for NDT client measurements.
 type NDT5ResultRow struct {
-	ParseInfo *ParseInfo
+	ParseInfo *ParseInfoV0
 	TestID    string          `json:"test_id,string" bigquery:"test_id"`
 	LogTime   int64           `json:"log_time,int64" bigquery:"log_time"`
 	Result    data.NDT5Result `json:"result" bigquery:"result"`
