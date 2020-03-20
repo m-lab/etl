@@ -16,7 +16,7 @@ type NDT5ResultRow struct {
 	Result    data.NDT5Result `json:"result" bigquery:"result"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	null *row.NullAnnotator `bigquery:"-"`
+	*row.NullAnnotator `bigquery:"-"`
 }
 
 // Schema returns the BigQuery schema for NDT5ResultRow.
