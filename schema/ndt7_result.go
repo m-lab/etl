@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/annotation-service/api"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/ndt-server/data"
 )
@@ -17,6 +17,9 @@ type NDT7ResultRow struct {
 	TestTime  time.Time       `bigquery:"testTime"`
 	Flags     int64           `bigquery:"flags"`
 	Raw       data.NDT7Result `bigquery:"raw"`
+
+	// NOT part of struct schema. Included only to provide a fake annotator interface.
+	null *row.NullAnnotator `bigquery:"-"`
 }
 
 // NDT7Summary contains fields summarizing or derived from the raw data.
@@ -41,24 +44,4 @@ func (row *NDT7ResultRow) Schema() (bigquery.Schema, error) {
 	}
 	rr := bqx.RemoveRequired(sch)
 	return rr, err
-}
-
-// Implement row.Annotatable
-// This is a trivial implementation, as the schema does not yet include
-// annotations, and probably will not until we integrate UUID Annotator.
-
-func (row *NDT7ResultRow) GetLogTime() time.Time {
-	return time.Now()
-}
-func (row *NDT7ResultRow) GetClientIPs() []string {
-	return []string{}
-}
-func (row *NDT7ResultRow) GetServerIP() string {
-	return ""
-}
-func (row *NDT7ResultRow) AnnotateClients(map[string]*api.Annotations) error {
-	return nil
-}
-func (row *NDT7ResultRow) AnnotateServer(*api.Annotations) error {
-	return nil
 }
