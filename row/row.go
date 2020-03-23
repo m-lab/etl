@@ -354,3 +354,32 @@ func (pb *Base) Put(row Annotatable) {
 		}
 	}
 }
+
+// NullAnnotator satisfies the Annotatable interface without actually doing
+// anything.
+type NullAnnotator struct{}
+
+// GetLogTime returns current time rather than the actual row time.
+func (row *NullAnnotator) GetLogTime() time.Time {
+	return time.Now()
+}
+
+// GetClientIPs returns an empty array so nothing is annotated.
+func (row *NullAnnotator) GetClientIPs() []string {
+	return []string{}
+}
+
+// GetServerIP returns an empty string because there is nothing to annotate.
+func (row *NullAnnotator) GetServerIP() string {
+	return ""
+}
+
+// AnnotateClients does nothing.
+func (row *NullAnnotator) AnnotateClients(map[string]*api.Annotations) error {
+	return nil
+}
+
+// AnnotateServer does nothing.
+func (row *NullAnnotator) AnnotateServer(*api.Annotations) error {
+	return nil
+}

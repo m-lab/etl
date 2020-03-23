@@ -35,8 +35,8 @@ func Test_main(t *testing.T) {
 	main() // no crash == working
 
 	// Check for expected files in tmpdir
-	_, err = os.Stat(path.Join(tmpdir, "schema_ndtresultrow.md"))
+	_, err = os.Stat(path.Join(tmpdir, "schema_ndt5resultrow.md"))
 	if err != nil {
-		t.Errorf("main() missing output file; missing schema_ndtresultrow.md")
+		t.Errorf("main() missing output file; missing schema_ndt5resultrow.md")
 	}
 }

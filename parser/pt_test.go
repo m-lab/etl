@@ -245,7 +245,7 @@ func TestPTParser(t *testing.T) {
 
 func TestPTInserter(t *testing.T) {
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins)
+	pt := parser.NewPTParser(ins, &fakeAnnotator{})
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
@@ -273,7 +273,7 @@ func TestPTInserter(t *testing.T) {
 
 func TestPTInserterLastTest(t *testing.T) {
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins)
+	pt := parser.NewPTParser(ins, &fakeAnnotator{})
 	rawData, err := ioutil.ReadFile("testdata/PT/20130524T00:04:44Z_ALL5729.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")

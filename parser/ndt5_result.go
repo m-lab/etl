@@ -58,7 +58,7 @@ func (dp *NDT5ResultParser) TaskError() error {
 func (dp *NDT5ResultParser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like: "<UUID>.json"
 	if strings.HasSuffix(testName, "json") {
-		return "ndt_result", true
+		return "ndt5_result", true
 	}
 	return "unknown", false
 }
@@ -70,8 +70,8 @@ func (dp *NDT5ResultParser) IsParsable(testName string, data []byte) (string, bo
 // ParseAndInsert decodes the data.NDT5Result JSON and inserts it into BQ.
 func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
-	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Inc()
-	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt_result").Dec()
+	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Inc()
+	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Dec()
 
 	// An older version of the NDT result struct used a JSON object (Go map) to
 	// store ClientMetadata. Results in that format will fail to parse. This step
@@ -87,7 +87,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	for dec.More() {
 		stats := schema.NDT5ResultRow{
 			TestID: testName,
-			ParseInfo: &schema.ParseInfo{
+			ParseInfo: &schema.ParseInfoV0{
 				TaskFileName:  meta["filename"].(string),
 				ParseTime:     time.Now(),
 				ParserVersion: Version(),
@@ -97,7 +97,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		if err != nil {
 			log.Println(err)
 			metrics.TestCount.WithLabelValues(
-				dp.TableName(), "ndt_result", "Decode").Inc()
+				dp.TableName(), "ndt5_result", "Decode").Inc()
 			return err
 		}
 
@@ -110,7 +110,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 
 		dp.Base.Put(&stats)
 		// Count successful inserts.
-		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt_result", "ok").Inc()
+		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
 	}
 
 	return nil

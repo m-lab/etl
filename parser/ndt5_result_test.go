@@ -31,7 +31,7 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ins := newInMemorySink()
-			n := parser.NewNDT5ResultParser(ins, "test", "_suffix", nil)
+			n := parser.NewNDT5ResultParser(ins, "test", "_suffix", &fakeAnnotator{})
 
 			resultData, err := ioutil.ReadFile(`testdata/NDT5Result/` + tt.testName)
 			if err != nil {

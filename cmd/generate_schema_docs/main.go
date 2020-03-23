@@ -89,10 +89,6 @@ func generateRichMarkdown(s bigquery.Schema, t schemaGenerator) []byte {
 				path := strings.Join(prefix[start:], ".")
 				d, ok = combo[path]
 			}
-			if !ok {
-				// This is not an error, the field simply doesn't have extra description.
-				return nil
-			}
 
 			// We found relevant documentation, now concatenate the fields when found.
 			richDesc := d["Description"]
@@ -154,6 +150,7 @@ func main() {
 
 	generators := []schemaGenerator{
 		&schema.NDT5ResultRow{},
+		&schema.NDT7ResultRow{},
 		&schema.TCPRow{},
 		&schema.PTTest{},
 		// TODO(https://github.com/m-lab/etl/issues/745): Add additional types once
