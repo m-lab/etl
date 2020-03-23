@@ -140,7 +140,7 @@ func TestNDT7ResultParser_IsParsable(t *testing.T) {
 	}{
 		{
 			name:     "success-json",
-			testName: `ndt7-download-20200318T002722.065323104Z.ndt-knwp4_1583603744_0000000000006213.json`,
+			testName: `ndt7-download-20200318T000657.568382877Z.ndt-knwp4_1583603744_000000000000590E.json`,
 			want:     true,
 		},
 		{
