@@ -19,7 +19,7 @@ type NDT7ResultRow struct {
 	Raw       data.NDT7Result `bigquery:"raw"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	*row.NullAnnotator `bigquery:"-"`
+	row.NullAnnotator `bigquery:"-"`
 }
 
 // NDT7Summary contains fields summarizing or derived from the raw data.
