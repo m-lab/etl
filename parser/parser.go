@@ -9,6 +9,8 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"github.com/m-lab/annotation-service/api/v2"
+
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -42,13 +44,13 @@ func Version() string {
 }
 
 // NewSinkParser creates an appropriate parser for a given data type.
-func NewSinkParser(dt etl.DataType, sink row.Sink, table string) etl.Parser {
+func NewSinkParser(dt etl.DataType, sink row.Sink, table string, ann api.Annotator) etl.Parser {
 	switch dt {
 	case etl.NDT5:
-		return NewNDT5ResultParser(sink, table, "", nil)
+		return NewNDT5ResultParser(sink, table, "", ann)
 
 	case etl.TCPINFO:
-		return NewTCPInfoParser(sink, table, "", nil)
+		return NewTCPInfoParser(sink, table, "", ann)
 	default:
 		return nil
 	}
