@@ -1,11 +1,17 @@
 package worker_test
 
 import (
+	"context"
 	"log"
 	"math"
 	"net/http"
 	"testing"
+	"time"
 
+	"github.com/m-lab/annotation-service/api"
+	v2 "github.com/m-lab/annotation-service/api/v2"
+
+	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
 	"github.com/prometheus/client_golang/prometheus"
@@ -38,6 +44,38 @@ func TestProcessTask(t *testing.T) {
 	}
 	filename := "gs://archive-mlab-testing/ndt/2018/05/09/20180509T101913Z-mlab1-mad03-ndt-0000.tgz"
 	status, err := worker.ProcessTask(filename)
+	if err != nil {
+		t.Error(err)
+	}
+	if status != http.StatusOK {
+		t.Error("Expected", http.StatusOK, "Got:", status)
+	}
+
+	// This section checks that prom metrics are updated appropriately.
+	c := make(chan prometheus.Metric, 10)
+
+	metrics.FileCount.Collect(c)
+	checkCounter(t, c, 1)
+
+	metrics.TaskCount.Collect(c)
+	checkCounter(t, c, 1)
+
+	metrics.TestCount.Collect(c)
+	checkCounter(t, c, 1)
+}
+
+type fakeAnnotator struct{}
+
+func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2.Response, error) {
+	return &v2.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
+}
+
+func TestProcessGKETask(t *testing.T) {
+	if testing.Short() {
+		t.Log("Skipping integration test")
+	}
+	filename := "gs://archive-mlab-testing/ndt/ndt5/2019/12/01/20191201T020010.092692Z-ndt5-mlab1-yyz02-ndt.tgz"
+	status, err := worker.ProcessGKETask(filename, fake.NewFakeUploader(), &fakeAnnotator{})
 	if err != nil {
 		t.Error(err)
 	}

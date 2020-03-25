@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/m-lab/annotation-service/api/v2"
+
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -101,7 +103,7 @@ func ProcessTask(fn string) (int, error) {
 // and processes the file content.  The inserter is customized to write to column partitioned tables.
 // Returns an http status code and an error if the task did not complete successfully.
 // This was previously a private function in etl_worker.go.
-func ProcessGKETask(fn string) (int, error) {
+func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, error) {
 	path, err := etl.ValidateTestPath(fn)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(path.TableBase(), "worker", "InvalidFilename").Inc()
@@ -137,7 +139,7 @@ func ProcessGKETask(fn string) (int, error) {
 	dateFormat := "20060102"
 	date, err := time.Parse(dateFormat, path.PackedDate)
 
-	ins, err := bq.NewColumnPartitionedInserter(dataType, nil)
+	ins, err := bq.NewColumnPartitionedInserter(dataType, uploader)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)
@@ -146,7 +148,7 @@ func ProcessGKETask(fn string) (int, error) {
 	}
 
 	// Create parser, injecting Inserter
-	p := parser.NewSinkParser(dataType, ins, path.TableBase())
+	p := parser.NewSinkParser(dataType, ins, path.TableBase(), ann)
 	if p == nil {
 		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating parser for %s", dataType)
