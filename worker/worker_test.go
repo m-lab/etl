@@ -12,6 +12,13 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
+func getCounterVec(c prometheus.CounterVec) float64 {
+	ch := make(chan prometheus.Metric, 10)
+	c.Collect(ch)
+	m <- ch
+
+}
+
 func counterValue(m prometheus.Metric) float64 {
 	var mm dto.Metric
 	m.Write(&mm)
