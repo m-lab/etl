@@ -404,6 +404,7 @@ func (in *BQInserter) Commit(rows []interface{}, label string) (int, error) {
 // flushSlice flushes a slice of rows to BigQuery.
 // It returns the number of rows successfully committed.
 // It is NOT threadsafe.
+// TODO should this return errors?  Currently always returns nil error, even on failure.
 func (in *BQInserter) flushSlice(rows []interface{}) (int, error) {
 	metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Inc()
 	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Dec()
