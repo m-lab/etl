@@ -204,14 +204,12 @@ func xTestQuotaError(t *testing.T) {
 
 // This isn't particularly thorough, but it exercises the various error handling paths
 // to ensure there aren't any panics.
-func xTestUpdateMetrics(t *testing.T) {
+func xTestGKEUpdateMetrics(t *testing.T) {
 	fakeUploader := fake.NewFakeUploader()
-	in, e := bq.NewBQInserter(standardInsertParams(20), fakeUploader)
-	if e != nil {
-		log.Printf("%v\n", e)
-		t.Fatal()
+	in, err := bq.NewColumnPartitionedInserter(etl.NDT5, fakeUploader)
+	if err != nil {
+		t.Fatal(err)
 	}
-	bqi := in.(*bq.BQInserter)
 
 	// These don't have to implement saver as long as Err is being set,
 	// and flush is not autotriggering more than once.
@@ -220,37 +218,36 @@ func xTestUpdateMetrics(t *testing.T) {
 	items = append(items, Item{Name: "x2", Count: 12, Foobar: 44})
 
 	fakeUploader.SetErr(make(bigquery.PutMultiError, 2))
-	bqi.InsertRows(items)
-	bqi.Flush()
-	if bqi.Failed() != 2 {
-		t.Error(in)
+	n, err := in.Commit(items, "label")
+	if n > 0 || err != nil {
+		t.Error(n, err)
 	}
 
 	// Try adding 11 rows, with a PutMultiError on all rows.
 	fakeUploader.SetErr(make(bigquery.PutMultiError, 11))
-	bqi.InsertRows(make([]interface{}, 11))
-	bqi.Flush()
-	// There should now be 13 failed rows.
-	if bqi.Failed() != 13 {
-		t.Error(in)
+	n, err = in.Commit(make([]interface{}, 11), "label")
+	if n > 0 || err != nil {
+		t.Error(n, err)
 	}
 
 	// Try adding 1 row with a simple error.
 	fakeUploader.SetErr(&url.Error{Err: errors.New("random error")})
-	bqi.InsertRows(make([]interface{}, 1))
-	bqi.Flush()
-	// There should now be 14 failures.
-	if bqi.Failed() != 14 {
-		t.Error(in)
+	n, err = in.Commit(make([]interface{}, 1), "label")
+	if n > 0 || err != nil {
+		t.Error(n, err)
 	}
 
 	// Try adding 1 row with a googleapi.Error.
 	fakeUploader.SetErr(&googleapi.Error{Code: 404})
-	bqi.InsertRows(make([]interface{}, 1))
-	bqi.Flush()
-	// Should now be 15 failures.
-	if bqi.Failed() != 15 || bqi.Committed() != 0 {
-		t.Error(in)
+	n, err = in.Commit(make([]interface{}, 1), "label")
+	if n > 0 || err != nil {
+		t.Error(n, err)
 	}
 
+	if fakeUploader.Total != 0 {
+		t.Error("Expected zero total:", fakeUploader.Total)
+	}
+	if fakeUploader.CallCount != 4 {
+		t.Error("Expected 4 calls:", fakeUploader.CallCount)
+	}
 }
