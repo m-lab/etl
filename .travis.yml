@@ -319,7 +319,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     &&
-    BIGQUERY_DATASET="ndt_raw"
+    BIGQUERY_DATASET="tmp_ndt"
     $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-sandbox data-processing ./apply-cluster.sh
   skip_cleanup: true
   on:
@@ -359,7 +359,7 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     &&
-    BIGQUERY_DATASET="ndt_raw"
+    BIGQUERY_DATASET="tmp_ndt"
     $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
     &&
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
