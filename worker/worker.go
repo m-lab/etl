@@ -19,9 +19,7 @@ import (
 // ProcessTask interprets a filename to create a Task, Parser, and Inserter,
 // and processes the file content.
 // Returns an http status code and an error if the task did not complete successfully.
-// This was previously a private function in etl_worker.go.
-// TODO - add comprehensive unit test??
-// TODO - refactor into a Worker struct containing a StorageClient and other similar things, to allow use of fake implementations for testing.
+// DEPRECATED - should migrate to ProcessGKETask.
 func ProcessTask(fn string) (int, error) {
 	data, err := etl.ValidateTestPath(fn)
 	if err != nil {
@@ -101,8 +99,9 @@ func ProcessTask(fn string) (int, error) {
 
 // ProcessGKETask interprets a filename to create a Task, Parser, and Inserter,
 // and processes the file content.  The inserter is customized to write to column partitioned tables.
+// It is currently used in the GKE parser instances, but will eventually replace ProcessTask for
+// all parser/task types.
 // Returns an http status code and an error if the task did not complete successfully.
-// This was previously a private function in etl_worker.go.
 func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, error) {
 	path, err := etl.ValidateTestPath(fn)
 	if err != nil {
