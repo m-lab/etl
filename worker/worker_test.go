@@ -81,7 +81,8 @@ func TestProcessGKETask(t *testing.T) {
 	if testing.Short() {
 		t.Log("Skipping integration test")
 	}
-	filename := "gs://archive-mlab-testing/ndt/ndt5/2019/12/01/20191201T020010.092692Z-ndt5-mlab1-yyz02-ndt.tgz"
+	// TODO load this from local file?
+	filename := "gs://archive-mlab-testing/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
 	up := fake.NewFakeUploader()
 	status, err := worker.ProcessGKETask(filename, up, &fakeAnnotator{})
 	if err != nil {
@@ -95,16 +96,16 @@ func TestProcessGKETask(t *testing.T) {
 	c := make(chan prometheus.Metric, 10)
 
 	metrics.FileCount.Collect(c)
-	checkCounter(t, c, 3627)
+	checkCounter(t, c, 488)
 
 	metrics.TaskCount.Collect(c)
 	checkCounter(t, c, 1)
 
 	metrics.TestCount.Collect(c)
-	checkCounter(t, c, 3552)
+	checkCounter(t, c, 478)
 
-	if up.Total != 3552 {
-		t.Error("Expected 3627 tests, got", up.Total)
+	if up.Total != 478 {
+		t.Error("Expected 478 tests, got", up.Total)
 	}
 	metrics.FileCount.Reset()
 	metrics.TaskCount.Reset()
