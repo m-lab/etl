@@ -2,6 +2,7 @@ package worker_test
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -34,6 +35,7 @@ func checkCounter(t *testing.T, c chan prometheus.Metric, expected float64) {
 	m := <-c
 	v := counterValue(m)
 	if v != expected {
+		log.Output(2, fmt.Sprintln("For", m.Desc(), "expected:", expected, "got:", v))
 		t.Error("For", m.Desc(), "expected:", expected, "got:", v)
 	}
 }
@@ -62,6 +64,10 @@ func TestProcessTask(t *testing.T) {
 
 	metrics.TestCount.Collect(c)
 	checkCounter(t, c, 1)
+
+	metrics.FileCount.Reset()
+	metrics.TaskCount.Reset()
+	metrics.TestCount.Reset()
 }
 
 type fakeAnnotator struct{}
@@ -71,12 +77,13 @@ func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ip
 }
 
 // Enable this test when we have fixed the prom counter resets.
-func xTestProcessGKETask(t *testing.T) {
+func TestProcessGKETask(t *testing.T) {
 	if testing.Short() {
 		t.Log("Skipping integration test")
 	}
 	filename := "gs://archive-mlab-testing/ndt/ndt5/2019/12/01/20191201T020010.092692Z-ndt5-mlab1-yyz02-ndt.tgz"
-	status, err := worker.ProcessGKETask(filename, fake.NewFakeUploader(), &fakeAnnotator{})
+	up := fake.NewFakeUploader()
+	status, err := worker.ProcessGKETask(filename, up, &fakeAnnotator{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -88,11 +95,18 @@ func xTestProcessGKETask(t *testing.T) {
 	c := make(chan prometheus.Metric, 10)
 
 	metrics.FileCount.Collect(c)
-	checkCounter(t, c, 1)
+	checkCounter(t, c, 3627)
 
 	metrics.TaskCount.Collect(c)
 	checkCounter(t, c, 1)
 
 	metrics.TestCount.Collect(c)
-	checkCounter(t, c, 1)
+	checkCounter(t, c, 3552)
+
+	if up.Total != 3552 {
+		t.Error("Expected 3627 tests, got", up.Total)
+	}
+	metrics.FileCount.Reset()
+	metrics.TaskCount.Reset()
+	metrics.TestCount.Reset()
 }
