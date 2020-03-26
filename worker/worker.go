@@ -175,6 +175,16 @@ func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, e
 		// TODO - anything better we could do here?
 	}
 
+	// NOTE: In the k8s parsers, there are huge spikes in the task rate.  For ndt5, this is likely just
+	// because the tasks are very small.  In tcpinfo, there are many many small tasks at the end of
+	// a date, because long running connections cause pusher to make small archives for subsequent
+	// days, and these are lexicographically after all the large files.
+	// We are starting to think this is a bug, and tcpinfo should instead place the small files
+	// from long running connections in future date directories, instead of the date that the
+	// connection originated.  The parser should then also put these small connection snippets into
+	// the partition corresponding to the time of the traffic, rather than the time of the original
+	// connection.  We are unclear about how to handle short connections that span midnight UTC, but
+	// suspect they should be placed in the date of the original connection time.
 	metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "OK").Inc()
 	return http.StatusOK, nil
 }
