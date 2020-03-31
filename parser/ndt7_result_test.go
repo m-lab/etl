@@ -54,7 +54,7 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 					UUID:               "ndt-knwp4_1583603744_000000000000590E",
 					TestTime:           row.A.TestTime,
 					CongestionControl:  "bbr",
-					MeanThroughputMbps: 46.26645885913907,
+					MeanThroughputMbps: 38.714033637501984,
 					MinRTT:             0.285804,
 					LossRate:           0.12029169202467564,
 				}
