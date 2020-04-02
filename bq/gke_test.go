@@ -37,7 +37,7 @@ func TestGKEBasicInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = in.Commit([]interface{}{Item{Name: tag + "_x0", Count: 17, Foobar: 44}}, "basic"); err != nil {
+	if _, err = in.Commit(items[0:1], "basic"); err != nil {
 		t.Error(err)
 	}
 	if _, err = in.Commit(items, "Basic"); err != nil {
@@ -101,7 +101,12 @@ func TestGKEHandleInsertErrors(t *testing.T) {
 	}
 }
 
-func xTestHandleRequestTooLarge(t *testing.T) {
+func TestGKEHandleRequestTooLarge(t *testing.T) {
+	if true {
+		t.Log("Test not yet ported to GKE")
+		return
+	}
+
 	fakeUploader := fake.NewFakeUploader()
 	fakeUploader.RejectIfMoreThan = 2
 	bqi, e := bq.NewBQInserter(standardInsertParams(5), fakeUploader)
@@ -133,7 +138,11 @@ func xTestHandleRequestTooLarge(t *testing.T) {
 	}
 }
 
-func xTestQuotaError(t *testing.T) {
+func TestGKEQuotaError(t *testing.T) {
+	if true {
+		t.Log("Test not yet ported to GKE")
+		return
+	}
 
 	// Set up an Inserter with a fake Uploader backend for testing.
 	// Buffer 5 rows, so that we can test the buffering.
@@ -204,7 +213,12 @@ func xTestQuotaError(t *testing.T) {
 
 // This isn't particularly thorough, but it exercises the various error handling paths
 // to ensure there aren't any panics.
-func xTestGKEUpdateMetrics(t *testing.T) {
+func TestGKEUpdateMetrics(t *testing.T) {
+	if true {
+		t.Log("Test not yet ported to GKE")
+		return
+	}
+
 	fakeUploader := fake.NewFakeUploader()
 	in, err := bq.NewColumnPartitionedInserter(etl.NDT5, fakeUploader)
 	if err != nil {

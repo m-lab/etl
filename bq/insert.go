@@ -361,7 +361,7 @@ func (in *BQInserter) release() {
 // It may block if there is already a Put or Flush in progress.
 func (in *BQInserter) Put(rows []interface{}) error {
 	in.acquire()
-	_, err := in.flushSlice(rows)
+	_, err := in.flushSlice(rows, in.TableBase())
 	in.release()
 	return err
 }
@@ -376,7 +376,7 @@ func (in *BQInserter) Put(rows []interface{}) error {
 func (in *BQInserter) PutAsync(rows []interface{}) {
 	in.acquire()
 	go func() {
-		in.flushSlice(rows)
+		in.flushSlice(rows, in.TableBase())
 		in.release()
 	}()
 }
@@ -398,16 +398,17 @@ func (in *BQInserter) Flush() error {
 func (in *BQInserter) Commit(rows []interface{}, label string) (int, error) {
 	in.acquire()
 	defer in.release()
-	return in.flushSlice(rows)
+	return in.flushSlice(rows, label)
 }
 
 // flushSlice flushes a slice of rows to BigQuery.
 // It returns the number of rows successfully committed.
 // It is NOT threadsafe.
 // TODO should this return errors?  Currently always returns nil error, even on failure.
-func (in *BQInserter) flushSlice(rows []interface{}) (int, error) {
-	metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Inc()
-	defer metrics.WorkerState.WithLabelValues(in.TableBase(), "flush").Dec()
+// TODO pass in the Commit label, a
+func (in *BQInserter) flushSlice(rows []interface{}, label string) (int, error) {
+	metrics.WorkerState.WithLabelValues(label, "flush").Inc()
+	defer metrics.WorkerState.WithLabelValues(label, "flush").Dec()
 
 	if len(rows) == 0 {
 		return 0, nil
@@ -462,7 +463,7 @@ func (in *BQInserter) flushSlice(rows []interface{}) (int, error) {
 		if err == nil || !strings.Contains(err.Error(), "Quota exceeded:") {
 			break
 		}
-		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Quota Exceeded").Inc()
+		metrics.WarningCount.WithLabelValues(label, "", "Quota Exceeded").Inc()
 
 		// Use some randomness to reduce risk of synchronization across tasks.
 		delayNanos := float32(backoff.Nanoseconds()) * (0.5 + rand.Float32()) // between 0.5 and 1.5 * RetryDelay
@@ -477,7 +478,7 @@ func (in *BQInserter) flushSlice(rows []interface{}) (int, error) {
 		if !ok || size <= 1 || apiError.Code != 400 || !strings.Contains(apiError.Error(), "Request payload size exceeds the limit:") {
 			// This adjusts the inserted count, failure count, and updates in.rows.
 			metrics.InsertionHistogram.WithLabelValues(
-				in.TableBase(), "fail").Observe(time.Since(start).Seconds())
+				label, "fail").Observe(time.Since(start).Seconds())
 			return in.handleErrors(err)
 		}
 
@@ -485,10 +486,10 @@ func (in *BQInserter) flushSlice(rows []interface{}) (int, error) {
 		// NOTE: This splitting behavior may cause repeated encoding of the same data.  Worst case,
 		// all the data may be encoded log2(size) times.  So best if this only happens infrequently.
 		log.Printf("Splitting %d rows to avoid size limit for %s\n", size, in.TableBase())
-		metrics.WarningCount.WithLabelValues(in.TableBase(), "", "Splitting buffer").Inc()
+		metrics.WarningCount.WithLabelValues(label, "", "Splitting buffer").Inc()
 
-		n1, err1 := in.flushSlice(rows[:size/2])
-		n2, err2 := in.flushSlice(rows[size/2:])
+		n1, err1 := in.flushSlice(rows[:size/2], label)
+		n2, err2 := in.flushSlice(rows[size/2:], label)
 		// The recursive calls will have added various InsertionHistogram results, included successes
 		// and failures, so we don't need to add those here.
 		// Recursive calls also will have handled accounting for any errors not resolved by splitting,
@@ -502,7 +503,7 @@ func (in *BQInserter) flushSlice(rows []interface{}) (int, error) {
 	in.inserted += in.pending
 	in.pending = 0
 	metrics.InsertionHistogram.WithLabelValues(
-		in.TableBase(), "succeed").Observe(time.Since(start).Seconds())
+		label, "succeed").Observe(time.Since(start).Seconds())
 	return len(rows), nil
 }
 
