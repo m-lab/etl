@@ -135,9 +135,6 @@ func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, e
 	}
 	defer tr.Close()
 
-	dateFormat := "20060102"
-	date, err := time.Parse(dateFormat, path.PackedDate)
-
 	ins, err := bq.NewColumnPartitionedInserter(dataType, uploader)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "NewInserterError").Inc()
@@ -156,6 +153,14 @@ func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, e
 	tsk := task.NewTask(fn, tr, p)
 
 	files, err := tsk.ProcessAllTests()
+
+	dateFormat := "20060102"
+	date, err := time.Parse(dateFormat, path.PackedDate)
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "Bad Date").Inc()
+		log.Printf("Error parsing path.PackedDate: %v", err)
+		return http.StatusBadRequest, err
+	}
 
 	// Count the files processed per-host-module per-weekday.
 	// TODO(soltesz): evaluate separating hosts and pods as separate metrics.
