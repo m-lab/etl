@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/go/bqx"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -126,6 +127,11 @@ func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, e
 	}
 
 	dataType := path.GetDataType()
+	if dataType == etl.INVALID {
+		metrics.TaskCount.WithLabelValues(path.TableBase(), "invalid", "SourcePathError").Inc()
+		log.Printf("Invalid datatype: %s", path)
+		return http.StatusInternalServerError, err
+	}
 	tr, err := storage.NewTestSource(client, fn, path.TableBase())
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "ETLSourceError").Inc()
@@ -135,7 +141,10 @@ func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, e
 	}
 	defer tr.Close()
 
-	ins, err := bq.NewColumnPartitionedInserter(dataType, uploader)
+	// TODO move this to dataType.
+	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
+
+	ins, err := bq.NewColumnPartitionedInserter(pdt, dataType.BQBufferSize(), uploader)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(path.TableBase(), string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)

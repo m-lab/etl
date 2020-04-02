@@ -31,6 +31,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
+	"github.com/m-lab/go/bqx"
 )
 
 // insertsBeforeRowJSONCount controls how often we perform a wasted JSON marshal
@@ -78,27 +79,23 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 
 // NewColumnPartitionedInserter creates a new BQInserter with appropriate characteristics.
 // TODO - migrate all the tests to use this instead of NewBQInserter.
-func NewColumnPartitionedInserter(dt etl.DataType, uploader etl.Uploader) (row.Sink, error) {
-	bqProject := dt.BigqueryProject()
-	dataset := dt.Dataset()
-	table := dt.Table()
-
-	client, err := GetClient(bqProject)
+func NewColumnPartitionedInserter(pdt bqx.PDT, bufferSize int, uploader etl.Uploader) (row.Sink, error) {
+	client, err := GetClient(pdt.Project)
 	if err != nil {
 		return nil, err
 	}
 
 	if uploader == nil {
-		u := client.Dataset(dataset).Table(table).Uploader()
+		u := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
 		// This avoids problems when a single row of the insert has invalid
 		// data.  We then have to carefully parse the returned error object.
 		u.SkipInvalidRows = true
 		uploader = u
 	}
 
-	params := etl.InserterParams{Project: bqProject, Dataset: dataset, Table: table, Suffix: "",
+	params := etl.InserterParams{Project: pdt.Project, Dataset: pdt.Dataset, Table: pdt.Table, Suffix: "",
 		PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
-		BufferSize: dt.BQBufferSize()}
+		BufferSize: bufferSize}
 	token := make(chan struct{}, 1)
 	token <- struct{}{}
 	rows := make([]interface{}, 0, params.BufferSize)

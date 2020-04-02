@@ -13,6 +13,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/row"
+	"github.com/m-lab/go/bqx"
 )
 
 func init() {
@@ -32,7 +33,9 @@ func TestGKEBasicInsert(t *testing.T) {
 		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
 
 	u := fake.NewFakeUploader()
-	in, err := bq.NewColumnPartitionedInserter(etl.NDT5, u)
+	// TODO - make these explicit.
+	pdt := bqx.PDT{Project: etl.NDT5.BigqueryProject(), Dataset: etl.NDT5.Dataset(), Table: etl.NDT5.Table()}
+	in, err := bq.NewColumnPartitionedInserter(pdt, etl.NDT5.BQBufferSize(), u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +58,8 @@ func TestGKEBasicInsert(t *testing.T) {
 // Just manual testing for now - need to assert something useful.
 func TestGKEHandleInsertErrors(t *testing.T) {
 	u := fake.NewFakeUploader()
-	in, err := bq.NewColumnPartitionedInserter(etl.NDT5, u)
+	pdt := bqx.PDT{Project: etl.NDT5.BigqueryProject(), Dataset: etl.NDT5.Dataset(), Table: etl.NDT5.Table()}
+	in, err := bq.NewColumnPartitionedInserter(pdt, etl.NDT5.BQBufferSize(), u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +215,8 @@ func TestGKEUpdateMetrics(t *testing.T) {
 	t.Skip("Test not yet ported to GKE")
 
 	fakeUploader := fake.NewFakeUploader()
-	in, err := bq.NewColumnPartitionedInserter(etl.NDT5, fakeUploader)
+	pdt := bqx.PDT{Project: etl.NDT5.BigqueryProject(), Dataset: etl.NDT5.Dataset(), Table: etl.NDT5.Table()}
+	in, err := bq.NewColumnPartitionedInserter(pdt, etl.NDT5.BQBufferSize(), fakeUploader)
 	if err != nil {
 		t.Fatal(err)
 	}
