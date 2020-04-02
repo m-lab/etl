@@ -102,10 +102,7 @@ func TestGKEHandleInsertErrors(t *testing.T) {
 }
 
 func TestGKEHandleRequestTooLarge(t *testing.T) {
-	if true {
-		t.Log("Test not yet ported to GKE")
-		return
-	}
+	t.Skip("Test not yet ported to GKE")
 
 	fakeUploader := fake.NewFakeUploader()
 	fakeUploader.RejectIfMoreThan = 2
@@ -139,10 +136,7 @@ func TestGKEHandleRequestTooLarge(t *testing.T) {
 }
 
 func TestGKEQuotaError(t *testing.T) {
-	if true {
-		t.Log("Test not yet ported to GKE")
-		return
-	}
+	t.Skip("Test not yet ported to GKE")
 
 	// Set up an Inserter with a fake Uploader backend for testing.
 	// Buffer 5 rows, so that we can test the buffering.
@@ -214,10 +208,7 @@ func TestGKEQuotaError(t *testing.T) {
 // This isn't particularly thorough, but it exercises the various error handling paths
 // to ensure there aren't any panics.
 func TestGKEUpdateMetrics(t *testing.T) {
-	if true {
-		t.Log("Test not yet ported to GKE")
-		return
-	}
+	t.Skip("Test not yet ported to GKE")
 
 	fakeUploader := fake.NewFakeUploader()
 	in, err := bq.NewColumnPartitionedInserter(etl.NDT5, fakeUploader)
