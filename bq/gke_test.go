@@ -37,7 +37,7 @@ func TestGKEBasicInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = in.Commit([]interface{}{Item{Name: tag + "_x0", Count: 17, Foobar: 44}}, "basic"); err != nil {
+	if _, err = in.Commit(items[0:0], "basic"); err != nil {
 		t.Error(err)
 	}
 	if _, err = in.Commit(items, "Basic"); err != nil {

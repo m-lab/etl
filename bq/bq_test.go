@@ -69,7 +69,7 @@ func xTestRealPartitionInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err = in.InsertRow(Item{Name: tag + "_x0", Count: 17, Foobar: 44}); err != nil {
+	if err = in.InsertRow(items[0]); err != nil {
 		t.Error(err)
 	}
 	if err = in.InsertRows(items); err != nil {
