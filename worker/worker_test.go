@@ -47,10 +47,10 @@ func TestProcessTask(t *testing.T) {
 	filename := "gs://archive-mlab-testing/ndt/2018/05/09/20180509T101913Z-mlab1-mad03-ndt-0000.tgz"
 	status, err := worker.ProcessTask(filename)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if status != http.StatusOK {
-		t.Error("Expected", http.StatusOK, "Got:", status)
+		t.Fatal("Expected", http.StatusOK, "Got:", status)
 	}
 
 	// This section checks that prom metrics are updated appropriately.
@@ -86,10 +86,10 @@ func TestProcessGKETask(t *testing.T) {
 	up := fake.NewFakeUploader()
 	status, err := worker.ProcessGKETask(filename, up, &fakeAnnotator{})
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if status != http.StatusOK {
-		t.Error("Expected", http.StatusOK, "Got:", status)
+		t.Fatal("Expected", http.StatusOK, "Got:", status)
 	}
 
 	// This section checks that prom metrics are updated appropriately.
