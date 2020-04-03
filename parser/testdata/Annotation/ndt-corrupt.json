@@ -1,0 +1,49 @@
+{
+  "UUID": "ndt-njp6l_1585004303_00000000000170FB",
+  "Timestamp": "2020-04-03T00:00:05.751746933Z",
+  "Server": {
+    "Site": "lga1t",
+    "Machine": "mlab2",
+    "Geo": {
+      "ContinentCode": "NA",
+      "CountryCode": "US",
+      "City": "New York",
+      "Latitude": 40.7667,
+      "Longitude": -73.8667
+    },
+    "Network": {
+      "ASNumber": 3356,
+      "ASName": "Level 3 Parent, LLC",
+      "Systems": [
+        {
+          "ASNs": [
+            3356
+          ]
+        }
+      ]
+    }
+  },
+  "Client": {
+    "Geo": {
+      "ContinentCode": "NA",
+      "CountryCode": "US",
+      "CountryName": "United States",
+      "Subdivision1ISOCode": "VA",
+      "Subdivision1Name": "Virginia",
+      "Latitude": 38.6583,
+      "Longitude": -77.2481,
+      "AccuracyRadiusKm": 1000
+    },
+    "Network": {
+      "CIDR": "35.192.0.0/14",
+      "ASNumber": 15169,
+      "Systems": [
+        {
+          "ASNs": [
+            15169
+          ]
+        }
+      ]
+    }
+  }
+// THE FINAL } IS MISSING. And, this comment is here.
