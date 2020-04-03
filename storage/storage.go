@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/storage"
+	gcs "cloud.google.com/go/storage"
 	"google.golang.org/api/option"
 
 	"github.com/m-lab/etl/etl"
@@ -215,7 +215,7 @@ var errNoClient = errors.New("client should be non-null")
 //
 // uri should be of form gs://bucket/filename.tar or gs://bucket/filename.tgz
 // FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
-func NewTestSource(client *storage.Client, uri string, label string) (etl.TestSource, error) {
+func NewTestSource(client *gcs.Client, uri string, label string) (etl.TestSource, error) {
 	if client == nil {
 		return nil, errNoClient
 	}
@@ -270,17 +270,17 @@ func NewTestSource(client *storage.Client, uri string, label string) (etl.TestSo
 
 // GetStorageClient provides a storage reader client.
 // This contacts the backend server, so should be used infrequently.
-func GetStorageClient(writeAccess bool) (*storage.Client, error) {
+func GetStorageClient(writeAccess bool) (*gcs.Client, error) {
 	var scope string
 	if writeAccess {
-		scope = storage.ScopeReadWrite
+		scope = gcs.ScopeReadWrite
 	} else {
-		scope = storage.ScopeReadOnly
+		scope = gcs.ScopeReadOnly
 	}
 
 	// This cannot include a defer cancel, as the client then doesn't work after
 	// the cancel.
-	client, err := storage.NewClient(context.Background(), option.WithScopes(scope))
+	client, err := gcs.NewClient(context.Background(), option.WithScopes(scope))
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +292,7 @@ func GetStorageClient(writeAccess bool) (*storage.Client, error) {
 //---------------------------------------------------------------------------------
 
 // Caller is responsible for closing response body.
-func getReader(client *storage.Client, bucket string, fn string, timeout time.Duration) (io.ReadCloser, func(), error) {
+func getReader(client *gcs.Client, bucket string, fn string, timeout time.Duration) (io.ReadCloser, func(), error) {
 	// Lightweight - only setting up the local object.
 	b := client.Bucket(bucket)
 	obj := b.Object(fn)
