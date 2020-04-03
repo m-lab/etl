@@ -103,6 +103,7 @@ func ProcessTask(fn string) (int, error) {
 // It is currently used in the GKE parser instances, but will eventually replace ProcessTask for
 // all parser/task types.
 // Returns an http status code and an error if the task did not complete successfully.
+// TODO pass in the configured Sink object, instead of creating based on datatype.
 func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, error) {
 	path, err := etl.ValidateTestPath(fn)
 	if err != nil {
@@ -141,7 +142,6 @@ func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, e
 	}
 	defer tr.Close()
 
-	// TODO move this to dataType.
 	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
 
 	ins, err := bq.NewColumnPartitionedInserter(pdt, dataType.BQBufferSize(), uploader)
