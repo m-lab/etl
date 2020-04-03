@@ -47,9 +47,12 @@ func Version() string {
 // Eventually all datatypes will use this instead of NewParser.
 func NewSinkParser(dt etl.DataType, sink row.Sink, table string, ann api.Annotator) etl.Parser {
 	switch dt {
+	case etl.ANNOTATION:
+		return NewAnnotationParser(sink, table, "", ann)
 	case etl.NDT5:
 		return NewNDT5ResultParser(sink, table, "", ann)
-
+	case etl.NDT7:
+		return NewNDT7ResultParser(sink, table, "", ann)
 	case etl.TCPINFO:
 		return NewTCPInfoParser(sink, table, "", ann)
 	default:
@@ -71,15 +74,6 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 			return nil
 		}
 		return NewNDT5ResultParser(sink, ins.TableBase(), ins.TableSuffix(), nil)
-
-	case etl.NDT7:
-		sink, ok := ins.(row.Sink)
-		if !ok {
-			log.Printf("%v is not a Sink\n", ins)
-			log.Println(reflect.TypeOf(ins))
-			return nil
-		}
-		return NewNDT7ResultParser(sink, ins.TableBase(), ins.TableSuffix(), nil)
 
 	case etl.SS:
 		return NewDefaultSSParser(ins) // TODO fix this hack.
