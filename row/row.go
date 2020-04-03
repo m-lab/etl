@@ -24,6 +24,7 @@ var (
 	ErrAnnotationError = errors.New("Annotation error")
 	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
 	ErrBufferFull      = errors.New("Buffer full")
+	ErrInvalidSink     = errors.New("Not a valid row.Sink")
 )
 
 // Annotatable interface enables integration of annotation into parser.Base.

@@ -58,6 +58,11 @@ before_install:
   gcloud auth activate-service-account --key-file=travis-testing.key ;
   fi
 
+  # Rsync the archive-mlab-testing/ndt directory to match expected content.
+- cd $TRAVIS_BUILD_DIR/testfiles
+- ./sync.sh
+- cd $TRAVIS_BUILD_DIR
+
 # These directories will be cached on successful "script" builds, and restored,
 # if available, to save time on future builds.
 cache:
@@ -319,13 +324,13 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     &&
-    BIGQUERY_DATASET="ndt_raw"
+    BIGQUERY_DATASET="tmp_ndt"
     $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-sandbox data-processing ./apply-cluster.sh
   skip_cleanup: true
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == u-sanddbox-* || universal-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+    condition: $TRAVIS_BRANCH == u-sandbox-* || universal-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
 ######################################################################
 #  Staging deployments
@@ -359,7 +364,7 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-staging
     SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     &&
-    BIGQUERY_DATASET="ndt_raw"
+    BIGQUERY_DATASET="tmp_ndt"
     $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
     &&
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
