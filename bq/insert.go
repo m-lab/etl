@@ -98,10 +98,9 @@ func NewColumnPartitionedInserter(pdt bqx.PDT, bufferSize int, uploader etl.Uplo
 		BufferSize: bufferSize}
 	token := make(chan struct{}, 1)
 	token <- struct{}{}
-	rows := make([]interface{}, 0, params.BufferSize)
-	ins := &BQInserter{params: params, uploader: uploader, putTimeout: params.PutTimeout, rows: rows, token: token}
+	fl := sink{uploader: uploader, putTimeout: params.PutTimeout, maxRetryDelay: params.MaxRetryDelay, token: token}
 
-	sink := (row.Sink)(ins)
+	sink := (row.Sink)(&fl)
 	return sink, nil
 }
 
@@ -133,7 +132,8 @@ func NewBQInserter(params etl.InserterParams, uploader etl.Uploader) (etl.Insert
 	token := make(chan struct{}, 1)
 	token <- struct{}{}
 	rows := make([]interface{}, 0, params.BufferSize)
-	in := BQInserter{params: params, uploader: uploader, putTimeout: params.PutTimeout, rows: rows, token: token}
+	sink := sink{uploader: uploader, putTimeout: params.PutTimeout, maxRetryDelay: params.MaxRetryDelay, token: token}
+	in := BQInserter{sink: sink, params: params, rows: rows}
 	return &in, nil
 }
 
@@ -169,25 +169,13 @@ func assertSaver(ms MapSaver) {
 
 // BQInserter provides an API for inserting rows into a specific BQ Table.
 type BQInserter struct {
+	sink
+
 	// These are either constant or threadsafe.
-	params     etl.InserterParams
-	uploader   etl.Uploader  // May be a BQ Uploader, or a test Uploader
-	putTimeout time.Duration // Timeout used for BQ put operations.
+	params etl.InserterParams
 
 	// Rows must be accessed only by struct owner.
 	rows []interface{}
-
-	// The metrics are accessed by both the struct owner, and the flusher goroutine.
-	// Those accesses are protected by the token.
-	// We use a token instead of a mutex, because it is acquired in FlushAsync,
-	// but released by the flusher goroutine.
-	token chan struct{} // Token required for metric updates.
-
-	// TODO: Consider making some of these atomics?
-	pending  int // Number of rows being flushed.
-	inserted int // Number of rows successfully inserted.
-	badRows  int // Number of row failures, including rows in full failures.
-	failures int // Number of complete insert failures.
 }
 
 // InsertRow adds one row to the insert buffer, and flushes if necessary.
@@ -252,7 +240,7 @@ func (in *BQInserter) InsertRows(data []interface{}) error {
 
 // TODO for some error types, should retry the insert.
 // Returns best estimate of number of rows successfully committed.
-func (in *BQInserter) handleErrors(err error) (int, error) {
+func (in *sink) handleErrors(err error, label string, table string) (int, error) {
 	if in.pending == 0 {
 		log.Println("Unexpected state error!!")
 	}
@@ -269,7 +257,7 @@ func (in *BQInserter) handleErrors(err error) (int, error) {
 			log.Printf("InsertErr %v %v\n", err, typedErr.Error()) // Log the first RowInsertionError detail
 			// Backend failure counts failed RPCs.
 			metrics.BackendFailureCount.WithLabelValues(
-				in.TableBase(), "putmulti failed insert").Inc()
+				label, "putmulti failed insert").Inc()
 			in.failures++
 		}
 
@@ -278,45 +266,45 @@ func (in *BQInserter) handleErrors(err error) (int, error) {
 			// Handle each error individually.
 			for i, rowError := range typedErr {
 				// These are rowInsertionErrors
-				log.Printf("InsertErr %d %s on %s\n", i, rowError.Error(), in.FullTableName())
+				log.Printf("InsertErr %d %s on %s\n", i, rowError.Error(), table)
 			}
 		} else if len(typedErr) > 0 {
 			// Otherwise, just log the first RowInsertionError detail
-			log.Printf("InsertErr (%d) %v %s on %s\n", len(typedErr), err, typedErr[0].Error(), in.FullTableName())
+			log.Printf("InsertErr (%d) %v %s on %s\n", len(typedErr), err, typedErr[0].Error(), table)
 		}
 
 		// ErrorCount counts failed rows.
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "PutMultiError", "putmulti error").
+			label, "PutMultiError", "putmulti error").
 			Add(float64(len(typedErr)))
 		in.inserted += rows - len(typedErr)
 		in.badRows += len(typedErr)
 		// We return the number of successfully committed rows.
 		return rows - len(typedErr), nil
 	case *url.Error:
-		log.Printf("InsertErr url.Error: %v on %s", typedErr, in.FullTableName())
+		log.Printf("InsertErr url.Error: %v on %s", typedErr, table)
 		metrics.BackendFailureCount.WithLabelValues(
-			in.TableBase(), "url failed insert").Inc()
+			label, "url failed insert").Inc()
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "url.Error", "UNHANDLED url insert error").Inc()
+			label, "url.Error", "UNHANDLED url insert error").Inc()
 		// TODO - Conservative, but possibly not correct.
 		// This at least preserves the count invariance.
 		in.badRows += rows
 		return 0, nil
 	case *googleapi.Error:
 		// TODO add special handling for Quota Exceeded
-		log.Printf("InsertErr %v on %s", typedErr, in.FullTableName())
+		log.Printf("InsertErr %v on %s", typedErr, table)
 		if strings.Contains(err.Error(), "Quota exceeded:") {
 			metrics.BackendFailureCount.WithLabelValues(
-				in.TableBase(), "quota exceeded").Inc()
+				label, "quota exceeded").Inc()
 			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "googleapi.Error", "Insert: Quota Exceeded").
+				label, "googleapi.Error", "Insert: Quota Exceeded").
 				Add(float64(rows))
 		} else {
 			metrics.BackendFailureCount.WithLabelValues(
-				in.TableBase(), "googleapi failed insert").Inc()
+				label, "googleapi failed insert").Inc()
 			metrics.ErrorCount.WithLabelValues(
-				in.TableBase(), "googleapi.Error", "UNHANDLED googleapi error").
+				label, "googleapi.Error", "UNHANDLED googleapi error").
 				Add(float64(rows))
 		}
 		// TODO - Conservative, but possibly not correct.
@@ -327,13 +315,13 @@ func (in *BQInserter) handleErrors(err error) (int, error) {
 	default:
 		// With Elem(), this was causing panics.
 		log.Printf("InsertErr (Unhandled) %v: %v on %s\n", reflect.TypeOf(typedErr),
-			typedErr, in.FullTableName())
+			typedErr, table)
 		metrics.BackendFailureCount.WithLabelValues(
-			in.TableBase(), "failed insert").Inc()
+			label, "failed insert").Inc()
 		// TODO - This accounting is conservative, but possibly overestimates failed rows.
 		// This at least preserves the count invariance.
 		metrics.ErrorCount.WithLabelValues(
-			in.TableBase(), "unknown", "UNHANDLED insert error").
+			label, "unknown", "UNHANDLED insert error").
 			Add(float64(rows))
 		in.badRows += rows
 		return 0, nil
@@ -342,10 +330,10 @@ func (in *BQInserter) handleErrors(err error) (int, error) {
 
 // acquire and release handle the single token that protects the FlushSlice and
 // access to the metrics.
-func (in *BQInserter) acquire() {
+func (in *sink) acquire() {
 	<-in.token
 }
-func (in *BQInserter) release() {
+func (in *sink) release() {
 	in.token <- struct{}{} // return the token.
 }
 
@@ -358,7 +346,7 @@ func (in *BQInserter) release() {
 // It may block if there is already a Put or Flush in progress.
 func (in *BQInserter) Put(rows []interface{}) error {
 	in.acquire()
-	_, err := in.flushSlice(rows, in.TableBase())
+	_, err := in.flushSlice(rows, in.TableBase(), in.FullTableName())
 	in.release()
 	return err
 }
@@ -373,7 +361,7 @@ func (in *BQInserter) Put(rows []interface{}) error {
 func (in *BQInserter) PutAsync(rows []interface{}) {
 	in.acquire()
 	go func() {
-		in.flushSlice(rows, in.TableBase())
+		in.flushSlice(rows, in.TableBase(), in.FullTableName())
 		in.release()
 	}()
 }
@@ -389,13 +377,33 @@ func (in *BQInserter) Flush() error {
 	return in.Put(rows)
 }
 
+//====================================================================
+
+type sink struct {
+	uploader      etl.Uploader // May be a BQ Uploader, or a test Uploader
+	maxRetryDelay time.Duration
+	putTimeout    time.Duration // Timeout used for BQ put operations.
+
+	// TODO: Consider making some of these atomics?
+	pending  int // Number of rows being flushed.
+	inserted int // Number of rows successfully inserted.
+	badRows  int // Number of row failures, including rows in full failures.
+	failures int // Number of complete insert failures.
+
+	// The metrics are accessed by both the struct owner, and the flusher goroutine.
+	// Those accesses are protected by the token.
+	// We use a token instead of a mutex, because it is acquired in FlushAsync,
+	// but released by the flusher goroutine.
+	token chan struct{} // Token required for metric updates.
+}
+
 // Commit implements row.Sink.
 // It is thread safe, and returns the number of rows successfull committed.
 // NOTE: the label is ignored, and the TableBase is used instead.
-func (in *BQInserter) Commit(rows []interface{}, label string) (int, error) {
+func (in *sink) Commit(rows []interface{}, label string) (int, error) {
 	in.acquire()
 	defer in.release()
-	return in.flushSlice(rows, label)
+	return in.flushSlice(rows, label, label)
 }
 
 // flushSlice flushes a slice of rows to BigQuery.
@@ -403,7 +411,7 @@ func (in *BQInserter) Commit(rows []interface{}, label string) (int, error) {
 // It is NOT threadsafe.
 // TODO should this return errors?  Currently always returns nil error, even on failure.
 // TODO pass in the Commit label, a
-func (in *BQInserter) flushSlice(rows []interface{}, label string) (int, error) {
+func (in *sink) flushSlice(rows []interface{}, label string, table string) (int, error) {
 	metrics.WorkerState.WithLabelValues(label, "flush").Inc()
 	defer metrics.WorkerState.WithLabelValues(label, "flush").Dec()
 
@@ -451,7 +459,7 @@ func (in *BQInserter) flushSlice(rows []interface{}, label string) (int, error) 
 
 	start := time.Now()
 	var err error
-	for backoff := 10 * time.Millisecond; backoff < in.params.MaxRetryDelay; backoff *= 2 {
+	for backoff := 10 * time.Millisecond; backoff < in.maxRetryDelay; backoff *= 2 {
 		// This is heavyweight, and may run forever without a context deadline.
 		ctx, cancel := context.WithTimeout(context.Background(), in.putTimeout)
 		err = in.uploader.Put(ctx, rows)
@@ -476,17 +484,17 @@ func (in *BQInserter) flushSlice(rows []interface{}, label string) (int, error) 
 			// This adjusts the inserted count, failure count, and updates in.rows.
 			metrics.InsertionHistogram.WithLabelValues(
 				label, "fail").Observe(time.Since(start).Seconds())
-			return in.handleErrors(err)
+			return in.handleErrors(err, label, table)
 		}
 
 		// Explicitly handle "Request payload size exceeds ..."
 		// NOTE: This splitting behavior may cause repeated encoding of the same data.  Worst case,
 		// all the data may be encoded log2(size) times.  So best if this only happens infrequently.
-		log.Printf("Splitting %d rows to avoid size limit for %s\n", size, in.TableBase())
+		log.Printf("Splitting %d rows to avoid size limit for %s\n", size, label)
 		metrics.WarningCount.WithLabelValues(label, "", "Splitting buffer").Inc()
 
-		n1, err1 := in.flushSlice(rows[:size/2], label)
-		n2, err2 := in.flushSlice(rows[size/2:], label)
+		n1, err1 := in.flushSlice(rows[:size/2], label, table)
+		n2, err2 := in.flushSlice(rows[size/2:], label, table)
 		// The recursive calls will have added various InsertionHistogram results, included successes
 		// and failures, so we don't need to add those here.
 		// Recursive calls also will have handled accounting for any errors not resolved by splitting,
