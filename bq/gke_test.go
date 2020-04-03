@@ -26,24 +26,26 @@ func assertSink(in row.Sink) {
 
 //==================================================================================
 
+// This just tests that Commit calls the uploader the appropriate number
+// of times, and uploads the correct number of rows (3).
 func TestGKEBasicInsert(t *testing.T) {
-	tag := "new"
-	items := []interface{}{
-		Item{Name: tag + "_x0", Count: 17, Foobar: 44},
-		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
+	twoItems := []interface{}{
+		Item{Name: "a", Count: 1, Foobar: 11},
+		Item{Name: "b", Count: 2, Foobar: 22}}
+
+	singleItem := []interface{}{Item{Name: "c", Count: 3, Foobar: 33}}
 
 	u := fake.NewFakeUploader()
-	// TODO - make these explicit.
-	pdt := bqx.PDT{Project: etl.NDT5.BigqueryProject(), Dataset: etl.NDT5.Dataset(), Table: etl.NDT5.Table()}
-	in, err := bq.NewColumnPartitionedInserter(pdt, etl.NDT5.BQBufferSize(), u)
+	pdt := bqx.PDT{Project: "fake-project", Dataset: "fake-dataset", Table: "fake-table"}
+	in, err := bq.NewColumnPartitionedInserter(pdt, 10, u)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = in.Commit(items[0:1], "basic"); err != nil {
+	if _, err = in.Commit(singleItem, "Basic"); err != nil {
 		t.Error(err)
 	}
-	if _, err = in.Commit(items, "Basic"); err != nil {
+	if _, err = in.Commit(twoItems, "Basic"); err != nil {
 		t.Error(err)
 	}
 
@@ -58,29 +60,33 @@ func TestGKEBasicInsert(t *testing.T) {
 // Just manual testing for now - need to assert something useful.
 func TestGKEHandleInsertErrors(t *testing.T) {
 	u := fake.NewFakeUploader()
-	pdt := bqx.PDT{Project: etl.NDT5.BigqueryProject(), Dataset: etl.NDT5.Dataset(), Table: etl.NDT5.Table()}
-	in, err := bq.NewColumnPartitionedInserter(pdt, etl.NDT5.BQBufferSize(), u)
+	pdt := bqx.PDT{Project: "fake-project", Dataset: "fake-dataset", Table: "fake-table"}
+	in, err := bq.NewColumnPartitionedInserter(pdt, 10, u)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tag := "new"
-	items := []interface{}{
-		Item{Name: tag + "_x0", Count: 17, Foobar: 44},
-		Item{Name: tag + "_x1", Count: 12, Foobar: 44}}
+	twoItems := []interface{}{
+		Item{Name: "a", Count: 1, Foobar: 11},
+		Item{Name: "b", Count: 2, Foobar: 22}}
 
 	rie := bigquery.RowInsertionError{InsertID: "1234", RowIndex: 123}
-	var bqe bigquery.Error
-	bqe.Location = "location"
-	bqe.Message = "message"
-	bqe.Reason = "invalid"
+	bqe := bigquery.Error{
+		Location: "location",
+		Message:  "message",
+		Reason:   "invalid",
+	}
 	// This is a little wierd.  MultiError we receive from insert contain
 	// *bigquery.Error.  So that is what we test here.
 	rie.Errors = append(rie.Errors, &bqe)
+	// This sets up the fake uploader to return an error.
 	u.SetErr(&rie)
-	n, err := in.Commit(items, "test")
+	n, err := in.Commit(twoItems, "insert errors")
+	// n should be zero, because the uploader errored.
 	if n != 0 {
 		t.Fatal(err, n)
 	}
+	// At present, the Commit function does not return an error.
+	// TODO - fix Commit implementation to actually return an error.
 	if err != nil {
 		t.Error(err)
 	}
@@ -88,12 +94,12 @@ func TestGKEHandleInsertErrors(t *testing.T) {
 	var pme bigquery.PutMultiError
 	pme = append(pme, rie)
 	u.SetErr(&pme)
-	n, err = in.Commit(items, "test")
+	n, err = in.Commit(twoItems, "test")
 	if n != 0 {
 		t.Fatal(err, n)
 	}
+	// At present, the Commit function does not return an error.
 	if err != nil {
-		// TODO for now Commit never returns error, but that may not be what we want.
 		t.Error(err)
 	}
 
@@ -105,19 +111,20 @@ func TestGKEHandleInsertErrors(t *testing.T) {
 	}
 }
 
+// When request is too large, Inserter should subdivide into
+// smaller buffers, until the upload succeeds.
 func TestGKEHandleRequestTooLarge(t *testing.T) {
-	t.Skip("Test not yet ported to GKE")
-
 	fakeUploader := fake.NewFakeUploader()
 	fakeUploader.RejectIfMoreThan = 2
-	bqi, e := bq.NewBQInserter(standardInsertParams(5), fakeUploader)
-	if e != nil {
-		log.Printf("%v\n", e)
-		t.Fatal()
+	pdt := bqx.PDT{Project: "fake-project", Dataset: "fake-dataset", Table: "fake-table"}
+	in, err := bq.NewColumnPartitionedInserter(pdt, 10, fakeUploader)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// These don't have to implement saver as long as Err is being set,
-	// and flush is not autotriggering more than once.
+	// With 5 elements, we expect the sequence:
+	// 5, 3, 2, 1, 2 as each buffer is split into smaller buffers
+	// and retried.
 	var items []interface{}
 	items = append(items, Item{Name: "x1", Count: 17, Foobar: 44})
 	items = append(items, Item{Name: "x2", Count: 12, Foobar: 44})
@@ -125,17 +132,17 @@ func TestGKEHandleRequestTooLarge(t *testing.T) {
 	items = append(items, Item{Name: "x4", Count: 12, Foobar: 44})
 	items = append(items, Item{Name: "x5", Count: 12, Foobar: 44})
 
-	bqi.InsertRows(items)
-	bqi.Flush()
+	if _, err = in.Commit(items, "too large"); err != nil {
+		t.Error(err)
+	}
+
 	// Should see two fails, and three successes.
 	if fakeUploader.CallCount != 5 {
 		t.Errorf("Expected %d calls, got %d\n", 5, fakeUploader.CallCount)
 	}
-	if bqi.Committed() != 5 {
-		t.Error("Lost rows:", bqi.Committed())
-	}
-	if bqi.Failed() > 0 {
-		t.Errorf("Lost rows: %+v", bqi)
+	// All rows should end up uploaded.
+	if fakeUploader.Total != 5 {
+		t.Error("Expected 5 rows, got:", fakeUploader.Total)
 	}
 }
 
