@@ -77,25 +77,29 @@ func NewInserter(dt etl.DataType, partition time.Time) (etl.Inserter, error) {
 		nil)
 }
 
-// NewColumnPartitionedInserter creates a new BQInserter with appropriate characteristics.
-// TODO - migrate all the tests to use this instead of NewBQInserter.
-func NewColumnPartitionedInserter(pdt bqx.PDT, bufferSize int, uploader etl.Uploader) (row.Sink, error) {
+// NewColumnPartitionedInserter creates a new BQInserter for the specified
+// BQ table using default bigquery uploader.
+func NewColumnPartitionedInserter(pdt bqx.PDT) (row.Sink, error) {
 	client, err := GetClient(pdt.Project)
 	if err != nil {
 		return nil, err
 	}
 
-	if uploader == nil {
-		u := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
-		// This avoids problems when a single row of the insert has invalid
-		// data.  We then have to carefully parse the returned error object.
-		u.SkipInvalidRows = true
-		uploader = u
-	}
+	uploader := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
+	// This avoids problems when a single row of the insert has invalid
+	// data.  We then have to carefully parse the returned error object.
+	uploader.SkipInvalidRows = true
 
-	params := etl.InserterParams{Project: pdt.Project, Dataset: pdt.Dataset, Table: pdt.Table, Suffix: "",
+	return NewColumnPartitionedInserterWithUploader(pdt, uploader)
+}
+
+// NewColumnPartitionedInserterWithUploader creates a new BQInserter with appropriate characteristics.
+// TODO - migrate all the tests to use this instead of NewBQInserter.
+func NewColumnPartitionedInserterWithUploader(pdt bqx.PDT, uploader etl.Uploader) (row.Sink, error) {
+	params := etl.InserterParams{
+		Project: pdt.Project, Dataset: pdt.Dataset, Table: pdt.Table, Suffix: "",
 		PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
-		BufferSize: bufferSize}
+		BufferSize: -1}
 	token := make(chan struct{}, 1)
 	token <- struct{}{}
 	fl := sink{uploader: uploader, putTimeout: params.PutTimeout, maxRetryDelay: params.MaxRetryDelay, token: token}
@@ -378,6 +382,7 @@ func (in *BQInserter) Flush() error {
 }
 
 //====================================================================
+// TODO collect all sink code together after review.
 
 type sink struct {
 	uploader      etl.Uploader // May be a BQ Uploader, or a test Uploader
@@ -510,6 +515,8 @@ func (in *sink) flushSlice(rows []interface{}, label string, table string) (int,
 		label, "succeed").Observe(time.Since(start).Seconds())
 	return len(rows), nil
 }
+
+//============================================================
 
 func (in *BQInserter) FullTableName() string {
 	return in.TableBase() + in.TableSuffix()
