@@ -51,14 +51,35 @@ func GetSource(client *gcs.Client, uri string) (etl.TestSource, etl.DataPath, in
 // storage.Client may be injected for testing.
 // Returns an http status code and an error if the task did not complete successfully.
 // DEPRECATED - should migrate to ProcessGKETask.
+func ProcessTask(fn string) (int, error) {
+	client, err := storage.GetStorageClient(false)
+	if err != nil {
+		path, _ := etl.ValidateTestPath(fn)
+		metrics.TaskCount.WithLabelValues(path.TableBase(), "worker", "ServiceUnavailable").Inc()
+		log.Printf("Error getting storage client: %v\n", err)
+		return http.StatusServiceUnavailable, err
+	}
+	return ProcessTaskWithClient(client, fn)
+}
+
 func ProcessTaskWithClient(client *gcs.Client, fn string) (int, error) {
-	tr, path, status, err := GetSource(client, fn)
+	tr, _, status, err := GetSource(client, fn)
 	if err != nil {
 		return status, err
 	}
 	defer tr.Close()
 
-	label := path.TableBase()
+	return ProcessTestSource(tr, fn)
+}
+
+func ProcessTestSource(src etl.TestSource, fn string) (int, error) {
+	path, err := etl.ValidateTestPath(fn)
+	label := path.TableBase() // This works even on error?
+	if err != nil {
+		metrics.TaskCount.WithLabelValues(label, "worker", "InvalidFilename").Inc()
+		log.Printf("Invalid filename: %v\n", err)
+		return http.StatusBadRequest, err
+	}
 
 	// Count number of workers operating on each table.
 	metrics.WorkerCount.WithLabelValues(label).Inc()
@@ -88,7 +109,7 @@ func ProcessTaskWithClient(client *gcs.Client, fn string) (int, error) {
 		log.Printf("Error creating parser for %s", dataType)
 		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", dataType)
 	}
-	tsk := task.NewTask(fn, tr, p)
+	tsk := task.NewTask(fn, src, p)
 
 	files, err := tsk.ProcessAllTests()
 
@@ -120,6 +141,17 @@ func ProcessTaskWithClient(client *gcs.Client, fn string) (int, error) {
 // all parser/task types.
 // Returns an http status code and an error if the task did not complete successfully.
 // TODO pass in the configured Sink object, instead of creating based on datatype.
+func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, error) {
+	client, err := storage.GetStorageClient(false)
+	if err != nil {
+		path, _ := etl.ValidateTestPath(fn)
+		metrics.TaskCount.WithLabelValues(path.TableBase(), "worker", "ServiceUnavailable").Inc()
+		log.Printf("Error getting storage client: %v\n", err)
+		return http.StatusServiceUnavailable, err
+	}
+	return ProcessGKETaskWithClient(client, fn, uploader, ann)
+}
+
 func ProcessGKETaskWithClient(client *gcs.Client, fn string, uploader etl.Uploader, ann api.Annotator) (int, error) {
 	tr, path, status, err := GetSource(client, fn)
 	if err != nil {
