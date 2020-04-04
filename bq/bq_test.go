@@ -42,7 +42,7 @@ type Item struct {
 
 func standardInsertParams(bufferSize int) etl.InserterParams {
 	return etl.InserterParams{
-		Project: "mlab-testing", Dataset: "dataset", Table: "table",
+		Project: "fake-project", Dataset: "dataset", Table: "table",
 		Suffix:        "",
 		BufferSize:    bufferSize,
 		PutTimeout:    10 * time.Second,
@@ -296,7 +296,7 @@ func TestHandleRequestTooLarge(t *testing.T) {
 		t.Errorf("Expected %d calls, got %d\n", 5, fakeUploader.CallCount)
 	}
 	if bqi.Committed() != 5 {
-		t.Error("Lost rows:", bqi.Committed())
+		t.Error("Expected 5 rows, got", bqi.Committed())
 	}
 	if bqi.Failed() > 0 {
 		t.Errorf("Lost rows: %+v", bqi)

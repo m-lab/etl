@@ -399,7 +399,6 @@ type sink struct {
 
 // Commit implements row.Sink.
 // It is thread safe, and returns the number of rows successfull committed.
-// NOTE: the label is ignored, and the TableBase is used instead.
 func (in *sink) Commit(rows []interface{}, label string) (int, error) {
 	in.acquire()
 	defer in.release()
