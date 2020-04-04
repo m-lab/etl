@@ -58,11 +58,6 @@ before_install:
   gcloud auth activate-service-account --key-file=travis-testing.key ;
   fi
 
-  # Rsync the archive-mlab-testing/ndt directory to match expected content.
-- cd $TRAVIS_BUILD_DIR/testfiles
-- ./sync.sh
-- cd $TRAVIS_BUILD_DIR
-
 # These directories will be cached on successful "script" builds, and restored,
 # if available, to save time on future builds.
 cache:
