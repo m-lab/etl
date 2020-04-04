@@ -228,7 +228,7 @@ func (r *runnable) Run() error {
 	start := time.Now()
 	log.Println("Processing", path)
 	// TODO pass in storage client, or pass in TestSource.
-	statusCode, err := worker.ProcessGKETask(nil, path, nil, nil) // Use default uploader and annotator
+	statusCode, err := worker.ProcessGKETask(path, nil, nil) // Use default uploader and annotator
 	metrics.DurationHistogram.WithLabelValues(
 		data.DataType, http.StatusText(statusCode)).Observe(
 		time.Since(start).Seconds())
