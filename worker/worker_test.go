@@ -147,7 +147,7 @@ func TestProcessGKETask(t *testing.T) {
 
 	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
 	up := fake.NewFakeUploader()
-	status, err := worker.ProcessGKETaskWithClient(gcsClient, filename, up, &fakeAnnotator{})
+	status, err := worker.ProcessGKETaskWithClient(filename, gcsClient, up, &fakeAnnotator{})
 	if err != nil {
 		t.Fatal(err)
 	}
