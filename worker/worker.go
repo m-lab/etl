@@ -149,10 +149,11 @@ func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, e
 		log.Printf("Error getting storage client: %v\n", err)
 		return http.StatusServiceUnavailable, err
 	}
-	return ProcessGKETaskWithClient(client, fn, uploader, ann)
+	return ProcessGKETaskWithClient(fn, client, uploader, ann)
 }
 
-func ProcessGKETaskWithClient(client *gcs.Client, fn string, uploader etl.Uploader, ann api.Annotator) (int, error) {
+// ProcessGKETaskWithClient uses the provided GCS client to source the file.
+func ProcessGKETaskWithClient(fn string, client *gcs.Client, uploader etl.Uploader, ann api.Annotator) (int, error) {
 	tr, path, status, err := GetSource(client, fn)
 	if err != nil {
 		return status, err
@@ -172,7 +173,7 @@ func ProcessGKETaskWithClient(client *gcs.Client, fn string, uploader etl.Upload
 	dataType := path.GetDataType()
 	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
 
-	ins, err := bq.NewColumnPartitionedInserter(pdt, dataType.BQBufferSize(), uploader)
+	ins, err := bq.NewColumnPartitionedInserterWithUploader(pdt, uploader)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(label, string(dataType), "NewInserterError").Inc()
 		log.Printf("Error creating BQ Inserter:  %v", err)
