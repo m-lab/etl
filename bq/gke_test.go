@@ -37,7 +37,7 @@ func TestGKEBasicInsert(t *testing.T) {
 
 	u := fake.NewFakeUploader()
 	pdt := bqx.PDT{Project: "fake-project", Dataset: "fake-dataset", Table: "fake-table"}
-	in, err := bq.NewColumnPartitionedInserter(pdt, 10, u)
+	in, err := bq.NewColumnPartitionedInserterWithUploader(pdt, u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestGKEBasicInsert(t *testing.T) {
 func TestGKEHandleInsertErrors(t *testing.T) {
 	u := fake.NewFakeUploader()
 	pdt := bqx.PDT{Project: "fake-project", Dataset: "fake-dataset", Table: "fake-table"}
-	in, err := bq.NewColumnPartitionedInserter(pdt, 10, u)
+	in, err := bq.NewColumnPartitionedInserterWithUploader(pdt, u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestGKEHandleRequestTooLarge(t *testing.T) {
 	fakeUploader := fake.NewFakeUploader()
 	fakeUploader.RejectIfMoreThan = 2
 	pdt := bqx.PDT{Project: "fake-project", Dataset: "fake-dataset", Table: "fake-table"}
-	in, err := bq.NewColumnPartitionedInserter(pdt, 10, fakeUploader)
+	in, err := bq.NewColumnPartitionedInserterWithUploader(pdt, fakeUploader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestGKEUpdateMetrics(t *testing.T) {
 
 	fakeUploader := fake.NewFakeUploader()
 	pdt := bqx.PDT{Project: etl.NDT5.BigqueryProject(), Dataset: etl.NDT5.Dataset(), Table: etl.NDT5.Table()}
-	in, err := bq.NewColumnPartitionedInserter(pdt, etl.NDT5.BQBufferSize(), fakeUploader)
+	in, err := bq.NewColumnPartitionedInserterWithUploader(pdt, fakeUploader)
 	if err != nil {
 		t.Fatal(err)
 	}
