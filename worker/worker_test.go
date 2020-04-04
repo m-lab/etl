@@ -1,18 +1,22 @@
 package worker_test
 
 import (
+	"archive/tar"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/m-lab/annotation-service/api"
 	v2 "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
@@ -23,8 +27,11 @@ import (
 	"github.com/fsouza/fake-gcs-server/fakestorage"
 )
 
+var gcsClient *storage.Client
+
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	gcsClient = fromTar("test-bucket", "../testfiles/ndt.tar").Client()
 }
 
 func counterValue(m prometheus.Metric) float64 {
@@ -49,23 +56,32 @@ func checkCounter(t *testing.T, c chan prometheus.Metric, expected float64) {
 }
 
 // Adds a path from testdata to bucket.
-func add(t *testing.T, svr *fakestorage.Server, bucket string, fn string) *fakestorage.Server {
-	data, err := ioutil.ReadFile("testdata/" + fn)
-	if err != nil {
-		t.Fatal(err)
-	}
+func add(svr *fakestorage.Server, bucket string, fn string, rdr io.Reader) {
+	data, err := ioutil.ReadAll(rdr)
+	rtx.Must(err, "Error reading data for", fn)
 	svr.CreateObject(
 		fakestorage.Object{
 			BucketName: bucket,
 			Name:       fn,
 			Content:    data})
-	return svr // For chaining
 }
 
-func setup(t *testing.T, bucket string, fn string) *fakestorage.Server {
+func loadFromTar(svr *fakestorage.Server, bucket string, tf *tar.Reader) *fakestorage.Server {
+	for h, err := tf.Next(); err != io.EOF; h, err = tf.Next() {
+		if h.Typeflag == tar.TypeReg {
+			add(svr, bucket, h.Name, tf)
+		}
+	}
+	return svr
+}
+
+func fromTar(bucket string, fn string) *fakestorage.Server {
 	server := fakestorage.NewServer([]fakestorage.Object{})
-	add(t, server, bucket, fn)
-	return server
+	f, err := os.Open(fn)
+	rtx.Must(err, "opening tar file")
+	defer f.Close()
+	tf := tar.NewReader(f)
+	return loadFromTar(server, bucket, tf)
 }
 
 func tree(t *testing.T, client *storage.Client) {
@@ -79,17 +95,20 @@ func tree(t *testing.T, client *storage.Client) {
 	}
 }
 
+func TestLoadTar(t *testing.T) {
+	t.Skip("Useful for debugging")
+	tree(t, gcsClient)
+	t.Fatal()
+}
+
 func TestProcessTask(t *testing.T) {
 	if testing.Short() {
 		t.Log("Skipping integration test")
 	}
 
 	fn := "ndt/2018/05/09/20180509T101913Z-mlab1-mad03-ndt-0000.tgz"
-	server := setup(t, "test-bucket", fn)
-	defer server.Stop()
-	tree(t, server.Client())
 
-	status, err := worker.ProcessTaskWithClient(server.Client(), "gs://test-bucket/"+fn)
+	status, err := worker.ProcessTaskWithClient(gcsClient, "gs://test-bucket/"+fn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,14 +145,9 @@ func TestProcessGKETask(t *testing.T) {
 		t.Log("Skipping integration test")
 	}
 
-	server := setup(t, "test-bucket",
-		"ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz")
-	defer server.Stop()
-
 	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
 	up := fake.NewFakeUploader()
-	client := server.Client()
-	status, err := worker.ProcessGKETaskWithClient(client, filename, up, &fakeAnnotator{})
+	status, err := worker.ProcessGKETaskWithClient(gcsClient, filename, up, &fakeAnnotator{})
 	if err != nil {
 		t.Fatal(err)
 	}
