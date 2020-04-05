@@ -141,15 +141,25 @@ func ProcessTestSource(src etl.TestSource, fn string) (int, error) {
 // all parser/task types.
 // Returns an http status code and an error if the task did not complete successfully.
 // TODO pass in the configured Sink object, instead of creating based on datatype.
-func ProcessGKETask(fn string, uploader etl.Uploader, ann api.Annotator) (int, error) {
-	client, err := storage.GetStorageClient(false)
+func ProcessGKETask(fn string, pdt bqx.PDT, ann api.Annotator) (int, error) {
+	gcsClient, err := storage.GetStorageClient(false)
 	if err != nil {
 		path, _ := etl.ValidateTestPath(fn)
 		metrics.TaskCount.WithLabelValues(path.TableBase(), "worker", "ServiceUnavailable").Inc()
 		log.Printf("Error getting storage client: %v\n", err)
 		return http.StatusServiceUnavailable, err
 	}
-	return ProcessGKETaskWithClient(fn, client, uploader, ann)
+	client, err := bq.GetClient(pdt.Project)
+	if err != nil {
+		return 0, err
+	}
+
+	uploader := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
+	// This avoids problems when a single row of the insert has invalid
+	// data.  We then have to carefully parse the returned error object.
+	uploader.SkipInvalidRows = true
+
+	return ProcessGKETaskWithClient(fn, gcsClient, uploader, ann)
 }
 
 // ProcessGKETaskWithClient uses the provided GCS client to source the file.
