@@ -32,8 +32,7 @@ func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
 	schema, err := row.Schema()
 	rtx.Must(err, "TCPRow.Schema")
 
-	// NOTE: tcpinfo schema supports time partitioning, but not generally supported yet.
-	return CreateOrUpdate(schema, project, dataset, table, false)
+	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
 func CreateOrUpdatePT(project string, dataset string, table string) error {
@@ -41,34 +40,34 @@ func CreateOrUpdatePT(project string, dataset string, table string) error {
 	schema, err := row.Schema()
 	rtx.Must(err, "PTTest.Schema")
 
-	// NOTE: traceroute schema supports time partitioning, but not generally supported yet.
-	return CreateOrUpdate(schema, project, dataset, table, false)
+	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
 func CreateOrUpdateNDT5ResultRow(project string, dataset string, table string) error {
 	row := schema.NDT5ResultRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "NDT5ResultRow.Schema")
+
 	// NOTE: NDT5ResultRow does not support the TestTime field yet.
-	return CreateOrUpdate(schema, project, dataset, table, false)
+	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
 func CreateOrUpdateNDT7ResultRow(project string, dataset string, table string) error {
 	row := schema.NDT7ResultRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "NDT7ResultRow.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, true)
+	return CreateOrUpdate(schema, project, dataset, table, "TestTime")
 }
 
 func CreateOrUpdateAnnotationRow(project string, dataset string, table string) error {
 	row := schema.AnnotationRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "Annotation.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, true)
+	return CreateOrUpdate(schema, project, dataset, table, "TestTime")
 }
 
 // CreateOrUpdate will update or create a table from the given schema.
-func CreateOrUpdate(schema bigquery.Schema, project string, dataset string, table string, timePartition bool) error {
+func CreateOrUpdate(schema bigquery.Schema, project, dataset, table, partField string) error {
 	name := project + "." + dataset + "." + table
 	pdt, err := bqx.ParsePDT(name)
 	rtx.Must(err, "ParsePDT")
@@ -91,9 +90,8 @@ func CreateOrUpdate(schema bigquery.Schema, project string, dataset string, tabl
 		// TODO - different behavior on specific error types?
 	}
 
-	partitioning := &bigquery.TimePartitioning{}
-	if timePartition {
-		partitioning.Field = "TestTime"
+	partitioning := &bigquery.TimePartitioning{
+		Field: partField,
 	}
 
 	err = pdt.CreateTable(ctx, client, schema, "description", partitioning, nil)
@@ -176,7 +174,7 @@ func main() {
 		if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7"); err != nil {
+		if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7"); err != nil {
 			errCount++
 		}
 
@@ -184,7 +182,7 @@ func main() {
 		if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
+		if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
 			errCount++
 		}
 
