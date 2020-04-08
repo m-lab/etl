@@ -149,6 +149,7 @@ func main() {
 	flagx.ArgsFromEnv(flag.CommandLine)
 
 	generators := []schemaGenerator{
+		&schema.AnnotationRow{},
 		&schema.NDT5ResultRow{},
 		&schema.NDT7ResultRow{},
 		&schema.TCPRow{},
