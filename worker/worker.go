@@ -23,7 +23,7 @@ import (
 // fn is a gs:// GCS uri.
 func GetSource(client *gcs.Client, uri string) (etl.TestSource, etl.DataPath, int, error) {
 	path, err := etl.ValidateTestPath(uri)
-	label := path.TableBase() // This works even on error?
+	label := path.TableBase() // On error, this will be "invalid", so not all that useful.
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(label, "worker", "InvalidFilename").Inc()
 		log.Printf("Invalid filename: %v\n", err)
@@ -31,6 +31,7 @@ func GetSource(client *gcs.Client, uri string) (etl.TestSource, etl.DataPath, in
 	}
 
 	dataType := path.GetDataType()
+	// Can this be merged with error case above?
 	if dataType == etl.INVALID {
 		metrics.TaskCount.WithLabelValues(label, "invalid", "SourcePathError").Inc()
 		log.Printf("Invalid datatype: %s", path)
@@ -47,8 +48,8 @@ func GetSource(client *gcs.Client, uri string) (etl.TestSource, etl.DataPath, in
 }
 
 // ProcessTask interprets a filename to create a Task, Parser, and Inserter,
-// and processes the file content.
-// storage.Client may be injected for testing.
+// and processes the file content.  Storage client is implicitly obtained
+// from GetStorageClient.
 // Returns an http status code and an error if the task did not complete successfully.
 // DEPRECATED - should migrate to ProcessGKETask.
 func ProcessTask(fn string) (int, error) {
@@ -62,24 +63,20 @@ func ProcessTask(fn string) (int, error) {
 	return ProcessTaskWithClient(client, fn)
 }
 
+// ProcessTaskWithClient handles processing with an injected client.
 func ProcessTaskWithClient(client *gcs.Client, fn string) (int, error) {
-	tr, _, status, err := GetSource(client, fn)
+	tr, path, status, err := GetSource(client, fn)
 	if err != nil {
 		return status, err
 	}
 	defer tr.Close()
 
-	return ProcessTestSource(tr, fn)
+	return ProcessTestSource(tr, path)
 }
 
-func ProcessTestSource(src etl.TestSource, fn string) (int, error) {
-	path, err := etl.ValidateTestPath(fn)
+// ProcessTestSource handles processing of all TestSource contents.
+func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 	label := path.TableBase() // This works even on error?
-	if err != nil {
-		metrics.TaskCount.WithLabelValues(label, "worker", "InvalidFilename").Inc()
-		log.Printf("Invalid filename: %v\n", err)
-		return http.StatusBadRequest, err
-	}
 
 	// Count number of workers operating on each table.
 	metrics.WorkerCount.WithLabelValues(label).Inc()
@@ -109,7 +106,7 @@ func ProcessTestSource(src etl.TestSource, fn string) (int, error) {
 		log.Printf("Error creating parser for %s", dataType)
 		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", dataType)
 	}
-	tsk := task.NewTask(fn, src, p)
+	tsk := task.NewTask(src.Detail(), src, p)
 
 	files, err := tsk.ProcessAllTests()
 
