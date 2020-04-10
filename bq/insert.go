@@ -96,13 +96,9 @@ func NewColumnPartitionedInserter(pdt bqx.PDT) (row.Sink, error) {
 // NewColumnPartitionedInserterWithUploader creates a new BQInserter with appropriate characteristics.
 // TODO - migrate all the tests to use this instead of NewBQInserter.
 func NewColumnPartitionedInserterWithUploader(pdt bqx.PDT, uploader etl.Uploader) (row.Sink, error) {
-	params := etl.InserterParams{
-		Project: pdt.Project, Dataset: pdt.Dataset, Table: pdt.Table, Suffix: "",
-		PutTimeout: putContextTimeout, MaxRetryDelay: maxPutRetryDelay,
-		BufferSize: -1}
 	token := make(chan struct{}, 1)
 	token <- struct{}{}
-	fl := sink{uploader: uploader, putTimeout: params.PutTimeout, maxRetryDelay: params.MaxRetryDelay, token: token}
+	fl := sink{uploader: uploader, putTimeout: putContextTimeout, maxRetryDelay: maxPutRetryDelay, token: token}
 
 	sink := (row.Sink)(&fl)
 	return sink, nil
