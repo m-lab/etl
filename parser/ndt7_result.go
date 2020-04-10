@@ -57,7 +57,8 @@ func (dp *NDT7ResultParser) TaskError() error {
 // IsParsable returns the canonical test type and whether to parse data.
 func (dp *NDT7ResultParser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like: "<UUID>.json"
-	if strings.HasPrefix(testName, "ndt7") && strings.HasSuffix(testName, "json") {
+	// ndt7-{upload,download}-YYYYMMDDTHHMMSS.066461502Z.<UUID>.json.gz
+	if strings.HasPrefix(testName, "ndt7") && (strings.HasSuffix(testName, "json.gz") || strings.HasSuffix(testName, "json")) {
 		return "ndt7_result", true
 	}
 	return "unknown", false
