@@ -17,6 +17,7 @@ import (
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/go/logx"
 	"github.com/m-lab/ndt-server/ndt7/model"
 )
 
@@ -58,9 +59,10 @@ func (dp *NDT7ResultParser) TaskError() error {
 func (dp *NDT7ResultParser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like:
 	// ndt7-{upload,download}-YYYYMMDDTHHMMSS.066461502Z.<UUID>.json.gz
-	if strings.HasPrefix(testName, "ndt7") && (strings.HasSuffix(testName, "json.gz") || strings.HasSuffix(testName, "json")) {
+	if strings.Contains(testName, "ndt7") && (strings.HasSuffix(testName, "json.gz") || strings.HasSuffix(testName, "json")) {
 		return "ndt7_result", true
 	}
+	logx.Debug.Println("ndt7 unknown file:", testName)
 	return "unknown", false
 }
 
@@ -84,7 +86,7 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		}
 		err := dec.Decode(&row.Raw)
 		if err != nil {
-			log.Println(err)
+			log.Println(meta["filename"].(string), testName, err)
 			metrics.TestCount.WithLabelValues(
 				dp.TableName(), "ndt7_result", "Decode").Inc()
 			return err
@@ -104,7 +106,6 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		// Count successful inserts.
 		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt7_result", "ok").Inc()
 	}
-
 	return nil
 }
 
