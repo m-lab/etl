@@ -56,3 +56,9 @@ The row.Sink interface, and row.Buffer define cleaner APIs for the back end
 and for buffering and annotating.  This will streamline migration to
 Gardener driven table selection, column partitioned tables, and possibly
 future migration to BigQuery loads instead of streaming inserts.
+
+## Command line test tool
+
+```sh
+go run cmd/cli/cli.go -filename=gs://archive-measurement-lab/ndt/ndt7/2020/03/29/20200329T003204.926080Z-ndt7-mlab3-atl04-ndt.tgz
+```
