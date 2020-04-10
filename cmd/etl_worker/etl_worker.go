@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -255,6 +256,7 @@ var mainCtx, mainCancel = context.WithCancel(context.Background())
 
 func main() {
 	defer mainCancel()
+	flag.Parse()
 
 	// Expose prometheus and pprof metrics on a separate port.
 	prometheusx.MustStartPrometheus(":9090")
@@ -285,5 +287,5 @@ func main() {
 	} else {
 		log.Println("GARDENER_HOST not specified or empty")
 	}
-	http.ListenAndServe(":8080", nil)
+	rtx.Must(http.ListenAndServe(":8080", nil), "failed to listen")
 }
