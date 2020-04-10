@@ -27,11 +27,8 @@ import (
 	"github.com/fsouza/fake-gcs-server/fakestorage"
 )
 
-var gcsClient *storage.Client
-
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	gcsClient = fromTar("test-bucket", "../testfiles/ndt.tar").Client()
 }
 
 func counterValue(m prometheus.Metric) float64 {
@@ -97,6 +94,7 @@ func tree(t *testing.T, client *storage.Client) {
 
 func TestLoadTar(t *testing.T) {
 	t.Skip("Useful for debugging")
+	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
 	tree(t, gcsClient)
 	t.Fatal()
 }
@@ -106,9 +104,10 @@ func TestProcessTask(t *testing.T) {
 		t.Log("Skipping integration test")
 	}
 
-	fn := "ndt/2018/05/09/20180509T101913Z-mlab1-mad03-ndt-0000.tgz"
+	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
+	filename := "gs://test-bucket/ndt/2018/05/09/20180509T101913Z-mlab1-mad03-ndt-0000.tgz"
 
-	status, err := worker.ProcessTaskWithClient(gcsClient, "gs://test-bucket/"+fn)
+	status, err := worker.ProcessTaskWithClient(gcsClient, filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,6 +144,7 @@ func TestProcessGKETask(t *testing.T) {
 		t.Log("Skipping integration test")
 	}
 
+	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
 	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
 	up := fake.NewFakeUploader()
 	status, err := worker.ProcessGKETaskWithClient(filename, gcsClient, up, &fakeAnnotator{})
