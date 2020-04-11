@@ -179,8 +179,8 @@ var (
 			Name: "etl_task_count",
 			Help: "Number of tasks/archive files processed.",
 		},
-		// Go package or filename, and Status
-		[]string{"table", "package", "status"},
+		// table/datatype, and Status
+		[]string{"table", "status"},
 	)
 
 	// TestCount counts the number of tests successfully processed by the parsers.

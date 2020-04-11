@@ -126,7 +126,7 @@ func ValidateTestPath(path string) (DataPath, error) {
 
 	dataType := dp.GetDataType()
 	if dataType == INVALID {
-		metrics.TaskCount.WithLabelValues(dp.TableBase(), "worker", "BadRequest").Inc()
+		metrics.TaskCount.WithLabelValues(string(dataType), "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", path)
 		return DataPath{}, ErrBadDataType
 	}

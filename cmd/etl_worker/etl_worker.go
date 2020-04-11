@@ -22,7 +22,6 @@ import (
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/active"
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
@@ -121,7 +120,7 @@ func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
-		metrics.TaskCount.WithLabelValues("unknown", "worker", "TooManyRequests").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
 		rwr.WriteHeader(http.StatusTooManyRequests)
 		fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
 		return
@@ -177,7 +176,7 @@ func subworker(rawFileName string, executionCount, retryCount int, age time.Dura
 	// This handles base64 encoding, and requires a gs:// prefix.
 	fn, err := etl.GetFilename(rawFileName)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("unknown", "worker", "BadRequest").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)
 		return http.StatusBadRequest, `{"message": "Invalid filename."}`
 	}
@@ -231,19 +230,11 @@ func (r *runnable) Run() error {
 	// HACK - clean this up.
 	dataType := data.GetDataType()
 	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
-	client, err := bq.GetClient(pdt.Project)
-	if err != nil {
-		return err
-	}
-	up := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
-	// This avoids problems when a single row of the insert has invalid
-	// data.  We then have to carefully parse the returned error object.
-	up.SkipInvalidRows = true
 
 	start := time.Now()
 	log.Println("Processing", path)
 	// TODO pass in storage client, or pass in TestSource.
-	statusCode, err := worker.ProcessGKETask(path, up, nil) // Use default uploader and annotator
+	statusCode, err := worker.ProcessGKETask(path, pdt, nil) // Use default uploader and annotator
 	metrics.DurationHistogram.WithLabelValues(
 		data.DataType, http.StatusText(statusCode)).Observe(
 		time.Since(start).Seconds())

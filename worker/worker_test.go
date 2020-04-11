@@ -16,10 +16,12 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/m-lab/annotation-service/api"
 	v2 "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
@@ -146,8 +148,18 @@ func TestProcessGKETask(t *testing.T) {
 
 	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
 	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
+	data, err := etl.ValidateTestPath(filename)
+	if err != nil {
+		t.Fatal(err, filename)
+	}
+
+	// HACK - clean this up.
+	dataType := data.GetDataType()
+	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
+
 	up := fake.NewFakeUploader()
-	status, err := worker.ProcessGKETaskWithClient(filename, gcsClient, up, &fakeAnnotator{})
+	status, err := worker.ProcessGKETaskWithClient(
+		filename, pdt, gcsClient, up, &fakeAnnotator{})
 	if err != nil {
 		t.Fatal(err)
 	}
