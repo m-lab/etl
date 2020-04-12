@@ -165,6 +165,7 @@ var (
 			Name: "etl_files_processed",
 			Help: "Number of files processed.",
 		},
+		// TODO maybe change to host and exp/type?  Maybe drop day_of_week?
 		[]string{"rsync_host_module", "day_of_week"},
 	)
 

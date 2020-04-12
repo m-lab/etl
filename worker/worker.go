@@ -15,6 +15,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
 )
@@ -150,6 +151,7 @@ func ProcessGKETask(fn string, pdt bqx.PDT, ann api.Annotator) (int, error) {
 	return ProcessGKETaskWithUploader(fn, pdt, up, ann)
 }
 
+// ProcessGKETaskWithUploader writes to the provided uploader.
 func ProcessGKETaskWithUploader(fn string, pdt bqx.PDT, uploader etl.Uploader, ann api.Annotator) (int, error) {
 	client, err := storage.GetStorageClient(false)
 	if err != nil {
@@ -189,17 +191,24 @@ func ProcessGKETaskWithClient(fn string, pdt bqx.PDT, client *gcs.Client, upload
 		// TODO - anything better we could do here?
 	}
 
+	return ProcessGKESourceSink(fn, path, src, ins, ann)
+}
+
+// ProcessGKESourceSink processes files in a TestSource to a row.Sink.
+// TODO remove DataPath arg?
+func ProcessGKESourceSink(fn string, path etl.DataPath, src etl.TestSource, sink row.Sink, ann api.Annotator) (int, error) {
 	// Create parser, injecting Inserter
-	p := parser.NewSinkParser(dataType, ins, label, ann)
+	p := parser.NewSinkParser(path.GetDataType(), sink, src.Type(), ann)
 	if p == nil {
-		metrics.TaskCount.WithLabelValues(label, string(dataType), "NewInserterError").Inc()
-		log.Printf("Error creating parser for %s", dataType)
-		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", dataType)
+		metrics.TaskCount.WithLabelValues(src.Type(), "NewInserterError").Inc()
+		log.Printf("Error creating parser for %s", path.GetDataType())
+		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", path.GetDataType())
 	}
 
 	return DoGKETask(fn, path, src, p)
 }
 
+// DoGKETask creates task, processes all tests and handle metrics
 func DoGKETask(fn string, path etl.DataPath, src etl.TestSource, parser etl.Parser) (int, error) {
 	tsk := task.NewTask(fn, src, parser)
 
