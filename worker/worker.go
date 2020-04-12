@@ -134,12 +134,13 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 }
 
 // ProcessGKETask interprets a filename to create a Task, Parser, and Inserter,
-// and processes the file content.  The inserter is customized to write to column partitioned tables.
-// It is currently used in the GKE parser instances, but will eventually replace ProcessTask for
-// all parser/task types.
+// and processes the file content.
+// Used default BQ Sink, and GCS Source.
 // Returns an http status code and an error if the task did not complete successfully.
-// TODO pass in the configured Sink object, instead of creating based on datatype.
-func ProcessGKETask(fn string, pdt bqx.PDT, ann api.Annotator) (int, error) {
+func ProcessGKETask(fn string, path etl.DataPath, ann api.Annotator) (int, error) {
+	dataType := path.GetDataType()
+	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
+
 	bqClient, err := bq.GetClient(pdt.Project)
 	if err != nil {
 		return http.StatusInternalServerError, err
@@ -211,7 +212,6 @@ func ProcessGKESourceSink(fn string, path etl.DataPath, src etl.TestSource, sink
 // DoGKETask creates task, processes all tests and handle metrics
 func DoGKETask(fn string, path etl.DataPath, src etl.TestSource, parser etl.Parser) (int, error) {
 	tsk := task.NewTask(fn, src, parser)
-
 	files, err := tsk.ProcessAllTests()
 
 	dateFormat := "20060102"

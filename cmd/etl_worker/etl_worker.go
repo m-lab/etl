@@ -17,7 +17,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 
@@ -221,22 +220,18 @@ type runnable struct {
 
 func (r *runnable) Run() error {
 	path := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
-	data, err := etl.ValidateTestPath(path)
+	dp, err := etl.ValidateTestPath(path)
 	if err != nil {
 		log.Printf("Invalid filename: %v\n", err)
 		return err
 	}
 
-	// HACK - clean this up.
-	dataType := data.GetDataType()
-	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
-
 	start := time.Now()
 	log.Println("Processing", path)
 	// TODO pass in storage client, or pass in TestSource.
-	statusCode, err := worker.ProcessGKETask(path, pdt, nil) // Use default uploader and annotator
+	statusCode, err := worker.ProcessGKETask(path, dp, nil) // Use default uploader and annotator
 	metrics.DurationHistogram.WithLabelValues(
-		data.DataType, http.StatusText(statusCode)).Observe(
+		dp.DataType, http.StatusText(statusCode)).Observe(
 		time.Since(start).Seconds())
 	return err
 }
