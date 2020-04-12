@@ -104,6 +104,21 @@ func NewColumnPartitionedInserterWithUploader(pdt bqx.PDT, uploader etl.Uploader
 	return sink, nil
 }
 
+// SinkFactory implements factory.SinkFactory.
+type SinkFactory struct {
+	uploader etl.Uploader
+}
+
+// Get mplements factory.SinkFactory
+func (sf *SinkFactory) Get(
+	ctx context.Context, path etl.DataPath) (row.Sink, error) {
+
+	dt := path.GetDataType()
+	pdt :=
+		bqx.PDT{Project: dt.BigqueryProject(), Dataset: dt.Dataset(), Table: dt.Table()}
+	return NewColumnPartitionedInserterWithUploader(pdt, sf.uploader)
+}
+
 // NewBQInserter initializes a new BQInserter
 // Pass in nil uploader for normal use, custom uploader for custom behavior
 // TODO - improve the naming between here and NewInserter.

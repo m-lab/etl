@@ -56,3 +56,13 @@ The row.Sink interface, and row.Buffer define cleaner APIs for the back end
 and for buffering and annotating.  This will streamline migration to
 Gardener driven table selection, column partitioned tables, and possibly
 future migration to BigQuery loads instead of streaming inserts.
+
+## Factories
+
+The TaskFactory aggregates a number of other factories for the elements
+required for a Task
+
+* SinkFactory produces a Sink for output.
+* SourceFactory produces a Source for the input data.
+* AnnotatorFactory produces an Annotator to be used to annotate rows.
+* ParserFactory produces a Parser that can parse the Source data.

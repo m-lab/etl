@@ -13,6 +13,7 @@ import (
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/fake"
 )
 
@@ -22,6 +23,10 @@ func init() {
 
 func assertInserter(in etl.Inserter) {
 	func(in etl.Inserter) {}(&bq.BQInserter{})
+}
+
+func assertSinkFactory(f factory.SinkFactory) {
+	func(f factory.SinkFactory) {}(&bq.SinkFactory{})
 }
 
 func foobar(vs bigquery.ValueSaver) {
