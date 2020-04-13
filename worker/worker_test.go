@@ -201,9 +201,9 @@ func TestNilUploader(t *testing.T) {
 		t.Fatal(err, filename)
 	}
 	// TODO create a TaskFactory and use ProcessGKETask
-	status, err := worker.ProcessGKETask(path, &fakeFactory)
-	if status != http.StatusInternalServerError {
-		t.Fatal("Expected", http.StatusInternalServerError, "Got:", status)
+	pErr := worker.ProcessGKETask(path, &fakeFactory)
+	if pErr == nil || pErr.Code != http.StatusInternalServerError {
+		t.Fatal("Expected error with", http.StatusInternalServerError, "Got:", pErr)
 	}
 
 	metrics.FileCount.Reset()
@@ -229,9 +229,9 @@ func TestProcessGKETask(t *testing.T) {
 		t.Fatal(err, filename)
 	}
 	// TODO create a TaskFactory and use ProcessGKETask
-	status, err := worker.ProcessGKETask(path, &fakeFactory)
-	if status != http.StatusOK {
-		t.Fatal("Expected", http.StatusOK, "Got:", status)
+	pErr := worker.ProcessGKETask(path, &fakeFactory)
+	if pErr != nil {
+		t.Fatal("Expected", http.StatusOK, "Got:", pErr)
 	}
 
 	// This section checks that prom metrics are updated appropriately.

@@ -175,19 +175,19 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 // and processes the file content.
 // Used default BQ Sink, and GCS Source.
 // Returns an http status code and an error if the task did not complete successfully.
-func ProcessGKETask(path etl.DataPath, tf factory.TaskFactory) (int, *factory.ProcessingError) {
+func ProcessGKETask(path etl.DataPath, tf factory.TaskFactory) *factory.ProcessingError {
 	t, err := tf.Get(nil, path)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(err.DataType, err.Detail).Inc()
 		log.Printf("TaskFactory error: %v", err)
-		return err.Code, err // http.StatusBadRequest, err
+		return err // http.StatusBadRequest, err
 	}
 
 	return DoGKETask(t, path)
 }
 
 // DoGKETask creates task, processes all tests and handle metrics
-func DoGKETask(tsk *task.Task, path etl.DataPath) (int, *factory.ProcessingError) {
+func DoGKETask(tsk *task.Task, path etl.DataPath) *factory.ProcessingError {
 	files, err := tsk.ProcessAllTests()
 
 	dateFormat := "20060102"
@@ -195,7 +195,7 @@ func DoGKETask(tsk *task.Task, path etl.DataPath) (int, *factory.ProcessingError
 	if dateErr != nil {
 		metrics.TaskCount.WithLabelValues(path.DataType, "Bad Date").Inc()
 		log.Printf("Error parsing path.PackedDate: %v", err)
-		return http.StatusBadRequest, factory.NewError(
+		return factory.NewError(
 			path.DataType, "PackedDate", http.StatusBadRequest, dateErr)
 	}
 
@@ -208,7 +208,7 @@ func DoGKETask(tsk *task.Task, path etl.DataPath) (int, *factory.ProcessingError
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(path.DataType, "TaskError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
-		return http.StatusInternalServerError, factory.NewError(
+		return factory.NewError(
 			path.DataType, "TaskError", http.StatusInternalServerError, err)
 		// TODO - anything better we could do here?
 	}
@@ -224,5 +224,5 @@ func DoGKETask(tsk *task.Task, path etl.DataPath) (int, *factory.ProcessingError
 	// connection.  We are unclear about how to handle short connections that span midnight UTC, but
 	// suspect they should be placed in the date of the original connection time.
 	metrics.TaskCount.WithLabelValues(path.DataType, "OK").Inc()
-	return http.StatusOK, nil
+	return nil
 }
