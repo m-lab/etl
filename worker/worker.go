@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,14 +9,11 @@ import (
 
 	gcs "cloud.google.com/go/storage"
 
-	"github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/go/bqx"
-
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
 )
@@ -133,93 +131,72 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 	return http.StatusOK, nil
 }
 
+// StandardTaskFactory implements factory.Task
+type StandardTaskFactory struct {
+	Sink   factory.SinkFactory
+	Source factory.SourceFactory
+	Ann    factory.AnnotatorFactory
+}
+
+// Get implements factory.TaskFactory.Get
+func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.Task, *factory.ProcessingError) {
+	sink, err := tf.Sink.Get(ctx, dp)
+	if err != nil {
+		e := fmt.Errorf("%v creating sink for %s", err, dp.GetDataType())
+		log.Println(e, dp.URI)
+		return nil, err
+	}
+
+	ann, err := tf.Ann.Get(ctx, dp)
+	if err != nil {
+		e := fmt.Errorf("%v creating annotator for %s", err, dp.GetDataType())
+		log.Println(e, dp.URI)
+		return nil, err
+	}
+	src, err := tf.Source.Get(ctx, dp)
+	if err != nil {
+		e := fmt.Errorf("%v creating source for %s", err, dp.GetDataType())
+		log.Println(e, dp.URI)
+		return nil, err
+	}
+
+	p := parser.NewSinkParser(dp.GetDataType(), sink, src.Type(), ann)
+	if p == nil {
+		e := fmt.Errorf("%v creating parser for %s", err, dp.GetDataType())
+		log.Println(e, dp.URI)
+		return nil, err
+	}
+
+	tsk := task.NewTask(dp.URI, src, p)
+	return tsk, nil
+}
+
 // ProcessGKETask interprets a filename to create a Task, Parser, and Inserter,
 // and processes the file content.
 // Used default BQ Sink, and GCS Source.
 // Returns an http status code and an error if the task did not complete successfully.
-func ProcessGKETask(fn string, path etl.DataPath, ann api.Annotator) (int, error) {
-	dataType := path.GetDataType()
-	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
-
-	bqClient, err := bq.GetClient(pdt.Project)
+func ProcessGKETask(path etl.DataPath, tf factory.TaskFactory) (int, *factory.ProcessingError) {
+	t, err := tf.Get(nil, path)
 	if err != nil {
-		return http.StatusInternalServerError, err
-	}
-	up := bqClient.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
-	// This avoids problems when a single row of the insert has invalid
-	// data.  We then have to carefully parse the returned error object.
-	up.SkipInvalidRows = true
-	return ProcessGKETaskWithUploader(fn, pdt, up, ann)
-}
-
-// ProcessGKETaskWithUploader writes to the provided uploader.
-func ProcessGKETaskWithUploader(fn string, pdt bqx.PDT, uploader etl.Uploader, ann api.Annotator) (int, error) {
-	client, err := storage.GetStorageClient(false)
-	if err != nil {
-		path, _ := etl.ValidateTestPath(fn)
-		metrics.TaskCount.WithLabelValues(path.TableBase(), "worker", "ServiceUnavailable").Inc()
-		log.Printf("Error getting storage client: %v\n", err)
-		return http.StatusServiceUnavailable, err
-	}
-	return ProcessGKETaskWithClient(fn, pdt, client, uploader, ann)
-}
-
-// ProcessGKETaskWithClient uses the provided GCS client to source the file.
-func ProcessGKETaskWithClient(fn string, pdt bqx.PDT, client *gcs.Client, uploader etl.Uploader, ann api.Annotator) (int, error) {
-	src, path, status, err := GetSource(client, fn)
-	if err != nil {
-		return status, err
-	}
-	defer src.Close()
-
-	label := src.Type()
-
-	// Count number of workers operating on each table.
-	metrics.WorkerCount.WithLabelValues(label).Inc()
-	defer metrics.WorkerCount.WithLabelValues(label).Dec()
-
-	// These keep track of the (nested) state of the worker.
-	metrics.WorkerState.WithLabelValues(label, "worker").Inc()
-	defer metrics.WorkerState.WithLabelValues(label, "worker").Dec()
-
-	dataType := path.GetDataType()
-
-	ins, err := bq.NewColumnPartitionedInserterWithUploader(pdt, uploader)
-	if err != nil {
-		metrics.TaskCount.WithLabelValues(label, string(dataType), "NewInserterError").Inc()
-		log.Printf("Error creating BQ Inserter:  %v", err)
-		return http.StatusInternalServerError, err
-		// TODO - anything better we could do here?
+		metrics.TaskCount.WithLabelValues(err.DataType, err.Detail).Inc()
+		log.Printf("TaskFactory error: %v", err)
+		return err.Code, err // http.StatusBadRequest, err
 	}
 
-	return ProcessGKESourceSink(fn, path, src, ins, ann)
-}
-
-// ProcessGKESourceSink processes files in a TestSource to a row.Sink.
-// TODO remove DataPath arg?
-func ProcessGKESourceSink(fn string, path etl.DataPath, src etl.TestSource, sink row.Sink, ann api.Annotator) (int, error) {
-	// Create parser, injecting Inserter
-	p := parser.NewSinkParser(path.GetDataType(), sink, src.Type(), ann)
-	if p == nil {
-		metrics.TaskCount.WithLabelValues(src.Type(), "NewInserterError").Inc()
-		log.Printf("Error creating parser for %s", path.GetDataType())
-		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", path.GetDataType())
-	}
-
-	return DoGKETask(fn, path, src, p)
+	return DoGKETask(t, path)
 }
 
 // DoGKETask creates task, processes all tests and handle metrics
-func DoGKETask(fn string, path etl.DataPath, src etl.TestSource, parser etl.Parser) (int, error) {
-	tsk := task.NewTask(fn, src, parser)
+func DoGKETask(tsk *task.Task, path etl.DataPath) (int, *factory.ProcessingError) {
 	files, err := tsk.ProcessAllTests()
 
 	dateFormat := "20060102"
-	date, err := time.Parse(dateFormat, path.PackedDate)
-	if err != nil {
-		metrics.TaskCount.WithLabelValues(src.Type(), "Bad Date").Inc()
+	date, dateErr := time.Parse(dateFormat, path.PackedDate)
+	if dateErr != nil {
+		metrics.TaskCount.WithLabelValues(path.DataType, "Bad Date").Inc()
 		log.Printf("Error parsing path.PackedDate: %v", err)
-		return http.StatusBadRequest, err
+		return http.StatusBadRequest, factory.NewError(
+			path.DataType, "PackedDate", http.StatusBadRequest, dateErr)
 	}
 
 	// Count the files processed per-host-module per-weekday.
@@ -229,12 +206,10 @@ func DoGKETask(fn string, path etl.DataPath, src etl.TestSource, parser etl.Pars
 		date.Weekday().String()).Add(float64(files))
 
 	if err != nil {
-		metrics.TaskCount.WithLabelValues(src.Type(), "TaskError").Inc()
+		metrics.TaskCount.WithLabelValues(path.DataType, "TaskError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
-		// NOTE: This may cause indefinite retries, and stalled task queue.  Task will eventually
-		// expire, but it might be better to have a different mechanism for retries, particularly
-		// for gardener, which waits for empty task queue.
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, factory.NewError(
+			path.DataType, "TaskError", http.StatusInternalServerError, err)
 		// TODO - anything better we could do here?
 	}
 
@@ -248,6 +223,6 @@ func DoGKETask(fn string, path etl.DataPath, src etl.TestSource, parser etl.Pars
 	// the partition corresponding to the time of the traffic, rather than the time of the original
 	// connection.  We are unclear about how to handle short connections that span midnight UTC, but
 	// suspect they should be placed in the date of the original connection time.
-	metrics.TaskCount.WithLabelValues(src.Type(), "OK").Inc()
+	metrics.TaskCount.WithLabelValues(path.DataType, "OK").Inc()
 	return http.StatusOK, nil
 }

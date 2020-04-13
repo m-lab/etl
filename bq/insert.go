@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
@@ -29,6 +30,7 @@ import (
 	"google.golang.org/api/googleapi"
 
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/bqx"
@@ -111,12 +113,17 @@ type SinkFactory struct {
 
 // Get mplements factory.SinkFactory
 func (sf *SinkFactory) Get(
-	ctx context.Context, path etl.DataPath) (row.Sink, error) {
+	ctx context.Context, path etl.DataPath) (row.Sink, *factory.ProcessingError) {
 
 	dt := path.GetDataType()
 	pdt :=
 		bqx.PDT{Project: dt.BigqueryProject(), Dataset: dt.Dataset(), Table: dt.Table()}
-	return NewColumnPartitionedInserterWithUploader(pdt, sf.uploader)
+	ins, err := NewColumnPartitionedInserterWithUploader(pdt, sf.uploader)
+	if err != nil {
+		return nil, factory.NewError(path.DataType, "Inserter creation",
+			http.StatusInternalServerError, err)
+	}
+	return ins, nil
 }
 
 // NewBQInserter initializes a new BQInserter
