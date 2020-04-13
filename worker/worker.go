@@ -189,6 +189,7 @@ func ProcessGKETask(path etl.DataPath, tf factory.TaskFactory) *factory.Processi
 // DoGKETask creates task, processes all tests and handle metrics
 func DoGKETask(tsk *task.Task, path etl.DataPath) *factory.ProcessingError {
 	files, err := tsk.ProcessAllTests()
+	tsk.Close()
 
 	dateFormat := "20060102"
 	date, dateErr := time.Parse(dateFormat, path.PackedDate)

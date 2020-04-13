@@ -21,7 +21,9 @@ import (
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/active"
+	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
 
@@ -215,6 +217,7 @@ func setMaxInFlight() {
 }
 
 type runnable struct {
+	tf factory.TaskFactory
 	storage.ObjectAttrs
 }
 
@@ -228,8 +231,12 @@ func (r *runnable) Run() error {
 
 	start := time.Now()
 	log.Println("Processing", path)
-	// TODO pass in storage client, or pass in TestSource.
-	statusCode, err := worker.ProcessGKETask(path, dp, nil) // Use default uploader and annotator
+
+	statusCode := http.StatusOK
+	pErr := worker.ProcessGKETask(dp, r.tf)
+	if pErr != nil {
+		statusCode = pErr.Code
+	}
 	metrics.DurationHistogram.WithLabelValues(
 		dp.DataType, http.StatusText(statusCode)).Observe(
 		time.Since(start).Seconds())
@@ -241,8 +248,14 @@ func (r *runnable) Info() string {
 	return r.Name
 }
 
+var defaultFactory = &worker.StandardTaskFactory{
+	Ann:    factory.DefaultAnnotatorFactory(),
+	Sink:   bq.DefaultSinkFactory(),
+	Source: factory.DefaultSourceFactory(),
+}
+
 func toRunnable(obj *storage.ObjectAttrs) active.Runnable {
-	return &runnable{*obj}
+	return &runnable{defaultFactory, *obj}
 }
 
 func mustGardenerAPI(ctx context.Context, jobServer string) *active.GardenerAPI {

@@ -71,7 +71,7 @@ func TestValidateTestPath(t *testing.T) {
 			path:     `gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar.gz`,
 			wantType: etl.NDT,
 			want: etl.DataPath{
-				`gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar`,
+				`gs://m-lab-sandbox/ndt/2016/07/14/20160714T123456Z-mlab1-lax04-ndt-0001.tar.gz`,
 				"m-lab-sandbox", "", "ndt", "2016/07/14", "20160714", "123456", "", "mlab1", "lax04", "ndt", "0001", "", ".tar.gz",
 			},
 		},
@@ -127,7 +127,7 @@ func TestValidateTestPath(t *testing.T) {
 			if !tt.wantErr {
 				if diff := deep.Equal(got, tt.want); diff != nil {
 					log.Println(tt.path)
-					t.Errorf("ValidateTestPath() = %v\n", diff)
+					t.Errorf("%s: %v\n", tt.name, diff)
 				}
 			}
 		})

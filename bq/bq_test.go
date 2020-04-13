@@ -26,7 +26,7 @@ func assertInserter(in etl.Inserter) {
 }
 
 func assertSinkFactory(f factory.SinkFactory) {
-	func(f factory.SinkFactory) {}(&bq.SinkFactory{})
+	func(f factory.SinkFactory) {}(bq.DefaultSinkFactory())
 }
 
 func foobar(vs bigquery.ValueSaver) {

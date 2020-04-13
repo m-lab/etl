@@ -106,24 +106,39 @@ func NewColumnPartitionedInserterWithUploader(pdt bqx.PDT, uploader etl.Uploader
 	return sink, nil
 }
 
-// SinkFactory implements factory.SinkFactory.
-type SinkFactory struct {
-	uploader etl.Uploader
+// TODO consider adding a Job level cache.
+type defaultSinkFactory struct {
 }
 
 // Get mplements factory.SinkFactory
-func (sf *SinkFactory) Get(
+func (sf *defaultSinkFactory) Get(
 	ctx context.Context, path etl.DataPath) (row.Sink, *factory.ProcessingError) {
+	dataType := path.GetDataType()
+	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
 
-	dt := path.GetDataType()
-	pdt :=
-		bqx.PDT{Project: dt.BigqueryProject(), Dataset: dt.Dataset(), Table: dt.Table()}
-	ins, err := NewColumnPartitionedInserterWithUploader(pdt, sf.uploader)
+	client, err := GetClient(pdt.Project)
 	if err != nil {
-		return nil, factory.NewError(path.DataType, "Inserter creation",
+		return nil, factory.NewError(path.DataType, "StorageClient",
+			http.StatusInternalServerError, err)
+	}
+
+	uploader := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
+	// This avoids problems when a single row of the insert has invalid
+	// data.  We then have to carefully parse the returned error object.
+	uploader.SkipInvalidRows = true
+
+	ins, err := NewColumnPartitionedInserterWithUploader(pdt, uploader)
+	if err != nil {
+		return nil, factory.NewError(path.DataType, "InserterCreation",
 			http.StatusInternalServerError, err)
 	}
 	return ins, nil
+}
+
+// DefaultSinkFactory returns the default SinkFactory
+// TODO inject a common bq client.
+func DefaultSinkFactory() factory.SinkFactory {
+	return &defaultSinkFactory{}
 }
 
 // NewBQInserter initializes a new BQInserter
