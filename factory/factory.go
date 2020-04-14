@@ -1,5 +1,4 @@
-// Package factory provides factory definitions.
-// It may cause import cycles and have to be broken up.S
+// Package factory provides factories for constructing Task components.
 package factory
 
 import (
@@ -14,10 +13,10 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/storage"
-	"github.com/m-lab/etl/task"
 )
 
-// ProcessingError extends error to provide  dataType and detail for metrics.
+// ProcessingError extends error to provide dataType and detail for metrics,
+// and appropriate return codes for http handlers.
 type ProcessingError struct {
 	DataType string
 	Detail   string
@@ -28,12 +27,6 @@ type ProcessingError struct {
 // NewError creates a new ProcessingError.
 func NewError(dt, detail string, code int, err error) *ProcessingError {
 	return &ProcessingError{dt, detail, code, err}
-}
-
-// TaskFactory provides Get() which always returns a new, complete Task.
-// TODO for the defs that stay in factory package, remove ...Factory.
-type TaskFactory interface {
-	Get(context.Context, etl.DataPath) (*task.Task, *ProcessingError)
 }
 
 // AnnotatorFactory provides Get() which always returns a new or existing Annotator.
