@@ -228,7 +228,8 @@ func (r *runnable) Run() error {
 		return err
 	}
 
-	// HACK - clean this up.
+	// TODO This is short term hack to fix the injection bug.
+	// It will be removed in the third PR that introduces Factories
 	dataType := data.GetDataType()
 	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
 	client, err := bq.GetClient(pdt.Project)
