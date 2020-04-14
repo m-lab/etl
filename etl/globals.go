@@ -76,6 +76,8 @@ var (
 
 // DataPath breaks out the components of a task filename.
 type DataPath struct {
+	URI string // The full URI
+
 	// These fields are from the bucket and path
 	Bucket   string // the GCS bucket name.
 	ExpDir   string // the experiment directory.
@@ -109,6 +111,7 @@ func ValidateTestPath(path string) (DataPath, error) {
 		return DataPath{}, errors.New("Invalid postamble: " + basic[5])
 	}
 	dp := DataPath{
+		URI:        path,
 		Bucket:     preamble[1],
 		ExpDir:     preamble[2],
 		DataType:   preamble[3],
