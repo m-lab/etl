@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"strings"
@@ -8,8 +9,8 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -27,15 +28,21 @@ type AnnotationParser struct {
 	suffix string
 }
 
+type nullAnnotator struct{}
+
+func (ann *nullAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2as.Response, error) {
+	return &v2as.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
+}
+
 // NewAnnotationParser creates a new parser for annotation data.
 func NewAnnotationParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.ANNOTATION.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(annotation.BatchURL)
+		ann = &nullAnnotator{}
 	}
 
 	return &AnnotationParser{
-		Base:   row.NewBase("foobar", sink, bufSize, ann),
+		Base:   row.NewBase(table, sink, bufSize, ann),
 		table:  table,
 		suffix: suffix,
 	}
