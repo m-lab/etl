@@ -46,6 +46,10 @@ type SourceFactory interface {
 	Get(context.Context, etl.DataPath) (etl.TestSource, *ProcessingError)
 }
 
+//=======================================================================
+//  Implementations
+//=======================================================================
+
 type defaultAnnotatorFactory struct{}
 
 // Get implements AnnotatorFactory.Get
@@ -59,7 +63,8 @@ func DefaultAnnotatorFactory() AnnotatorFactory {
 }
 
 // TODO - might be preferable to put this in storage package, but that
-// currently creates an import cycle.
+// currently creates an import cycle.  Will likely refactor in a later
+// PR in a few days.
 type gcsSourceFactory struct {
 	client *gcs.Client
 }
