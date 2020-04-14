@@ -17,10 +17,12 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/active"
+	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/worker"
@@ -226,10 +228,22 @@ func (r *runnable) Run() error {
 		return err
 	}
 
+	// HACK - clean this up.
+	dataType := data.GetDataType()
+	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
+	client, err := bq.GetClient(pdt.Project)
+	if err != nil {
+		return err
+	}
+	up := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
+	// This avoids problems when a single row of the insert has invalid
+	// data.  We then have to carefully parse the returned error object.
+	up.SkipInvalidRows = true
+
 	start := time.Now()
 	log.Println("Processing", path)
 	// TODO pass in storage client, or pass in TestSource.
-	statusCode, err := worker.ProcessGKETask(path, nil, nil) // Use default uploader and annotator
+	statusCode, err := worker.ProcessGKETask(path, up, nil) // Use default uploader and annotator
 	metrics.DurationHistogram.WithLabelValues(
 		data.DataType, http.StatusText(statusCode)).Observe(
 		time.Since(start).Seconds())
