@@ -183,6 +183,14 @@ func ProcessGKETask(path etl.DataPath, tf factory.TaskFactory) *factory.Processi
 		return err // http.StatusBadRequest, err
 	}
 
+	// Count number of workers operating on each table.
+	metrics.WorkerCount.WithLabelValues(path.DataType).Inc()
+	defer metrics.WorkerCount.WithLabelValues(path.DataType).Dec()
+
+	// Keep track of the (nested) state of the worker.
+	metrics.WorkerState.WithLabelValues(path.DataType, "worker").Inc()
+	defer metrics.WorkerState.WithLabelValues(path.DataType, "worker").Dec()
+
 	return DoGKETask(t, path)
 }
 
@@ -206,6 +214,8 @@ func DoGKETask(tsk *task.Task, path etl.DataPath) *factory.ProcessingError {
 		path.Host+"-"+path.Site+"-"+path.Experiment,
 		date.Weekday().String()).Add(float64(files))
 
+	metrics.WorkerState.WithLabelValues(path.DataType, "finish").Inc()
+	defer metrics.WorkerState.WithLabelValues(path.DataType, "finish").Dec()
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(path.DataType, "TaskError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
