@@ -16,8 +16,10 @@ package bq
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
@@ -29,6 +31,7 @@ import (
 	"google.golang.org/api/googleapi"
 
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/bqx"
@@ -513,6 +516,8 @@ func (in *sink) flushSlice(rows []interface{}, label string, table string) (int,
 }
 
 //============================================================
+// Remaining etl.Inserter methods
+//============================================================
 
 func (in *BQInserter) FullTableName() string {
 	return in.TableBase() + in.TableSuffix()
@@ -549,4 +554,41 @@ func (in *BQInserter) Failed() int {
 	in.acquire()
 	defer in.release()
 	return in.badRows
+}
+
+//======================================================================
+// sinkFactory implements factory.SinkFactory based on bigquery Inserter
+//======================================================================
+
+type sinkFactory struct{}
+
+// Get implements factory.SinkFactory
+func (sf *sinkFactory) Get(ctx context.Context, path etl.DataPath) (row.Sink, factory.ProcessingError) {
+	dataType := path.GetDataType()
+	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
+
+	client, err := GetClient(pdt.Project)
+	if err != nil {
+		return nil, factory.NewError(path.DataType, "StorageClient",
+			http.StatusInternalServerError,
+			fmt.Errorf("StorageClientError %w", err))
+	}
+
+	uploader := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
+	// This avoids problems when a single row of the insert has invalid
+	// data.  We then have to carefully parse the returned error object.
+	uploader.SkipInvalidRows = true
+
+	ins, err := NewColumnPartitionedInserterWithUploader(pdt, uploader)
+	if err != nil {
+		return nil, factory.NewError(path.DataType, "InserterCreation",
+			http.StatusInternalServerError,
+			fmt.Errorf("InserterCreationError %w", err))
+	}
+	return ins, nil
+}
+
+// NewSinkFactory returns a SinkFactory that returns bigquery Sinks.
+func NewSinkFactory() factory.SinkFactory {
+	return &sinkFactory{}
 }

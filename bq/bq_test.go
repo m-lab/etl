@@ -1,6 +1,7 @@
 package bq_test
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/fake"
 )
 
@@ -22,6 +24,23 @@ func init() {
 
 func assertInserter(in etl.Inserter) {
 	func(in etl.Inserter) {}(&bq.BQInserter{})
+}
+
+func assertSinkFactory(f factory.SinkFactory) {
+	func(f factory.SinkFactory) {}(bq.NewSinkFactory())
+}
+
+func TestSinkFactory(t *testing.T) {
+	f := bq.NewSinkFactory()
+	s, err := f.Get(context.Background(), etl.DataPath{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, commitErr := s.Commit(nil, "test")
+	if commitErr != nil {
+		t.Error(commitErr)
+	}
 }
 
 func foobar(vs bigquery.ValueSaver) {
