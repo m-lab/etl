@@ -3,6 +3,7 @@ package factory
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -17,33 +18,52 @@ import (
 
 // ProcessingError extends error to provide dataType and detail for metrics,
 // and appropriate return codes for http handlers.
-type ProcessingError struct {
-	DataType string
-	Detail   string
-	Code     int
+type ProcessingError interface {
+	DataType() string
+	Detail() string
+	Code() int
 	error
 }
 
+type processingError struct {
+	dataType string
+	detail   string
+	code     int
+	error
+}
+
+func (pe processingError) DataType() string {
+	return pe.dataType
+}
+
+func (pe processingError) Detail() string {
+	return pe.detail
+}
+
+func (pe processingError) Code() int {
+	return pe.code
+}
+
 // NewError creates a new ProcessingError.
-func NewError(dt, detail string, code int, err error) *ProcessingError {
-	return &ProcessingError{dt, detail, code, err}
+func NewError(dt, detail string, code int, err error) ProcessingError {
+	return processingError{dt, detail, code, err}
 }
 
 // AnnotatorFactory provides Get() which always returns a new or existing Annotator.
 type AnnotatorFactory interface {
-	Get(context.Context, etl.DataPath) (v2.Annotator, *ProcessingError)
+	Get(context.Context, etl.DataPath) (v2.Annotator, ProcessingError)
 }
 
 // SinkFactory provides Get() which may return a new or existing Sink.
 // If existing Sink, the Commit method must support concurrent calls.
 // Existing Sink may or may not respect the context.
 type SinkFactory interface {
-	Get(context.Context, etl.DataPath) (row.Sink, *ProcessingError)
+	Get(context.Context, etl.DataPath) (row.Sink, ProcessingError)
 }
 
 // SourceFactory provides Get() which always produces a new TestSource.
 type SourceFactory interface {
-	Get(context.Context, etl.DataPath) (etl.TestSource, *ProcessingError)
+	Get(context.Context, etl.DataPath) (etl.TestSource, ProcessingError)
 }
 
 //=======================================================================
@@ -53,7 +73,7 @@ type SourceFactory interface {
 type defaultAnnotatorFactory struct{}
 
 // Get implements AnnotatorFactory.Get
-func (ann *defaultAnnotatorFactory) Get(ctx context.Context, dp etl.DataPath) (v2.Annotator, *ProcessingError) {
+func (ann *defaultAnnotatorFactory) Get(ctx context.Context, dp etl.DataPath) (v2.Annotator, ProcessingError) {
 	return v2.GetAnnotator(annotation.BatchURL), nil
 }
 
@@ -70,7 +90,7 @@ type gcsSourceFactory struct {
 }
 
 // Get implements SourceFactory.Get
-func (sf *gcsSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, *ProcessingError) {
+func (sf *gcsSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, ProcessingError) {
 	label := dp.TableBase() // On error, this will be "invalid", so not all that useful.
 	// TODO - is this already handled upstream?
 	dataType := dp.GetDataType()
@@ -84,7 +104,8 @@ func (sf *gcsSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestS
 		log.Printf("Error opening gcs file: %v", err)
 		// TODO - anything better we could do here?
 		return nil, NewError(dp.DataType, "ETLSourceError",
-			http.StatusInternalServerError, err)
+			http.StatusInternalServerError,
+			fmt.Errorf("ETLSourceError %w", err))
 	}
 
 	return tr, nil
