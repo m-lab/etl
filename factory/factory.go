@@ -90,8 +90,8 @@ func DefaultAnnotatorFactory() AnnotatorFactory {
 }
 
 // TODO - might be preferable to put this in storage package, but that
-// currently creates an import cycle.  Will likely refactor in a later
-// PR in a few days.
+// currently creates an import cycle.  task -> storage -> factory -> task ?
+// Will likely refactor in a later PR in a few days.
 type gcsSourceFactory struct {
 	client *gcs.Client
 }
