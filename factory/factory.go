@@ -14,6 +14,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/etl/task"
 )
 
 // ProcessingError extends error to provide dataType and detail for metrics,
@@ -47,6 +48,12 @@ func (pe processingError) Code() int {
 // NewError creates a new ProcessingError.
 func NewError(dt, detail string, code int, err error) ProcessingError {
 	return processingError{dt, detail, code, err}
+}
+
+// TaskFactory provides Get() which always returns a new, complete Task.
+// TODO for the defs that stay in factory package, remove ...Factory.
+type TaskFactory interface {
+	Get(context.Context, etl.DataPath) (*task.Task, ProcessingError)
 }
 
 // AnnotatorFactory provides Get() which always returns a new or existing Annotator.

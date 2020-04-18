@@ -16,7 +16,6 @@ package bq
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -557,21 +556,22 @@ func (in *BQInserter) Failed() int {
 }
 
 //======================================================================
-// sinkFactory implements factory.SinkFactory based on bigquery Inserter
+// bqSinkFactory implements factory.SinkFactory based on bigquery Inserter
 //======================================================================
 
-type sinkFactory struct{}
+// TODO consider adding a Job level cache.
+type bqSinkFactory struct{}
 
-// Get implements factory.SinkFactory
-func (sf *sinkFactory) Get(ctx context.Context, path etl.DataPath) (row.Sink, factory.ProcessingError) {
+// Get mplements factory.SinkFactory
+func (sf *bqSinkFactory) Get(
+	ctx context.Context, path etl.DataPath) (row.Sink, factory.ProcessingError) {
 	dataType := path.GetDataType()
 	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
 
 	client, err := GetClient(pdt.Project)
 	if err != nil {
 		return nil, factory.NewError(path.DataType, "StorageClient",
-			http.StatusInternalServerError,
-			fmt.Errorf("StorageClientError %w", err))
+			http.StatusInternalServerError, err)
 	}
 
 	uploader := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
@@ -582,13 +582,13 @@ func (sf *sinkFactory) Get(ctx context.Context, path etl.DataPath) (row.Sink, fa
 	ins, err := NewColumnPartitionedInserterWithUploader(pdt, uploader)
 	if err != nil {
 		return nil, factory.NewError(path.DataType, "InserterCreation",
-			http.StatusInternalServerError,
-			fmt.Errorf("InserterCreationError %w", err))
+			http.StatusInternalServerError, err)
 	}
 	return ins, nil
 }
 
-// NewSinkFactory returns a SinkFactory that returns bigquery Sinks.
+// NewSinkFactory returns the default SinkFactory
+// TODO inject a common bq client.
 func NewSinkFactory() factory.SinkFactory {
-	return &sinkFactory{}
+	return &bqSinkFactory{}
 }

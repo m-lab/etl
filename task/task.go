@@ -54,12 +54,13 @@ func (tt *Task) SetMaxFileSize(max int64) {
 // ProcessAllTests loops through all the tests in a tar file, calls the
 // injected parser to parse them, and inserts them into bigquery. Returns the
 // number of files processed.
+// TODO pass in the datatype label.
 func (tt *Task) ProcessAllTests() (int, error) {
 	if tt.Parser == nil {
 		panic("Parser is nil")
 	}
-	metrics.WorkerState.WithLabelValues(tt.TableName(), "task").Inc()
-	defer metrics.WorkerState.WithLabelValues(tt.TableName(), "task").Dec()
+	metrics.WorkerState.WithLabelValues(tt.Type(), "task").Inc()
+	defer metrics.WorkerState.WithLabelValues(tt.Type(), "task").Dec()
 	files := 0
 	nilData := 0
 	var testname string
@@ -79,7 +80,7 @@ OUTER:
 					tt.meta["filename"], testname, files,
 					time.Since(tt.meta["parse_time"].(time.Time)), err)
 				metrics.TestCount.WithLabelValues(
-					tt.Parser.TableName(), "unknown", "oversize file").Inc()
+					tt.Type(), "unknown", "oversize file").Inc()
 				continue OUTER
 			default:
 				// We are seeing several of these per hour, a little more than
@@ -97,7 +98,7 @@ OUTER:
 					time.Since(tt.meta["parse_time"].(time.Time)), err)
 
 				metrics.TestCount.WithLabelValues(
-					tt.Parser.TableName(), "unknown", "unrecovered").Inc()
+					tt.Type(), "unknown", "unrecovered").Inc()
 				// Since we don't understand these errors, safest thing to do is
 				// stop processing the tar file (and task).
 				break OUTER
@@ -113,18 +114,18 @@ OUTER:
 		kind, parsable := tt.Parser.IsParsable(testname, data)
 		if !parsable {
 			metrics.FileSizeHistogram.WithLabelValues(
-				tt.Parser.TableName(), kind, "ignored").Observe(float64(len(data)))
+				tt.Type(), kind, "ignored").Observe(float64(len(data)))
 			// Don't bother calling ParseAndInsert since this is unparsable.
 			continue
 		} else {
 			metrics.FileSizeHistogram.WithLabelValues(
-				tt.Parser.TableName(), kind, "parsed").Observe(float64(len(data)))
+				tt.Type(), kind, "parsed").Observe(float64(len(data)))
 		}
 		err = tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if err != nil {
 			metrics.TaskCount.WithLabelValues(
-				tt.TableName(), "Task", "ParseAndInsertError").Inc()
+				tt.Type(), "ParseAndInsertError").Inc()
 			log.Printf("%v", err)
 			// TODO(dev) Handle this error properly!
 			continue
