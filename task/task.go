@@ -6,6 +6,7 @@
 package task
 
 import (
+	"context"
 	"io"
 	"log"
 	"time"
@@ -16,6 +17,12 @@ import (
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/storage"
 )
+
+// Factory provides Get() which always returns a new, complete Task.
+// TODO for the defs that stay in factory package, remove ...Factory.
+type Factory interface {
+	Get(context.Context, etl.DataPath) (*Task, etl.ProcessingError)
+}
 
 // DefaultMaxFileSize is the default value for the file size limit for calls to NextTest.
 // Larger than this risks an OOM if there are

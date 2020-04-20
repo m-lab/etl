@@ -139,7 +139,7 @@ type StandardTaskFactory struct {
 }
 
 // Get implements factory.TaskFactory.Get
-func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.Task, factory.ProcessingError) {
+func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.Task, etl.ProcessingError) {
 	sink, err := tf.Sink.Get(ctx, dp)
 	if err != nil {
 		e := fmt.Errorf("%v creating sink for %s", err, dp.GetDataType())
@@ -175,7 +175,7 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 // and processes the file content.
 // Used default BQ Sink, and GCS Source.
 // Returns an http status code and an error if the task did not complete successfully.
-func ProcessGKETask(path etl.DataPath, tf factory.TaskFactory) factory.ProcessingError {
+func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
 	t, err := tf.Get(nil, path)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(err.DataType(), err.Detail()).Inc()
@@ -187,7 +187,7 @@ func ProcessGKETask(path etl.DataPath, tf factory.TaskFactory) factory.Processin
 }
 
 // DoGKETask creates task, processes all tests and handle metrics
-func DoGKETask(tsk *task.Task, path etl.DataPath) factory.ProcessingError {
+func DoGKETask(tsk *task.Task, path etl.DataPath) etl.ProcessingError {
 	files, err := tsk.ProcessAllTests()
 	tsk.Close()
 

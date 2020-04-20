@@ -145,7 +145,7 @@ func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ip
 	return &v2.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
 }
 
-func (ann *fakeAnnotator) Get(ctx context.Context, dp etl.DataPath) (v2.Annotator, factory.ProcessingError) {
+func (ann *fakeAnnotator) Get(ctx context.Context, dp etl.DataPath) (v2.Annotator, etl.ProcessingError) {
 	return ann, nil
 }
 
@@ -153,7 +153,7 @@ type fakeSinkFactory struct {
 	up etl.Uploader
 }
 
-func (fsf *fakeSinkFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, factory.ProcessingError) {
+func (fsf *fakeSinkFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, etl.ProcessingError) {
 	if fsf.up == nil {
 		return nil, factory.NewError(dp.DataType, "fakeSinkFactory",
 			http.StatusInternalServerError, errors.New("nil uploader"))
@@ -168,7 +168,7 @@ type fakeSourceFactory struct {
 	client *storage.Client
 }
 
-func (sf *fakeSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, factory.ProcessingError) {
+func (sf *fakeSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, etl.ProcessingError) {
 	// TODO simplify GetSource
 	tr, _, _, err := worker.GetSource(sf.client, dp.URI)
 	rtx.Must(err, "Bad TestSource")

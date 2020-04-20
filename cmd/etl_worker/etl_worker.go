@@ -26,6 +26,7 @@ import (
 	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/etl/task"
 	"github.com/m-lab/etl/worker"
 
 	// Enable profiling. For more background and usage information, see:
@@ -218,7 +219,7 @@ func setMaxInFlight() {
 }
 
 type runnable struct {
-	tf factory.TaskFactory
+	tf task.Factory
 	gcs.ObjectAttrs
 }
 
@@ -257,7 +258,7 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	taskFactory := worker.StandardTaskFactory{
 		Ann:    factory.DefaultAnnotatorFactory(),
 		Sink:   bq.NewSinkFactory(),
-		Source: factory.GCSSourceFactory(c),
+		Source: storage.GCSSourceFactory(c),
 	}
 	return &runnable{&taskFactory, *obj}
 }

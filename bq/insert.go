@@ -564,7 +564,7 @@ type bqSinkFactory struct{}
 
 // Get mplements factory.SinkFactory
 func (sf *bqSinkFactory) Get(
-	ctx context.Context, path etl.DataPath) (row.Sink, factory.ProcessingError) {
+	ctx context.Context, path etl.DataPath) (row.Sink, etl.ProcessingError) {
 	dataType := path.GetDataType()
 	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
 
