@@ -49,7 +49,8 @@ func GetSource(client *gcs.Client, uri string) (etl.TestSource, etl.DataPath, in
 // ProcessTask interprets a filename to create a Task, Parser, and Inserter,
 // and processes the file content.  Storage client is implicitly obtained
 // from GetStorageClient.
-// Returns an http status code and an error if the task did not complete successfully.
+// Returns an http status code and an error if the task did not complete
+// successfully.
 // DEPRECATED - should migrate to ProcessGKETask.
 func ProcessTask(fn string) (int, error) {
 	client, err := storage.GetStorageClient(false)
@@ -120,9 +121,10 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(string(dataType), "TaskError").Inc()
 		log.Printf("Error Processing Tests:  %v", err)
-		// NOTE: This may cause indefinite retries, and stalled task queue.  Task will eventually
-		// expire, but it might be better to have a different mechanism for retries, particularly
-		// for gardener, which waits for empty task queue.
+		// NOTE: This may cause indefinite retries, and stalled task queue.
+		//  Task will eventually expire, but it might be better to have a
+		// different mechanism for retries, particularly for gardener, which
+		// waits for empty task queue.
 		return http.StatusInternalServerError, err
 		// TODO - anything better we could do here?
 	}
@@ -174,7 +176,8 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 // ProcessGKETask interprets a filename to create a Task, Parser, and Inserter,
 // and processes the file content.
 // Used default BQ Sink, and GCS Source.
-// Returns an http status code and an error if the task did not complete successfully.
+// Returns an http status code and an error if the task did not complete
+// successfully.
 func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
 	t, err := tf.Get(nil, path)
 	if err != nil {
@@ -214,16 +217,20 @@ func DoGKETask(tsk *task.Task, path etl.DataPath) etl.ProcessingError {
 		// TODO - anything better we could do here?
 	}
 
-	// NOTE: In the k8s parsers, there are huge spikes in the task rate.  For ndt5, this is likely just
-	// because the tasks are very small.  In tcpinfo, there are many many small tasks at the end of
-	// a date, because long running connections cause pusher to make small archives for subsequent
-	// days, and these are lexicographically after all the large files.
-	// We are starting to think this is a bug, and tcpinfo should instead place the small files
-	// from long running connections in future date directories, instead of the date that the
-	// connection originated.  The parser should then also put these small connection snippets into
-	// the partition corresponding to the time of the traffic, rather than the time of the original
-	// connection.  We are unclear about how to handle short connections that span midnight UTC, but
-	// suspect they should be placed in the date of the original connection time.
+	// NOTE: In the k8s parsers, there are huge spikes in the task rate.
+	//  For ndt5, this is likely just because the tasks are very small.
+	// In tcpinfo, there are many many small tasks at the end of a date,
+	// because long running connections cause pusher to make small archives
+	// for subsequent days, and these are lexicographically after all the
+	// large files. We are starting to think this is a bug, and tcpinfo
+	// should instead place the small files from long running connections
+	// in future date directories, instead of the date that the connection
+	// originated.  The parser should then also put these small connection
+	// snippets into the partition corresponding to the time of the traffic,
+	// rather than the time of the original connection.  We are unclear
+	// about how to handle short connections that span midnight UTC, but
+	// suspect they should be placed in the date of the original connection
+	// time.
 	metrics.TaskCount.WithLabelValues(path.DataType, "OK").Inc()
 	return nil
 }
