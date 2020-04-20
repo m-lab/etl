@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
+	"github.com/m-lab/etl/etl"
 )
 
 // ObjectWriter creates a writer to a named object.
@@ -40,6 +42,17 @@ func NewRowWriter(ctx context.Context, client stiface.Client, bucket string, pat
 	writing <- struct{}{}
 
 	return &RowWriter{w: w, encoding: encoding, writing: writing}, nil
+}
+
+// SinkFactory implements factory.SinkFactory.
+type SinkFactory struct {
+	client stiface.Client
+}
+
+// Get mplements factory.SinkFactory
+func (sf *SinkFactory) Get(
+	ctx context.Context, path etl.DataPath) (*RowWriter, error) {
+	return nil, errors.New("not implemented")
 }
 
 // Acquire the encoding token.
