@@ -1,4 +1,4 @@
-// The etl package provides all major interfaces used across packages.
+// Package etl provides all major interfaces used across packages.
 package etl
 
 import (
@@ -8,6 +8,15 @@ import (
 
 	"cloud.google.com/go/bigquery"
 )
+
+// ProcessingError extends error to provide dataType and detail for metrics,
+// and appropriate return codes for http handlers.
+type ProcessingError interface {
+	DataType() string
+	Detail() string
+	Code() int
+	error
+}
 
 // RowStats interface defines some useful Inserter stats that will also be
 // implemented by Parser.
