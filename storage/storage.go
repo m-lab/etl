@@ -11,9 +11,11 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +24,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 )
 
@@ -285,6 +288,37 @@ func GetStorageClient(writeAccess bool) (*gcs.Client, error) {
 		return nil, err
 	}
 	return client, nil
+}
+
+type gcsSourceFactory struct {
+	client *gcs.Client
+}
+
+// Get implements SourceFactory.Get
+func (sf *gcsSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, etl.ProcessingError) {
+	label := dp.TableBase() // On error, this will be "invalid", so not all that useful.
+	// TODO - is this already handled upstream?
+	dataType := dp.GetDataType()
+	if dataType == etl.INVALID {
+		return nil, factory.NewError(dp.DataType, "InvalidDatatype",
+			http.StatusInternalServerError, etl.ErrBadDataType)
+	}
+
+	tr, err := NewTestSource(sf.client, dp.URI, label)
+	if err != nil {
+		log.Printf("Error opening gcs file: %v", err)
+		// TODO - anything better we could do here?
+		return nil, factory.NewError(dp.DataType, "ETLSourceError",
+			http.StatusInternalServerError,
+			fmt.Errorf("ETLSourceError %w", err))
+	}
+
+	return tr, nil
+}
+
+// GCSSourceFactory returns the default SourceFactory
+func GCSSourceFactory(c *gcs.Client) factory.SourceFactory {
+	return &gcsSourceFactory{c}
 }
 
 //---------------------------------------------------------------------------------
