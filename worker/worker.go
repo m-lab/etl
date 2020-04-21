@@ -133,14 +133,14 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 	return http.StatusOK, nil
 }
 
-// StandardTaskFactory implements factory.Task
+// StandardTaskFactory implements task.Factory
 type StandardTaskFactory struct {
-	Sink   factory.SinkFactory
-	Source factory.SourceFactory
-	Ann    factory.AnnotatorFactory
+	Sink      factory.SinkFactory
+	Source    factory.SourceFactory
+	Annotator factory.AnnotatorFactory
 }
 
-// Get implements factory.TaskFactory.Get
+// Get implements task.Factory.Get
 func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.Task, etl.ProcessingError) {
 	sink, err := tf.Sink.Get(ctx, dp)
 	if err != nil {
@@ -149,7 +149,7 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 		return nil, err
 	}
 
-	ann, err := tf.Ann.Get(ctx, dp)
+	ann, err := tf.Annotator.Get(ctx, dp)
 	if err != nil {
 		e := fmt.Errorf("%v creating annotator for %s", err, dp.GetDataType())
 		log.Println(e, dp.URI)
@@ -179,20 +179,20 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 // Returns an http status code and an error if the task did not complete
 // successfully.
 func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
-	t, err := tf.Get(nil, path)
+	tsk, err := tf.Get(nil, path)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(err.DataType(), err.Detail()).Inc()
 		log.Printf("TaskFactory error: %v", err)
 		return err // http.StatusBadRequest, err
 	}
 
+	defer tsk.Close()
 	return DoGKETask(t, path)
 }
 
 // DoGKETask creates task, processes all tests and handle metrics
 func DoGKETask(tsk *task.Task, path etl.DataPath) etl.ProcessingError {
 	files, err := tsk.ProcessAllTests()
-	tsk.Close()
 
 	dateFormat := "20060102"
 	date, dateErr := time.Parse(dateFormat, path.PackedDate)
