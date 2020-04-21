@@ -256,9 +256,9 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 		return nil // TODO add an error?
 	}
 	taskFactory := worker.StandardTaskFactory{
-		Ann:    factory.DefaultAnnotatorFactory(),
-		Sink:   bq.NewSinkFactory(),
-		Source: storage.GCSSourceFactory(c),
+		Annotator: factory.DefaultAnnotatorFactory(),
+		Sink:      bq.NewSinkFactory(),
+		Source:    storage.GCSSourceFactory(c),
 	}
 	return &runnable{&taskFactory, *obj}
 }

@@ -187,7 +187,7 @@ func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
 	}
 
 	defer tsk.Close()
-	return DoGKETask(t, path)
+	return DoGKETask(tsk, path)
 }
 
 // DoGKETask creates task, processes all tests and handle metrics

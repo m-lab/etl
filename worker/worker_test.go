@@ -190,9 +190,9 @@ func TestNilUploader(t *testing.T) {
 	}
 
 	fakeFactory := worker.StandardTaskFactory{
-		Ann:    &fakeAnnotatorFactory{},
-		Sink:   &fakeSinkFactory{up: nil},
-		Source: NewSourceFactory(),
+		Annotator: &fakeAnnotatorFactory{},
+		Sink:      &fakeSinkFactory{up: nil},
+		Source:    NewSourceFactory(),
 	}
 
 	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
@@ -218,9 +218,9 @@ func TestProcessGKETask(t *testing.T) {
 
 	up := fake.NewFakeUploader()
 	fakeFactory := worker.StandardTaskFactory{
-		Ann:    &fakeAnnotatorFactory{},
-		Sink:   &fakeSinkFactory{up: up},
-		Source: NewSourceFactory(),
+		Annotator: &fakeAnnotatorFactory{},
+		Sink:      &fakeSinkFactory{up: up},
+		Source:    NewSourceFactory(),
 	}
 
 	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
