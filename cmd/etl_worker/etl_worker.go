@@ -14,17 +14,19 @@ import (
 	"sync/atomic"
 	"time"
 
-	"cloud.google.com/go/storage"
+	gcs "cloud.google.com/go/storage"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/active"
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/etl/task"
 	"github.com/m-lab/etl/worker"
 
 	// Enable profiling. For more background and usage information, see:
@@ -121,7 +123,7 @@ func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
-		metrics.TaskCount.WithLabelValues("unknown", "worker", "TooManyRequests").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
 		rwr.WriteHeader(http.StatusTooManyRequests)
 		fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
 		return
@@ -177,7 +179,7 @@ func subworker(rawFileName string, executionCount, retryCount int, age time.Dura
 	// This handles base64 encoding, and requires a gs:// prefix.
 	fn, err := etl.GetFilename(rawFileName)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("unknown", "worker", "BadRequest").Inc()
+		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)
 		return http.StatusBadRequest, `{"message": "Invalid filename."}`
 	}
@@ -217,36 +219,28 @@ func setMaxInFlight() {
 }
 
 type runnable struct {
-	storage.ObjectAttrs
+	tf task.Factory
+	gcs.ObjectAttrs
 }
 
 func (r *runnable) Run() error {
 	path := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
-	data, err := etl.ValidateTestPath(path)
+	dp, err := etl.ValidateTestPath(path)
 	if err != nil {
 		log.Printf("Invalid filename: %v\n", err)
 		return err
 	}
 
-	// TODO This is short term hack to fix the injection bug.
-	// It will be removed in the third PR that introduces Factories
-	dataType := data.GetDataType()
-	pdt := bqx.PDT{Project: dataType.BigqueryProject(), Dataset: dataType.Dataset(), Table: dataType.Table()}
-	client, err := bq.GetClient(pdt.Project)
-	if err != nil {
-		return err
-	}
-	up := client.Dataset(pdt.Dataset).Table(pdt.Table).Uploader()
-	// This avoids problems when a single row of the insert has invalid
-	// data.  We then have to carefully parse the returned error object.
-	up.SkipInvalidRows = true
-
 	start := time.Now()
 	log.Println("Processing", path)
-	// TODO pass in storage client, or pass in TestSource.
-	statusCode, err := worker.ProcessGKETask(path, up, nil) // Use default uploader and annotator
+
+	statusCode := http.StatusOK
+	pErr := worker.ProcessGKETask(dp, r.tf)
+	if pErr != nil {
+		statusCode = pErr.Code()
+	}
 	metrics.DurationHistogram.WithLabelValues(
-		data.DataType, http.StatusText(statusCode)).Observe(
+		dp.DataType, http.StatusText(statusCode)).Observe(
 		time.Since(start).Seconds())
 	return err
 }
@@ -256,8 +250,17 @@ func (r *runnable) Info() string {
 	return r.Name
 }
 
-func toRunnable(obj *storage.ObjectAttrs) active.Runnable {
-	return &runnable{*obj}
+func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
+	c, err := storage.GetStorageClient(false)
+	if err != nil {
+		return nil // TODO add an error?
+	}
+	taskFactory := worker.StandardTaskFactory{
+		Annotator: factory.DefaultAnnotatorFactory(),
+		Sink:      bq.NewSinkFactory(),
+		Source:    storage.GCSSourceFactory(c),
+	}
+	return &runnable{&taskFactory, *obj}
 }
 
 func mustGardenerAPI(ctx context.Context, jobServer string) *active.GardenerAPI {

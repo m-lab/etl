@@ -3,6 +3,7 @@ package worker_test
 import (
 	"archive/tar"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,12 +17,17 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/m-lab/annotation-service/api"
 	v2 "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/go/bqx"
 	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
+	"github.com/m-lab/etl/bq"
+	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/worker"
 
 	"github.com/fsouza/fake-gcs-server/fakestorage"
@@ -132,27 +138,100 @@ func TestProcessTask(t *testing.T) {
 	metrics.TestCount.Reset()
 }
 
-type fakeAnnotator struct{}
+// This is also the annotator, so it just returns itself.
+type fakeAnnotatorFactory struct{}
 
-func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2.Response, error) {
+func (ann *fakeAnnotatorFactory) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2.Response, error) {
 	return &v2.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
 }
 
-// Enable this test when we have fixed the prom counter resets.
+func (ann *fakeAnnotatorFactory) Get(ctx context.Context, dp etl.DataPath) (v2.Annotator, etl.ProcessingError) {
+	return ann, nil
+}
+
+type fakeSinkFactory struct {
+	up etl.Uploader
+}
+
+func (fsf *fakeSinkFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, etl.ProcessingError) {
+	if fsf.up == nil {
+		return nil, factory.NewError(dp.DataType, "fakeSinkFactory",
+			http.StatusInternalServerError, errors.New("nil uploader"))
+	}
+	pdt := bqx.PDT{Project: "fake-project", Dataset: "fake-dataset", Table: "fake-table"}
+	in, err := bq.NewColumnPartitionedInserterWithUploader(pdt, fsf.up)
+	rtx.Must(err, "Bad SinkFactory")
+	return in, nil
+}
+
+type fakeSourceFactory struct {
+	client *storage.Client
+}
+
+func (sf *fakeSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, etl.ProcessingError) {
+	// TODO simplify GetSource
+	tr, _, _, err := worker.GetSource(sf.client, dp.URI)
+	rtx.Must(err, "Bad TestSource")
+
+	// TODO
+	// defer tr.Close()
+
+	return tr, nil
+}
+
+func NewSourceFactory() factory.SourceFactory {
+	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
+	return &fakeSourceFactory{client: gcsClient}
+}
+
+func TestNilUploader(t *testing.T) {
+	if testing.Short() {
+		t.Log("Skipping integration test")
+	}
+
+	fakeFactory := worker.StandardTaskFactory{
+		Annotator: &fakeAnnotatorFactory{},
+		Sink:      &fakeSinkFactory{up: nil},
+		Source:    NewSourceFactory(),
+	}
+
+	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
+	path, err := etl.ValidateTestPath(filename)
+	if err != nil {
+		t.Fatal(err, filename)
+	}
+	// TODO create a TaskFactory and use ProcessGKETask
+	pErr := worker.ProcessGKETask(path, &fakeFactory)
+	if pErr == nil || pErr.Code() != http.StatusInternalServerError {
+		t.Fatal("Expected error with", http.StatusInternalServerError, "Got:", pErr)
+	}
+
+	metrics.FileCount.Reset()
+	metrics.TaskCount.Reset()
+	metrics.TestCount.Reset()
+}
+
 func TestProcessGKETask(t *testing.T) {
 	if testing.Short() {
 		t.Log("Skipping integration test")
 	}
 
-	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
-	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
 	up := fake.NewFakeUploader()
-	status, err := worker.ProcessGKETaskWithClient(filename, gcsClient, up, &fakeAnnotator{})
-	if err != nil {
-		t.Fatal(err)
+	fakeFactory := worker.StandardTaskFactory{
+		Annotator: &fakeAnnotatorFactory{},
+		Sink:      &fakeSinkFactory{up: up},
+		Source:    NewSourceFactory(),
 	}
-	if status != http.StatusOK {
-		t.Fatal("Expected", http.StatusOK, "Got:", status)
+
+	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
+	path, err := etl.ValidateTestPath(filename)
+	if err != nil {
+		t.Fatal(err, filename)
+	}
+	// TODO create a TaskFactory and use ProcessGKETask
+	pErr := worker.ProcessGKETask(path, &fakeFactory)
+	if pErr != nil {
+		t.Fatal("Expected", http.StatusOK, "Got:", pErr)
 	}
 
 	// This section checks that prom metrics are updated appropriately.
