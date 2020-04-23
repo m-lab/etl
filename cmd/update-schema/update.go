@@ -16,9 +16,9 @@ import (
 	"os"
 	"time"
 
+	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/googleapi"
 
-	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
