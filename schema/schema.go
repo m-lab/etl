@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/m-lab/go/bqx"
+	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/go/rtx"
 )
 

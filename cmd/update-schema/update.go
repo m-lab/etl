@@ -16,14 +16,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/m-lab/go/flagx"
-
-	"github.com/m-lab/etl/schema"
-	"github.com/m-lab/go/rtx"
+	"google.golang.org/api/googleapi"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/go/bqx"
-	"google.golang.org/api/googleapi"
+	"github.com/m-lab/go/cloud/bqx"
+	"github.com/m-lab/go/flagx"
+	"github.com/m-lab/go/rtx"
+
+	"github.com/m-lab/etl/schema"
 )
 
 // CreateOrUpdateTCPInfo will update existing TCPInfo table, or create new table if update fails.

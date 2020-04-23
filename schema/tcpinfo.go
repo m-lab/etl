@@ -6,11 +6,12 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/annotation-service/api"
-	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/go/bqx"
+	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/tcp-info/snapshot"
+
+	"github.com/m-lab/etl/metrics"
 )
 
 // ServerInfo details various information about the server.

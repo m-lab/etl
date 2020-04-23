@@ -2,9 +2,11 @@ package schema
 
 import (
 	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/etl/row"
-	"github.com/m-lab/go/bqx"
+
+	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/ndt-server/data"
+
+	"github.com/m-lab/etl/row"
 )
 
 // NDT5ResultRow defines the BQ schema for the data.NDT5Result produced by the

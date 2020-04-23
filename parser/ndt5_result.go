@@ -65,7 +65,7 @@ func (dp *NDT5ResultParser) IsParsable(testName string, data []byte) (string, bo
 
 // NOTE: data.NDT5Result is a JSON object that should be pushed directly into BigQuery.
 // We read the value into a struct, for compatibility with current inserter
-// backend and to eventually rely on the schema inference in m-lab/go/bqx.CreateTable().
+// backend and to eventually rely on the schema inference in m-lab/go/cloud/bqx.CreateTable().
 
 // ParseAndInsert decodes the data.NDT5Result JSON and inserts it into BQ.
 func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {

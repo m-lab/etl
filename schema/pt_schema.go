@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+
 	"github.com/m-lab/annotation-service/api"
+	"github.com/m-lab/go/cloud/bqx"
+
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/go/bqx"
 )
 
 type HopIP struct {
@@ -38,7 +40,7 @@ type ScamperHop struct {
 type PTTest struct {
 	UUID           string       `json:"uuid,string" bigquery:"uuid"`
 	TestTime       time.Time    `json:"testtime"`
-	Parseinfo      ParseInfoV0   `json:"parseinfo"`
+	Parseinfo      ParseInfoV0  `json:"parseinfo"`
 	StartTime      int64        `json:"start_time,int64" bigquery:"start_time"`
 	StopTime       int64        `json:"stop_time,int64" bigquery:"stop_time"`
 	ScamperVersion string       `json:"scamper_version,string" bigquery:"scamper_version"`
