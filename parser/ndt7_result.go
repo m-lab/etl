@@ -38,7 +38,7 @@ func NewNDT7ResultParser(sink row.Sink, table, suffix string, ann v2as.Annotator
 	}
 
 	return &NDT7ResultParser{
-		Base:   row.NewBase("foobar", sink, bufSize, ann),
+		Base:   row.NewBase("ndt7", sink, bufSize, ann),
 		table:  table,
 		suffix: suffix,
 	}
