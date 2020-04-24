@@ -204,7 +204,7 @@ func NewTCPInfoParser(sink row.Sink, table, suffix string, ann v2as.Annotator) *
 	}
 
 	return &TCPInfoParser{
-		Base:   row.NewBase("foobar", sink, bufSize, ann),
+		Base:   row.NewBase("tcpinfo", sink, bufSize, ann),
 		table:  table,
 		suffix: suffix,
 	}
