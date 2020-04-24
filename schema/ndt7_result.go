@@ -4,8 +4,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+
 	"github.com/m-lab/etl/row"
-	"github.com/m-lab/go/bqx"
+	"github.com/m-lab/go/cloud/bqx"
+
 	"github.com/m-lab/ndt-server/data"
 )
 

@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/go/bqx"
+
+	"github.com/m-lab/go/cloud/bqx"
 )
 
 func TestAnnotationRow_Schema(t *testing.T) {

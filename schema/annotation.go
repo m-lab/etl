@@ -4,9 +4,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/etl/row"
-	"github.com/m-lab/go/bqx"
+
+	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/uuid-annotator/annotator"
+
+	"github.com/m-lab/etl/row"
 )
 
 // AnnotationRow defines the BQ schema using 'Standard Columns' conventions for

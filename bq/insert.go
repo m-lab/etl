@@ -29,11 +29,12 @@ import (
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/googleapi"
 
+	"github.com/m-lab/go/cloud/bqx"
+
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
-	"github.com/m-lab/go/bqx"
 )
 
 // insertsBeforeRowJSONCount controls how often we perform a wasted JSON marshal

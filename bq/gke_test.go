@@ -9,11 +9,12 @@ import (
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/googleapi"
 
+	"github.com/m-lab/go/cloud/bqx"
+
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/row"
-	"github.com/m-lab/go/bqx"
 )
 
 func init() {

@@ -15,12 +15,13 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/m-lab/annotation-service/api"
-	v2 "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/go/bqx"
-	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+
+	"github.com/m-lab/annotation-service/api"
+	v2 "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/go/cloud/bqx"
+	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
