@@ -179,6 +179,14 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 // Returns an http status code and an error if the task did not complete
 // successfully.
 func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
+	// Count number of workers operating on each table.
+	metrics.WorkerCount.WithLabelValues(path.Datatype).Inc()
+	defer metrics.WorkerCount.WithLabelValues(path.Datatype).Dec()
+
+	// These keep track of the (nested) state of the worker.
+	metrics.WorkerState.WithLabelValues(label, "worker").Inc()
+	defer metrics.WorkerState.WithLabelValues(label, "worker").Dec()
+
 	tsk, err := tf.Get(nil, path)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(err.DataType(), err.Detail()).Inc()
