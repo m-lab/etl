@@ -12,6 +12,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"runtime"
 	"runtime/debug"
 	"time"
@@ -22,16 +23,33 @@ import (
 
 func init() {
 	NumCPU.Set(float64(runtime.NumCPU()))
+
+	commit, ok := os.LookupEnv("GIT_COMMIT")
+	if ok {
+		CommitHash.WithLabelValues(commit).Set(1)
+	}
+
+	release, ok := os.LookupEnv("RELEASE_TAG")
+	if ok {
+		ReleaseTag.WithLabelValues(release).Set(1)
+	}
 }
 
-// TODO
-// Want a goroutine that monitors the workers, and updates metrics to indicate how long the
-// workers have been working, and perhaps what their state is.
-// How about a gauge, broken down by state?  The state transitions will be triggered by the
-// worker code.
-//
-
 var (
+	// CommitHash records the passed in Git commit.
+	CommitHash = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "etl_commit_hash",
+			Help: "Commit hash from repo build",
+		}, []string{"value"})
+
+	// ReleaseTag records the passed in Git commit.
+	ReleaseTag = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "etl_release_tag",
+			Help: "Release tag from repo build",
+		}, []string{"value"})
+
 	// NumCPU makes the number of cpus available for prometheus calculations.
 	NumCPU = promauto.NewGauge(
 		prometheus.GaugeOpts{
