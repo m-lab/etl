@@ -143,6 +143,37 @@ type CyclestopLine struct {
 	Stop_time float64 `json:"stop_time"`
 }
 
+// ParsonPT the json test file into schema.PTTest
+func ParsePT(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
+	// Get the logtime
+	logTime, err := GetLogtime(PTFileName{Name: filepath.Base(testName)})
+	if err != nil {
+		return schema.PTTest{}, err
+	}
+
+	var ptTest schema.PTTest
+	err = json.Unmarshal(rawContent, &ptTest)
+	if err != nil {
+		metrics.ErrorCount.WithLabelValues(
+			tableName, "pt", "corrupted json content").Inc()
+		metrics.TestCount.WithLabelValues(
+			tableName, "pt", "corrupted json content").Inc()
+		return schema.PTTest{}, errors.New("corrupted json content")
+	}
+
+	parseInfo := schema.ParseInfoV0{
+		TaskFileName:  taskFilename,
+		ParseTime:     time.Now(),
+		ParserVersion: Version(),
+		Filename:      testName,
+	}
+
+	ptTest.Parseinfo = parseInfo
+	ptTest.TestTime = logTime
+
+	return ptTest, nil
+}
+
 // ParseJSON the raw jsonl test file into schema.PTTest.
 func ParseJSON(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
 	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
@@ -527,8 +558,26 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return errors.New("empty filename")
 	}
 
-	// Process the json output of Scamper binary.
-	if strings.Contains(testName, "jsonl") {
+	// Process json output from traceroute-caller
+	if strings.HasSuffix(testName, ".json") {
+		ptTest, err := ParsePT(testName, rawContent, pt.TableName(), pt.taskFileName)
+
+		if err == nil {
+			err := pt.AddRow(&ptTest)
+			if err == etl.ErrBufferFull {
+				// Flush asynchronously, to improve throughput.
+				pt.PutAsync(pt.TakeRows())
+				pt.AddRow(&ptTest)
+			}
+		} else {
+			// Modify metrics
+			log.Printf("JSON parsing failed with error %v for %s, %s", err, testName, pt.taskFileName)
+		}
+		return nil
+	}
+
+	// Process the jsonl output of Scamper binary.
+	if strings.HasSuffix(testName, ".jsonl") {
 		ptTest, err := ParseJSON(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
 			err := pt.AddRow(&ptTest)
