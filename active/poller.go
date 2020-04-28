@@ -151,7 +151,7 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 		return err
 	}
 
-	log.Println(job)
+	log.Println(job, "filter:", job.Filter)
 	gcsSource, err := g.JobFileSource(ctx, job.Job, toRunnable)
 	if err != nil {
 		return err
