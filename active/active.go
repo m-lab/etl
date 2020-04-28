@@ -13,6 +13,7 @@ package active
 import (
 	"context"
 	"log"
+	"regexp"
 	"sync"
 	"time"
 
@@ -45,9 +46,18 @@ type FileLister func(ctx context.Context) ([]*storage.ObjectAttrs, int64, error)
 // FileListerFunc creates a function that returns a slice of *storage.ObjectAttrs.
 // On certain GCS errors, it may return partial result and an error.
 // TODO - consider moving this to GardenerAPI.
-func FileListerFunc(sc stiface.Client, prefix string) FileLister {
+func FileListerFunc(sc stiface.Client, prefix string, filter string) FileLister {
+	var rx *regexp.Regexp
+	if len(filter) > 0 {
+		log.Println("Using:", filter)
+		var err error
+		rx, err = regexp.Compile(filter)
+		if err != nil {
+			log.Println(err, filter)
+		}
+	}
 	return func(ctx context.Context) ([]*storage.ObjectAttrs, int64, error) {
-		return gcs.GetFilesSince(ctx, sc, prefix, time.Time{})
+		return gcs.GetFilesSince(ctx, sc, prefix, rx, time.Time{})
 	}
 }
 

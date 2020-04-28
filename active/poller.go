@@ -128,7 +128,8 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 func (g *GardenerAPI) JobFileSource(ctx context.Context, job tracker.Job,
 	toRunnable func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
 
-	lister := FileListerFunc(g.gcs, job.Path())
+	filter := job.Filter
+	lister := FileListerFunc(g.gcs, job.Path(), filter)
 	gcsSource, err := NewGCSSource(ctx, job.Path(), lister, toRunnable)
 	if err != nil {
 		JobFailures.WithLabelValues(
