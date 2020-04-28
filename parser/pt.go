@@ -145,6 +145,9 @@ type CyclestopLine struct {
 
 // ParsonPT the json test file into schema.PTTest
 func ParsePT(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
+	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
+	defer metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Dec()
+
 	// Get the logtime
 	logTime, err := GetLogtime(PTFileName{Name: filepath.Base(testName)})
 	if err != nil {
@@ -152,12 +155,13 @@ func ParsePT(testName string, rawContent []byte, tableName string, taskFilename 
 	}
 
 	var ptTest schema.PTTest
-	err = json.Unmarshal(rawContent, &ptTest)
+	err = json.Unmarshal([]byte(rawContent), &ptTest)
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
 		metrics.TestCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
+		log.Println(err)
 		return schema.PTTest{}, errors.New("corrupted json content")
 	}
 
