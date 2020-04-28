@@ -180,12 +180,12 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 // successfully.
 func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
 	// Count number of workers operating on each table.
-	metrics.WorkerCount.WithLabelValues(path.Datatype).Inc()
-	defer metrics.WorkerCount.WithLabelValues(path.Datatype).Dec()
+	metrics.WorkerCount.WithLabelValues(path.DataType).Inc()
+	defer metrics.WorkerCount.WithLabelValues(path.DataType).Dec()
 
 	// These keep track of the (nested) state of the worker.
-	metrics.WorkerState.WithLabelValues(label, "worker").Inc()
-	defer metrics.WorkerState.WithLabelValues(label, "worker").Dec()
+	metrics.WorkerState.WithLabelValues(path.DataType, "worker").Inc()
+	defer metrics.WorkerState.WithLabelValues(path.DataType, "worker").Dec()
 
 	tsk, err := tf.Get(nil, path)
 	if err != nil {
