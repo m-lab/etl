@@ -16,7 +16,7 @@ import (
 
 // getFilesSince returns list of all normal file objects with prefix and mTime > after.
 // returns (objects, byteCount, error)
-func getFilesSince(ctx context.Context, bh stiface.BucketHandle, prefix string, after time.Time) ([]*storage.ObjectAttrs, int64, error) {
+func getFilesSince(ctx context.Context, bh stiface.BucketHandle, prefix string, filter *regexp.Regexp, after time.Time) ([]*storage.ObjectAttrs, int64, error) {
 	qry := storage.Query{
 		Delimiter: "/", // This prevents traversing subdirectories.
 		Prefix:    prefix,
@@ -53,6 +53,10 @@ func getFilesSince(ctx context.Context, bh stiface.BucketHandle, prefix string, 
 		if !o.Updated.After(after) || len(o.Prefix) > 0 {
 			continue
 		}
+		// Ignore files that don't match filter.
+		if filter != nil && !filter.MatchString(o.Name) {
+			continue
+		}
 		byteCount += o.Size
 		files = append(files, o)
 	}
@@ -83,7 +87,7 @@ func getBucket(ctx context.Context, sClient stiface.Client, bucketName string) (
 
 // GetFilesSince gets list of all storage objects with prefix, created or updated since given date.
 // TODO - similar to code in etl-gardener/cloud/tq/tq.go.  Should move to go/cloud/gcs
-func GetFilesSince(ctx context.Context, sClient stiface.Client, prefix string, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
+func GetFilesSince(ctx context.Context, sClient stiface.Client, prefix string, filter *regexp.Regexp, since time.Time) ([]*storage.ObjectAttrs, int64, error) {
 	// Submit all files from the bucket that match the prefix.
 	p, err := ParsePrefix(prefix)
 	if err != nil {
@@ -103,7 +107,7 @@ func GetFilesSince(ctx context.Context, sClient stiface.Client, prefix string, s
 		return nil, 0, fmt.Errorf("Nil bucket for %s", prefix)
 	}
 
-	return getFilesSince(ctx, bucket, p.Path(), since)
+	return getFilesSince(ctx, bucket, p.Path(), filter, since)
 }
 
 // CODE BELOW is common with etl-gardener state.go.
