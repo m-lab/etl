@@ -13,7 +13,6 @@ import (
 )
 
 func TestParseTraceroute(t *testing.T) {
-	//testStr := `{"uuid":"ndt-rfwqf_1587759929_000000000001914B","testtime":"0001-01-01T00:00:00Z","parseinfo":{"TaskFileName":"","ParseTime":"0001-01-01T00:00:00Z","ParserVersion":"","Filename":""},"start_time":1588019643,"stop_time":1588019892,"scamper_version":"0.1,"source":{"IP":"4.14.159.75","Port":0,"IATA":"","Geo":{"continent_code":"NA","country_code":"US","country_name":"United States","metro_code":501,"city":"Bronxville","postal_code":"10708","latitude":40.9352,"longitude":-73.8341,"radius":100},"Network":{"Systems":[{"ASNs":[3356]}]}},"destination":{"IP":"35.193.194.176","Port":0,"Geo":{"continent_code":"NA","country_code":"US","country_name":"United States","latitude":38.6583,"longitude":-77.2481,"radius":1000},"Network":{"Systems":[{"ASNs":[15169]}]}},"probe_size":44,"probec":44,"hop":null,"exp_version":"5051e51","cached_result":true}`
 	testStr := `{"uuid":"\"ndt-plh7v_1566050090_000000000004D64D\"","testtime":"0001-01-01T00:00:00Z","parseinfo":{"TaskFileName":"","ParseTime":"0001-01-01T00:00:00Z","ParserVersion":"","Filename":""},"start_time":1566691298,"stop_time":1566691298,"scamper_version":"\"0.1\"","source":{"IP":"::ffff:180.87.97.101","Port":0,"IATA":"","Geo":null,"Network":null},"destination":{"IP":"::ffff:1.47.236.62","Port":0,"Geo":null,"Network":null},"probe_size":60,"probec":0,"hop":null,"exp_version":"\"\"","cached_result":false}`
 	_, err := parser.ParsePT("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.json", []byte(testStr), "", "")
 	if err != nil {
