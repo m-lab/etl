@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -128,7 +129,10 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 func (g *GardenerAPI) JobFileSource(ctx context.Context, job tracker.Job,
 	toRunnable func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
 
-	filter := job.Filter
+	filter, err := regexp.Compile(job.Filter)
+	if err != nil {
+		return nil, err
+	}
 	lister := FileListerFunc(g.gcs, job.Path(), filter)
 	gcsSource, err := NewGCSSource(ctx, job.Path(), lister, toRunnable)
 	if err != nil {
