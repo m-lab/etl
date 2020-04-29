@@ -31,7 +31,7 @@ func TestParseTraceroute(t *testing.T) {
 		t.Fatalf("Err to get correct test time")
 	}
 	if output.Parseinfo.Filename != "20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.json" {
-		t.Fatalf("Err to get correct filename")
+		t.Fatalf("Err to get correct file name")
 	}
 }
 
