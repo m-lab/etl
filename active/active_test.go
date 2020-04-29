@@ -93,7 +93,7 @@ func testClient() stiface.Client {
 }
 
 func standardLister() active.FileLister {
-	return active.FileListerFunc(testClient(), "gs://foobar/ndt/ndt5/2019/01/01/")
+	return active.FileListerFunc(testClient(), "gs://foobar/ndt/ndt5/2019/01/01/", nil)
 }
 
 func runAll(ctx context.Context, rSrc active.RunnableSource) (*errgroup.Group, error) {
