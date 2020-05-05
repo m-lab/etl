@@ -7,8 +7,8 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/annotation-service/api"
-	"github.com/m-lab/uuid-annotator/annotator"
 	"github.com/m-lab/go/cloud/bqx"
+	"github.com/m-lab/uuid-annotator/annotator"
 
 	"github.com/m-lab/etl/metrics"
 )
@@ -38,7 +38,7 @@ type ScamperHop struct {
 	Links  []HopLink `json:"link"`
 }
 
-type PTTestV0 struct {
+type PTTest struct {
 	UUID           string       `json:"uuid,string" bigquery:"uuid"`
 	TestTime       time.Time    `json:"testtime"`
 	Parseinfo      ParseInfoV0  `json:"parseinfo"`
@@ -54,24 +54,23 @@ type PTTestV0 struct {
 	CachedResult   bool         `json:"cached_result,bool" bigquery:"cached_result"`
 }
 
-type PTTest struct {
-	UUID           string       `json:"uuid,string" bigquery:"uuid"`
-	TestTime       time.Time    `json:"testtime"`
-	Parseinfo      ParseInfo    `json:"parseinfo"`
-	StartTime      int64        `json:"start_time,int64" bigquery:"start_time"`
-	StopTime       int64        `json:"stop_time,int64" bigquery:"stop_time"`
-	ScamperVersion string       `json:"scamper_version,string" bigquery:"scamper_version"`
-	ServerIP       string       `json:"serverIP,string" bigquery:"serverip"`
-	ClientIP       string       `json:"clientIP,string" bigquery:"clientip"`
-	Source         annotator.ServerAnnotations   `json:"source"`
-	Destination    annotator.ClientAnnotations   `json:"destination"`
-	ProbeSize      int64        `json:"probe_size,int64"`
-	ProbeC         int64        `json:"probec,int64"`
-	Hop            []ScamperHop `json:"hop"`
-	ExpVersion     string       `json:"exp_version,string" bigquery:"exp_version"`
-	CachedResult   bool         `json:"cached_result,bool" bigquery:"cached_result"`
+type PTTestSC struct {
+	UUID           string                      `json:"uuid,string" bigquery:"uuid"`
+	TestTime       time.Time                   `json:"testtime"`
+	Parseinfo      ParseInfo                   `json:"parseinfo"`
+	StartTime      int64                       `json:"start_time,int64" bigquery:"start_time"`
+	StopTime       int64                       `json:"stop_time,int64" bigquery:"stop_time"`
+	ScamperVersion string                      `json:"scamper_version,string" bigquery:"scamper_version"`
+	ServerIP       string                      `json:"serverIP,string" bigquery:"serverip"`
+	ClientIP       string                      `json:"clientIP,string" bigquery:"clientip"`
+	Source         annotator.ServerAnnotations `json:"source"`
+	Destination    annotator.ClientAnnotations `json:"destination"`
+	ProbeSize      int64                       `json:"probe_size,int64"`
+	ProbeC         int64                       `json:"probec,int64"`
+	Hop            []ScamperHop                `json:"hop"`
+	ExpVersion     string                      `json:"exp_version,string" bigquery:"exp_version"`
+	CachedResult   bool                        `json:"cached_result,bool" bigquery:"cached_result"`
 }
-
 
 // Schema returns the Bigquery schema for PTTest.
 func (row *PTTest) Schema() (bigquery.Schema, error) {
