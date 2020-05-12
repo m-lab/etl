@@ -14,6 +14,7 @@ import (
 // NDT7ResultRow defines the BQ schema using 'Standard Columns' conventions for
 // the data.NDT7Result produced by the ndt-server for NDT7 client measurements.
 type NDT7ResultRow struct {
+	ID        string          `bigquery:"id"`
 	A         NDT7Summary     `bigquery:"a"`
 	ParseInfo ParseInfo       `bigquery:"parseInfo"`
 	TestTime  time.Time       `bigquery:"testTime"`
