@@ -6,51 +6,21 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/annotation-service/api"
+	"github.com/m-lab/uuid-annotator/annotator"
+	ptschema "github.com/m-lab/traceroute-caller/schema"
 	"github.com/m-lab/go/cloud/bqx"
 
 	"github.com/m-lab/etl/metrics"
 )
 
-type HopIP struct {
-	IP          string `json:"ip,string"`
-	City        string `json:"city,string"`
-	CountryCode string `json:"country_code,string"`
-	Hostname    string `json:"hostname,string"`
-	ASN         uint32 `json:"asn,uint32"`
-}
-
-type HopProbe struct {
-	Flowid int64     `json:"flowid,int64"`
-	Rtt    []float64 `json:"rtt"`
-}
-
-type HopLink struct {
-	HopDstIP string     `json:"hop_dst_ip,string"`
-	TTL      int64      `json:"ttl,int64"`
-	Probes   []HopProbe `json:"probes"`
-}
-
-type ScamperHop struct {
-	Source HopIP     `json:"source"`
-	Linkc  int64     `json:"linkc,int64"`
-	Links  []HopLink `json:"link"`
-}
 
 type PTTest struct {
-	UUID           string       `json:"uuid,string" bigquery:"uuid"`
-	TestTime       time.Time    `json:"testtime"`
-	Parseinfo      ParseInfoV0  `json:"parseinfo"`
-	StartTime      int64        `json:"start_time,int64" bigquery:"start_time"`
-	StopTime       int64        `json:"stop_time,int64" bigquery:"stop_time"`
-	ScamperVersion string       `json:"scamper_version,string" bigquery:"scamper_version"`
-	Source         ServerInfo   `json:"source"`
-	Destination    ClientInfo   `json:"destination"`
-	ProbeSize      int64        `json:"probe_size,int64"`
-	ProbeC         int64        `json:"probec,int64"`
-	Hop            []ScamperHop `json:"hop"`
-	ExpVersion     string       `json:"exp_version,string" bigquery:"exp_version"`
-	CachedResult   bool         `json:"cached_result,bool" bigquery:"cached_result"`
+	A PTSummary `json:"a"`
+        Server annotator.ServerAnnotations `json:"server"`
+        Client annotator.ClientAnnotations `json:"client"`
+        ParseInfo ParseInfo `json:"parseinfo"`
+        TestTime time.Time `json:"testtime"`
+        Raw ptchema.PTTestRaw `json:"raw"`
 }
 
 // Schema returns the Bigquery schema for PTTest.
@@ -78,9 +48,6 @@ func (row *PTTest) GetLogTime() time.Time {
 func (row *PTTest) GetClientIPs() []string {
 	requestIPs := make(map[string]bool, len(row.Hop)+1)
 	requestIPs[row.Destination.IP] = true
-	for _, hop := range row.Hop {
-		requestIPs[hop.Source.IP] = true
-	}
 	batchRequest := make([]string, 0, len(requestIPs))
 	for key, _ := range requestIPs {
 		batchRequest = append(batchRequest, key)
