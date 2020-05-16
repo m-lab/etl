@@ -9,6 +9,7 @@ import (
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/uuid-annotator/annotator"
+	ptschema "github.com/m-lab/traceroute-caller/schema"
 
 	"github.com/m-lab/etl/metrics"
 )
