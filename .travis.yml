@@ -71,7 +71,7 @@ install:
 
 # Get dependencies
 - cd $TRAVIS_BUILD_DIR
-- go get -v -t ./...
+- go get -v -t ./... || go get -v -t ./...
 
 # List submodule versions
 - git submodule
@@ -128,7 +128,7 @@ script:
 
 # Coveralls
 - $HOME/gopath/bin/gocovmerge *.cov > merge.cov
-- $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci
+- $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci || true
 
 # Clean build and prepare for deployment
 - cd $TRAVIS_BUILD_DIR/cmd/etl_worker &&
@@ -325,7 +325,7 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == u-sandbox-* || universal-sandbox-* || $TRAVIS_BRANCH == sandbox-*
+    condition: $TRAVIS_BRANCH == u-sandbox-* || universal-sandbox-*
 
 ######################################################################
 #  Staging deployments
