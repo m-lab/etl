@@ -164,9 +164,9 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 
 	p := parser.NewSinkParser(dp.GetDataType(), sink, src.Type(), ann)
 	if p == nil {
-		e := fmt.Errorf("%v creating parser for %s", err, dp.GetDataType())
+		e := fmt.Errorf("Nil parser for %s", dp.GetDataType())
 		log.Println(e, dp.URI)
-		return nil, err
+		return nil, factory.NewError(dp.DataType, "Nil parser", http.StatusInternalServerError, nil)
 	}
 
 	tsk := task.NewTask(dp.URI, src, p)
@@ -188,7 +188,7 @@ func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
 	defer metrics.WorkerState.WithLabelValues(path.DataType, "worker").Dec()
 
 	tsk, err := tf.Get(nil, path)
-	if err != nil {
+	if err != nil || tsk == nil {
 		metrics.TaskCount.WithLabelValues(err.DataType(), err.Detail()).Inc()
 		log.Printf("TaskFactory error: %v", err)
 		return err // http.StatusBadRequest, err
