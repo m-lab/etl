@@ -228,11 +228,7 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == sandbox-* ||
-               $TRAVIS_BRANCH == ndt-sandbox-* ||
-               $TRAVIS_BRANCH == ss-sandbox-* ||
-               $TRAVIS_BRANCH == fast-sandbox-* ||
-               $TRAVIS_BRANCH == disco-sandbox-*
+    condition: $TRAVIS_BRANCH == sandbox-* 
 
 
 ## Service: etl-universal-parser -- AppEngine Flexible Environment.
