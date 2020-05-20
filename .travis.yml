@@ -71,7 +71,7 @@ install:
 
 # Get dependencies
 - cd $TRAVIS_BUILD_DIR
-- go get -v -t ./...
+- go get -v -t ./... || go get -v -t ./...
 
 # List submodule versions
 - git submodule
