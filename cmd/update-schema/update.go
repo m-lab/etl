@@ -138,13 +138,12 @@ func main() {
 		if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
 			errCount++
 		}
-		/* Temporaily comment out due to NDT7 unstable schemas.
 		if err := CreateOrUpdateNDT5ResultRow(project, "base_tables", "ndt5"); err != nil {
 			errCount++
 		}
 		if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
 			errCount++
-		}*/
+		}
 
 	case "tcpinfo":
 		if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {
