@@ -244,7 +244,7 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == u-sandbox-* || universal-sandbox-*
+    condition: $TRAVIS_BRANCH == u-sandbox-* ||  $TRAVIS_BRANCH == universal-sandbox-*
 
 ######################################################################
 #  Staging deployments
