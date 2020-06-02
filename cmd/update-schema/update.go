@@ -56,14 +56,14 @@ func CreateOrUpdateNDT7ResultRow(project string, dataset string, table string) e
 	row := schema.NDT7ResultRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "NDT7ResultRow.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "TestTime")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
 func CreateOrUpdateAnnotationRow(project string, dataset string, table string) error {
 	row := schema.AnnotationRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "Annotation.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "TestTime")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
 // CreateOrUpdate will update or create a table from the given schema.
@@ -170,18 +170,18 @@ func main() {
 		}
 
 	case "ndt7":
-		if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7"); err != nil {
+		if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7_deletemenow"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7"); err != nil {
+		if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7_deletemenow"); err != nil {
 			errCount++
 		}
 
 	case "annotation":
-		if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
+		if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation_deleteme"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
+		if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation_deleteme"); err != nil {
 			errCount++
 		}
 
