@@ -3,7 +3,6 @@ package parser
 // This file defines the Parser subtype that handles NDT7Result data.
 
 import (
-	"bytes"
 	"encoding/json"
 	"log"
 	"strings"
@@ -72,40 +71,43 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt7_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt7_result").Dec()
 
-	rdr := bytes.NewReader(test)
-	dec := json.NewDecoder(rdr)
-
-	for dec.More() {
-		row := schema.NDT7ResultRow{
-			ParseInfo: schema.ParseInfo{
-				ArchiveURL:    meta["filename"].(string),
-				ParseTime:     time.Now(),
-				ParserVersion: Version(),
-				Filename:      testName,
-			},
-		}
-		err := dec.Decode(&row.Raw)
-		if err != nil {
-			log.Println(meta["filename"].(string), testName, err)
-			metrics.TestCount.WithLabelValues(
-				dp.TableName(), "ndt7_result", "Decode").Inc()
-			return err
-		}
-		row.TestTime = row.Raw.StartTime
-		if row.Raw.Download != nil {
-			row.A = downSummary(row.Raw.Download)
-		} else if row.Raw.Upload != nil {
-			row.A = upSummary(row.Raw.Upload)
-		}
-
-		// Estimate the row size based on the input JSON size.
-		metrics.RowSizeHistogram.WithLabelValues(
-			dp.TableName()).Observe(float64(len(test)))
-
-		dp.Base.Put(&row)
-		// Count successful inserts.
-		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt7_result", "ok").Inc()
+	row := schema.NDT7ResultRow{
+		ParseInfo: schema.ParseInfo{
+			ArchiveURL:    meta["filename"].(string),
+			ParseTime:     time.Now(),
+			ParserVersion: Version(),
+			Filename:      testName,
+		},
 	}
+
+	// Parse the test.
+	err := json.Unmarshal(test, &row.Raw)
+	if err != nil {
+		log.Println(meta["filename"].(string), testName, err)
+		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt7_result", "Unmarshal").Inc()
+		return err
+	}
+
+	row.TestTime = row.Raw.StartTime
+	if row.Raw.Download != nil {
+		row.A = downSummary(row.Raw.Download)
+	} else if row.Raw.Upload != nil {
+		row.A = upSummary(row.Raw.Upload)
+	} else {
+		metrics.WarningCount.WithLabelValues(
+			dp.TableName(), "ndt7", "download and upload are both nil").Inc()
+	}
+	row.ID = row.A.UUID
+
+	// Estimate the row size based on the input JSON size.
+	metrics.RowSizeHistogram.WithLabelValues(
+		dp.TableName()).Observe(float64(len(test)))
+
+	// Insert the row.
+	dp.Base.Put(&row)
+
+	// Count successful inserts.
+	metrics.TestCount.WithLabelValues(dp.TableName(), "ndt7_result", "ok").Inc()
 	return nil
 }
 
