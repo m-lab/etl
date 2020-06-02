@@ -20,7 +20,7 @@ func TestAnnotationRow_Schema(t *testing.T) {
 	// The complete schema is large, so verify that field descriptions
 	// are present for select fields by walking the schema and looking for them.
 	bqx.WalkSchema(got, func(prefix []string, field *bigquery.FieldSchema) error {
-		for _, name := range []string{"client", "server", "parseInfo"} {
+		for _, name := range []string{"client", "server", "parser"} {
 			if field.Name == name {
 				if field.Description == "" {
 					t.Errorf("AnnotationRow.Schema() missing field.Description for %q", field.Name)

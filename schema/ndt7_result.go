@@ -14,12 +14,12 @@ import (
 // NDT7ResultRow defines the BQ schema using 'Standard Columns' conventions for
 // the data.NDT7Result produced by the ndt-server for NDT7 client measurements.
 type NDT7ResultRow struct {
-	ID        string          `bigquery:"id"`
-	A         NDT7Summary     `bigquery:"a"`
-	ParseInfo ParseInfo       `bigquery:"parseInfo"`
-	TestTime  time.Time       `bigquery:"testTime"`
-	Flags     int64           `bigquery:"flags"`
-	Raw       data.NDT7Result `bigquery:"raw"`
+	ID     string          `bigquery:"id"`
+	A      NDT7Summary     `bigquery:"a"`
+	Parser ParseInfo       `bigquery:"parser"`
+	Date   time.Time       `bigquery:"date"`
+	Flags  int64           `bigquery:"flags"`
+	Raw    data.NDT7Result `bigquery:"raw"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
 	row.NullAnnotator `bigquery:"-"`

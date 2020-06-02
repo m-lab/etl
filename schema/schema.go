@@ -14,11 +14,11 @@ import (
 
 // ParseInfo provides details about the parsed row. Uses 'Standard Column' names.
 type ParseInfo struct {
-	ParserVersion string
-	ParseTime     time.Time
-	ArchiveURL    string
-	Filename      string
-	Priority      int64
+	Version    string
+	Time       time.Time
+	ArchiveURL string
+	Filename   string
+	Priority   int64
 }
 
 // Requires go-bindata tool in environment:

@@ -14,11 +14,11 @@ import (
 // AnnotationRow defines the BQ schema using 'Standard Columns' conventions for
 // the annotation datatype produced by the uuid-annotator.
 type AnnotationRow struct {
-	UUID      string                      // NOTE: there is no 'a' record for AnnotationRows.
-	Server    annotator.ServerAnnotations `bigquery:"server"`
-	Client    annotator.ClientAnnotations `bigquery:"client"`
-	ParseInfo ParseInfo                   `bigquery:"parseInfo"`
-	TestTime  time.Time                   `bigquery:"testTime" json:"Timestamp"`
+	UUID   string                      `bigquery:"id"` // NOTE: there is no 'a' record for AnnotationRows.
+	Server annotator.ServerAnnotations `bigquery:"server"`
+	Client annotator.ClientAnnotations `bigquery:"client"`
+	Parser ParseInfo                   `bigquery:"parser"`
+	Date   time.Time                   `bigquery:"date" json:"Timestamp"`
 
 	// NOTE: there is no 'Raw' field for annotation datatypes because the
 	// uuid-annotator output schema was designed to be used directly by the parser.
