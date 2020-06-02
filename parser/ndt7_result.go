@@ -72,11 +72,11 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt7_result").Dec()
 
 	row := schema.NDT7ResultRow{
-		ParseInfo: schema.ParseInfo{
-			ArchiveURL:    meta["filename"].(string),
-			ParseTime:     time.Now(),
-			ParserVersion: Version(),
-			Filename:      testName,
+		Parser: schema.ParseInfo{
+			ArchiveURL: meta["filename"].(string),
+			Time:       time.Now(),
+			Version:    Version(),
+			Filename:   testName,
 		},
 	}
 
@@ -88,7 +88,7 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		return err
 	}
 
-	row.TestTime = row.Raw.StartTime
+	row.Date = row.Raw.StartTime
 	if row.Raw.Download != nil {
 		row.A = downSummary(row.Raw.Download)
 	} else if row.Raw.Upload != nil {

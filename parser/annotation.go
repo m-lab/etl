@@ -73,11 +73,11 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	defer metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation").Dec()
 
 	row := schema.AnnotationRow{
-		ParseInfo: schema.ParseInfo{
-			ArchiveURL:    meta["filename"].(string),
-			ParseTime:     time.Now(),
-			ParserVersion: Version(),
-			Filename:      testName,
+		Parser: schema.ParseInfo{
+			ArchiveURL: meta["filename"].(string),
+			Time:       time.Now(),
+			Version:    Version(),
+			Filename:   testName,
 		},
 	}
 
