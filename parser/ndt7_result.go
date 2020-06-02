@@ -93,6 +93,9 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		row.A = downSummary(row.Raw.Download)
 	} else if row.Raw.Upload != nil {
 		row.A = upSummary(row.Raw.Upload)
+	} else {
+		metrics.WarningCount.WithLabelValues(
+			dp.TableName(), "ndt7", "download and upload are both nil").Inc()
 	}
 	row.ID = row.A.UUID
 
