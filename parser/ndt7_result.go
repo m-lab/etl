@@ -18,6 +18,7 @@ import (
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/logx"
 	"github.com/m-lab/ndt-server/ndt7/model"
+	"github.com/m-lab/src/cloud.google.com/go/civil"
 )
 
 //=====================================================================================
@@ -88,7 +89,7 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		return err
 	}
 
-	row.Date = row.Raw.StartTime
+	row.Date = civil.DateOf(row.Raw.StartTime)
 	if row.Raw.Download != nil {
 		row.A = downSummary(row.Raw.Download)
 	} else if row.Raw.Upload != nil {

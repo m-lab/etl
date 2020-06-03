@@ -1,11 +1,10 @@
 package schema
 
 import (
-	"time"
-
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/go/cloud/bqx"
+	"github.com/m-lab/src/cloud.google.com/go/civil"
 	"github.com/m-lab/uuid-annotator/annotator"
 
 	"github.com/m-lab/etl/row"
@@ -18,7 +17,7 @@ type AnnotationRow struct {
 	Server annotator.ServerAnnotations `bigquery:"server"`
 	Client annotator.ClientAnnotations `bigquery:"client"`
 	Parser ParseInfo                   `bigquery:"parser"`
-	Date   time.Time                   `bigquery:"date" json:"Timestamp"`
+	Date   civil.Date                  `bigquery:"date"`
 
 	// NOTE: there is no 'Raw' field for annotation datatypes because the
 	// uuid-annotator output schema was designed to be used directly by the parser.

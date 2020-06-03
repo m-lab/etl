@@ -15,6 +15,8 @@ import (
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/src/cloud.google.com/go/civil"
+	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 //=====================================================================================
@@ -81,13 +83,22 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		},
 	}
 
-	// Parse the test.
-	err := json.Unmarshal(test, &row)
+	// Parse the raw test.
+	raw := annotator.Annotations{}
+	err := json.Unmarshal(test, &raw)
 	if err != nil {
 		log.Println(err)
 		metrics.TestCount.WithLabelValues(ap.TableName(), "annotation", "decode-location-error").Inc()
 		return err
 	}
+
+	// Fill in the row.
+	row.UUID = raw.UUID
+	row.Server = raw.Server
+	row.Client = raw.Client
+	// NOTE: annotations are joined with other tables using the UUID, so
+	// finegrain timestamp is not necessary.
+	row.Date = civil.DateOf(raw.Timestamp)
 
 	// Estimate the row size based on the input JSON size.
 	metrics.RowSizeHistogram.WithLabelValues(ap.TableName()).Observe(float64(len(test)))

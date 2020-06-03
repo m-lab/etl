@@ -7,6 +7,7 @@ import (
 
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
+	"github.com/m-lab/src/cloud.google.com/go/civil"
 
 	"github.com/m-lab/ndt-server/data"
 )
@@ -17,7 +18,7 @@ type NDT7ResultRow struct {
 	ID     string          `bigquery:"id"`
 	A      NDT7Summary     `bigquery:"a"`
 	Parser ParseInfo       `bigquery:"parser"`
-	Date   time.Time       `bigquery:"date"`
+	Date   civil.Date      `bigquery:"date"`
 	Flags  int64           `bigquery:"flags"`
 	Raw    data.NDT7Result `bigquery:"raw"`
 
