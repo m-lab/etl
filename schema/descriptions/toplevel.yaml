@@ -13,6 +13,10 @@ test_id:
 log_time:
   Description: Original measurement collection timestamp.
 
+date:
+  Description: Date is used by BigQuery to partition data to improve query
+    performance.
+
 # Lower case parser for 'Standard Column' supporting schemas.
 parser:
   Description: Metadata about how the parser processed this measurement row.
