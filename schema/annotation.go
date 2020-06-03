@@ -3,8 +3,8 @@ package schema
 import (
 	"cloud.google.com/go/bigquery"
 
+	"cloud.google.com/go/civil"
 	"github.com/m-lab/go/cloud/bqx"
-	"github.com/m-lab/src/cloud.google.com/go/civil"
 	"github.com/m-lab/uuid-annotator/annotator"
 
 	"github.com/m-lab/etl/row"

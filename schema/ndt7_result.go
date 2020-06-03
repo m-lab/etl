@@ -5,7 +5,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/cloud.google.com/go/civil"
+	"cloud.google.com/go/civil"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
 
