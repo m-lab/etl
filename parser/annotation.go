@@ -74,9 +74,9 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 
 	row := schema.AnnotationRow{
 		Parser: schema.ParseInfo{
-			ArchiveURL: meta["filename"].(string),
-			Time:       time.Now(),
 			Version:    Version(),
+			Time:       time.Now(),
+			ArchiveURL: meta["filename"].(string),
 			Filename:   testName,
 		},
 	}

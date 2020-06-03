@@ -73,9 +73,9 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 
 	row := schema.NDT7ResultRow{
 		Parser: schema.ParseInfo{
-			ArchiveURL: meta["filename"].(string),
-			Time:       time.Now(),
 			Version:    Version(),
+			Time:       time.Now(),
+			ArchiveURL: meta["filename"].(string),
 			Filename:   testName,
 		},
 	}
