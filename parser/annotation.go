@@ -11,11 +11,11 @@ import (
 
 	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/cloud.google.com/go/civil"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
-	"github.com/m-lab/src/cloud.google.com/go/civil"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
