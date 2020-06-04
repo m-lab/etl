@@ -89,6 +89,10 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		return err
 	}
 
+	// NOTE: Civil is not TZ adjusted. It takes the year, month, and date from
+	// the given timestamp, regardless of the timestamp's timezone. Since we
+	// run our systems in UTC, all timestamps will be relative to UTC and as
+	// will these dates.
 	row.Date = civil.DateOf(row.Raw.StartTime)
 	if row.Raw.Download != nil {
 		row.A = downSummary(row.Raw.Download)

@@ -98,6 +98,11 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	row.Client = raw.Client
 	// NOTE: annotations are joined with other tables using the UUID, so
 	// finegrain timestamp is not necessary.
+	//
+	// NOTE: Civil is not TZ adjusted. It takes the year, month, and date from
+	// the given timestamp, regardless of the timestamp's timezone. Since we
+	// run our systems in UTC, all timestamps will be relative to UTC and as
+	// will these dates.
 	row.Date = civil.DateOf(raw.Timestamp)
 
 	// Estimate the row size based on the input JSON size.
