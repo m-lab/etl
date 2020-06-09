@@ -170,18 +170,18 @@ func main() {
 		}
 
 	case "ndt7":
-		if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7_deletemenow"); err != nil {
+		if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7_deletemenow"); err != nil {
+		if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7"); err != nil {
 			errCount++
 		}
 
 	case "annotation":
-		if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation_deleteme"); err != nil {
+		if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation_deleteme"); err != nil {
+		if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
 			errCount++
 		}
 

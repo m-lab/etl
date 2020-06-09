@@ -19,7 +19,6 @@ type NDT7ResultRow struct {
 	A      NDT7Summary     `bigquery:"a"`
 	Parser ParseInfo       `bigquery:"parser"`
 	Date   civil.Date      `bigquery:"date"`
-	Flags  int64           `bigquery:"flags"`
 	Raw    data.NDT7Result `bigquery:"raw"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
