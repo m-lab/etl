@@ -19,7 +19,7 @@ func TestNDT7Result_Schema(t *testing.T) {
 	// The complete schema is large, so verify that field descriptions
 	// are present for select fields by walking the schema and looking for them.
 	bqx.WalkSchema(got, func(prefix []string, field *bigquery.FieldSchema) error {
-		for _, name := range []string{"a", "parseInfo", "GitShortCommit"} {
+		for _, name := range []string{"a", "parser", "GitShortCommit"} {
 			if field.Name == name {
 				if field.Description == "" {
 					t.Errorf("NDT7Result.Schema() missing field.Description for %q", field.Name)

@@ -10,6 +10,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"cloud.google.com/go/civil"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
@@ -72,11 +73,11 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt7_result").Dec()
 
 	row := schema.NDT7ResultRow{
-		ParseInfo: schema.ParseInfo{
-			ArchiveURL:    meta["filename"].(string),
-			ParseTime:     time.Now(),
-			ParserVersion: Version(),
-			Filename:      testName,
+		Parser: schema.ParseInfo{
+			Version:    Version(),
+			Time:       time.Now(),
+			ArchiveURL: meta["filename"].(string),
+			Filename:   testName,
 		},
 	}
 
@@ -88,7 +89,11 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		return err
 	}
 
-	row.TestTime = row.Raw.StartTime
+	// NOTE: Civil is not TZ adjusted. It takes the year, month, and date from
+	// the given timestamp, regardless of the timestamp's timezone. Since we
+	// run our systems in UTC, all timestamps will be relative to UTC and as
+	// will these dates.
+	row.Date = civil.DateOf(row.Raw.StartTime)
 	if row.Raw.Download != nil {
 		row.A = downSummary(row.Raw.Download)
 	} else if row.Raw.Upload != nil {

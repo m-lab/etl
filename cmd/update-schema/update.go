@@ -56,14 +56,14 @@ func CreateOrUpdateNDT7ResultRow(project string, dataset string, table string) e
 	row := schema.NDT7ResultRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "NDT7ResultRow.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "TestTime")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
 func CreateOrUpdateAnnotationRow(project string, dataset string, table string) error {
 	row := schema.AnnotationRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "Annotation.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "TestTime")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
 // CreateOrUpdate will update or create a table from the given schema.

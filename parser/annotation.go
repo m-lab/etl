@@ -9,12 +9,14 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
+	"cloud.google.com/go/civil"
 	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 //=====================================================================================
@@ -73,21 +75,35 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	defer metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation").Dec()
 
 	row := schema.AnnotationRow{
-		ParseInfo: schema.ParseInfo{
-			ArchiveURL:    meta["filename"].(string),
-			ParseTime:     time.Now(),
-			ParserVersion: Version(),
-			Filename:      testName,
+		Parser: schema.ParseInfo{
+			Version:    Version(),
+			Time:       time.Now(),
+			ArchiveURL: meta["filename"].(string),
+			Filename:   testName,
 		},
 	}
 
-	// Parse the test.
-	err := json.Unmarshal(test, &row)
+	// Parse the raw test.
+	raw := annotator.Annotations{}
+	err := json.Unmarshal(test, &raw)
 	if err != nil {
 		log.Println(err)
 		metrics.TestCount.WithLabelValues(ap.TableName(), "annotation", "decode-location-error").Inc()
 		return err
 	}
+
+	// Fill in the row.
+	row.UUID = raw.UUID
+	row.Server = raw.Server
+	row.Client = raw.Client
+	// NOTE: annotations are joined with other tables using the UUID, so
+	// finegrain timestamp is not necessary.
+	//
+	// NOTE: Civil is not TZ adjusted. It takes the year, month, and date from
+	// the given timestamp, regardless of the timestamp's timezone. Since we
+	// run our systems in UTC, all timestamps will be relative to UTC and as
+	// will these dates.
+	row.Date = civil.DateOf(raw.Timestamp)
 
 	// Estimate the row size based on the input JSON size.
 	metrics.RowSizeHistogram.WithLabelValues(ap.TableName()).Observe(float64(len(test)))

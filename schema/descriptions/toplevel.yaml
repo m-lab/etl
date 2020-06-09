@@ -13,14 +13,18 @@ test_id:
 log_time:
   Description: Original measurement collection timestamp.
 
-# Lower case parseInfo for 'Standard Column' supporting schemas.
-parseInfo:
-  Description: Metadata about how the parser processed the measurement.
-parseInfo.TaskFileName:
-  Description: GCS URL to the archive containing the test_id for this row.
-parseInfo.ParseTime:
+date:
+  Description: Date is used by BigQuery to partition data to improve query
+    performance.
+
+# Lower case parser for 'Standard Column' supporting schemas.
+parser:
+  Description: Metadata about how the parser processed this measurement row.
+parser.ArchiveURL:
+  Description: GCS URL to the archive containing the Filename for this row.
+parser.Time:
   Description: Time that the parser processed this row.
-parseInfo.ParserVersion:
+parser.Version:
   Description: Version of the parser that processed this row.
 
 server:

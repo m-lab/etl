@@ -1,10 +1,9 @@
 package schema
 
 import (
-	"time"
-
 	"cloud.google.com/go/bigquery"
 
+	"cloud.google.com/go/civil"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/uuid-annotator/annotator"
 
@@ -14,11 +13,11 @@ import (
 // AnnotationRow defines the BQ schema using 'Standard Columns' conventions for
 // the annotation datatype produced by the uuid-annotator.
 type AnnotationRow struct {
-	UUID      string                      // NOTE: there is no 'a' record for AnnotationRows.
-	Server    annotator.ServerAnnotations `bigquery:"server"`
-	Client    annotator.ClientAnnotations `bigquery:"client"`
-	ParseInfo ParseInfo                   `bigquery:"parseInfo"`
-	TestTime  time.Time                   `bigquery:"testTime" json:"Timestamp"`
+	UUID   string                      `bigquery:"id"` // NOTE: there is no 'a' record for AnnotationRows.
+	Server annotator.ServerAnnotations `bigquery:"server"`
+	Client annotator.ClientAnnotations `bigquery:"client"`
+	Parser ParseInfo                   `bigquery:"parser"`
+	Date   civil.Date                  `bigquery:"date"`
 
 	// NOTE: there is no 'Raw' field for annotation datatypes because the
 	// uuid-annotator output schema was designed to be used directly by the parser.

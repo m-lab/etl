@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 
-	job "github.com/m-lab/etl-gardener/job-service"
+	job "github.com/m-lab/etl-gardener/client"
 	"github.com/m-lab/etl-gardener/tracker"
 	"github.com/m-lab/go/rtx"
 
