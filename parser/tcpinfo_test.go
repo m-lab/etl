@@ -106,9 +106,10 @@ func TestTCPParser(t *testing.T) {
 	os.Setenv("RELEASE_TAG", "foobar")
 	parserVersion := parser.InitParserVersionForTest()
 
-	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	fakeprefix := "gs://fakebucket/fakexperiment/tcpinfo/2019/05/16/"
+	filename := "20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 
-	src, err := fileSource(filename)
+	src, err := fileSource("testdata/" + filename)
 	if err != nil {
 		t.Fatal("Failed reading testdata from", filename)
 	}
@@ -116,7 +117,7 @@ func TestTCPParser(t *testing.T) {
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
 	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
-	task := task.NewTask(filename, src, p)
+	task := task.NewTask(fakeprefix+filename, src, p)
 
 	startDecode := time.Now()
 	n, err := task.ProcessAllTests()
@@ -149,8 +150,8 @@ func TestTCPParser(t *testing.T) {
 		if row.ParseInfo.ParseTime.After(time.Now()) {
 			t.Error("Should have inserted parse_time")
 		}
-		if row.ParseInfo.TaskFileName != filename {
-			t.Error("Should have correct filename", filename, "!=", row.ParseInfo.TaskFileName)
+		if row.ParseInfo.TaskFileName != fakeprefix+filename {
+			t.Error("Should have correct filename", fakeprefix+filename, "!=", row.ParseInfo.TaskFileName)
 		}
 
 		if row.ParseInfo.ParserVersion != parserVersion {
@@ -220,13 +221,14 @@ func TestTCPTask(t *testing.T) {
 	ins := newInMemorySink()
 	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
 
-	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
-	src, err := fileSource(filename)
+	fakeprefix := "gs://fakebucket/fakexperiment/tcpinfo/2019/05/16/"
+	filename := "20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	src, err := fileSource("testdata/" + filename)
 	if err != nil {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p)
+	task := task.NewTask(fakeprefix+filename, src, p)
 
 	n, err := task.ProcessAllTests()
 	if err != nil {
@@ -245,13 +247,14 @@ func TestBQSaver(t *testing.T) {
 	ins := newInMemorySink()
 	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
 
-	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
-	src, err := fileSource(filename)
+	fakeprefix := "gs://fakebucket/fakexperiment/tcpinfo/2019/05/16/"
+	filename := "20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	src, err := fileSource("testdata/" + filename)
 	if err != nil {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p)
+	task := task.NewTask(fakeprefix+filename, src, p)
 
 	_, err = task.ProcessAllTests()
 	if err != nil {
@@ -278,15 +281,16 @@ func BenchmarkTCPParser(b *testing.B) {
 	ins := newInMemorySink()
 	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
 
-	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	fakeprefix := "gs://fakebucket/fakexperiment/tcpinfo/2019/05/16/"
+	filename := "20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	n := 0
 	for i := 0; i < b.N; i += n {
-		src, err := fileSource(filename)
+		src, err := fileSource("testdata/" + filename)
 		if err != nil {
 			b.Fatalf("cannot read testdata.")
 		}
 
-		task := task.NewTask(filename, src, p)
+		task := task.NewTask(fakeprefix+filename, src, p)
 
 		n, err = task.ProcessAllTests()
 		if err != nil {
