@@ -110,7 +110,7 @@ func TestBadTarFileInput(t *testing.T) {
 	tp := &TestParser{}
 
 	// Among other things, this requires that tp implements etl.Parser.
-	tt := task.NewTask("filename", rdr, tp)
+	tt := task.NewTask("gs://bucket/exp/tcpinfo/2020/06/12/20200612T123456.12345Z-foo-mlab1-foo01-bar.tgz", rdr, tp)
 	fc, err := tt.ProcessAllTests()
 	if err.Error() != "Random Error" {
 		t.Error("Expected Random Error, but got " + err.Error())
@@ -131,7 +131,7 @@ func TestTarFileInput(t *testing.T) {
 	tp := &TestParser{}
 
 	// Among other things, this requires that tp implements etl.Parser.
-	tt := task.NewTask("filename", rdr, tp)
+	tt := task.NewTask("gs://bucket/exp/tcpinfo/2020/06/12/20200612T123456.12345Z-foo-mlab1-foo01-bar.tgz", rdr, tp)
 	fn, bb, err := tt.NextTest(100)
 	if err != nil {
 		t.Error(err)
@@ -169,7 +169,7 @@ func TestTarFileInput(t *testing.T) {
 	// Reset the tar reader and create new task, to test the ProcessAllTests behavior.
 	rdr = MakeTestSource(t)
 
-	tt = task.NewTask("filename", rdr, tp)
+	tt = task.NewTask("gs://bucket/exp/tcpinfo/2020/06/12/20200612T123456.12345Z-foo-mlab1-foo01-bar.tgz", rdr, tp)
 	tt.SetMaxFileSize(100)
 	fc, err := tt.ProcessAllTests()
 	if err != nil {
