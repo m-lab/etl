@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/go/rtx"
 )
 
 // Factory provides Get() which always returns a new, complete Task.
@@ -45,10 +47,16 @@ type Task struct {
 // NewTask constructs a task, injecting the source and the parser.
 func NewTask(filename string, src etl.TestSource, prsr etl.Parser) *Task {
 	// TODO - should the meta data be a nested type?
+	p, err := etl.ValidateTestPath(filename)
+	rtx.Must(err, "failed to parse filename")
+	archiveDate, err := time.Parse("2006/01/02", p.DatePath)
+	rtx.Must(err, "failed to parse archive date path")
+
 	meta := make(map[string]bigquery.Value, 3)
 	meta["filename"] = filename
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
+	meta["date"] = civil.DateOf(archiveDate)
 	t := Task{src, prsr, meta, DefaultMaxFileSize}
 	return &t
 }

@@ -93,7 +93,7 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// the given timestamp, regardless of the timestamp's timezone. Since we
 	// run our systems in UTC, all timestamps will be relative to UTC and as
 	// will these dates.
-	row.Date = civil.DateOf(row.Raw.StartTime)
+	row.Date = meta["date"].(civil.Date)
 	if row.Raw.Download != nil {
 		row.A = downSummary(row.Raw.Download)
 	} else if row.Raw.Upload != nil {
