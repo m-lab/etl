@@ -18,8 +18,8 @@ import (
 )
 
 var testBucket = "mlab-testing.appspot.com"
-var tarFile = "gs://" + testBucket + "/test.tar"
-var tgzFile = "gs://" + testBucket + "/test.tgz"
+var tarFile = "gs://" + testBucket + "/ndt/ndt5/2020/06/11/20200611T123456.12345Z-ndt5-mlab1-foo01-ndt.tar"
+var tgzFile = "gs://" + testBucket + "/ndt/ndt5/2020/06/11/20200611T123456.12345Z-ndt5-mlab1-foo01-ndt.tgz"
 
 func assertGCSourceIsTestSource(in etl.TestSource) {
 	func(in etl.TestSource) {}(&GCSSource{})
@@ -46,7 +46,11 @@ func TestNewTarReader(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping tests that access GCS")
 	}
-	src, err := NewTestSource(client, tarFile, "label")
+	dpf, err := etl.ValidateTestPath(tarFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := NewTestSource(client, dpf, "label")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +72,11 @@ func TestNewTarReaderGzip(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping tests that access GCS")
 	}
-	src, err := NewTestSource(client, tgzFile, "label")
+	dpf, err := etl.ValidateTestPath(tgzFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := NewTestSource(client, dpf, "label")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,8 +106,12 @@ func init() {
 }
 
 func BenchmarkNewTarReader(b *testing.B) {
+	dpf, err := etl.ValidateTestPath(tarFile)
+	if err != nil {
+		b.Fatal(err)
+	}
 	for i := 0; i < b.N; i++ {
-		src, err := NewTestSource(client, tarFile, "label")
+		src, err := NewTestSource(client, dpf, "label")
 		if err == nil {
 			src.Close()
 		}
@@ -107,8 +119,12 @@ func BenchmarkNewTarReader(b *testing.B) {
 }
 
 func BenchmarkNewTarReaderGzip(b *testing.B) {
+	dpf, err := etl.ValidateTestPath(tgzFile)
+	if err != nil {
+		b.Fatal(err)
+	}
 	for i := 0; i < b.N; i++ {
-		src, err := NewTestSource(client, tgzFile, "label")
+		src, err := NewTestSource(client, dpf, "label")
 		if err == nil {
 			src.Close()
 		}
