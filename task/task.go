@@ -49,6 +49,7 @@ func NewTask(filename string, src etl.TestSource, prsr etl.Parser) *Task {
 	meta["filename"] = filename
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
+	meta["date"] = src.Date()
 	t := Task{src, prsr, meta, DefaultMaxFileSize}
 	return &t
 }

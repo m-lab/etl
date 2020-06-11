@@ -103,7 +103,7 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// the given timestamp, regardless of the timestamp's timezone. Since we
 	// run our systems in UTC, all timestamps will be relative to UTC and as
 	// will these dates.
-	row.Date = civil.DateOf(raw.Timestamp)
+	row.Date = meta["date"].(civil.Date)
 
 	// Estimate the row size based on the input JSON size.
 	metrics.RowSizeHistogram.WithLabelValues(ap.TableName()).Observe(float64(len(test)))

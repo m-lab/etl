@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/civil"
 	gcs "cloud.google.com/go/storage"
 	"google.golang.org/api/option"
 
@@ -44,6 +45,7 @@ type GCSSource struct {
 	io.Closer                   // Closer interface to be provided by an embedded struct.
 	RetryBaseTime time.Duration // The base time for backoff and retry.
 	TableBase     string        // TableBase is BQ table associated with this source, or "invalid".
+	PathDate      civil.Date    // Date associated with YYYY/MM/DD in FilePath.
 }
 
 // Retrieve next file header.
@@ -123,6 +125,11 @@ func (src *GCSSource) Type() string {
 // Detail returns a string for use in logs.
 func (src *GCSSource) Detail() string {
 	return src.FilePath
+}
+
+// Date returns a civil.Date associated with the GCSSource archive path.
+func (src *GCSSource) Date() civil.Date {
+	return src.PathDate
 }
 
 // NextTest reads the next test object from the tar file.
@@ -218,25 +225,30 @@ var errNoClient = errors.New("client should be non-null")
 //
 // uri should be of form gs://bucket/filename.tar or gs://bucket/filename.tgz
 // FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
-func NewTestSource(client *gcs.Client, uri string, label string) (etl.TestSource, error) {
+func NewTestSource(client *gcs.Client, dp etl.DataPath, label string) (etl.TestSource, error) {
 	if client == nil {
 		return nil, errNoClient
 	}
 	// For now only handle gcs paths.
-	if !strings.HasPrefix(uri, "gs://") {
-		return nil, errors.New("invalid file path: " + uri)
+	if !strings.HasPrefix(dp.URI, "gs://") {
+		return nil, errors.New("invalid file path: " + dp.URI)
 	}
-	parts := strings.SplitN(uri, "/", 4)
+	parts := strings.SplitN(dp.URI, "/", 4)
 	if len(parts) != 4 {
-		return nil, errors.New("invalid file path: " + uri)
+		return nil, errors.New("invalid file path: " + dp.URI)
 	}
 	bucket := parts[2]
 	fn := parts[3]
 
+	archiveDate, err := time.Parse("2006/01/02", dp.DatePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse archive date path: %w", err)
+	}
+
 	// TODO - consider just always testing for valid gzip file.
 	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
 		strings.HasSuffix(fn, ".tar.gz")) {
-		return nil, errors.New("not tar or tgz: " + uri)
+		return nil, errors.New("not tar or tgz: " + dp.URI)
 	}
 
 	// TODO(prod) Evaluate whether this is long enough.
@@ -268,7 +280,15 @@ func NewTestSource(client *gcs.Client, uri string, label string) (etl.TestSource
 	tarReader := tar.NewReader(rdr)
 
 	baseTimeout := 16 * time.Millisecond
-	return &GCSSource{uri, tarReader, closer, baseTimeout, label}, nil
+	gcs := &GCSSource{
+		FilePath:      dp.URI,
+		TarReader:     tarReader,
+		Closer:        closer,
+		RetryBaseTime: baseTimeout,
+		TableBase:     label,
+		PathDate:      civil.DateOf(archiveDate),
+	}
+	return gcs, nil
 }
 
 // GetStorageClient provides a storage reader client.
@@ -304,7 +324,7 @@ func (sf *gcsSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestS
 			http.StatusInternalServerError, etl.ErrBadDataType)
 	}
 
-	tr, err := NewTestSource(sf.client, dp.URI, label)
+	tr, err := NewTestSource(sf.client, dp, label)
 	if err != nil {
 		log.Printf("Error opening gcs file: %v", err)
 		// TODO - anything better we could do here?

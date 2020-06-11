@@ -36,7 +36,7 @@ func GetSource(client *gcs.Client, uri string) (etl.TestSource, etl.DataPath, in
 		log.Printf("Invalid datatype: %s", path)
 		return nil, etl.DataPath{}, http.StatusInternalServerError, err
 	}
-	tr, err := storage.NewTestSource(client, uri, label)
+	tr, err := storage.NewTestSource(client, path, label)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(string(dataType), "ETLSourceError").Inc()
 		log.Printf("Error opening gcs file: %v", err)

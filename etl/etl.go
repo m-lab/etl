@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 )
 
 // ProcessingError extends error to provide dataType and detail for metrics,
@@ -143,8 +144,9 @@ type TestSource interface {
 	NextTest(maxSize int64) (string, []byte, error)
 	Close() error
 
-	Detail() string // Detail for logs.
-	Type() string   // Data type for logs and metrics
+	Detail() string   // Detail for logs.
+	Type() string     // Data type for logs and metrics
+	Date() civil.Date // Date associated with test source
 }
 
 //========================================================================

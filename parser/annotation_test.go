@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/go/rtx"
 )
@@ -39,6 +40,7 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 
 			meta := map[string]bigquery.Value{
 				"filename": "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/" + tt.file,
+				"date":     civil.Date{Year: 2020, Month: 3, Day: 18},
 			}
 
 			if err := n.ParseAndInsert(meta, tt.file, data); (err != nil) != tt.wantErr {
