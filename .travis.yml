@@ -15,6 +15,7 @@
 # TODO(soltesz): Add deployment automation when fine-grained permissions are
 # possible.
 
+dist: bionic
 language: go
 go:
  - "1.13.8"
