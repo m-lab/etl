@@ -15,6 +15,7 @@ import (
 	v2 "github.com/m-lab/annotation-service/api/v2"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
@@ -52,7 +53,8 @@ func fileSource(fn string) (etl.TestSource, error) {
 	tarReader := tar.NewReader(rdr)
 
 	timeout := 16 * time.Millisecond
-	return &storage.GCSSource{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
+	return &storage.GCSSource{TarReader: tarReader, Closer: raw,
+		RetryBaseTime: timeout, TableBase: "test", PathDate: civil.Date{Year: 2020, Month: 6, Day: 11}}, nil
 }
 
 type fakeAnnotator struct{}
