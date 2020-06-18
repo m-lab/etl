@@ -84,6 +84,9 @@ func (tp *TestParser) FullTableName() string {
 func (tp *TestParser) Flush() error {
 	return nil
 }
+func (tp *TestParser) Close() error {
+	return nil
+}
 func (tp *TestParser) TaskError() error {
 	return nil
 }

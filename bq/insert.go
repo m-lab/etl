@@ -409,6 +409,9 @@ func (in *sink) Commit(rows []interface{}, label string) (int, error) {
 	return in.flushSlice(rows, label, label)
 }
 
+// Close synchronizes on the tokens, and closes the backing file.
+func (in *sink) Close() error { return nil }
+
 // flushSlice flushes a slice of rows to BigQuery.
 // It returns the number of rows successfully committed.
 // It is NOT threadsafe.
@@ -571,7 +574,7 @@ func (sf *bqSinkFactory) Get(
 
 	client, err := GetClient(pdt.Project)
 	if err != nil {
-		return nil, factory.NewError(path.DataType, "StorageClient",
+		return nil, factory.NewError(path.DataType, "BQClient",
 			http.StatusInternalServerError, err)
 	}
 
