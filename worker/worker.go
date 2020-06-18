@@ -74,6 +74,14 @@ func ProcessTaskWithClient(client *gcs.Client, fn string) (int, error) {
 	return ProcessTestSource(tr, path)
 }
 
+// NullCloser implements Closer
+type NullCloser struct{}
+
+// Close implements Closer.Close()
+func (nc NullCloser) Close() error {
+	return nil
+}
+
 // ProcessTestSource handles processing of all TestSource contents.
 func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 	label := path.TableBase() // This works even on error?
@@ -106,7 +114,8 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 		log.Printf("Error creating parser for %s", dataType)
 		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", dataType)
 	}
-	tsk := task.NewTask(src.Detail(), src, p)
+
+	tsk := task.NewTask(src.Detail(), src, p, &NullCloser{})
 
 	files, err := tsk.ProcessAllTests()
 
@@ -169,7 +178,7 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 		return nil, err
 	}
 
-	tsk := task.NewTask(dp.URI, src, p)
+	tsk := task.NewTask(dp.URI, src, p, sink)
 	return tsk, nil
 }
 
