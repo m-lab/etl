@@ -107,6 +107,7 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", dataType)
 	}
 	tsk := task.NewTask(src.Detail(), src, p)
+	defer tsk.Close()
 
 	files, err := tsk.ProcessAllTests()
 

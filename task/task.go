@@ -50,8 +50,23 @@ func NewTask(filename string, src etl.TestSource, prsr etl.Parser) *Task {
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
 	meta["date"] = src.Date()
-	t := Task{src, prsr, meta, DefaultMaxFileSize}
+	t := Task{
+		TestSource:  src,
+		Parser:      prsr,
+		meta:        meta,
+		maxFileSize: DefaultMaxFileSize,
+	}
 	return &t
+}
+
+// Close closes the source and sink.
+func (tt *Task) Close() error {
+	pErr := tt.Parser.Close()
+	tErr := tt.TestSource.Close()
+	if pErr != nil {
+		return pErr
+	}
+	return tErr
 }
 
 // SetMaxFileSize overrides the default maxFileSize.
@@ -142,10 +157,10 @@ OUTER:
 
 	// Flush any rows cached in the inserter.
 	flushErr := tt.Flush()
-
 	if flushErr != nil {
 		log.Printf("%v", flushErr)
 	}
+
 	// TODO - make this debug or remove
 	log.Printf("Processed %d files, %d nil data, %d rows committed, %d failed, from %s into %s",
 		files, nilData, tt.Parser.Committed(), tt.Parser.Failed(),
@@ -159,5 +174,5 @@ OUTER:
 	if tt.Parser.TaskError() != nil {
 		return files, tt.Parser.TaskError()
 	}
-	return files, nil
+	return files, flushErr
 }

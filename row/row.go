@@ -109,6 +109,7 @@ type HasStats interface {
 // Implementations should be threadsafe.
 type Sink interface {
 	Commit(rows []interface{}, label string) (int, error)
+	Close() error // For sinks that require closing.
 }
 
 // Buffer provides all basic functionality generally needed for buffering, annotating, and inserting
@@ -301,6 +302,11 @@ type Base struct {
 func NewBase(label string, sink Sink, bufSize int, ann v2as.Annotator) *Base {
 	buf := NewBuffer(bufSize)
 	return &Base{sink: sink, ann: annotator{ann}, buf: buf, label: label}
+}
+
+// Close implements Sink.Close
+func (pb *Base) Close() error {
+	return pb.sink.Close()
 }
 
 // GetStats returns the buffer/sink stats.
