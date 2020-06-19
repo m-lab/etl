@@ -105,6 +105,7 @@ script:
 - for module in $MODULES; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=${module//\//_}.cov github.com/m-lab/etl/$module ;
     EC=$[ $EC || $? ] ;
+    echo "status $EC" ;
   done
 - echo "summary status $EC" ;
 - if [[ $EC != 0 ]]; then false; fi ;
@@ -119,6 +120,7 @@ script:
   for module in metrics ; do
     go test -v -coverpkg=$COVER_PKGS -coverprofile=${module//\//_}.cov github.com/m-lab/etl/$module -tags=integration ;
     EC=$[ $EC || $? ] ;
+    echo "summary $EC" ;
   done ;
   echo "summary status $EC" ;
   if [[ $EC != 0 ]]; then false; fi ;
