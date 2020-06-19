@@ -283,6 +283,8 @@ func TestBQSaver(t *testing.T) {
 //    mlab-sandbox:gfr.small_tcpinfo gs://archive-mlab-testing/gfr/tcpinfo.json ./schema.json
 // Recommend commenting out snapshots in tcpinfo.go.
 func TestTaskToGCS(t *testing.T) {
+	t.Skip("Skipping test intended for manual experimentation")
+
 	os.Setenv("RELEASE_TAG", "foobar")
 	parser.InitParserVersionForTest()
 
