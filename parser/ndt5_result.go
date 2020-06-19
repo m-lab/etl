@@ -109,7 +109,9 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		metrics.RowSizeHistogram.WithLabelValues(
 			dp.TableName()).Observe(float64(len(test)))
 
-		dp.Base.Put(&stats)
+		if err = dp.Base.Put(&stats); err != nil {
+			return err
+		}
 		// Count successful inserts.
 		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
 	}

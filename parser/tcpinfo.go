@@ -190,7 +190,12 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 		}
 	}
 
-	p.Put(&row)
+	// For GCS, errors here are generally fatal.
+	// For BigQuery, errors here could be fatal, or could be due to quota exceeded.
+	err = p.Put(&row)
+	if err != nil {
+		return err
+	}
 	metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "ok").Inc()
 	return nil
 }

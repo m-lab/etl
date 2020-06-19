@@ -353,7 +353,7 @@ func (pb *Base) Flush() error {
 // sequential calls to Put.  However, once a block of rows is submitted
 // to pb.commit, it should be written in the same order to the Sink.
 // TODO improve Annotatable architecture.
-func (pb *Base) Put(row Annotatable) {
+func (pb *Base) Put(row Annotatable) error {
 	rows := pb.buf.Append(row)
 	pb.stats.Inc()
 
@@ -363,8 +363,10 @@ func (pb *Base) Put(row Annotatable) {
 		err := pb.commit(rows)
 		if err != nil {
 			log.Println(pb.label, err)
+			return err
 		}
 	}
+	return nil
 }
 
 // NullAnnotator satisfies the Annotatable interface without actually doing
