@@ -86,6 +86,10 @@ func (rw *RowWriter) releaseWritingToken() {
 }
 
 // Commit commits rows, in order, to the GCS object.
+// The GCS object is not available until Close is called, at which
+// point the entire object becomes available atomically.
+// The returned int is the number of rows written (and pending), or,
+// if error is not nil, an estimate of the number of rows written.
 func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 	rw.acquireEncodingToken()
 	// First, do the encoding.  Other calls to Commit will block here
@@ -108,12 +112,14 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 	defer rw.releaseWritingToken()
 	n, err := buf.WriteTo(rw.w) // This is buffered (by 4MB chunks).  Are the writes to GCS synchronous?
 	if err != nil {
-		// This approximates the number of rows written prior to error.
 		log.Println(err, rw.bucket, rw.path)
+		// This approximates the number of rows written prior to error.
+		// It is unclear whether these rows will actually show up.
+		// The caller should likely abandon the archive at this point,
+		// as further writing will likely result in a corrupted file.
 		return int(n) * len(rows) / numBytes, err
 	}
 
-	// TODO - these may not be committed, so the returned value may be wrong.
 	return len(rows), nil
 }
 
