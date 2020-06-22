@@ -137,6 +137,26 @@ func ValidateTestPath(path string) (DataPath, error) {
 	return dp, nil
 }
 
+// PathAndFilename returns the entire GCS path except for the gs://bucket/ prefix and .tgz suffix.
+func (dp DataPath) PathAndFilename() string {
+	e := dp.Embargo
+	//	if len(e) > 0 {
+	//		e = "-" + e
+	//	}
+	dt2 := dp.DataType2
+	if len(dt2) > 0 {
+		//dt2 = "-" + dt2
+	}
+	if dp.ExpDir == "" {
+		return fmt.Sprintf("%s/%s/%sT%sZ%s-%s-%s-%s-%s%s",
+			dp.DataType, dp.DatePath, dp.PackedDate, dp.PackedTime, dt2,
+			dp.Host, dp.Site, dp.Experiment, dp.FileNumber, e)
+	}
+	return fmt.Sprintf("%s/%s/%s/%sT%sZ-%s-%s-%s-%s-%s%s",
+		dp.ExpDir, dp.DataType, dp.DatePath, dp.PackedDate, dp.PackedTime, dt2,
+		dp.Host, dp.Site, dp.Experiment, dp.FileNumber, e)
+}
+
 // GetDataType finds the type of data stored in a file from its complete filename
 func (dp DataPath) GetDataType() DataType {
 	dt, ok := dirToDataType[dp.DataType]
