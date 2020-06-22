@@ -30,7 +30,8 @@ func ObjectWriter(ctx context.Context, client stiface.Client, bucket string, pat
 
 // RowWriter implements row.Sink to a GCS file backend.
 type RowWriter struct {
-	w stiface.Writer
+	w   stiface.Writer
+	ctx context.Context
 
 	bucket string
 	path   string
@@ -50,7 +51,7 @@ func NewRowWriter(ctx context.Context, client stiface.Client, bucket string, pat
 	writing := make(chan struct{}, 1)
 	writing <- struct{}{}
 
-	return &RowWriter{bucket: bucket, path: path, w: w, encoding: encoding, writing: writing}, nil
+	return &RowWriter{bucket: bucket, ctx: ctx, path: path, w: w, encoding: encoding, writing: writing}, nil
 }
 
 // Acquire the encoding token.
@@ -89,7 +90,7 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 	// until encoding is done.
 	// NOTE: This can cause a fairly hefty memory footprint for
 	// large numbers of large rows.
-	buf := bytes.NewBuffer(nil)
+	buf := bytes.NewBuffer(make([]byte, 0, 1000))
 
 	for i := range rows {
 		j, err := json.Marshal(rows[i])
@@ -104,8 +105,10 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 		buf.WriteByte('\n')
 	}
 	numBytes := buf.Len()
+	log.Println(numBytes)
 	rw.swapForWritingToken()
 	defer rw.releaseWritingToken()
+	log.Println("writing to", rw.w)
 	n, err := buf.WriteTo(rw.w) // This is buffered (by 4MB chunks).  Are the writes to GCS synchronous?
 	if err != nil {
 		switch typedErr := err.(type) {

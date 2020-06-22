@@ -10,6 +10,7 @@ import (
 
 	gcs "cloud.google.com/go/storage"
 
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"github.com/m-lab/annotation-service/api"
 	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/go/flagx"
@@ -46,7 +47,7 @@ type runnable struct {
 	gcs.ObjectAttrs
 }
 
-func (r *runnable) Run() error {
+func (r *runnable) Run(ctx context.Context) error {
 	path := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
 	dp, err := etl.ValidateTestPath(path)
 	if err != nil {
@@ -58,7 +59,7 @@ func (r *runnable) Run() error {
 	log.Println("Processing", path)
 
 	statusCode := http.StatusOK
-	pErr := worker.ProcessGKETask(dp, r.tf)
+	pErr := worker.ProcessGKETask(ctx, dp, r.tf)
 	if pErr != nil {
 		statusCode = pErr.Code()
 	}
@@ -80,7 +81,7 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	}
 	taskFactory := worker.StandardTaskFactory{
 		Annotator: &nullAnnotatorFactory{},
-		Sink:      storage.NewSinkFactory(c, *output),
+		Sink:      storage.NewSinkFactory(stiface.AdaptClient(c), *output),
 		Source:    storage.GCSSourceFactory(c),
 	}
 	return &runnable{&taskFactory, *obj}
@@ -101,13 +102,16 @@ var (
 func main() {
 	ctx := context.Background()
 
+	c, err := storage.GetStorageClient(true)
+
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from env")
 
-	o := c.Bucket(bucket).Object(archive)
+	obj, err := c.Bucket(*bucket).Object(*path).Attrs(ctx)
+	rtx.Must(err, "Object Attrs")
 
-	runnable := toRunnable()
-	err := runnable.Run()
+	runnable := toRunnable(obj)
+	err = runnable.Run(ctx)
 	rtx.Must(err, "Run failure")
 
 }

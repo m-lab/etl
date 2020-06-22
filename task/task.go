@@ -82,6 +82,11 @@ var emptyTest = logx.NewLogEvery(nil, time.Second)
 // number of files processed.
 // TODO pass in the datatype label.
 func (tt *Task) ProcessAllTests() (int, error) {
+
+	log.Println("ProcessAllTests")
+
+	defer tt.Close()
+
 	if tt.Parser == nil {
 		panic("Parser is nil")
 	}

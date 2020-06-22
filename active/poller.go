@@ -113,7 +113,7 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Inc()
 			defer metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Dec()
 
-			err := run.Run()
+			err := run.Run(ctx)
 			if err == nil {
 				update := tracker.UpdateURL(g.trackerBase, job, tracker.Parsing, run.Info())
 				if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {
