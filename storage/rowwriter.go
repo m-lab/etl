@@ -117,6 +117,7 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 		// It is unclear whether these rows will actually show up.
 		// The caller should likely abandon the archive at this point,
 		// as further writing will likely result in a corrupted file.
+		// See https://github.com/m-lab/etl/issues/899
 		return int(n) * len(rows) / numBytes, err
 	}
 
