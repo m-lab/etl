@@ -129,6 +129,3 @@ func (np *NullParser) TableName() string {
 func (np *NullParser) TaskError() error {
 	return nil
 }
-func (np *NullParser) Close() error {
-	return nil
-}

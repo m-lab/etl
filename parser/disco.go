@@ -34,11 +34,6 @@ func NewDiscoParser(ins etl.Inserter) etl.Parser {
 		RowStats: ins} // Delegate RowStats functions to the Inserter.
 }
 
-// Close implements etl.Parser.Close
-func (dp *DiscoParser) Close() error {
-	return nil
-}
-
 func (dp *DiscoParser) TaskError() error {
 	return nil
 }

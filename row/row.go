@@ -104,6 +104,20 @@ type HasStats interface {
 	GetStats() Stats
 }
 
+// Closer describes objects that have Close()
+// TODO should this be defined where it is used instead of here?
+type Closer interface {
+	Close() error
+}
+
+// NullCloser implements Closer
+type NullCloser struct{}
+
+// Close implements Closer.Close()
+func (nc NullCloser) Close() error {
+	return nil
+}
+
 // Sink defines the interface for committing rows.
 // Returns the number of rows successfully committed, and error.
 // Implementations should be threadsafe.
@@ -302,11 +316,6 @@ type Base struct {
 func NewBase(label string, sink Sink, bufSize int, ann v2as.Annotator) *Base {
 	buf := NewBuffer(bufSize)
 	return &Base{sink: sink, ann: annotator{ann}, buf: buf, label: label}
-}
-
-// Close implements Sink.Close
-func (pb *Base) Close() error {
-	return pb.sink.Close()
 }
 
 // GetStats returns the buffer/sink stats.

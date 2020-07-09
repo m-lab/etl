@@ -121,9 +121,6 @@ type Parser interface {
 	// Flush flushes any pending rows.
 	Flush() error
 
-	// Close should close any resources that require closing.
-	Close() error
-
 	// TableName of the table that this Parser inserts into.
 	// Used for metrics and logging.
 	TableName() string

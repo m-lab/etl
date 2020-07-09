@@ -239,8 +239,3 @@ func (pb *Base) AnnotateAndPutAsync(metricLabel string) error {
 	pb.PutAsync(rows)
 	return annErr
 }
-
-// Close implements etl.Parser.Close
-func (pb *Base) Close() error {
-	return nil
-}

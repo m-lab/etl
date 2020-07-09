@@ -84,9 +84,6 @@ func (tp *TestParser) FullTableName() string {
 func (tp *TestParser) Flush() error {
 	return nil
 }
-func (tp *TestParser) Close() error {
-	return nil
-}
 func (tp *TestParser) TaskError() error {
 	return nil
 }
@@ -113,7 +110,7 @@ func TestBadTarFileInput(t *testing.T) {
 	tp := &TestParser{}
 
 	// Among other things, this requires that tp implements etl.Parser.
-	tt := task.NewTask("filename", rdr, tp)
+	tt := task.NewTask("filename", rdr, tp, &NullCloser{})
 	fc, err := tt.ProcessAllTests()
 	if err.Error() != "Random Error" {
 		t.Error("Expected Random Error, but got " + err.Error())
@@ -134,7 +131,7 @@ func TestTarFileInput(t *testing.T) {
 	tp := &TestParser{}
 
 	// Among other things, this requires that tp implements etl.Parser.
-	tt := task.NewTask("filename", rdr, tp)
+	tt := task.NewTask("filename", rdr, tp, &NullCloser{})
 	fn, bb, err := tt.NextTest(100)
 	if err != nil {
 		t.Error(err)
@@ -172,7 +169,7 @@ func TestTarFileInput(t *testing.T) {
 	// Reset the tar reader and create new task, to test the ProcessAllTests behavior.
 	rdr = MakeTestSource(t)
 
-	tt = task.NewTask("filename", rdr, tp)
+	tt = task.NewTask("filename", rdr, tp, &NullCloser{})
 	tt.SetMaxFileSize(100)
 	fc, err := tt.ProcessAllTests()
 	if err != nil {
