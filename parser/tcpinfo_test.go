@@ -20,7 +20,6 @@ import (
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
@@ -108,6 +107,10 @@ func (in *inMemorySink) Committed() int {
 	return in.committed
 }
 
+type nullCloser struct{}
+
+func (nc nullCloser) Close() error { return nil }
+
 // NOTE: This uses a fake annotator which returns no annotations.
 // TODO: This test seems to be flakey in travis - sometimes only 357 tests instead of 362
 func TestTCPParser(t *testing.T) {
@@ -124,7 +127,7 @@ func TestTCPParser(t *testing.T) {
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
 	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
-	task := task.NewTask(filename, src, p, row.NullCloser{})
+	task := task.NewTask(filename, src, p, nullCloser{})
 
 	startDecode := time.Now()
 	n, err := task.ProcessAllTests()
@@ -234,7 +237,7 @@ func TestTCPTask(t *testing.T) {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p, row.NullCloser{})
+	task := task.NewTask(filename, src, p, &nullCloser{})
 
 	n, err := task.ProcessAllTests()
 	if err != nil {
@@ -259,7 +262,7 @@ func TestBQSaver(t *testing.T) {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p, &row.NullCloser{})
+	task := task.NewTask(filename, src, p, &nullCloser{})
 
 	_, err = task.ProcessAllTests()
 	if err != nil {
@@ -307,7 +310,7 @@ func TestTaskToGCS(t *testing.T) {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p, &row.NullCloser{})
+	task := task.NewTask(filename, src, p, &nullCloser{})
 
 	n, err := task.ProcessAllTests()
 	if err != nil {
@@ -339,7 +342,7 @@ func BenchmarkTCPParser(b *testing.B) {
 			b.Fatalf("cannot read testdata.")
 		}
 
-		task := task.NewTask(filename, src, p, &row.NullCloser{})
+		task := task.NewTask(filename, src, p, &nullCloser{})
 
 		n, err = task.ProcessAllTests()
 		if err != nil {

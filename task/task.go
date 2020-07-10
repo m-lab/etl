@@ -15,7 +15,6 @@ import (
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/storage"
 )
 
@@ -42,11 +41,11 @@ type Task struct {
 	meta        map[string]bigquery.Value // Metadata about this task.
 	maxFileSize int64                     // Max file size to avoid OOM.
 
-	closer row.Closer // So we can call Close()
+	closer io.Closer // So we can call Close()
 }
 
 // NewTask constructs a task, injecting the source and the parser.
-func NewTask(filename string, src etl.TestSource, prsr etl.Parser, closer row.Closer) *Task {
+func NewTask(filename string, src etl.TestSource, prsr etl.Parser, closer io.Closer) *Task {
 	// TODO - should the meta data be a nested type?
 	meta := make(map[string]bigquery.Value, 3)
 	meta["filename"] = filename

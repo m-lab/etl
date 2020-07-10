@@ -67,11 +67,6 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 	return tp.inserter.InsertRow(bq.MapSaver(values))
 }
 
-// Close implements etl.Parser.Close
-func (tp *TestParser) Close() error {
-	return nil
-}
-
 // These functions are also required to complete the etl.Parser interface.
 func (tp *TestParser) Flush() error {
 	return nil

@@ -6,6 +6,7 @@ package row
 import (
 	"context"
 	"errors"
+	"io"
 	"log"
 	"sync"
 	"time"
@@ -104,26 +105,12 @@ type HasStats interface {
 	GetStats() Stats
 }
 
-// Closer describes objects that have Close()
-// TODO should this be defined where it is used instead of here?
-type Closer interface {
-	Close() error
-}
-
-// NullCloser implements Closer
-type NullCloser struct{}
-
-// Close implements Closer.Close()
-func (nc NullCloser) Close() error {
-	return nil
-}
-
 // Sink defines the interface for committing rows.
 // Returns the number of rows successfully committed, and error.
 // Implementations should be threadsafe.
 type Sink interface {
 	Commit(rows []interface{}, label string) (int, error)
-	Close() error // For sinks that require closing.
+	io.Closer
 }
 
 // Buffer provides all basic functionality generally needed for buffering, annotating, and inserting

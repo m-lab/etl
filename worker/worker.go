@@ -14,10 +14,13 @@ import (
 	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
 )
+
+type nullCloser struct{}
+
+func (nc nullCloser) Close() error { return nil }
 
 // GetSource gets the TestSource for the filename.
 // fn is a gs:// GCS uri.
@@ -109,7 +112,7 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 	}
 
 	// The closer does nothing, so we could just provide a null closer.
-	tsk := task.NewTask(src.Detail(), src, p, &row.NullCloser{})
+	tsk := task.NewTask(src.Detail(), src, p, &nullCloser{})
 
 	files, err := tsk.ProcessAllTests()
 
