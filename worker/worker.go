@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	gcs "cloud.google.com/go/storage"
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -24,7 +24,7 @@ func (nc nullCloser) Close() error { return nil }
 
 // GetSource gets the TestSource for the filename.
 // fn is a gs:// GCS uri.
-func GetSource(client *gcs.Client, uri string) (etl.TestSource, etl.DataPath, int, error) {
+func GetSource(client stiface.Client, uri string) (etl.TestSource, etl.DataPath, int, error) {
 	path, err := etl.ValidateTestPath(uri)
 	label := path.TableBase() // On error, this will be "invalid", so not all that useful.
 	if err != nil {
@@ -68,7 +68,7 @@ func ProcessTask(fn string) (int, error) {
 }
 
 // ProcessTaskWithClient handles processing with an injected client.
-func ProcessTaskWithClient(client *gcs.Client, fn string) (int, error) {
+func ProcessTaskWithClient(client stiface.Client, fn string) (int, error) {
 	tr, path, status, err := GetSource(client, fn)
 	if err != nil {
 		return status, err

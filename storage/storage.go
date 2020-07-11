@@ -24,6 +24,7 @@ import (
 	gcs "cloud.google.com/go/storage"
 	"google.golang.org/api/option"
 
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
@@ -41,6 +42,7 @@ type TarReader interface {
 // GCSSource wraps a gsutil tar file containing tests.
 type GCSSource struct {
 	FilePath      string
+	Size          int64
 	TarReader                   // TarReader interface provided by an embedded struct.
 	io.Closer                   // Closer interface to be provided by an embedded struct.
 	RetryBaseTime time.Duration // The base time for backoff and retry.
@@ -56,6 +58,7 @@ func (src *GCSSource) nextHeader(trial int) (*tar.Header, bool, error) {
 		if err == io.EOF {
 			return nil, false, err
 		} else if strings.Contains(err.Error(), "unexpected EOF") {
+			// We are seeing these metrics, but logs at 113
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, "next", strconv.Itoa(trial), "unexpected EOF").Inc()
 			// TODO: These are likely unrecoverable, so we should
@@ -66,7 +69,7 @@ func (src *GCSSource) nextHeader(trial int) (*tar.Header, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, "next", strconv.Itoa(trial), "other").Inc()
 		}
-		log.Printf("nextHeader: %v\n", err)
+		log.Printf("ERROR nextHeader: %v\n", err)
 	}
 	return h, true, err
 }
@@ -88,7 +91,7 @@ func (src *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			}
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, "open zip", strconv.Itoa(trial), "zipReaderError").Inc()
-			log.Printf("zipReaderError(%d): %v in file %s\n", trial, err, h.Name)
+			log.Printf("Error zipReader(%d): %v in file %s\n", trial, err, h.Name)
 			return nil, true, err
 		}
 		defer zipReader.Close()
@@ -106,11 +109,14 @@ func (src *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, phase, strconv.Itoa(trial), "stream error").Inc()
 		} else {
-			// We haven't seen any of these so far (as of May 9)
+			// We haven't seen any of these so far (as of May 9, 2017)
+			// We ARE seeing these for ndt7/read-zip, June 2020.  They are consistent for each reprocessing.
+			// They occur when there is a truncated gz file within an archive.
+			// HOWEVER, there are also many empty gz files, that we should also warn about.
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, phase, strconv.Itoa(trial), "other error").Inc()
 		}
-		log.Printf("nextData(%d): %v\n", trial, err)
+		log.Printf("ERROR nextData:%d [%s] %s (%d bytes) from %s\n", trial, err, h.Name, h.Size, src.FilePath)
 		return nil, true, err
 	}
 
@@ -225,7 +231,7 @@ var errNoClient = errors.New("client should be non-null")
 //
 // uri should be of form gs://bucket/filename.tar or gs://bucket/filename.tgz
 // FYI Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
-func NewTestSource(client *gcs.Client, dp etl.DataPath, label string) (etl.TestSource, error) {
+func NewTestSource(client stiface.Client, dp etl.DataPath, label string) (etl.TestSource, error) {
 	if client == nil {
 		return nil, errNoClient
 	}
@@ -251,11 +257,12 @@ func NewTestSource(client *gcs.Client, dp etl.DataPath, label string) (etl.TestS
 		return nil, errors.New("not tar or tgz: " + dp.URI)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	// TODO(prod) Evaluate whether this is long enough.
 	// TODO - appengine requests time out after 60 minutes, so more than that doesn't help.
 	// SS processing sometimes times out with 1 hour.
 	// Is there a limit on http requests from task queue, or into flex instance?
-	rdr, cancel, err := getReader(client, bucket, fn, 300*time.Minute)
+	rdr, size, err := getReader(ctx, client, bucket, fn, 300*time.Minute)
 	if err != nil {
 		cancel()
 		log.Println(err)
@@ -282,6 +289,7 @@ func NewTestSource(client *gcs.Client, dp etl.DataPath, label string) (etl.TestS
 	baseTimeout := 16 * time.Millisecond
 	gcs := &GCSSource{
 		FilePath:      dp.URI,
+		Size:          size,
 		TarReader:     tarReader,
 		Closer:        closer,
 		RetryBaseTime: baseTimeout,
@@ -293,7 +301,7 @@ func NewTestSource(client *gcs.Client, dp etl.DataPath, label string) (etl.TestS
 
 // GetStorageClient provides a storage reader client.
 // This contacts the backend server, so should be used infrequently.
-func GetStorageClient(writeAccess bool) (*gcs.Client, error) {
+func GetStorageClient(writeAccess bool) (stiface.Client, error) {
 	var scope string
 	if writeAccess {
 		scope = gcs.ScopeReadWrite
@@ -307,11 +315,11 @@ func GetStorageClient(writeAccess bool) (*gcs.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return client, nil
+	return stiface.AdaptClient(client), nil
 }
 
 type gcsSourceFactory struct {
-	client *gcs.Client
+	client stiface.Client
 }
 
 // Get implements SourceFactory.Get
@@ -337,7 +345,7 @@ func (sf *gcsSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestS
 }
 
 // GCSSourceFactory returns the default SourceFactory
-func GCSSourceFactory(c *gcs.Client) factory.SourceFactory {
+func GCSSourceFactory(c stiface.Client) factory.SourceFactory {
 	return &gcsSourceFactory{c}
 }
 
@@ -346,11 +354,14 @@ func GCSSourceFactory(c *gcs.Client) factory.SourceFactory {
 //---------------------------------------------------------------------------------
 
 // Caller is responsible for closing response body.
-func getReader(client *gcs.Client, bucket string, fn string, timeout time.Duration) (io.ReadCloser, func(), error) {
+func getReader(ctx context.Context, client stiface.Client, bucket string, fn string, timeout time.Duration) (io.ReadCloser, int64, error) {
 	// Lightweight - only setting up the local object.
 	b := client.Bucket(bucket)
 	obj := b.Object(fn)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	rdr, err := obj.NewReader(ctx)
-	return rdr, cancel, err
+	if err != nil {
+		return rdr, 0, err
+	}
+	attr, err := obj.Attrs(ctx)
+	return rdr, attr.Size, err
 }
