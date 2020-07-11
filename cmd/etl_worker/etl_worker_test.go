@@ -86,6 +86,7 @@ func TestMain(t *testing.T) {
 
 func TestPollingMode(t *testing.T) {
 	flag.Set("prometheusx.listen-address", ":9090")
+	flag.Set("json_out", "true")
 	mainCtx, mainCancel = context.WithCancel(context.Background())
 
 	vars := map[string]string{
@@ -130,6 +131,11 @@ func TestPollingMode(t *testing.T) {
 	// Check expected GardenerAPI
 	if !strings.Contains(string(data), "http://gardener:8080") {
 		t.Error("Should contain 'Gardener API: http://gardener:8080':\n", string(data))
+	}
+	// Check expected GardenerAPI
+	expect := "Writing output to json-mlab-testing"
+	if !strings.Contains(string(data), expect) {
+		t.Errorf("Should contain '%s':\n%s", expect, string(data))
 	}
 	resp.Body.Close()
 

@@ -45,6 +45,7 @@ func init() {
 }
 
 var (
+	jsonOutput     = flag.Bool("json_out", false, "Write output to json-[project] bucket")
 	maxActiveTasks = flag.Int64("max_active", 1, "Maximum number of active tasks")
 	gardenerHost   = flag.String("gardener_host", "", "Gardener host for jobs")
 
@@ -87,7 +88,11 @@ func Status(w http.ResponseWriter, r *http.Request) {
 	if gardenerAPI != nil {
 		gardenerAPI.Status(w)
 	}
-	fmt.Fprintf(w, "Writing output to BigQuery\n")
+	if *jsonOutput {
+		fmt.Fprintf(w, "Writing output to %s\n", outputBucket())
+	} else {
+		fmt.Fprintf(w, "Writing output to BigQuery\n")
+	}
 	fmt.Fprintf(w, "<p>Workers: %d / %d</p>\n", atomic.LoadInt32(&inFlight), maxInFlight)
 	env := os.Environ()
 	for i := range env {
@@ -269,13 +274,22 @@ func (r *runnable) Info() string {
 	return r.Name
 }
 
+func outputBucket() string {
+	return "json-" + os.Getenv("GCLOUD_PROJECT")
+}
+
 func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	c, err := storage.GetStorageClient(false)
 	if err != nil {
 		return nil // TODO add an error?
 	}
 
-	sink := bq.NewSinkFactory()
+	var sink factory.SinkFactory
+	if *jsonOutput {
+		sink = storage.NewSinkFactory(c, outputBucket())
+	} else {
+		sink = bq.NewSinkFactory()
+	}
 
 	taskFactory := worker.StandardTaskFactory{
 		Annotator: factory.DefaultAnnotatorFactory(),
