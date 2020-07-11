@@ -81,7 +81,7 @@ var emptyTest = logx.NewLogEvery(nil, time.Second)
 // injected parser to parse them, and inserts them into bigquery. Returns the
 // number of files processed.
 // TODO pass in the datatype label.
-func (tt *Task) ProcessAllTests() (int, error) {
+func (tt *Task) ProcessAllTests(failfast bool) (int, error) {
 	if tt.Parser == nil {
 		panic("Parser is nil")
 	}
@@ -161,6 +161,9 @@ OUTER:
 				tt.Type(), "ParseAndInsertError").Inc()
 			log.Printf("ERROR %v", loopErr)
 			// TODO(dev) Handle this error properly!
+			if failfast {
+				break OUTER
+			}
 			continue
 		}
 	}
