@@ -47,7 +47,7 @@ const ExpTypePattern = `(?:([a-z-]+)/)?([a-z0-9-]+)/` // experiment OR experimen
 // DatePathPattern is used to extract the date directory part of the path, e.g. 2017/01/02
 const DatePathPattern = `(\d{4}/[01]\d/[0123]\d)/`
 
-const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6})(\.\d{0,6})?Z`
+const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6}(\.\d{0,6})?)Z`
 
 const type2 = `(?:-([a-z0-9-]+))?` // optional datatype string
 const mlabNSiteNN = `-(mlab\d)-([a-z]{3}\d[0-9t])-`
@@ -135,6 +135,23 @@ func ValidateTestPath(path string) (DataPath, error) {
 	}
 
 	return dp, nil
+}
+
+// PathAndFilename returns the entire GCS path except for the gs://bucket/ prefix and .tgz suffix.
+func (dp DataPath) PathAndFilename() string {
+	e := dp.Embargo
+	dt2 := dp.DataType2
+	if len(dt2) > 0 {
+		//dt2 = "-" + dt2
+	}
+	if dp.ExpDir == "" {
+		return fmt.Sprintf("%s/%s/%sT%sZ%s-%s-%s-%s-%s%s",
+			dp.DataType, dp.DatePath, dp.PackedDate, dp.PackedTime, dt2,
+			dp.Host, dp.Site, dp.Experiment, dp.FileNumber, e)
+	}
+	return fmt.Sprintf("%s/%s/%s/%sT%sZ-%s-%s-%s-%s-%s%s",
+		dp.ExpDir, dp.DataType, dp.DatePath, dp.PackedDate, dp.PackedTime, dt2,
+		dp.Host, dp.Site, dp.Experiment, dp.FileNumber, e)
 }
 
 // GetDataType finds the type of data stored in a file from its complete filename
