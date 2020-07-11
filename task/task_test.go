@@ -111,7 +111,7 @@ func TestBadTarFileInput(t *testing.T) {
 
 	// Among other things, this requires that tp implements etl.Parser.
 	tt := task.NewTask("filename", rdr, tp, &NullCloser{})
-	fc, err := tt.ProcessAllTests()
+	fc, err := tt.ProcessAllTests(true)
 	if err.Error() != "Random Error" {
 		t.Error("Expected Random Error, but got " + err.Error())
 	}
@@ -171,7 +171,7 @@ func TestTarFileInput(t *testing.T) {
 
 	tt = task.NewTask("filename", rdr, tp, &NullCloser{})
 	tt.SetMaxFileSize(100)
-	fc, err := tt.ProcessAllTests()
+	fc, err := tt.ProcessAllTests(false)
 	if err != nil {
 		t.Error("Expected nil error, but got ", err)
 	}

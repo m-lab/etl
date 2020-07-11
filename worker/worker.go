@@ -114,7 +114,7 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 	// The closer does nothing, so we could just provide a null closer.
 	tsk := task.NewTask(src.Detail(), src, p, &nullCloser{})
 
-	files, err := tsk.ProcessAllTests()
+	files, err := tsk.ProcessAllTests(false) // ignore most parse errors.
 
 	// Count the files processed per-host-module per-weekday.
 	// TODO(soltesz): evaluate separating hosts and pods as separate metrics.
@@ -206,7 +206,7 @@ func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
 
 // DoGKETask creates task, processes all tests and handle metrics
 func DoGKETask(tsk *task.Task, path etl.DataPath) etl.ProcessingError {
-	files, err := tsk.ProcessAllTests()
+	files, err := tsk.ProcessAllTests(true) // fail fast on parsing errors.
 
 	dateFormat := "20060102"
 	date, dateErr := time.Parse(dateFormat, path.PackedDate)
