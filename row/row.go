@@ -218,6 +218,8 @@ func (ann *annotator) annotateServers(rows []interface{}, label string) error {
 	return err
 }
 
+var logEmptyAnn = logx.NewLogEvery(nil, 60*time.Second)
+
 // label is used to label metrics and errors in GetAnnotations
 func (ann *annotator) annotateClients(rows []interface{}, label string) error {
 	ipSlice := make([]string, 0, 2*len(rows)) // This may be inadequate, but its a reasonable start.
@@ -242,7 +244,7 @@ func (ann *annotator) annotateClients(rows []interface{}, label string) error {
 	}
 	annMap := response.Annotations
 	if annMap == nil {
-		log.Println("empty client annotation response")
+		logEmptyAnn.Println("empty client annotation response")
 		metrics.AnnotationErrorCount.With(prometheus.
 			Labels{"source": "Client IP: empty response"}).Inc()
 		return ErrAnnotationError
@@ -330,6 +332,7 @@ func (pb *Base) commit(rows []interface{}) error {
 		pb.stats.Done(done, nil)
 	}
 	if err != nil {
+		log.Println(pb.label, err)
 		pb.stats.Done(len(rows)-done, err)
 	}
 	return err
@@ -355,12 +358,7 @@ func (pb *Base) Put(row Annotatable) error {
 
 	if rows != nil {
 		pb.stats.MoveToPending(len(rows))
-		// TODO consider making this asynchronous.
-		err := pb.commit(rows)
-		if err != nil {
-			log.Println(pb.label, err)
-			return err
-		}
+		return pb.commit(rows)
 	}
 	return nil
 }

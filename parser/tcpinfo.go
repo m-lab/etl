@@ -158,12 +158,16 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 		log.Println(err)
 		log.Println(string(rawContent))
 		metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "decode error").Inc()
+		metrics.ErrorCount.WithLabelValues(
+			p.TableName(), "", "decode error").Inc()
 		return err
 	}
 
 	if len(snaps) < 1 {
 		// For now, we don't save rows with no snapshots.
 		metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "no-snaps").Inc()
+		metrics.WarningCount.WithLabelValues(
+			p.TableName(), "", "no-snaps").Inc()
 		return nil
 	}
 
@@ -190,10 +194,14 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 		}
 	}
 
-	// For GCS, errors here are generally fatal.
-	// For BigQuery, errors here could be fatal, or could be due to quota exceeded.
-	err = p.Put(&row)
-	if err != nil {
+	if err := p.Put(&row); err != nil {
+		// Note that error is likely associated with buffered rows, not the current
+		// row.
+		// When using GCS output, this may result in a corrupted json file.
+		// In that event, the test count may become meaningless.
+		metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "error").Inc()
+		metrics.ErrorCount.WithLabelValues(
+			p.TableName(), "", "put error").Inc()
 		return err
 	}
 	metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "ok").Inc()
