@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	v2 "github.com/m-lab/annotation-service/api/v2"
 
 	"cloud.google.com/go/bigquery"
@@ -297,7 +296,7 @@ func TestTaskToGCS(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rw, err := storage.NewRowWriter(context.Background(), stiface.AdaptClient(c), "archive-mlab-testing", "gfr/tcpinfo.json")
+	rw, err := storage.NewRowWriter(context.Background(), c, "archive-mlab-testing", "gfr/tcpinfo2.json")
 	if err != nil {
 		t.Fatal(err)
 	}

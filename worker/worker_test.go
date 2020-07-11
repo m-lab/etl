@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
@@ -114,7 +115,7 @@ func TestProcessTask(t *testing.T) {
 	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
 	filename := "gs://test-bucket/ndt/2018/05/09/20180509T101913Z-mlab1-mad03-ndt-0000.tgz"
 
-	status, err := worker.ProcessTaskWithClient(gcsClient, filename)
+	status, err := worker.ProcessTaskWithClient(stiface.AdaptClient(gcsClient), filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +167,7 @@ func (fsf *fakeSinkFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink,
 }
 
 type fakeSourceFactory struct {
-	client *storage.Client
+	client stiface.Client
 }
 
 func (sf *fakeSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, etl.ProcessingError) {
@@ -182,7 +183,7 @@ func (sf *fakeSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.Test
 
 func NewSourceFactory() factory.SourceFactory {
 	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
-	return &fakeSourceFactory{client: gcsClient}
+	return &fakeSourceFactory{client: stiface.AdaptClient(gcsClient)}
 }
 
 func TestNilUploader(t *testing.T) {
