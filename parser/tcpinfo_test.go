@@ -129,7 +129,7 @@ func TestTCPParser(t *testing.T) {
 	task := task.NewTask(filename, src, p, nullCloser{})
 
 	startDecode := time.Now()
-	n, err := task.ProcessAllTests()
+	n, err := task.ProcessAllTests(false)
 	decodeTime := time.Since(startDecode)
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestTCPTask(t *testing.T) {
 
 	task := task.NewTask(filename, src, p, &nullCloser{})
 
-	n, err := task.ProcessAllTests()
+	n, err := task.ProcessAllTests(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestBQSaver(t *testing.T) {
 
 	task := task.NewTask(filename, src, p, &nullCloser{})
 
-	_, err = task.ProcessAllTests()
+	_, err = task.ProcessAllTests(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestTaskToGCS(t *testing.T) {
 
 	task := task.NewTask(filename, src, p, &nullCloser{})
 
-	n, err := task.ProcessAllTests()
+	n, err := task.ProcessAllTests(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func BenchmarkTCPParser(b *testing.B) {
 
 		task := task.NewTask(filename, src, p, &nullCloser{})
 
-		n, err = task.ProcessAllTests()
+		n, err = task.ProcessAllTests(false)
 		if err != nil {
 			b.Fatal(err)
 		}
