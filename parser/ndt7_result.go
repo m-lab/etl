@@ -109,8 +109,10 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		dp.TableName()).Observe(float64(len(test)))
 
 	// Insert the row.
-	dp.Base.Put(&row)
-
+	err = dp.Base.Put(&row)
+	if err != nil {
+		return err
+	}
 	// Count successful inserts.
 	metrics.TestCount.WithLabelValues(dp.TableName(), "ndt7_result", "ok").Inc()
 	return nil

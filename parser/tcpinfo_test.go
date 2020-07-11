@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	v2 "github.com/m-lab/annotation-service/api/v2"
 
 	"cloud.google.com/go/bigquery"
@@ -94,6 +95,10 @@ func (in *inMemorySink) Commit(data []interface{}, label string) (int, error) {
 	return len(data), nil
 }
 
+func (in *inMemorySink) Close() error {
+	return nil
+}
+
 func (in *inMemorySink) Flush() error {
 	in.committed = len(in.data)
 	return nil
@@ -101,6 +106,10 @@ func (in *inMemorySink) Flush() error {
 func (in *inMemorySink) Committed() int {
 	return in.committed
 }
+
+type nullCloser struct{}
+
+func (nc nullCloser) Close() error { return nil }
 
 // NOTE: This uses a fake annotator which returns no annotations.
 // TODO: This test seems to be flakey in travis - sometimes only 357 tests instead of 362
@@ -118,7 +127,7 @@ func TestTCPParser(t *testing.T) {
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
 	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
-	task := task.NewTask(filename, src, p)
+	task := task.NewTask(filename, src, p, nullCloser{})
 
 	startDecode := time.Now()
 	n, err := task.ProcessAllTests()
@@ -228,7 +237,7 @@ func TestTCPTask(t *testing.T) {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p)
+	task := task.NewTask(filename, src, p, &nullCloser{})
 
 	n, err := task.ProcessAllTests()
 	if err != nil {
@@ -253,7 +262,7 @@ func TestBQSaver(t *testing.T) {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p)
+	task := task.NewTask(filename, src, p, &nullCloser{})
 
 	_, err = task.ProcessAllTests()
 	if err != nil {
@@ -269,6 +278,51 @@ func TestBQSaver(t *testing.T) {
 	id := sid.(map[string]bigquery.Value)
 	if id["SPort"].(uint16) != 3010 {
 		t.Error(id)
+	}
+}
+
+// This test writes 364 rows to a json file in GCS.
+// The rows can then be loaded into a BQ table, using the schema in testdata, like:
+// bq load --source_format=NEWLINE_DELIMITED_JSON \
+//    mlab-sandbox:gfr.small_tcpinfo gs://archive-mlab-testing/gfr/tcpinfo.json ./schema.json
+// Recommend commenting out snapshots in tcpinfo.go.
+func TestTaskToGCS(t *testing.T) {
+	t.Skip("Skipping test intended for manual experimentation")
+
+	os.Setenv("RELEASE_TAG", "foobar")
+	parser.InitParserVersionForTest()
+
+	c, err := storage.GetStorageClient(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rw, err := storage.NewRowWriter(context.Background(), stiface.AdaptClient(c), "archive-mlab-testing", "gfr/tcpinfo.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Inject fake inserter and annotator
+	p := parser.NewTCPInfoParser(rw, "test", "suffix", &fakeAnnotator{})
+
+	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	src, err := fileSource(filename)
+	if err != nil {
+		t.Fatal("Failed reading testdata from", filename)
+	}
+
+	task := task.NewTask(filename, src, p, &nullCloser{})
+
+	n, err := task.ProcessAllTests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rw.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if n != 364 {
+		t.Errorf("Expected ProcessAllTests to handle %d files, but it handled %d.\n", 364, n)
 	}
 }
 
@@ -288,7 +342,7 @@ func BenchmarkTCPParser(b *testing.B) {
 			b.Fatalf("cannot read testdata.")
 		}
 
-		task := task.NewTask(filename, src, p)
+		task := task.NewTask(filename, src, p, &nullCloser{})
 
 		n, err = task.ProcessAllTests()
 		if err != nil {

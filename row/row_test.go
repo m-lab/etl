@@ -72,6 +72,8 @@ func (in *inMemorySink) Commit(data []interface{}, label string) (int, error) {
 	return len(data), nil
 }
 
+func (in *inMemorySink) Close() error { return nil }
+
 func TestBase(t *testing.T) {
 	ins := &inMemorySink{}
 

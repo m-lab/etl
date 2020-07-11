@@ -40,18 +40,31 @@ type Task struct {
 
 	meta        map[string]bigquery.Value // Metadata about this task.
 	maxFileSize int64                     // Max file size to avoid OOM.
+
+	closer io.Closer // So we can call Close()
 }
 
 // NewTask constructs a task, injecting the source and the parser.
-func NewTask(filename string, src etl.TestSource, prsr etl.Parser) *Task {
+func NewTask(filename string, src etl.TestSource, prsr etl.Parser, closer io.Closer) *Task {
 	// TODO - should the meta data be a nested type?
 	meta := make(map[string]bigquery.Value, 3)
 	meta["filename"] = filename
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
 	meta["date"] = src.Date()
-	t := Task{src, prsr, meta, DefaultMaxFileSize}
+	t := Task{
+		TestSource:  src,
+		Parser:      prsr,
+		meta:        meta,
+		maxFileSize: DefaultMaxFileSize,
+		closer:      closer}
 	return &t
+}
+
+// Close closes the source and sink.
+func (tt *Task) Close() {
+	tt.TestSource.Close()
+	tt.closer.Close()
 }
 
 // SetMaxFileSize overrides the default maxFileSize.
@@ -73,20 +86,20 @@ func (tt *Task) ProcessAllTests() (int, error) {
 	nilData := 0
 	var testname string
 	var data []byte
-	var err error
+	var loopErr error
 	// Read each file from the tar
 
 OUTER:
-	for testname, data, err = tt.NextTest(tt.maxFileSize); err != io.EOF; testname, data, err = tt.NextTest(tt.maxFileSize) {
+	for testname, data, loopErr = tt.NextTest(tt.maxFileSize); loopErr != io.EOF; testname, data, loopErr = tt.NextTest(tt.maxFileSize) {
 		files++
-		if err != nil {
+		if loopErr != nil {
 			switch {
-			case err == io.EOF:
+			case loopErr == io.EOF:
 				break OUTER
-			case err == storage.ErrOversizeFile:
+			case loopErr == storage.ErrOversizeFile:
 				log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
 					tt.meta["filename"], testname, files,
-					time.Since(tt.meta["parse_time"].(time.Time)), err)
+					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
 				metrics.TestCount.WithLabelValues(
 					tt.Type(), "unknown", "oversize file").Inc()
 				continue OUTER
@@ -103,7 +116,7 @@ OUTER:
 				// the Task level.
 				log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
 					tt.meta["filename"], testname, files,
-					time.Since(tt.meta["parse_time"].(time.Time)), err)
+					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
 
 				metrics.TestCount.WithLabelValues(
 					tt.Type(), "unknown", "unrecovered").Inc()
@@ -129,35 +142,39 @@ OUTER:
 			metrics.FileSizeHistogram.WithLabelValues(
 				tt.Type(), kind, "parsed").Observe(float64(len(data)))
 		}
-		err = tt.Parser.ParseAndInsert(tt.meta, testname, data)
+		loopErr = tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
-		if err != nil {
+		if loopErr != nil {
 			metrics.TaskCount.WithLabelValues(
 				tt.Type(), "ParseAndInsertError").Inc()
-			log.Printf("%v", err)
+			log.Printf("%v", loopErr)
 			// TODO(dev) Handle this error properly!
 			continue
 		}
 	}
 
-	// Flush any rows cached in the inserter.
+	// There may be an error from the processing loop, but we wait to handle that
+	// error until after we flush and cached rows.
 	flushErr := tt.Flush()
-
 	if flushErr != nil {
 		log.Printf("%v", flushErr)
 	}
+
 	// TODO - make this debug or remove
 	log.Printf("Processed %d files, %d nil data, %d rows committed, %d failed, from %s into %s",
 		files, nilData, tt.Parser.Committed(), tt.Parser.Failed(),
 		tt.meta["filename"], tt.Parser.FullTableName())
-	// Return the file count, and the terminal error, if other than EOF.
-	if err != io.EOF {
-		return files, err
+
+	// We expect the loopErr to be io.EOF.  If it is something else, then
+	// it is an actual error, and we want to return that error.
+	if loopErr != io.EOF {
+		return files, loopErr
 	}
 
 	// Check if the overall task is OK, or should be rejected.
 	if tt.Parser.TaskError() != nil {
 		return files, tt.Parser.TaskError()
 	}
-	return files, nil
+	// Otherwise, return any error from the call to Flush.
+	return files, flushErr
 }

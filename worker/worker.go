@@ -18,6 +18,10 @@ import (
 	"github.com/m-lab/etl/task"
 )
 
+type nullCloser struct{}
+
+func (nc nullCloser) Close() error { return nil }
+
 // GetSource gets the TestSource for the filename.
 // fn is a gs:// GCS uri.
 func GetSource(client *gcs.Client, uri string) (etl.TestSource, etl.DataPath, int, error) {
@@ -106,7 +110,9 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 		log.Printf("Error creating parser for %s", dataType)
 		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", dataType)
 	}
-	tsk := task.NewTask(src.Detail(), src, p)
+
+	// The closer does nothing, so we could just provide a null closer.
+	tsk := task.NewTask(src.Detail(), src, p, &nullCloser{})
 
 	files, err := tsk.ProcessAllTests()
 
@@ -169,7 +175,7 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 		return nil, err
 	}
 
-	tsk := task.NewTask(dp.URI, src, p)
+	tsk := task.NewTask(dp.URI, src, p, sink)
 	return tsk, nil
 }
 

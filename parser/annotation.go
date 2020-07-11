@@ -109,7 +109,9 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	metrics.RowSizeHistogram.WithLabelValues(ap.TableName()).Observe(float64(len(test)))
 
 	// Insert the row.
-	ap.Base.Put(&row)
+	if err = ap.Base.Put(&row); err != nil {
+		return err
+	}
 
 	// Count successful inserts.
 	metrics.TestCount.WithLabelValues(ap.TableName(), "annotation", "ok").Inc()

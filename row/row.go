@@ -6,6 +6,7 @@ package row
 import (
 	"context"
 	"errors"
+	"io"
 	"log"
 	"sync"
 	"time"
@@ -109,6 +110,7 @@ type HasStats interface {
 // Implementations should be threadsafe.
 type Sink interface {
 	Commit(rows []interface{}, label string) (int, error)
+	io.Closer
 }
 
 // Buffer provides all basic functionality generally needed for buffering, annotating, and inserting
@@ -313,9 +315,14 @@ func (pb *Base) TaskError() error {
 	return nil
 }
 
+var logAnnError = logx.NewLogEvery(nil, 60*time.Second)
+
 func (pb *Base) commit(rows []interface{}) error {
-	// TODO - care about error?
-	_ = pb.ann.Annotate(rows, pb.label)
+	err := pb.ann.Annotate(rows, pb.label)
+	if err != nil {
+		logAnnError.Println("annotation: ", err)
+	}
+
 	// TODO do we need these to be done in order.
 	// This is synchronous, blocking, and thread safe.
 	done, err := pb.sink.Commit(rows, pb.label)
@@ -342,7 +349,7 @@ func (pb *Base) Flush() error {
 // sequential calls to Put.  However, once a block of rows is submitted
 // to pb.commit, it should be written in the same order to the Sink.
 // TODO improve Annotatable architecture.
-func (pb *Base) Put(row Annotatable) {
+func (pb *Base) Put(row Annotatable) error {
 	rows := pb.buf.Append(row)
 	pb.stats.Inc()
 
@@ -351,9 +358,11 @@ func (pb *Base) Put(row Annotatable) {
 		// TODO consider making this asynchronous.
 		err := pb.commit(rows)
 		if err != nil {
-			log.Println(err)
+			log.Println(pb.label, err)
+			return err
 		}
 	}
+	return nil
 }
 
 // NullAnnotator satisfies the Annotatable interface without actually doing
