@@ -21,7 +21,6 @@ import (
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/active"
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
@@ -255,9 +254,11 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	if err != nil {
 		return nil // TODO add an error?
 	}
+	// HACK for now
+	outputBucket := "json-" + os.Getenv("GCLOUD_PROJECT")
 	taskFactory := worker.StandardTaskFactory{
 		Annotator: factory.DefaultAnnotatorFactory(),
-		Sink:      bq.NewSinkFactory(),
+		Sink:      storage.NewSinkFactory(c, outputBucket),
 		Source:    storage.GCSSourceFactory(c),
 	}
 	return &runnable{&taskFactory, *obj}
@@ -298,7 +299,7 @@ func main() {
 	gardener := os.Getenv("GARDENER_HOST")
 	if len(gardener) > 0 {
 		log.Println("Using", gardener)
-		maxWorkers := 120
+		maxWorkers := 200
 		minPollingInterval := 10 * time.Second
 		gapi := mustGardenerAPI(mainCtx, gardener)
 		// Note that this does not currently track duration metric.
