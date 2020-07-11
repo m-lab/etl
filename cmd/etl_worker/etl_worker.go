@@ -324,7 +324,7 @@ func main() {
 	gardener := os.Getenv("GARDENER_HOST")
 	if len(gardener) > 0 {
 		log.Println("Using", gardener)
-		maxWorkers := 120
+		maxWorkers := 200
 		minPollingInterval := 10 * time.Second
 		gardenerAPI = mustGardenerAPI(mainCtx, gardener)
 		// Note that this does not currently track duration metric.
