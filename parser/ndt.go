@@ -167,7 +167,7 @@ func NewNDTParser(ins etl.Inserter, annotator ...v2as.Annotator) *NDTParser {
 // TaskError returns non-nil if more than 10% of row inserts failed.
 func (n *NDTParser) TaskError() error {
 	if n.Inserter.Committed() < 10*n.Inserter.Failed() {
-		log.Printf("Warning: high row insert errors: %d / %d\n",
+		log.Printf("Warning: high row commit errors: %d / %d\n",
 			n.Inserter.Accepted(), n.Inserter.Failed())
 		return errors.New("too many insertion failures")
 	}

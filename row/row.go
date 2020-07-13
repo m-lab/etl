@@ -358,7 +358,17 @@ func (pb *Base) Put(row Annotatable) error {
 
 	if rows != nil {
 		pb.stats.MoveToPending(len(rows))
-		return pb.commit(rows)
+		err := pb.commit(rows)
+		if err != nil {
+			// Note that error is likely associated with buffered rows, not the current
+			// row.
+			// When using GCS output, this may result in a corrupted json file.
+			// In that event, the test count may become meaningless.
+			metrics.TestCount.WithLabelValues(pb.label, pb.label, "error").Inc()
+			metrics.ErrorCount.WithLabelValues(
+				pb.label, "", "put error").Inc()
+			return err
+		}
 	}
 	return nil
 }

@@ -25,13 +25,14 @@ import (
 //                       NDT7Result Parser
 //=====================================================================================
 
-// NDT7ResultParser
+// NDT7ResultParser handles parsing of NDT7Result archives.
 type NDT7ResultParser struct {
 	*row.Base
 	table  string
 	suffix string
 }
 
+// NewNDT7ResultParser returns a parser for NDT7Result archives.
 func NewNDT7ResultParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.NDT7.BQBufferSize()
 	if ann == nil {
@@ -45,10 +46,13 @@ func NewNDT7ResultParser(sink row.Sink, table, suffix string, ann v2as.Annotator
 	}
 }
 
+// TaskError returns non-nil if the task had enough failures to justify
+// recording the entire task as in error.  For now, this is any failure
+// rate exceeding 10%.
 func (dp *NDT7ResultParser) TaskError() error {
 	stats := dp.GetStats()
 	if stats.Total() < 10*stats.Failed {
-		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
+		log.Printf("Warning: high row commit errors (more than 10%%): %d failed of %d accepted\n",
 			stats.Failed, stats.Total())
 		return etl.ErrHighInsertionFailureRate
 	}

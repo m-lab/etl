@@ -37,23 +37,26 @@ func (ann *nullAnnotator) GetAnnotations(ctx context.Context, date time.Time, ip
 }
 
 // NewAnnotationParser creates a new parser for annotation data.
-func NewAnnotationParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+func NewAnnotationParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.ANNOTATION.BQBufferSize()
 	if ann == nil {
 		ann = &nullAnnotator{}
 	}
 
 	return &AnnotationParser{
-		Base:   row.NewBase(table, sink, bufSize, ann),
-		table:  table,
+		Base:   row.NewBase(label, sink, bufSize, ann),
+		table:  label,
 		suffix: suffix,
 	}
 }
 
+// TaskError returns non-nil if the task had enough failures to justify
+// recording the entire task as in error.  For now, this is any failure
+// rate exceeding 10%.
 func (ap *AnnotationParser) TaskError() error {
 	stats := ap.GetStats()
 	if stats.Total() < 10*stats.Failed {
-		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
+		log.Printf("Warning: high row commit errors (more than 10%%): %d failed of %d accepted\n",
 			stats.Failed, stats.Total())
 		return etl.ErrHighInsertionFailureRate
 	}

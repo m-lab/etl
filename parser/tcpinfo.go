@@ -73,11 +73,11 @@ func (p *TCPInfoParser) TableName() string {
 }
 
 // TaskError return the task level error, based on failed rows, or any other criteria.
-// TaskError returns non-nil if more than 10% of row inserts failed.
+// TaskError returns non-nil if more than 10% of row commits failed.
 func (p *TCPInfoParser) TaskError() error {
 	stats := p.GetStats()
 	if stats.Total() < 10*stats.Failed {
-		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
+		log.Printf("Warning: high row commit errors (more than 10%%): %d failed of %d accepted\n",
 			stats.Failed, stats.Total())
 		return etl.ErrHighInsertionFailureRate
 	}
@@ -195,13 +195,6 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 	}
 
 	if err := p.Put(&row); err != nil {
-		// Note that error is likely associated with buffered rows, not the current
-		// row.
-		// When using GCS output, this may result in a corrupted json file.
-		// In that event, the test count may become meaningless.
-		metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "error").Inc()
-		metrics.ErrorCount.WithLabelValues(
-			p.TableName(), "", "put error").Inc()
 		return err
 	}
 	metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "ok").Inc()
