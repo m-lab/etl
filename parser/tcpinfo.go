@@ -73,11 +73,11 @@ func (p *TCPInfoParser) TableName() string {
 }
 
 // TaskError return the task level error, based on failed rows, or any other criteria.
-// TaskError returns non-nil if more than 10% of row inserts failed.
+// TaskError returns non-nil if more than 10% of row commits failed.
 func (p *TCPInfoParser) TaskError() error {
 	stats := p.GetStats()
 	if stats.Total() < 10*stats.Failed {
-		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
+		log.Printf("Warning: high row commit errors (more than 10%%): %d failed of %d accepted\n",
 			stats.Failed, stats.Total())
 		return etl.ErrHighInsertionFailureRate
 	}
@@ -158,12 +158,16 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 		log.Println(err)
 		log.Println(string(rawContent))
 		metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "decode error").Inc()
+		metrics.ErrorCount.WithLabelValues(
+			p.TableName(), "", "decode error").Inc()
 		return err
 	}
 
 	if len(snaps) < 1 {
 		// For now, we don't save rows with no snapshots.
 		metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "no-snaps").Inc()
+		metrics.WarningCount.WithLabelValues(
+			p.TableName(), "", "no-snaps").Inc()
 		return nil
 	}
 
@@ -190,10 +194,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 		}
 	}
 
-	// For GCS, errors here are generally fatal.
-	// For BigQuery, errors here could be fatal, or could be due to quota exceeded.
-	err = p.Put(&row)
-	if err != nil {
+	if err := p.Put(&row); err != nil {
 		return err
 	}
 	metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "ok").Inc()

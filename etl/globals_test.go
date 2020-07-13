@@ -86,11 +86,11 @@ func TestValidateTestPath(t *testing.T) {
 		},
 		{
 			name:     "pusher-tcpinfo-tgz",
-			path:     `gs://pusher-mlab-staging/ndt/tcpinfo/2019/05/25/20190525T020001.697396Z-tcpinfo-mlab4-ord01-ndt.tgz`,
+			path:     `gs://pusher-mlab-staging/ndt/tcpinfo/2019/05/25/20190525T020001.697396Z-tcpinfo-mlab4-ord01-ndt-0001.tgz`,
 			wantType: etl.TCPINFO,
 			want: etl.DataPath{
-				`gs://pusher-mlab-staging/ndt/tcpinfo/2019/05/25/20190525T020001.697396Z-tcpinfo-mlab4-ord01-ndt.tgz`,
-				"pusher-mlab-staging", "ndt", "tcpinfo", "2019/05/25", "20190525", "020001", "tcpinfo", "mlab4", "ord01", "ndt", "", "", ".tgz",
+				`gs://pusher-mlab-staging/ndt/tcpinfo/2019/05/25/20190525T020001.697396Z-tcpinfo-mlab4-ord01-ndt-0001.tgz`,
+				"pusher-mlab-staging", "ndt", "tcpinfo", "2019/05/25", "20190525", "020001.697396", "tcpinfo", "mlab4", "ord01", "ndt", "0001", "", ".tgz",
 			},
 		},
 		{
@@ -104,11 +104,11 @@ func TestValidateTestPath(t *testing.T) {
 		},
 		{
 			name:     "scamper-tgz",
-			path:     `gs://archive-mlab-oti/ndt/traceroute/2019/06/20/20190620T224809.435046Z-traceroute-mlab1-den06-ndt.tgz`,
+			path:     `gs://archive-mlab-oti/ndt/traceroute/2019/06/20/20190620T224809.435046Z-traceroute-mlab1-den06-ndt-0001.tgz`,
 			wantType: etl.PT,
 			want: etl.DataPath{
-				`gs://archive-mlab-oti/ndt/traceroute/2019/06/20/20190620T224809.435046Z-traceroute-mlab1-den06-ndt.tgz`,
-				"archive-mlab-oti", "ndt", "traceroute", "2019/06/20", "20190620", "224809", "traceroute", "mlab1", "den06", "ndt", "", "", ".tgz",
+				`gs://archive-mlab-oti/ndt/traceroute/2019/06/20/20190620T224809.435046Z-traceroute-mlab1-den06-ndt-0001.tgz`,
+				"archive-mlab-oti", "ndt", "traceroute", "2019/06/20", "20190620", "224809.435046", "traceroute", "mlab1", "den06", "ndt", "0001", "", ".tgz",
 			},
 		},
 	}
@@ -116,12 +116,12 @@ func TestValidateTestPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := etl.ValidateTestPath(tt.path)
 			if (err != nil) != tt.wantErr {
-				log.Println(tt.path)
+				t.Log(tt.path)
 				t.Errorf("ValidateTestPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got.GetDataType() != tt.wantType {
-				t.Error(got.GetDataType(), "!=", tt.wantType)
+				t.Error(tt.name, got.GetDataType(), "!=", tt.wantType, got)
 				return
 			}
 			if !tt.wantErr {

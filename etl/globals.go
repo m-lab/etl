@@ -47,7 +47,7 @@ const ExpTypePattern = `(?:([a-z-]+)/)?([a-z0-9-]+)/` // experiment OR experimen
 // DatePathPattern is used to extract the date directory part of the path, e.g. 2017/01/02
 const DatePathPattern = `(\d{4}/[01]\d/[0123]\d)/`
 
-const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6})(\.\d{0,6})?Z`
+const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6}(\.\d{0,6})?)Z`
 
 const type2 = `(?:-([a-z0-9-]+))?` // optional datatype string
 const mlabNSiteNN = `-(mlab\d)-([a-z]{3}\d[0-9t])-`

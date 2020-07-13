@@ -9,7 +9,9 @@ import (
 
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
+	"google.golang.org/api/googleapi"
 )
 
 // ObjectWriter creates a writer to a named object.
@@ -102,8 +104,11 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 		j, err := json.Marshal(rows[i])
 		if err != nil {
 			rw.releaseEncodingToken()
+			metrics.BackendFailureCount.WithLabelValues(
+				label, "encoding error").Inc()
 			return 0, err
 		}
+		metrics.RowSizeHistogram.WithLabelValues(label).Observe(float64(len(j)))
 		buf.Write(j)
 		buf.WriteByte('\n')
 	}
@@ -112,7 +117,19 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 	defer rw.releaseWritingToken()
 	n, err := buf.WriteTo(rw.w) // This is buffered (by 4MB chunks).  Are the writes to GCS synchronous?
 	if err != nil {
-		log.Println(err, rw.bucket, rw.path)
+		switch typedErr := err.(type) {
+		case *googleapi.Error:
+			metrics.BackendFailureCount.WithLabelValues(
+				label, "googleapi.Error").Inc()
+			log.Println(typedErr, rw.bucket, rw.path)
+			for _, e := range typedErr.Errors {
+				log.Println(e)
+			}
+		default:
+			metrics.BackendFailureCount.WithLabelValues(
+				label, "other error").Inc()
+			log.Println(typedErr, rw.bucket, rw.path)
+		}
 		// This approximates the number of rows written prior to error.
 		// It is unclear whether these rows will actually show up.
 		// The caller should likely abandon the archive at this point,
@@ -121,6 +138,7 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 		return int(n) * len(rows) / numBytes, err
 	}
 
+	// TODO - these may not be committed, so the returned value may be wrong.
 	return len(rows), nil
 }
 

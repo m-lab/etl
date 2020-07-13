@@ -96,7 +96,9 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 	for {
 		run, err := rSrc.Next(ctx)
 		if err != nil {
-			debug.Println(err)
+			metrics.BackendFailureCount.WithLabelValues(
+				job.Datatype, "rSrc.Next").Inc()
+			log.Println(err)
 			return eg, err
 		}
 
@@ -131,6 +133,8 @@ func (g *GardenerAPI) JobFileSource(ctx context.Context, job tracker.Job,
 
 	filter, err := regexp.Compile(job.Filter)
 	if err != nil {
+		JobFailures.WithLabelValues(
+			job.Experiment+"/"+job.Datatype, job.Date.Format("2006"), "filter compile").Inc()
 		return nil, err
 	}
 	lister := FileListerFunc(g.gcs, job.Path(), filter)
