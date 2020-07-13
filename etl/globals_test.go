@@ -24,14 +24,18 @@ func TestValidateTestPath(t *testing.T) {
 		want     etl.DataPath
 		wantErr  bool
 	}{
-		{name: "error-bad-uri-prefix",
+		{
+			name:     "error-bad-uri-prefix",
 			path:     `xgs://m-lab-sandbox/ndt/2016/01/26/20160126T123456Z-mlab1-prg01-ndt-0007.tgz`,
 			wantErr:  true,
-			wantType: "invalid"},
-		{name: "error-bad-extension",
+			wantType: "invalid",
+		},
+		{
+			name:     "error-bad-extension",
 			path:     `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.gz.baz`,
 			wantErr:  true,
-			wantType: "invalid"},
+			wantType: "invalid",
+		},
 		{
 			name:     "error-bad-pod-name",
 			path:     `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg1-ndt-0007.tar.gz`,
@@ -124,10 +128,6 @@ func TestValidateTestPath(t *testing.T) {
 				if diff := deep.Equal(got, tt.want); diff != nil {
 					log.Println(tt.path)
 					t.Errorf("%s: %v\n", tt.name, diff)
-				}
-				recon := fmt.Sprintf("gs://%s/%s%s", got.Bucket, got.PathAndFilename(), tt.want.Suffix)
-				if recon != tt.path {
-					t.Error(tt.name, "expected:", tt.path, "got:", recon, "\n", tt.want)
 				}
 			}
 		})
