@@ -8,25 +8,24 @@ Version:
   Description: Version is the symbolic version (if any) of the running server
     code.
 ServerIP:
-  Description:
+  Description: The IP address assigned to the server through which the test was conducted.
 ServerPort:
-  Description:
+  Description: The port used by the server to conduct the test.
 ClientIP:
-  Description:
+  Description: The IP address assigned to the client from which the test was conducted.
 ClientPort:
-  Description:
+  Description: The port used by the client to conduct the test.
 StartTime:
-  Description:
+  Description: The date and time when the test began in UTC.
 EndTime:
-  Description:
+  Description: The date and time when the test ended in UTC.
 Control:
   Description: Metadata for TCP connections to the NDT5 control channel. All
     NDT5 measurements have a control channel.
 Control.UUID:
-  Description: UUID for control channel.
+  Description: The Universally Unique Identifier for the test's control channel.
 Control.Protocol:
-  Description: Protocol used for S2C and C2S measurements. Values include WS,
-    WSS, and PLAIN.
+  Description: The protocol used for S2C and C2S measurements. Values include WS, WSS, and PLAIN.
 Control.MessageProtocol:
   Description: Individual messages are sent with the MessageProtocol. Values
     include JSON, TLV.
@@ -38,98 +37,97 @@ Control.ClientMetadata.Value:
   Description:
 
 C2S:
-  Description: Metadata for Client-to-Server measurements performed using the
-    NDT5 protocol, e.g. "Upload".
+  Description: Metadata for Client-to-Server (upload) measurements performed using the ndt5 protocol.
 C2S.ServerIP:
-  Description:
+  Description: The IP address assigned to the server through which the upload test was conducted.
 C2S.ServerPort:
-  Description:
+  Description: The port used by the server to conduct the upload test.
 C2S.ClientIP:
-  Description:
+  Description: The IP address assigned to the client from which the upload test was conducted.
 C2S.ClientPort:
-  Description:
+  Description: The port used by the client to conduct the upload test.
 C2S.UUID:
-  Description: UUID for C2S TCP connection.
+  Description: The Universally Unique Identifier assigned to the upload test.
 C2S.MeanThroughputMbps:
-  Description: Server calculated average upload rate.
-C2S.Error:
-  Description:
+  Description: The upload rate as calculated by the server. Presented in megabits per second, or Mbit/s, this value is the average of measurement snapshots taken by the server during each ndt5 test. Therefore it is identified as "MeanThroughputMbps".
+S2C.Error:
+  Description: Any error message(s) recorded during a download test.
 
 S2C:
-  Description: Metadata for Server-to-Client measurements performed using the
-    NDT5 protocol, e.g. "Download".
+  Description: Metadata for Server-to-Client (download) measurements performed using the ndt5 protocol.
 S2C.UUID:
-  Description: UUID for S2C TCP connection.
+  Description: The Universally Unique Identifier assigned to the download test.
 S2C.ServerIP:
-  Description:
+  Description: The IP address assigned to the server through which the download test was conducted.
 S2C.ServerPort:
-  Description:
+  Description: The port used by the server to conduct the download test.
 S2C.ClientIP:
-  Description:
+  Description: The IP address assigned to the client from which the download test was conducted. 
 S2C.ClientPort:
-  Description:
+  Description: The port used by the client to conduct the download test.
 S2C.StartTime:
-  Description:
+  Description: The date and time when the download test began in UTC.
 S2C.EndTime:
-  Description:
+  Description: The date and time when the download test ended in UTC.
 S2C.MeanThroughputMbps:
-  Description: Server calculated average download rate.
+  Description: The download rate as calculated by the server. Saved in megabits per second, or Mbit/s, this value is the average of measurement snapshots taken by the server during each ndt5 test. Therefore it is identified as "MeanThroughputMbps".
 S2C.MinRTT:
-  Description: The minimum RTT observed during the download measurement.
+  Description: The minimum RTT observed during the download measurement, recorded in milliseconds.
 S2C.ClientReportedMbps:
-  Description: The client reported average download rate.
+  Description: The download rate as calculated by the client, in megabits per secont, or Mbit/s.
 S2C.Error:
-  Description:
+  Description: Any error message(s) recorded during a download test.
+
 Upload:
   Description:
-Upload.UUID:
+Upload.UUID: The Universally Unique Identifier assigned to the upload test.
   Description:
 Upload.StartTime:
-  Description:
+  Description: The date and time when the upload test began in UTC.
 Upload.EndTime:
-  Description:
+  Description: The date and time when the upload test ended in UTC.
 Upload.ServerMeasurements:
   Description:
 Upload.ServerMeasurements.AppInfo:
   Description:
 Upload.ServerMeasurements.AppInfo.NumBytes:
-  Description:
+  Description: The number of bytes uploaded to the M-Lab server during an upload test, as measured by the M-Lab server.
 Upload.ServerMeasurements.BBRInfo:
   Description:
 Upload.ServerMeasurements.BBRInfo.MaxBandwidth:
-  Description:
+  Description: The maximum end to end bandwidth between the client and server as measured the M-Lab server using BBR.
 Upload.ServerMeasurements.BBRInfo.MinRTT:
-  Description:
+  Description: The minimum round trip time as measured by the M-Lab server using BBR.
 Upload.ServerMeasurements.Elapsed:
-  Description:
+  Description: The duration of an upload test as measured by the M-Lab server in milliseconds.
 Upload.ServerMeasurements.TCPInfo:
   Description:
 Upload.ServerMeasurements.TCPInfo.SmoothedRTT:
-  Description:
+  Description: SmoothedRTT is used in combination with RTTVar to calculate retransmission timeout (RTO). For more information please see https://tools.ietf.org/html/rfc6298 
 Upload.ServerMeasurements.TCPInfo.RTTVar:
-  Description:
+  Description: The variation in round trip time during the upload test as measured by the M-Lab server.
 Upload.ClientMeasurements:
   Description:
 Upload.ClientMeasurements.AppInfo:
   Description:
 Upload.ClientMeasurements.AppInfo.NumBytes:
-  Description:
+  Description: The number of bytes uploaded to the M-Lab server during an upload test, as measured by the client.
 Upload.ClientMeasurements.BBRInfo:
   Description:
 Upload.ClientMeasurements.BBRInfo.MaxBandwidth:
-  Description:
+  Description: The maximum end to end bandwidth between the client and server as measured the client using BBR.
 Upload.ClientMeasurements.BBRInfo.MinRTT:
-  Description:
+  Description: The minimum round trip time as measured by the client using BBR.
 Upload.ClientMeasurements.Elapsed:
-  Description:
+  Description: The duration of an upload test as measured by the client in milliseconds.
 Upload.ClientMeasurements.TCPInfo:
   Description:
 Upload.ClientMeasurements.TCPInfo.SmoothedRTT:
-  Description:
+  Description: SmoothedRTT is used in combination with RTTVar to calculate retransmission timeout (RTO). For more information please see https://tools.ietf.org/html/rfc6298 
 Upload.ClientMeasurements.TCPInfo.RTTVar:
-  Description:
+  Description: The variation in round trip time during the upload test as measured by the client.
 Upload.ClientMetadata:
-  Description:
+  Description: Client-reported metadata as name/value pairs.
 Upload.ClientMetadata.Name:
   Description:
 Upload.ClientMetadata.Value:
@@ -137,54 +135,54 @@ Upload.ClientMetadata.Value:
 
 Download:
   Description:
-Download.UUID:
+Download.UUID: The Universally Unique Identifier assigned to the upload test.
   Description:
 Download.StartTime:
-  Description:
+  Description: The date and time when the upload test began in UTC.
 Download.EndTime:
-  Description:
+  Description: The date and time when the upload test ended in UTC.
 Download.ServerMeasurements:
   Description:
 Download.ServerMeasurements.AppInfo:
   Description:
 Download.ServerMeasurements.AppInfo.NumBytes:
-  Description:
-Download.ServerMeasurements.BBRInfo:
+  Description: The number of bytes uploaded to the M-Lab server during an upload test, as measured by the M-Lab server.
+Upload.ServerMeasurements.BBRInfo:
   Description:
 Download.ServerMeasurements.BBRInfo.MaxBandwidth:
-  Description:
+  Description: The maximum end to end bandwidth between the client and server as measured the M-Lab server using BBR.
 Download.ServerMeasurements.BBRInfo.MinRTT:
-  Description:
+  Description: The minimum round trip time as measured by the M-Lab server using BBR.
 Download.ServerMeasurements.Elapsed:
-  Description:
+  Description: The duration of an upload test as measured by the M-Lab server in milliseconds.
 Download.ServerMeasurements.TCPInfo:
   Description:
 Download.ServerMeasurements.TCPInfo.SmoothedRTT:
-  Description:
+  Description: SmoothedRTT is used in combination with RTTVar to calculate retransmission timeout (RTO). For more information please see https://tools.ietf.org/html/rfc6298 
 Download.ServerMeasurements.TCPInfo.RTTVar:
-  Description:
+  Description: The variation in round trip time during the download test as measured by the M-Lab server.
 Download.ClientMeasurements:
   Description:
 Download.ClientMeasurements.AppInfo:
   Description:
 Download.ClientMeasurements.AppInfo.NumBytes:
-  Description:
+  Description: The number of bytes uploaded to the M-Lab server during an upload test, as measured by the client.
 Download.ClientMeasurements.BBRInfo:
   Description:
 Download.ClientMeasurements.BBRInfo.MaxBandwidth:
-  Description:
+  Description: The maximum end to end bandwidth between the client and server as measured the client using BBR.
 Download.ClientMeasurements.BBRInfo.MinRTT:
-  Description:
+  Description: The minimum round trip time as measured by the client using BBR.
 Download.ClientMeasurements.Elapsed:
-  Description:
+  Description: The duration of an upload test as measured by the client in milliseconds.
 Download.ClientMeasurements.TCPInfo:
   Description:
 Download.ClientMeasurements.TCPInfo.SmoothedRTT:
-  Description:
+  Description: SmoothedRTT is used in combination with RTTVar to calculate retransmission timeout (RTO). For more information please see https://tools.ietf.org/html/rfc6298 
 Download.ClientMeasurements.TCPInfo.RTTVar:
-  Description:
+  Description: The variation in round trip time during the download test as measured by the client.
 Download.ClientMetadata:
-  Description:
+  Description: Client-reported metadata as name/value pairs.
 Download.ClientMetadata.Name:
   Description:
 Download.ClientMetadata.Value:
