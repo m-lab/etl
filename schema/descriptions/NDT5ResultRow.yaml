@@ -73,117 +73,117 @@ S2C.MeanThroughputMbps:
   Description: The download rate as calculated by the server. Saved in megabits per second, or Mbit/s, this value is the average of tcp-info snapshots taken at the beginning and end of an ndt5 measurement. Therefore it is identified as "MeanThroughputMbps".
 S2C.MinRTT:
   Description: The minimum RTT observed during the download measurement, recorded in milliseconds.
+S2C.MaxRTT:
+  Description:
+S2C.SumRTT:
+  Description:
+S2C.CountRTT:
+  Description:
 S2C.ClientReportedMbps:
   Description: The download rate as calculated by the client, in megabits per secont, or Mbit/s. Not all clients report this value.
+S2C.TCPInfo:
+  Description:
+S2C.TCPInfo.State:
+  Description:
+S2C.TCPInfo.CAState:
+  Description:
+S2C.TCPInfo.Retransmits:
+  Description:
+S2C.TCPInfo.Probes:
+  Description:
+S2C.TCPInfo.Backoff:
+  Description:
+S2C.TCPInfo.Options:
+  Description:
+S2C.TCPInfo.WScale:
+  Description:
+S2C.TCPInfo.AppLimited:
+  Description:
+S2C.TCPInfo.RTO:
+  Description:
+S2C.TCPInfo.ATO:
+  Description:
+S2C.TCPInfo.SndMSS:
+  Description:
+S2C.TCPInfo.RcvMSS:
+  Description:
+S2C.TCPInfo.Unacked:
+  Description:
+S2C.TCPInfo.Sacked:
+  Description:
+S2C.TCPInfo.Lost:
+  Description:
+S2C.TCPInfo.Retrans:
+  Description:
+S2C.TCPInfo.Fackets:
+  Description:
+S2C.TCPInfo.LastDataSent:
+  Description:
+S2C.TCPInfo.LastAckSent:
+  Description:
+S2C.TCPInfo.LastDataRecv:
+  Description:
+S2C.TCPInfo.PMTU:
+  Description:
+S2C.TCPInfo.RcvSsThresh:
+  Description:
+S2C.TCPInfo.RTT:
+  Description:
+S2C.TCPInfo.RTTVar:
+  Description:
+S2C.TCPInfo.SndSsThresh:
+  Description:
+S2C.TCPInfo.SndCwnd:
+  Description:
+S2C.TCPInfo.AdvMSS:
+  Description:
+S2C.TCPInfo.Reordering:
+  Description:
+S2C.TCPInfo.RcvRTT:
+  Description:
+S2C.TCPInfo.RcvSpace:
+  Description:
+S2C.TCPInfo.TotalRetrans:
+  Description:
+S2C.TCPInfo.PacingRate:
+  Description:
+S2C.TCPInfo.MaxPacingRate:
+  Description:
+S2C.TCPInfo.BytesAcked:
+  Description:
+S2C.TCPInfo.BytesReceived:
+  Description:
+S2C.TCPInfo.SegsOut:
+  Description:
+S2C.TCPInfo.SegsIn:
+  Description:
+S2C.TCPInfo.NotsentBytes:
+  Description:
+S2C.TCPInfo.MinRTT:
+  Description:
+S2C.TCPInfo.DataSegsIn:
+  Description:
+S2C.TCPInfo.DataSegsOut:
+  Description:
+S2C.TCPInfo.DeliveryRate:
+  Description:
+S2C.TCPInfo.BusyTime:
+  Description:
+S2C.TCPInfo.RWndLimited:
+  Description:
+S2C.TCPInfo.SndBufLimited:
+  Description:
+S2C.TCPInfo.Delivered:
+  Description:
+S2C.TCPInfo.DeliveredCE:
+  Description:
+S2C.TCPInfo.BytesSent:
+  Description:
+S2C.TCPInfo.BytesRetrans:
+  Description:
+S2C.TCPInfo.DSackDups:
+  Description:
+S2C.TCPInfo.ReordSeen:
+  Description:
 S2C.Error:
   Description: Any error message(s) recorded during a download measurement.
-
-Upload:
-  Description:
-Upload.UUID: The Universally Unique Identifier assigned to the upload measurement.
-  Description:
-Upload.StartTime:
-  Description: The date and time when the upload measurement began in UTC.
-Upload.EndTime:
-  Description: The date and time when the upload measurement ended in UTC.
-Upload.ServerMeasurements:
-  Description:
-Upload.ServerMeasurements.AppInfo:
-  Description:
-Upload.ServerMeasurements.AppInfo.NumBytes:
-  Description: The number of bytes uploaded to the M-Lab server during an upload measurement, as measured by the M-Lab server.
-Upload.ServerMeasurements.BBRInfo:
-  Description:
-Upload.ServerMeasurements.BBRInfo.MaxBandwidth:
-  Description: The maximum end to end bandwidth between the client and server as measured the M-Lab server using BBR.
-Upload.ServerMeasurements.BBRInfo.MinRTT:
-  Description: The minimum round trip time as measured by the M-Lab server using BBR.
-Upload.ServerMeasurements.Elapsed:
-  Description: The duration of an upload test as measured by the M-Lab server in milliseconds.
-Upload.ServerMeasurements.TCPInfo:
-  Description:
-Upload.ServerMeasurements.TCPInfo.SmoothedRTT:
-  Description: SmoothedRTT is used in combination with RTTVar to calculate retransmission timeout (RTO). For more information please see https://tools.ietf.org/html/rfc6298 
-Upload.ServerMeasurements.TCPInfo.RTTVar:
-  Description: The variation in round trip time during the upload measurement as measured by the M-Lab server.
-Upload.ClientMeasurements:
-  Description: Periodic measurements reported by the client. Not all clients report this information.
-Upload.ClientMeasurements.AppInfo:
-  Description:
-Upload.ClientMeasurements.AppInfo.NumBytes:
-  Description: The number of bytes uploaded to the M-Lab server during an upload measurement, as measured by the client.
-Upload.ClientMeasurements.BBRInfo:
-  Description:
-Upload.ClientMeasurements.BBRInfo.MaxBandwidth:
-  Description: The maximum end to end bandwidth between the client and server as measured the client using BBR.
-Upload.ClientMeasurements.BBRInfo.MinRTT:
-  Description: The minimum round trip time as measured by the client using BBR.
-Upload.ClientMeasurements.Elapsed:
-  Description: The duration of an upload test as measured by the client in milliseconds.
-Upload.ClientMeasurements.TCPInfo:
-  Description:
-Upload.ClientMeasurements.TCPInfo.SmoothedRTT:
-  Description: SmoothedRTT is used in combination with RTTVar to calculate retransmission timeout (RTO). For more information please see https://tools.ietf.org/html/rfc6298 
-Upload.ClientMeasurements.TCPInfo.RTTVar:
-  Description: The variation in round trip time during the upload measurement as measured by the client.
-Upload.ClientMetadata:
-  Description: Client-reported metadata as name/value pairs.
-Upload.ClientMetadata.Name:
-  Description: If set, contains text that identifies and provides context for the corresponding metadata value. For example, "OS" or "clientApplication"
-Upload.ClientMetadata.Value:
-  Description: If set, contains a value corresponding to metadata name. For example, "Windows 10" or "ndtJS"
-
-Download:
-  Description:
-Download.UUID: The Universally Unique Identifier assigned to the upload measurement.
-  Description:
-Download.StartTime:
-  Description: The date and time when the upload measurement began in UTC.
-Download.EndTime:
-  Description: The date and time when the upload measurement ended in UTC.
-Download.ServerMeasurements:
-  Description:
-Download.ServerMeasurements.AppInfo:
-  Description:
-Download.ServerMeasurements.AppInfo.NumBytes:
-  Description: The number of bytes uploaded to the M-Lab server during an upload test, as measured by the M-Lab server.
-Upload.ServerMeasurements.BBRInfo:
-  Description:
-Download.ServerMeasurements.BBRInfo.MaxBandwidth:
-  Description: The maximum end to end bandwidth between the client and server as measured the M-Lab server using BBR.
-Download.ServerMeasurements.BBRInfo.MinRTT:
-  Description: The minimum round trip time as measured by the M-Lab server using BBR.
-Download.ServerMeasurements.Elapsed:
-  Description: The duration of an upload measurement as measured by the M-Lab server in milliseconds.
-Download.ServerMeasurements.TCPInfo:
-  Description:
-Download.ServerMeasurements.TCPInfo.SmoothedRTT:
-  Description: SmoothedRTT is used in combination with RTTVar to calculate retransmission timeout (RTO). For more information please see https://tools.ietf.org/html/rfc6298 
-Download.ServerMeasurements.TCPInfo.RTTVar:
-  Description: The variation in round trip time during the download measurement as measured by the M-Lab server.
-Download.ClientMeasurements:
-  Description:
-Download.ClientMeasurements.AppInfo:
-  Description:
-Download.ClientMeasurements.AppInfo.NumBytes:
-  Description: The number of bytes uploaded to the M-Lab server during an upload test, as measured by the client.
-Download.ClientMeasurements.BBRInfo:
-  Description:
-Download.ClientMeasurements.BBRInfo.MaxBandwidth:
-  Description: The maximum end to end bandwidth between the client and server as measured the client using BBR.
-Download.ClientMeasurements.BBRInfo.MinRTT:
-  Description: The minimum round trip time as measured by the client using BBR.
-Download.ClientMeasurements.Elapsed:
-  Description: The duration of an upload test as measured by the client in milliseconds.
-Download.ClientMeasurements.TCPInfo:
-  Description:
-Download.ClientMeasurements.TCPInfo.SmoothedRTT:
-  Description: SmoothedRTT is used in combination with RTTVar to calculate retransmission timeout (RTO). For more information please see https://tools.ietf.org/html/rfc6298 
-Download.ClientMeasurements.TCPInfo.RTTVar:
-  Description: The variation in round trip time during the download measurement as measured by the client.
-Download.ClientMetadata:
-  Description: Client-reported metadata as name/value pairs.
-Download.ClientMetadata.Name:
-  Description: If set, contains text that identifies and provides context for the corresponding metadata value. For example, "OS" or "clientApplication"
-Download.ClientMetadata.Value:
-  Description: If set, contains a value corresponding to metadata name. For example, "Windows 10" or "ndtJS"
