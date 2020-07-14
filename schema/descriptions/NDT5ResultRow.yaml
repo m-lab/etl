@@ -1,10 +1,24 @@
+partition_date:
+  Description: The date when each test was conducted in UTC.
+
 GitShortCommit:
   Description: GitShortCommit is the Git commit (short form) of the running
     server code.
 Version:
   Description: Version is the symbolic version (if any) of the running server
     code.
-
+ServerIP:
+  Description:
+ServerPort:
+  Description:
+ClientIP:
+  Description:
+ClientPort:
+  Description:
+StartTime:
+  Description:
+EndTime:
+  Description:
 Control:
   Description: Metadata for TCP connections to the NDT5 control channel. All
     NDT5 measurements have a control channel.
@@ -18,23 +32,160 @@ Control.MessageProtocol:
     include JSON, TLV.
 Control.ClientMetadata:
   Description: Client-reported metadata as name/value pairs.
+Control.ClientMetadata.Name:
+  Description:
+Control.ClientMetadata.Value:
+  Description:
 
 C2S:
   Description: Metadata for Client-to-Server measurements performed using the
     NDT5 protocol, e.g. "Upload".
+C2S.ServerIP:
+  Description:
+C2S.ServerPort:
+  Description:
+C2S.ClientIP:
+  Description:
+C2S.ClientPort:
+  Description:
 C2S.UUID:
   Description: UUID for C2S TCP connection.
 C2S.MeanThroughputMbps:
   Description: Server calculated average upload rate.
+C2S.Error:
+  Description:
 
 S2C:
   Description: Metadata for Server-to-Client measurements performed using the
     NDT5 protocol, e.g. "Download".
 S2C.UUID:
   Description: UUID for S2C TCP connection.
+S2C.ServerIP:
+  Description:
+S2C.ServerPort:
+  Description:
+S2C.ClientIP:
+  Description:
+S2C.ClientPort:
+  Description:
+S2C.StartTime:
+  Description:
+S2C.EndTime:
+  Description:
 S2C.MeanThroughputMbps:
   Description: Server calculated average download rate.
 S2C.MinRTT:
   Description: The minimum RTT observed during the download measurement.
 S2C.ClientReportedMbps:
   Description: The client reported average download rate.
+S2C.Error:
+  Description:
+Upload:
+  Description:
+Upload.UUID:
+  Description:
+Upload.StartTime:
+  Description:
+Upload.EndTime:
+  Description:
+Upload.ServerMeasurements:
+  Description:
+Upload.ServerMeasurements.AppInfo:
+  Description:
+Upload.ServerMeasurements.AppInfo.NumBytes:
+  Description:
+Upload.ServerMeasurements.BBRInfo:
+  Description:
+Upload.ServerMeasurements.BBRInfo.MaxBandwidth:
+  Description:
+Upload.ServerMeasurements.BBRInfo.MinRTT:
+  Description:
+Upload.ServerMeasurements.Elapsed:
+  Description:
+Upload.ServerMeasurements.TCPInfo:
+  Description:
+Upload.ServerMeasurements.TCPInfo.SmoothedRTT:
+  Description:
+Upload.ServerMeasurements.TCPInfo.RTTVar:
+  Description:
+Upload.ClientMeasurements:
+  Description:
+Upload.ClientMeasurements.AppInfo:
+  Description:
+Upload.ClientMeasurements.AppInfo.NumBytes:
+  Description:
+Upload.ClientMeasurements.BBRInfo:
+  Description:
+Upload.ClientMeasurements.BBRInfo.MaxBandwidth:
+  Description:
+Upload.ClientMeasurements.BBRInfo.MinRTT:
+  Description:
+Upload.ClientMeasurements.Elapsed:
+  Description:
+Upload.ClientMeasurements.TCPInfo:
+  Description:
+Upload.ClientMeasurements.TCPInfo.SmoothedRTT:
+  Description:
+Upload.ClientMeasurements.TCPInfo.RTTVar:
+  Description:
+Upload.ClientMetadata:
+  Description:
+Upload.ClientMetadata.Name:
+  Description:
+Upload.ClientMetadata.Value:
+  Description:
+
+Download:
+  Description:
+Download.UUID:
+  Description:
+Download.StartTime:
+  Description:
+Download.EndTime:
+  Description:
+Download.ServerMeasurements:
+  Description:
+Download.ServerMeasurements.AppInfo:
+  Description:
+Download.ServerMeasurements.AppInfo.NumBytes:
+  Description:
+Download.ServerMeasurements.BBRInfo:
+  Description:
+Download.ServerMeasurements.BBRInfo.MaxBandwidth:
+  Description:
+Download.ServerMeasurements.BBRInfo.MinRTT:
+  Description:
+Download.ServerMeasurements.Elapsed:
+  Description:
+Download.ServerMeasurements.TCPInfo:
+  Description:
+Download.ServerMeasurements.TCPInfo.SmoothedRTT:
+  Description:
+Download.ServerMeasurements.TCPInfo.RTTVar:
+  Description:
+Download.ClientMeasurements:
+  Description:
+Download.ClientMeasurements.AppInfo:
+  Description:
+Download.ClientMeasurements.AppInfo.NumBytes:
+  Description:
+Download.ClientMeasurements.BBRInfo:
+  Description:
+Download.ClientMeasurements.BBRInfo.MaxBandwidth:
+  Description:
+Download.ClientMeasurements.BBRInfo.MinRTT:
+  Description:
+Download.ClientMeasurements.Elapsed:
+  Description:
+Download.ClientMeasurements.TCPInfo:
+  Description:
+Download.ClientMeasurements.TCPInfo.SmoothedRTT:
+  Description:
+Download.ClientMeasurements.TCPInfo.RTTVar:
+  Description:
+Download.ClientMetadata:
+  Description:
+Download.ClientMetadata.Name:
+  Description:
+Download.ClientMetadata.Value:
+  Description:
