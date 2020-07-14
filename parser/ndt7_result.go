@@ -93,6 +93,20 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		return err
 	}
 
+	// This is a hack to deal with the ConnectionInfo fields that are not intended to be
+	// exported to bigquery.  With the GCS row.Sink, we convert to json, but we cannot
+	// tag the json, because the json tag is already used for the NDT7 client comms.
+	if row.Raw.Download != nil && row.Raw.Download.ServerMeasurements != nil {
+		for i := range row.Raw.Download.ServerMeasurements {
+			row.Raw.Download.ServerMeasurements[i].ConnectionInfo = nil
+		}
+	}
+	if row.Raw.Upload != nil && row.Raw.Upload.ServerMeasurements != nil {
+		for i := range row.Raw.Upload.ServerMeasurements {
+			row.Raw.Upload.ServerMeasurements[i].ConnectionInfo = nil
+		}
+	}
+
 	// NOTE: Civil is not TZ adjusted. It takes the year, month, and date from
 	// the given timestamp, regardless of the timestamp's timezone. Since we
 	// run our systems in UTC, all timestamps will be relative to UTC and as
