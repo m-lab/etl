@@ -16,6 +16,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/go/logx"
 )
 
 // Factory provides Get() which always returns a new, complete Task.
@@ -72,6 +73,10 @@ func (tt *Task) SetMaxFileSize(max int64) {
 	tt.maxFileSize = max
 }
 
+// This is used for logging empty test warnings.
+// TODO - consider just removing the log.
+var emptyTest = logx.NewLogEvery(nil, time.Second)
+
 // ProcessAllTests loops through all the tests in a tar file, calls the
 // injected parser to parse them, and inserts them into bigquery. Returns the
 // number of files processed.
@@ -97,7 +102,7 @@ OUTER:
 			case loopErr == io.EOF:
 				break OUTER
 			case loopErr == storage.ErrOversizeFile:
-				log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
+				log.Printf("ERROR filename:%s testname:%s files:%d, duration:%v err:%v",
 					tt.meta["filename"], testname, files,
 					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
 				metrics.TestCount.WithLabelValues(
@@ -114,7 +119,7 @@ OUTER:
 				// err:stream error: stream ID 801; INTERNAL_ERROR
 				// Because of the break, this error is passed up, and counted at
 				// the Task level.
-				log.Printf("filename:%s testname:%s files:%d, duration:%v err:%v",
+				log.Printf("ERROR filename:%s testname:%s files:%d, duration:%v err:%v",
 					tt.meta["filename"], testname, files,
 					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
 
@@ -132,6 +137,13 @@ OUTER:
 			// If verbose, log the filename that is skipped.
 			continue
 		}
+		if len(data) == 0 {
+			// Parser should also, likely, insert an empty row with just parse info and id
+			// There are spike of 100K, so we use a 1 second logEvery to avoid log spam.
+			emptyTest.Printf("WARNING empty test %s:%s %s\n", tt.TableName(), tt.Type(), tt.Detail())
+			metrics.WarningCount.WithLabelValues(
+				tt.TableName(), tt.Type(), "empty test file").Inc()
+		}
 		kind, parsable := tt.Parser.IsParsable(testname, data)
 		if !parsable {
 			metrics.FileSizeHistogram.WithLabelValues(
@@ -147,7 +159,7 @@ OUTER:
 		if loopErr != nil {
 			metrics.TaskCount.WithLabelValues(
 				tt.Type(), "ParseAndInsertError").Inc()
-			log.Printf("%v", loopErr)
+			log.Printf("ERROR %v", loopErr)
 			// TODO(dev) Handle this error properly!
 			continue
 		}

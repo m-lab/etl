@@ -25,30 +25,34 @@ import (
 //                       NDT5Result Parser
 //=====================================================================================
 
-// NDT5ResultParser
+// NDT5ResultParser handles parsing of NDT5Result archives.
 type NDT5ResultParser struct {
 	*row.Base
 	table  string
 	suffix string
 }
 
-func NewNDT5ResultParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+// NewNDT5ResultParser returns a parser for NDT5Result archives.
+func NewNDT5ResultParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.NDT5.BQBufferSize()
 	if ann == nil {
 		ann = v2as.GetAnnotator(annotation.BatchURL)
 	}
 
 	return &NDT5ResultParser{
-		Base:   row.NewBase(table, sink, bufSize, ann),
-		table:  table,
+		Base:   row.NewBase(label, sink, bufSize, ann),
+		table:  label,
 		suffix: suffix,
 	}
 }
 
+// TaskError returns non-nil if the task had enough failures to justify
+// recording the entire task as in error.  For now, this is any failure
+// rate exceeding 10%.
 func (dp *NDT5ResultParser) TaskError() error {
 	stats := dp.GetStats()
 	if stats.Total() < 10*stats.Failed {
-		log.Printf("Warning: high row insert errors (more than 10%%): %d failed of %d accepted\n",
+		log.Printf("Warning: high row commit errors (more than 10%%): %d failed of %d accepted\n",
 			stats.Failed, stats.Total())
 		return etl.ErrHighInsertionFailureRate
 	}
