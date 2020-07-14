@@ -129,6 +129,10 @@ func TestValidateTestPath(t *testing.T) {
 					log.Println(tt.path)
 					t.Errorf("%s: %v\n", tt.name, diff)
 				}
+				recon := fmt.Sprintf("gs://%s/%s%s", got.Bucket, got.PathAndFilename(), tt.want.Suffix)
+				if recon != tt.path {
+					t.Error(tt.name, "expected:", tt.path, "got:", recon, "\n", tt.want)
+				}
 			}
 		})
 	}
