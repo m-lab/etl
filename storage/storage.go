@@ -69,7 +69,7 @@ func (src *GCSSource) nextHeader(trial int) (*tar.Header, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, "next", strconv.Itoa(trial), "other").Inc()
 		}
-		log.Printf("ERROR nextHeader: %v\n", err)
+		log.Printf("ERROR: nextHeader: %v\n", err)
 	}
 	return h, true, err
 }
@@ -91,7 +91,7 @@ func (src *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			}
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, "open zip", strconv.Itoa(trial), "zipReaderError").Inc()
-			log.Printf("Error zipReader(%d): %v in file %s\n", trial, err, h.Name)
+			log.Printf("ERROR: zipReader(%d): %v in file %s\n", trial, err, h.Name)
 			return nil, true, err
 		}
 		defer zipReader.Close()
@@ -116,7 +116,7 @@ func (src *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, phase, strconv.Itoa(trial), "other error").Inc()
 		}
-		log.Printf("ERROR nextData:%d [%s] %s (%d bytes) from %s\n", trial, err, h.Name, h.Size, src.FilePath)
+		log.Printf("ERROR: nextData:%d [%s] %s (%d bytes) from %s\n", trial, err, h.Name, h.Size, src.FilePath)
 		return nil, true, err
 	}
 
@@ -258,7 +258,7 @@ func NewTestSource(client stiface.Client, dp etl.DataPath, label string) (etl.Te
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	// TODO(prod) Evaluate whether this is long enough.
+	// TODO(prod) Evaluate whether timeout this is long enough.
 	// TODO - appengine requests time out after 60 minutes, so more than that doesn't help.
 	// SS processing sometimes times out with 1 hour.
 	// Is there a limit on http requests from task queue, or into flex instance?
@@ -334,7 +334,7 @@ func (sf *gcsSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestS
 
 	tr, err := NewTestSource(sf.client, dp, label)
 	if err != nil {
-		log.Printf("Error opening gcs file: %v", err)
+		log.Printf("ERROR: opening gcs file: %v", err)
 		// TODO - anything better we could do here?
 		return nil, factory.NewError(dp.DataType, "ETLSourceError",
 			http.StatusInternalServerError,
