@@ -222,12 +222,16 @@ S2C.TCPInfo.DeliveredCE:
   Description: ECE marked data segments delivered to the receiver including retransmits. As reported by returning ACKs, used by ECN.
   Kernel: `delivered_ce` in `include/linux/tcp.h`
 S2C.TCPInfo.BytesSent:
-  Description: Payload bytes sent (excludes headers, includes retransmissions). Kernel reference-- `bytes_sent`
+  Description: Payload bytes sent (excludes headers, includes retransmissions).
+  Kernel: `bytes_sent`
 S2C.TCPInfo.BytesRetrans:
-  Description: Bytes retransmitted. May include headers and new data carried with a retransmission (for thin flows). Kernel reference-- `bytes_retrans`
+  Description: Bytes retransmitted. May include headers and new data carried with a retransmission (for thin flows).
+  Kernel: `bytes_retrans`
 S2C.TCPInfo.DSackDups:
-  Description: Duplicate segments reported by DSACK. Not reported by some Operating Systems. Kernel reference-- `dsack_dups`
+  Description: Duplicate segments reported by DSACK. Not reported by some Operating Systems.
+  Kernel: `dsack_dups`
 S2C.TCPInfo.ReordSeen:
-  Description: Received ACKs that were out of order. Estimates reordering on the return path. Kernel reference-- `reord_seen`
+  Description: Received ACKs that were out of order. Estimates reordering on the return path.
+  Kernel: `reord_seen`
 S2C.Error:
   Description: Any error message(s) recorded during a download measurement.
