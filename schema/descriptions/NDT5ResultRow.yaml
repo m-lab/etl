@@ -85,153 +85,153 @@ S2C.TCPInfo:
   Description: The TCPInfo record provides results from the TCP_INFO netlink socket. These are the same values returned to clients at the end of the download (S2C) measurement.
 S2C.TCPInfo.State:
   Description: TCP state is nominally 1 (Established). Other values reflect transient states having incomplete rows.
-  Kernel: See `TCP_ESTABLISHED` `in include/net/tcp_states.h`
+  Kernel: See TCP_ESTABLISHED in include/net/tcp_states.h
 S2C.TCPInfo.CAState:
   Description: Loss recovery state machine. For traditional loss based congestion control algorithms, CAState is also used to control window adjustments.
-  Kernel: `tcp_set_ca_state` in `include/net/tcp.h`
+  Kernel: tcp_set_ca_state in include/net/tcp.h
 S2C.TCPInfo.Retransmits:
   Description: Number of timeouts (RTO based retransmissions) at this sequence. Reset to zero on forward progress.
-  Kernel: `icsk_retransmits` in `include/net/inet_connection_sock.h`
+  Kernel: icsk_retransmits in include/net/inet_connection_sock.h
 S2C.TCPInfo.Probes:
   Description: Consecutive zero window probes that have gone unanswered.
-  Kernel: `icsk_probes_out` in `include/net/inet_connection_sock.h`
+  Kernel: icsk_probes_out in include/net/inet_connection_sock.h
 S2C.TCPInfo.Backoff:
   Description: Exponential timeout backoff counter. Increment on RTO, reset on successful RTT measurements.
-  Kernel: `icsk_backoff` in `include/net/inet_connection_sock.h`
+  Kernel: icsk_backoff in include/net/inet_connection_sock.h
 S2C.TCPInfo.Options:
   Description: Bit encoded SYN options and other negotiations TIMESTAMPS 0x1; SACK 0x2; WSCALE 0x4; ECN 0x8 - Was negotiated; ECN_SEEN - At least one ECT seen; SYN_DATA - SYN-ACK acknowledged data in SYN sent or rcvd.
-  Kernel: `TCPI_OPT_TIMESTAMPS` in `include/uapi/linux/tcp.h`
+  Kernel: TCPI_OPT_TIMESTAMPS in include/uapi/linux/tcp.h
 S2C.TCPInfo.WScale:
   Description: BUG Conflation of SndWScale and RcvWScale. See github.com/m-lab/etl/issues/790
 S2C.TCPInfo.AppLimited:
   Description: Flag indicating that rate measurements reflect non-network bottlenecks. Note that even very short application stalls invalidate max_BW measurements.
-  Kernel: `rate_app_limited` in `include/linux/tcp.h`
+  Kernel: rate_app_limited in include/linux/tcp.h
 S2C.TCPInfo.RTO:
   Description: Retransmission Timeout. Quantized to system jiffies.
-  Kernel: `icsk_rto` in `include/net/inet_connection_sock.h`
+  Kernel: icsk_rto in include/net/inet_connection_sock.h
 S2C.TCPInfo.ATO:
   Description: Delayed ACK Timeout. Quantized to system jiffies.
-  Kernel: `ato` in `icsk_ack` in `include/net/inet_connection_sock.h`
+  Kernel: ato in icsk_ack in include/net/inet_connection_sock.h
 S2C.TCPInfo.SndMSS:
   Description: Current Maximum Segment Size. Note that this can be smaller than the negotiated MSS for various reasons.
-  Kernel: `mss_cache` in `include/linux/tcp.h`
+  Kernel: mss_cache in include/linux/tcp.h
 S2C.TCPInfo.RcvMSS:
   Description: Maximum observed segment size from the remote host. Used to trigger delayed ACKs.
-  Kernel: `rcv_mss` in `icsk_ack` in `include/net/inet_connection_sock.h`
+  Kernel: rcv_mss in icsk_ack in include/net/inet_connection_sock.h
 S2C.TCPInfo.Unacked:
-  Description: Number of segments between `snd.nxt` and `snd.una`. Accounting for the Pipe algorithm.
-  Kernel: `packets_out` in `include/linux/tcp.h`
+  Description: Number of segments between snd.nxt and snd.una. Accounting for the Pipe algorithm.
+  Kernel: packets_out in include/linux/tcp.h
 S2C.TCPInfo.Sacked:
   Description: Scoreboard segment marked SACKED by sack blocks. Accounting for the Pipe algorithm.
-  Kernel: `sacked_out` in `include/linux/tcp.h`
+  Kernel: sacked_out in include/linux/tcp.h
 S2C.TCPInfo.Lost:
   Description: Scoreboard segments marked lost by loss detection heuristics. Accounting for the Pipe algorithm.
-  Kernel: `lost_out` in `include/linux/tcp.h`
+  Kernel: lost_out in include/linux/tcp.h
 S2C.TCPInfo.Retrans:
   Description: Scoreboard segments marked retransmitted. Accounting for the Pipe algorithm.
-  Kernel: `retrans_out` in `include/linux/tcp.h`
+  Kernel: retrans_out in include/linux/tcp.h
 S2C.TCPInfo.Fackets:
   Description: 
 S2C.TCPInfo.LastDataSent:
   Description: Time since last data segment was sent. Quantized to jiffies.
-  Kernel: `lsndtime` in `include/linux/tcp.h`
+  Kernel: lsndtime in include/linux/tcp.h
 S2C.TCPInfo.LastAckSent:
   Description: Time since last ACK was sent (not implemented). Present in TCP_INFO but not elsewhere in the kernel.
 S2C.TCPInfo.LastDataRecv:
   Description: Time since last data segment was received. Quantized to jiffies.
-  Kernel: `lrcvtime` in `icsk_ack` in `include/net/inet_connection_sock.h`
+  Kernel: lrcvtime in icsk_ack in include/net/inet_connection_sock.h
 S2C.TCPInfo.PMTU:
   Description: Maximum IP Transmission Unit for this path.
-  Kernel: `icsk_pmtu_cookie` in `include/net/inet_connection_sock.h`
+  Kernel: icsk_pmtu_cookie in include/net/inet_connection_sock.h
 S2C.TCPInfo.RcvSsThresh:
   Description: Current Window Clamp. Receiver algorithm to avoid allocating excessive receive buffers.
-  Kernel: `rcv_ssthresh` in `include/linux/tcp.h`
+  Kernel: rcv_ssthresh in include/linux/tcp.h
 S2C.TCPInfo.RTT:
   Description: Smoothed Round Trip Time (RTT). The Linux implementation differs from the standard.
-  Kernel: `srtt_us` in `include/linux/tcp.h`
+  Kernel: srtt_us in include/linux/tcp.h
 S2C.TCPInfo.RTTVar:
   Description: RTT variance. The Linux implementation differs from the standard.
-  Kernel: `mdev_us` in `include/linux/tcp.h`
+  Kernel: mdev_us in include/linux/tcp.h
 S2C.TCPInfo.SndSsThresh:
   Description: Slow Start Threshold. Value controlled by the selected congestion control algorithm.
-  Kernel: `snd_ssthresh` in `include/linux/tcp.h`
+  Kernel: snd_ssthresh in include/linux/tcp.h
 S2C.TCPInfo.SndCwnd:
   Description: Congestion Window. Value controlled by the selected congestion control algorithm.
-  Kernel: `snd_cwnd` in `include/linux/tcp.h`
+  Kernel: snd_cwnd in include/linux/tcp.h
 S2C.TCPInfo.AdvMSS:
   Description: Advertised MSS.
-  Kernel: `advmss` in `include/linux/tcp.h`
+  Kernel: advmss in include/linux/tcp.h
 S2C.TCPInfo.Reordering:
   Description: Maximum observed reordering distance.
-  Kernel: `reordering` in `include/linux/tcp.h`
+  Kernel: reordering in include/linux/tcp.h
 S2C.TCPInfo.RcvRTT:
   Description: Receiver Side RTT estimate.
-  Kernel: `rcv_rtt_est.rtt_us` in `include/linux/tcp.h`
+  Kernel: rcv_rtt_est.rtt_us in include/linux/tcp.h
 S2C.TCPInfo.RcvSpace:
   Description: Space reserved for the receive queue. Typically updated by receiver side auto-tuning.
-  Kernel: `space` in `rcvq_space` in `include/linux/tcp.h`
+  Kernel: space in rcvq_space in include/linux/tcp.h
 S2C.TCPInfo.TotalRetrans:
   Description: Total number of segments containing retransmitted data.
-  Kernel: `total_retrans` in `include/linux/tcp.h`
+  Kernel: total_retrans in include/linux/tcp.h
 S2C.TCPInfo.PacingRate:
   Description: Current Pacing Rate, nominally updated by congestion control.
-  Kernel: `sk_pacing_rate` in `include/net/sock.h`
+  Kernel: sk_pacing_rate in include/net/sock.h
 S2C.TCPInfo.MaxPacingRate:
   Description: Settable pacing rate clamp. Set with setsockopt( ..SO_MAX_PACING_RATE.. ).
-  Kernel: `sk_max_pacing_rate` in `include/net/sock.h`
+  Kernel: sk_max_pacing_rate in include/net/sock.h
 S2C.TCPInfo.BytesAcked:
   Description: The number of data bytes for which cumulative acknowledgments have been received.
-  Kernel: `bytes_acked` in `include/linux/tcp.h`
+  Kernel: bytes_acked in include/linux/tcp.h
 S2C.TCPInfo.BytesReceived:
   Description: The number of data bytes for which have been received.
-  Kernel: `bytes_received` in `include/linux/tcp.h`
+  Kernel: bytes_received in include/linux/tcp.h
 S2C.TCPInfo.SegsOut:
   Description: The number of segments transmitted. Includes data and pure ACKs.
-  Kernel: `segs_out` in `include/linux/tcp.h`
+  Kernel: segs_out in include/linux/tcp.h
 S2C.TCPInfo.SegsIn:
   Description: The number of segments received. Includes data and pure ACKs.
-  Kernel: `segs_in` in `include/linux/tcp.h`
+  Kernel: segs_in in include/linux/tcp.h
 S2C.TCPInfo.NotsentBytes:
   Description: Number of bytes queued in the send buffer that have not been sent.
-  Kernel: `tcpi_notsent_bytes()` in `net/ipv4/tcp.c`
+  Kernel: tcpi_notsent_bytes() in net/ipv4/tcp.c
 S2C.TCPInfo.MinRTT:
   Description: Minimum Round Trip Time. From an older, pre-BBR algorithm.
-  Kernel: `tcp_min_rtt` in `include/net/tcp.h`
+  Kernel: tcp_min_rtt in include/net/tcp.h
 S2C.TCPInfo.DataSegsIn:
   Description: Input segments carrying data (len>0).
-  Kernel: `data_segs_in` in `include/net/tcp.h`
+  Kernel: data_segs_in in include/net/tcp.h
 S2C.TCPInfo.DataSegsOut:
   Description: Transmitted segments carrying data (len>0).
-  Kernel: `data_segs_out` in `include/net/tcp.h`
+  Kernel: data_segs_out in include/net/tcp.h
 S2C.TCPInfo.DeliveryRate:
   Description: Observed Maximum Delivery Rate.
-  Kernel: `tcp_compute_delivery_rate()` in `net/ipv4/tcp.c`
+  Kernel: tcp_compute_delivery_rate() in net/ipv4/tcp.c
 S2C.TCPInfo.BusyTime:
-  Description: Time with outstanding (unacknowledged) data. Time when `snd.una` is not equal to `snd.next`.
-  Kernel: `tcp_get_info_chrono_stats()` in `net/ipv4/tcp.c`
+  Description: Time with outstanding (unacknowledged) data. Time when snd.una is not equal to snd.next.
+  Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
 S2C.TCPInfo.RWndLimited:
   Description: Time spend waiting for receiver window.
-  Kernel: `tcp_get_info_chrono_stats()` in `net/ipv4/tcp.c`
+  Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
 S2C.TCPInfo.SndBufLimited:
   Description: Time spent waiting for sender buffer space. This only includes the time when TCP transmissions are starved for data, but the application has been stopped because the buffer is full and can not be grown for some reason.
-  Kernel: `tcp_get_info_chrono_stats()` in `net/ipv4/tcp.c`
+  Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
 S2C.TCPInfo.Delivered:
   Description: Data segments delivered to the receiver including retransmits. As reported by returning ACKs, used by ECN.
-  Kernel: `delivered` in `include/linux/tcp.h`
+  Kernel: delivered in include/linux/tcp.h
 S2C.TCPInfo.DeliveredCE:
   Description: ECE marked data segments delivered to the receiver including retransmits. As reported by returning ACKs, used by ECN.
-  Kernel: `delivered_ce` in `include/linux/tcp.h`
+  Kernel: delivered_ce in include/linux/tcp.h
 S2C.TCPInfo.BytesSent:
   Description: Payload bytes sent (excludes headers, includes retransmissions).
-  Kernel: `bytes_sent`
+  Kernel: bytes_sent
 S2C.TCPInfo.BytesRetrans:
   Description: Bytes retransmitted. May include headers and new data carried with a retransmission (for thin flows).
-  Kernel: `bytes_retrans`
+  Kernel: bytes_retrans
 S2C.TCPInfo.DSackDups:
   Description: Duplicate segments reported by DSACK. Not reported by some Operating Systems.
-  Kernel: `dsack_dups`
+  Kernel: dsack_dups
 S2C.TCPInfo.ReordSeen:
   Description: Received ACKs that were out of order. Estimates reordering on the return path.
-  Kernel: `reord_seen`
+  Kernel: reord_seen
 S2C.Error:
   Description: Any error message(s) recorded during a download measurement.
