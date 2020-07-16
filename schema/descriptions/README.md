@@ -35,7 +35,7 @@ go generate ./schema
 git commit -m 'Update bindata' -- ./schema/bindata.go
 ```
 
-Then, add a new tag on this repo using the format: `v#.#.#` 
+After review and merging, add a new tag on this repo using the format: `v#.#.#` 
 These tags are used to build a new Dockerhub image using that tag, named `generate-schema-docs`, which the website uses to generate schema include files. For example: `measurementlab/generate-schema-docs:v0.1.0`.
 
 Finally, the new tag must be updated in [m-lab/website/.travis.yml](https://github.com/m-lab/website/blob/master/.travis.yml#L23).
