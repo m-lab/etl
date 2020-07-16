@@ -30,7 +30,7 @@ The schema descriptions found here are used to automatically generate schema doc
 Update the relevant description file, and then in the root folder of this repository, run the following to update the `bindata` used by the etl build:
 
 ```
-go get -u github.com/jteeuwen/go-bindata/go-bindata
+go get -u github.com/go-bindata/go-bindata/go-bindata
 go generate ./schema
 git commit -m 'Update bindata' -- ./schema/bindata.go
 ```
