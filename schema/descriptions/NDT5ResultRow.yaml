@@ -36,25 +36,33 @@ Control.ClientMetadata.Name:
 Control.ClientMetadata.Value:
   Description: If set, contains a value corresponding to metadata name. For example, "Windows 10" or "ndtJS"
 
-C2S:
-  Description: Metadata for Client-to-Server (upload) measurements performed using the ndt5 protocol.
+C2S: 
+  Description: Metadata for Client-to-Server (upload) measurements performed
+  using the ndt5 protocol.
 C2S.ServerIP:
-  Description: The IP address assigned to the M-Lab server that conducted the measurement.
-C2S.ServerPort:
+  Description: The IP address assigned to the M-Lab server that conducted the
+  measurement.
+C2S.ServerPort: 
   Description: The port used by the server to conduct the upload measurement.
 C2S.ClientIP:
-  Description: The IP address assigned to the client that conducted the measurement.
+  Description: The IP address assigned to the client that conducted the
+  measurement.
 C2S.ClientPort:
   Description: The port used by the client to conduct the upload measurement.
-C2S.UUID:
-  Description: The Universally Unique Identifier assigned to the upload measurement.
-C2S.MeanThroughputMbps:
-  Description: The upload rate as calculated by the server. Presented in megabits per second, or Mbit/s, this value is the average of tcp-info snapshots taken at the beginning and end of an ndt5 measurement. Therefore it is identified as "MeanThroughputMbps".
+C2S.UUID: 
+  Description: The Universally Unique Identifier assigned to the upload
+  measurement.
+C2S.MeanThroughputMbps: 
+  Description: The upload rate as calculated by the server. Presented in
+  megabits per second, or Mbit/s, this value is the average of tcp-info
+  snapshots taken at the beginning and end of an ndt5 measurement. Therefore it
+  is identified as "MeanThroughputMbps".
 S2C.Error:
   Description: Any error message(s) recorded during a download measurement.
 
 S2C:
-  Description: Metadata for Server-to-Client (download) measurements performed using the ndt5 protocol.
+  Description: Metadata for Server-to-Client (download) measurements performed
+  using the ndt5 protocol.
 S2C.UUID:
   Description: The Universally Unique Identifier assigned to the download measurement.
 S2C.ServerIP:
