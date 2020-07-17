@@ -122,8 +122,8 @@ S2C.TCPInfo.Backoff:
   Kernel: icsk_backoff in include/net/inet_connection_sock.h
 S2C.TCPInfo.Options:
   Description: Bit encoded SYN options and other negotiations TIMESTAMPS 0x1;
-  SACK 0x2; WSCALE 0x4; ECN 0x8 - Was negotiated; ECN_SEEN - At least one ECT
-  seen; SYN_DATA - SYN-ACK acknowledged data in SYN sent or rcvd.
+    SACK 0x2; WSCALE 0x4; ECN 0x8 - Was negotiated; ECN_SEEN - At least one ECT
+    seen; SYN_DATA - SYN-ACK acknowledged data in SYN sent or rcvd.
   Kernel: TCPI_OPT_TIMESTAMPS in include/uapi/linux/tcp.h
 S2C.TCPInfo.WScale:
   Description: BUG Conflation of SndWScale and RcvWScale. See
