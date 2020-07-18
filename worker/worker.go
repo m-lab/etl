@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	gcs "cloud.google.com/go/storage"
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
@@ -24,7 +24,7 @@ func (nc nullCloser) Close() error { return nil }
 
 // GetSource gets the TestSource for the filename.
 // fn is a gs:// GCS uri.
-func GetSource(client *gcs.Client, uri string) (etl.TestSource, etl.DataPath, int, error) {
+func GetSource(client stiface.Client, uri string) (etl.TestSource, etl.DataPath, int, error) {
 	path, err := etl.ValidateTestPath(uri)
 	label := path.TableBase() // On error, this will be "invalid", so not all that useful.
 	if err != nil {
@@ -68,7 +68,7 @@ func ProcessTask(fn string) (int, error) {
 }
 
 // ProcessTaskWithClient handles processing with an injected client.
-func ProcessTaskWithClient(client *gcs.Client, fn string) (int, error) {
+func ProcessTaskWithClient(client stiface.Client, fn string) (int, error) {
 	tr, path, status, err := GetSource(client, fn)
 	if err != nil {
 		return status, err
@@ -114,7 +114,7 @@ func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
 	// The closer does nothing, so we could just provide a null closer.
 	tsk := task.NewTask(src.Detail(), src, p, &nullCloser{})
 
-	files, err := tsk.ProcessAllTests()
+	files, err := tsk.ProcessAllTests(false) // ignore most parse errors.
 
 	// Count the files processed per-host-module per-weekday.
 	// TODO(soltesz): evaluate separating hosts and pods as separate metrics.
@@ -206,7 +206,7 @@ func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
 
 // DoGKETask creates task, processes all tests and handle metrics
 func DoGKETask(tsk *task.Task, path etl.DataPath) etl.ProcessingError {
-	files, err := tsk.ProcessAllTests()
+	files, err := tsk.ProcessAllTests(true) // fail fast on parsing errors.
 
 	dateFormat := "20060102"
 	date, dateErr := time.Parse(dateFormat, path.PackedDate)

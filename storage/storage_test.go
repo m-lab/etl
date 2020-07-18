@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	gcs "cloud.google.com/go/storage"
 	"github.com/fsouza/fake-gcs-server/fakestorage"
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 
 	"github.com/m-lab/go/rtx"
 
@@ -33,13 +33,15 @@ func TestGetReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rdr, cancel, err := getReader(client, testBucket, "test.tar", 60*time.Second)
-
+	ctx := context.Background()
+	rdr, size, err := getReader(ctx, client, testBucket, "test.tar", 60*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rdr.Close()
-	cancel()
+	if size != 10240 {
+		t.Error("Wrong size, expected 10240: ", size)
+	}
 }
 
 func TestNewTarReader(t *testing.T) {
@@ -95,7 +97,7 @@ func TestNewTarReaderGzip(t *testing.T) {
 }
 
 // Using a persistent client saves about 80 msec, and 220 allocs, totalling 70kB.
-var client *gcs.Client
+var client stiface.Client
 
 func init() {
 	var err error
@@ -161,7 +163,7 @@ func TestSourceFactory(t *testing.T) {
 	fn := "ndt/ndt7/2020/03/18/20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz"
 	add(server, "fake-bucket", fn, file)
 
-	f := GCSSourceFactory(server.Client())
+	f := GCSSourceFactory(stiface.AdaptClient(server.Client()))
 	s, err := f.Get(context.Background(),
 		etl.DataPath{DataType: "test"})
 	if err == nil {
