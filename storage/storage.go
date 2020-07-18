@@ -58,16 +58,15 @@ func (src *GCSSource) nextHeader(trial int) (*tar.Header, bool, error) {
 		if err == io.EOF {
 			return nil, false, err
 		} else if strings.Contains(err.Error(), "unexpected EOF") {
-			// We are seeing these metrics, but logs at 113
 			metrics.GCSRetryCount.WithLabelValues(
-				src.TableBase, "next", strconv.Itoa(trial), "unexpected EOF").Inc()
+				src.TableBase, "nextHeader", strconv.Itoa(trial), "unexpected EOF").Inc()
 			// TODO: These are likely unrecoverable, so we should
-			// just return.
+			// probably return false.
 		} else {
 			// Quite a few of these now, and they seem to be
 			// unrecoverable.
 			metrics.GCSRetryCount.WithLabelValues(
-				src.TableBase, "next", strconv.Itoa(trial), "other").Inc()
+				src.TableBase, "nextHeader", strconv.Itoa(trial), "other").Inc()
 		}
 		log.Printf("ERROR: nextHeader: %v\n", err)
 	}
@@ -95,10 +94,10 @@ func (src *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			return nil, true, err
 		}
 		defer zipReader.Close()
-		phase = "read zip"
+		phase = "nextData zip"
 		data, err = ioutil.ReadAll(zipReader)
 	} else {
-		phase = "read"
+		phase = "nextData"
 		data, err = ioutil.ReadAll(src)
 	}
 	if err != nil {
@@ -108,11 +107,15 @@ func (src *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			// They are non-deterministic, so probably related to GCS problems.
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, phase, strconv.Itoa(trial), "stream error").Inc()
+		} else if strings.Contains(err.Error(), "unexpected EOF") {
+			// We ARE seeing 438 of these for ndt7/read-zip, June 2020.
+			// They are consistent for each reprocessing.
+			// They occur when there is a truncated gz file within an archive.  For example:
+			//   ERROR nextData:1 [unexpected EOF] 2020/04/20/ndt7-upload-20200420T051229.808987688Z.ndt-s5hxm_1583551492_000000000021ADBB.json.gz
+			//   (10 bytes) from gs://archive-measurement-lab/ndt/ndt7/2020/04/20/20200420T060456.005849Z-ndt7-mlab3-lhr03-ndt.tgz
+			metrics.GCSRetryCount.WithLabelValues(
+				src.TableBase, phase, strconv.Itoa(trial), "unexpected EOF").Inc()
 		} else {
-			// We haven't seen any of these so far (as of May 9, 2017)
-			// We ARE seeing these for ndt7/read-zip, June 2020.  They are consistent for each reprocessing.
-			// They occur when there is a truncated gz file within an archive.
-			// HOWEVER, there are also many empty gz files, that we should also warn about.
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, phase, strconv.Itoa(trial), "other error").Inc()
 		}
@@ -363,5 +366,9 @@ func getReader(ctx context.Context, client stiface.Client, bucket string, fn str
 		return rdr, 0, err
 	}
 	attr, err := obj.Attrs(ctx)
+	if err != nil {
+		// rdr is ok, but attribute not available
+		return rdr, 0, err
+	}
 	return rdr, attr.Size, err
 }
