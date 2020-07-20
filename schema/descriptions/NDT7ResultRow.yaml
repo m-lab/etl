@@ -2,14 +2,40 @@ a:
   Description: Fields summarizing or derived from the raw data.
 a.UUID:
   Description: UUID for TCP connection.
+a.TestTime: The date and time of the measurement in UTC.
 a.CongestionControl:
   Description: Congestion control algorithm used for connection.
 a.MeanThroughputMbps:
-  Description: Server calculated average rate.
+  Description: The measured rate as calculated by the server. Presented in
+    megabits per second, or Mbit/s, this value is the average of tcp-info
+    snapshots taken at the beginning and end of an ndt7 measurement. Therefore
+    it is identified as "MeanThroughputMbps".
 a.MinRTT:
-  Description: The minimum RTT observed during the measurement.
+  Description: The minimum RTT observed during the download, recorded in 
+    milliseconds.
 a.LossRate:
   Description: Loss rate from the lifetime of the connection.
+
+parser:
+  Description: Metadata about how the parser processed this measurement row.
+parser.Version:
+  Description: Version is the symbolic version (if any) of the running server 
+    code.
+parser.Time:
+  Description: The time that the parser processed this row.
+parser.ArchiveURL:
+  Description: The Google Cloud Storage URL to the archive containing the
+    Filename for this row.
+parser.Filename:
+  Description:
+parser.Priority:
+  Description:
+
+date:
+  Description: Date is used by BigQuery to partition data to improve query 
+    performance.
+flags:
+  Description:
 
 GitShortCommit:
   Description: GitShortCommit is the Git commit (short form) of the running
@@ -17,22 +43,576 @@ GitShortCommit:
 Version:
   Description: Version is the symbolic version (if any) of the running server
     code.
-
-Download:
-  Description: Metadata for the NDT7 download protocol.
-Download.UUID:
-  Description: UUID for download TCP connection.
-
+ServerIP:
+  Description: The IP address assigned to the M-Lab server that conducted the 
+    measurement.
+ServerPort:
+  Description: The port used by the server to conduct the measurement.
+ClientIP:
+  Description: The IP address assigned to the client that conducted the
+    measurement.
+ClientPort:
+  Description: The port used by the client to conduct the measurement.
+StartTime:
+  Description: The date and time when the measurement began in UTC.
+EndTime:
+  Description: The date and time when the measurement ended in UTC.
 Upload:
   Description: Metadata for the NDT7 upload protocol.
 Upload.UUID:
   Description: UUID for upload TCP connection.
+Upload.StartTime:
+  Description: The date and time when the upload measurement began in UTC.
+Upload.EndTime:
+  Description: The date and time when the upload measurement ended in UTC.
+Upload.ServerMeasurements:
+  Description:
+Upload.ServerMeasurements.AppInfo:
+  Description:
+Upload.ServerMeasurements.AppInfo.NumBytes:
+  Description: The number of bytes uploaded to the M-Lab server during an
+    upload measurement, as measured by the M-Lab server.
+Upload.ServerMeasurements.BBRInfo:
+  Description:
+Upload.ServerMeasurements.BBRInfo.BW:
+  Description:
+Upload.ServerMeasurements.BBRInfo.MinRTT:
+  Description: The minimum round trip time as measured by the M-Lab server
+    using BBR.
+Upload.ServerMeasurements.BBRInfo.PacingGain:
+  Description:
+Upload.ServerMeasurements.BBRInfo.CwndGain:
+  Description:
+Upload.ServerMeasurements.ElapsedTime:
+  Description: The duration of an upload test as measured by the M-Lab server
+    in milliseconds.
+Upload.ServerMeasurements.TCPInfo:
+  Description:
+Upload.ServerMeasurements.TCPInfo.State:
+  Description:
+Upload.ServerMeasurements.TCPInfo.CAState:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Retransmits:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Probes:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Backoff:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Options:
+  Description:
+Upload.ServerMeasurements.TCPInfo.WScale:
+  Description:
+Upload.ServerMeasurements.TCPInfo.AppLimited:
+  Description:
+Upload.ServerMeasurements.TCPInfo.RTO:
+  Description:
+Upload.ServerMeasurements.TCPInfo.ATO:
+  Description:
+Upload.ServerMeasurements.TCPInfo.SndMSS:
+  Description:
+Upload.ServerMeasurements.TCPInfo.RcvMSS:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Unacked:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Sacked:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Lost:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Retrans:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Fackets:
+  Description:
+Upload.ServerMeasurements.TCPInfo.LastDataSent:
+  Description:
+Upload.ServerMeasurements.TCPInfo.LastAckSent:
+  Description:
+Upload.ServerMeasurements.TCPInfo.LastDataRecv:
+  Description:
+Upload.ServerMeasurements.TCPInfo.PMTU:
+  Description:
+Upload.ServerMeasurements.TCPInfo.RcvSsThresh:
+  Description:
+Upload.ServerMeasurements.TCPInfo.RTT:
+  Description:
+Upload.ServerMeasurements.TCPInfo.RTTVar:
+  Description: The variation in round trip time during the upload measurement
+    as measured by the M-Lab server.
+Upload.ServerMeasurements.TCPInfo.SndSsThresh:
+  Description:
+Upload.ServerMeasurements.TCPInfo.SndCwnd:
+  Description:
+Upload.ServerMeasurements.TCPInfo.AdvMSS:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Reordering:
+  Description:
+Upload.ServerMeasurements.TCPInfo.RcvRTT:
+  Description:
+Upload.ServerMeasurements.TCPInfo.RcvSpace:
+  Description:
+Upload.ServerMeasurements.TCPInfo.TotalRetrans:
+  Description:
+Upload.ServerMeasurements.TCPInfo.PacingRate:
+  Description:
+Upload.ServerMeasurements.TCPInfo.MaxPacingRate:
+  Description:
+Upload.ServerMeasurements.TCPInfo.BytesAcked:
+  Description:
+Upload.ServerMeasurements.TCPInfo.BytesReceived:
+  Description:
+Upload.ServerMeasurements.TCPInfo.SegsOut:
+  Description:
+Upload.ServerMeasurements.TCPInfo.SegsIn:
+  Description:
+Upload.ServerMeasurements.TCPInfo.NotsentBytes:
+  Description:
+Upload.ServerMeasurements.TCPInfo.MinRTT:
+  Description:
+Upload.ServerMeasurements.TCPInfo.DataSegsIn:
+  Description:
+Upload.ServerMeasurements.TCPInfo.DataSegsOut:
+  Description:
+Upload.ServerMeasurements.TCPInfo.DeliveryRate:
+  Description:
+Upload.ServerMeasurements.TCPInfo.BusyTime:
+  Description:
+Upload.ServerMeasurements.TCPInfo.RWndLimited:
+  Description:
+Upload.ServerMeasurements.TCPInfo.SndBufLimited:
+  Description:
+Upload.ServerMeasurements.TCPInfo.Delivered:
+  Description:
+Upload.ServerMeasurements.TCPInfo.DeliveredCE:
+  Description:
+Upload.ServerMeasurements.TCPInfo.BytesSent:
+  Description:
+Upload.ServerMeasurements.TCPInfo.BytesRetrans:
+  Description:
+Upload.ServerMeasurements.TCPInfo.DSackDups:
+  Description:
+Upload.ServerMeasurements.TCPInfo.ReordSeen:
+  Description:
+Upload.ServerMeasurements.TCPInfo.ElapsedTime:
+  Description:
 
-ServerMeasurements:
-  Description: Server calculated measurements collected throughout the
-    lifetime of the connection.
-ClientMeasurements:
-  Description: Client calculated measurements collected and reported
-    throughout the lifetime of the connection.
-ClientMetadata:
-  Description: The client reported metadata.
+Upload.ClientMeasurements:
+  Description: Periodic measurements reported by the client. Not all clients
+    report this information.
+Upload.ClientMeasurements.AppInfo:
+  Description:
+Upload.ClientMeasurements.AppInfo.NumBytes:
+  Description: The number of bytes uploaded to the M-Lab server during an
+    upload measurement, as measured by the client.
+Upload.ClientMeasurements.AppInfo.ElapsedTime:
+  Description:
+Upload.ClientMeasurements.BBRInfo:
+  Description:
+Upload.ClientMeasurements.BBRInfo.BW:
+  Description: The maximum end to end bandwidth between the client and server
+    as measured the client using BBR.
+Upload.ClientMeasurements.BBRInfo.MinRTT:
+  Description: The minimum round trip time as measured by the client using BBR.
+Upload.ClientMeasurements.BBRInfo.PacingGain:
+  Description:
+Upload.ClientMeasurements.BBRInfo.CwndGain:
+  Description:
+Upload.ClientMeasurements.ElapsedTime:
+  Description: The duration of an upload test as measured by the client in
+    milliseconds.
+Upload.ClientMeasurements.TCPInfo:
+  Description:
+Upload.ClientMeasurements.TCPInfo.State:
+  Description:
+Upload.ClientMeasurements.TCPInfo.CAState:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Retransmits:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Probes:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Backoff:
+  Description:
+Upload.ClientMeasurements.TCPInfo.WScale:
+  Description:
+Upload.ClientMeasurements.TCPInfo.AppLimited:
+  Description:
+Upload.ClientMeasurements.TCPInfo.RTO:
+  Description:
+Upload.ClientMeasurements.TCPInfo.ATO:
+  Description:
+Upload.ClientMeasurements.TCPInfo.SndMSS:
+  Description:
+Upload.ClientMeasurements.TCPInfo.RcvMSS:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Unacked:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Sacked:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Lost:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Retrans:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Fackets:
+  Description:
+Upload.ClientMeasurements.TCPInfo.LastDataSent:
+  Description:
+Upload.ClientMeasurements.TCPInfo.LastDataRecv:
+  Description:
+Upload.ClientMeasurements.TCPInfo.LastAckRecv:
+  Description:
+Upload.ClientMeasurements.TCPInfo.PTMU:
+  Description:
+Upload.ClientMeasurements.TCPInfo.RcvSsThresh:
+  Description:
+Upload.ClientMeasurements.TCPInfo.RTT:
+  Description:
+Upload.ClientMeasurements.TCPInfo.RTTVar:
+  Description: The variation in round trip time during the upload measurement
+    as measured by the client.
+Upload.ClientMeasurements.TCPInfo.SndSsThresh:
+  Description:
+Upload.ClientMeasurements.TCPInfo.SndCwnd:
+  Description:
+Upload.ClientMeasurements.TCPInfo.AdvMSS:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Reordering:
+  Description:
+Upload.ClientMeasurements.TCPInfo.RcvRTT:
+  Description:
+Upload.ClientMeasurements.TCPInfo.RcvSpace:
+  Description:
+Upload.ClientMeasurements.TCPInfo.TotalRetrans:
+  Description:
+Upload.ClientMeasurements.TCPInfo.PacingRate:
+  Description:
+Upload.ClientMeasurements.TCPInfo.MaxPacingRate:
+  Description:
+Upload.ClientMeasurements.TCPInfo.BytesAcked:
+  Description:
+Upload.ClientMeasurements.TCPInfo.BytesReceived:
+  Description:
+Upload.ClientMeasurements.TCPInfo.SegsOut:
+  Description:
+Upload.ClientMeasurements.TCPInfo.SegsIn:
+  Description:
+Upload.ClientMeasurements.TCPInfo.NotsentBytes:
+  Description:
+Upload.ClientMeasurements.TCPInfo.MinRTT:
+  Description:
+Upload.ClientMeasurements.TCPInfo.DataSegsIn:
+  Description:
+Upload.ClientMeasurements.TCPInfo.DataSegsOut:
+  Description:
+Upload.ClientMeasurements.TCPInfo.DeliveryRate:
+  Description:
+Upload.ClientMeasurements.TCPInfo.BusyTime:
+  Description:
+Upload.ClientMeasurements.TCPInfo.RWndLimited:
+  Description:
+Upload.ClientMeasurements.TCPInfo.SndBufLimited:
+  Description:
+Upload.ClientMeasurements.TCPInfo.Delivered:
+  Description:
+Upload.ClientMeasurements.TCPInfo.DeliveredCE:
+  Description:
+Upload.ClientMeasurements.TCPInfo.BytesSent:
+  Description:
+Upload.ClientMeasurements.TCPInfo.BytesRetrans:
+  Description:
+Upload.ClientMeasurements.TCPInfo.DSackDups:
+  Description:
+Upload.ClientMeasurements.TCPInfo.ReordSeen:
+  Description:
+Upload.ClientMeasurements.TCPInfo.ElapsedTime:
+  Description:
+
+Upload.ClientMetadata:
+  Description: Client-reported metadata as name/value pairs.
+Upload.ClientMetadata.Name:
+  Description: If set, contains text that identifies and provides context for
+    the corresponding metadata value. For example, "OS" or "clientApplication"
+Upload.ClientMetadata.Value:
+  Description: If set, contains a value corresponding to metadata name. For
+    example, "Windows 10" or "ndtJS"
+
+Download:
+  Description:
+Download.UUID: The Universally Unique Identifier assigned to the upload
+  measurement.
+  Description:
+Download.StartTime:
+  Description: The date and time when the upload measurement began in UTC.
+Download.EndTime:
+  Description: The date and time when the upload measurement ended in UTC.
+Download.ServerMeasurements:
+  Description:
+Download.ServerMeasurements.AppInfo:
+  Description:
+Download.ServerMeasurements.AppInfo.NumBytes:
+  Description: The number of bytes uploaded to the M-Lab server during an
+    upload test, as measured by the M-Lab server.
+Download.ServerMeasurements.AppInfo.ElapsedTime:
+  Description:
+Download.ServerMeasurements.BBRInfo:
+  Description:
+Download.ServerMeasurements.BBRInfo.BW:
+  Description: The maximum end to end bandwidth between the client and server as measured the M-Lab server using BBR.
+Download.ServerMeasurements.BBRInfo.MinRTT:
+  Description: The minimum round trip time as measured by the M-Lab server
+    using BBR.
+Download.ServerMeasurements.BBRInfo.PacingGain:
+  Description:
+Download.ServerMeasurements.BBRInfo.CwndGain:
+  Description:
+Download.ServerMeasurements.BBRInfo.ElapsedTime:
+  Description: The duration of an download measurement as measured by the M-Lab
+    server in milliseconds.
+Download.ServerMeasurements.TCPInfo:
+  Description:
+Download.ServerMeasurements.TCPInfo.State:
+  Description:
+Download.ServerMeasurements.TCPInfo.CAState:
+  Description:
+Download.ServerMeasurements.TCPInfo.Retransmits:
+  Description:
+Download.ServerMeasurements.TCPInfo.Probes:
+  Description:
+Download.ServerMeasurements.TCPInfo.Backoff:
+  Description:
+Download.ServerMeasurements.TCPInfo.Options:
+  Description:
+Download.ServerMeasurements.TCPInfo.WScale:
+  Description:
+Download.ServerMeasurements.TCPInfo.AppLimited:
+  Description:
+Download.ServerMeasurements.TCPInfo.RTO:
+  Description:
+Download.ServerMeasurements.TCPInfo.ATO:
+  Description:
+Download.ServerMeasurements.TCPInfo.SndMSS:
+  Description:
+Download.ServerMeasurements.TCPInfo.RcvMSS:
+  Description:
+Download.ServerMeasurements.TCPInfo.Unacked:
+  Description:
+Download.ServerMeasurements.TCPInfo.Sacked:
+  Description:
+Download.ServerMeasurements.TCPInfo.Lost:
+  Description:
+Download.ServerMeasurements.TCPInfo.Retrans:
+  Description:
+Download.ServerMeasurements.TCPInfo.Fackets:
+  Description:
+Download.ServerMeasurements.TCPInfo.LastDataSent:
+  Description:
+Download.ServerMeasurements.TCPInfo.LastAckSent:
+  Description:
+Download.ServerMeasurements.TCPInfo.LastDataRecv:
+  Description:
+Download.ServerMeasurements.TCPInfo.LastAckRecv:
+  Description:
+Download.ServerMeasurements.TCPInfo.PTMU:
+  Description:
+Download.ServerMeasurements.TCPInfo.RcvSsThresh:
+  Description:
+Download.ServerMeasurements.TCPInfo.RTT:
+  Description:
+Download.ServerMeasurements.TCPInfo.RTTVar:
+  Description: The variation in round trip time during the download
+    measurement as measured by the M-Lab server.
+Download.ServerMeasurements.TCPInfo.SndSsThresh:
+  Description:
+Download.ServerMeasurements.TCPInfo.SndCwnd:
+  Description:
+Download.ServerMeasurements.TCPInfo.AdvMSS:
+  Description:
+Download.ServerMeasurements.TCPInfo.Reordering:
+  Description:
+Download.ServerMeasurements.TCPInfo.RcvRTT:
+  Description:
+Download.ServerMeasurements.TCPInfo.RcvSpace:
+  Description:
+Download.ServerMeasurements.TCPInfo.TotalRetrans:
+  Description:
+Download.ServerMeasurements.TCPInfo.PacingRate:
+  Description:
+Download.ServerMeasurements.TCPInfo.MaxPacingRate:
+  Description:
+Download.ServerMeasurements.TCPInfo.BytesAcked:
+  Description:
+Download.ServerMeasurements.TCPInfo.BytesReceived:
+  Description:
+Download.ServerMeasurements.TCPInfo.SegsOut:
+  Description:
+Download.ServerMeasurements.TCPInfo.SegsIn:
+  Description:
+Download.ServerMeasurements.TCPInfo.NotsentBytes:
+  Description:
+Download.ServerMeasurements.TCPInfo.MinRTT:
+  Description:
+Download.ServerMeasurements.TCPInfo.DataSegsIn:
+  Description:
+Download.ServerMeasurements.TCPInfo.DataSegsOut:
+  Description:
+Download.ServerMeasurements.TCPInfo.DeliveryRate:
+  Description:
+Download.ServerMeasurements.TCPInfo.BusyTime:
+  Description:
+Download.ServerMeasurements.TCPInfo.RWndLimited:
+  Description:
+Download.ServerMeasurements.TCPInfo.SndBufLimited:
+  Description:
+Download.ServerMeasurements.TCPInfo.Delivered:
+  Description:
+Download.ServerMeasurements.TCPInfo.DeliveredCE:
+  Description:
+Download.ServerMeasurements.TCPInfo.BytesSent:
+  Description:
+Download.ServerMeasurements.TCPInfo.BytesRetrans:
+  Description:
+Download.ServerMeasurements.TCPInfo.DSackDups:
+  Description:
+Download.ServerMeasurements.TCPInfo.ReordSeen:
+  Description:
+Download.ServerMeasurements.TCPInfo.ElapsedTime:
+  Description:
+
+Download.ClientMeasurements:
+  Description:
+Download.ClientMeasurements.AppInfo:
+  Description:
+Download.ClientMeasurements.AppInfo.NumBytes:
+  Description: The number of bytes uploaded to the M-Lab server during an
+    upload test, as measured by the client.
+Download.ClientMeasurements.AppInfo.ElapsedTime:
+  Description:
+
+Download.ClientMeasurements.BBRInfo:
+  Description:
+Download.ClientMeasurements.BBRInfo.BW:
+  Description: The maximum end to end bandwidth between the client and server
+    as measured the client using BBR.
+Download.ClientMeasurements.BBRInfo.MinRTT:
+  Description: The minimum round trip time as measured by the client using BBR.
+Download.ClientMeasurements.BBRInfo.PacingGain:
+  Description:
+Download.ClientMeasurements.BBRInfo.CwndGain:
+  Description:
+Download.ClientMeasurements.ElapsedTime:
+  Description: The duration of a download test as measured by the client in
+    milliseconds.
+
+Download.ClientMeasurements.TCPInfo:
+  Description:
+Download.ClientMeasurements.TCPInfo.State:
+  Description:
+Download.ClientMeasurements.TCPInfo.CAState:
+  Description:
+Download.ClientMeasurements.TCPInfo.Retransmitts:
+  Description:
+Download.ClientMeasurements.TCPInfo.Probes:
+  Description:
+Download.ClientMeasurements.TCPInfo.Backoff:
+  Description:
+Download.ClientMeasurements.TCPInfo.Options:
+  Description:
+Download.ClientMeasurements.TCPInfo.WScale:
+  Description:
+Download.ClientMeasurements.TCPInfo.AppLimited:
+  Description:
+Download.ClientMeasurements.TCPInfo.RTO:
+  Description:
+Download.ClientMeasurements.TCPInfo.ATO:
+  Description:
+Download.ClientMeasurements.TCPInfo.SndMSS:
+  Description:
+Download.ClientMeasurements.TCPInfo.RcvMSS:
+  Description:
+Download.ClientMeasurements.TCPInfo.Unacked:
+  Description:
+Download.ClientMeasurements.TCPInfo.Sacked:
+  Description:
+Download.ClientMeasurements.TCPInfo.Lost:
+  Description:
+Download.ClientMeasurements.TCPInfo.Retrans:
+  Description:
+Download.ClientMeasurements.TCPInfo.Fackets:
+  Description:
+Download.ClientMeasurements.TCPInfo.LastDataSent:
+  Description:
+Download.ClientMeasurements.TCPInfo.LastAckSent:
+  Description:
+Download.ClientMeasurements.TCPInfo.LastDataRecv:
+  Description:
+Download.ClientMeasurements.TCPInfo.LastAckRecv:
+  Description:
+Download.ClientMeasurements.TCPInfo.PTMU:
+  Description:
+Download.ClientMeasurements.TCPInfo.RcvSsThresh:
+  Description:
+Download.ClientMeasurements.TCPInfo.RTT:
+  Description:
+Download.ClientMeasurements.TCPInfo.RTTVar:
+  Description: The variation in round trip time during the download
+    measurement as measured by the client.
+Download.ClientMeasurements.TCPInfo.SndSsThresh:
+  Description:
+Download.ClientMeasurements.TCPInfo.SndCwnd:
+  Description:
+Download.ClientMeasurements.TCPInfo.AdvMSS:
+  Description:
+Download.ClientMeasurements.TCPInfo.Reordering:
+  Description:
+Download.ClientMeasurements.TCPInfo.RcvRTT:
+  Description:
+Download.ClientMeasurements.TCPInfo.RcvSpace:
+  Description:
+Download.ClientMeasurements.TCPInfo.TotalRetrans:
+  Description:
+Download.ClientMeasurements.TCPInfo.PacingRate:
+  Description:
+Download.ClientMeasurements.TCPInfo.MaxPacingRate:
+  Description:
+Download.ClientMeasurements.TCPInfo.BytesAcked:
+  Description:
+Download.ClientMeasurements.TCPInfo.BytesReceived:
+  Description:
+Download.ClientMeasurements.TCPInfo.SegsOut:
+  Description:
+Download.ClientMeasurements.TCPInfo.SegsIn:
+  Description:
+Download.ClientMeasurements.TCPInfo.NotsentBytes:
+  Description:
+Download.ClientMeasurements.TCPInfo.MinRTT:
+  Description:
+Download.ClientMeasurements.TCPInfo.DataSegsIn:
+  Description:
+Download.ClientMeasurements.TCPInfo.DataSegsOut:
+  Description:
+Download.ClientMeasurements.TCPInfo.BusyTime:
+  Description:
+Download.ClientMeasurements.TCPInfo.RWndLimited:
+  Description:
+Download.ClientMeasurements.TCPInfo.SndBufLimited:
+  Description:
+Download.ClientMeasurements.TCPInfo.Delivered:
+  Description:
+Download.ClientMeasurements.TCPInfo.DeliveredCE:
+  Description:
+Download.ClientMeasurements.TCPInfo.BytesSent:
+  Description:
+Download.ClientMeasurements.TCPInfo.BytesRetrans:
+  Description:
+Download.ClientMeasurements.TCPInfo.DSackDups:
+  Description:
+Download.ClientMeasurements.TCPInfo.ReordSeen:
+  Description:
+Download.ClientMeasurements.TCPInfo.ElapsedTime:
+  Description:
+
+Download.ClientMetadata:
+  Description: Client-reported metadata as name/value pairs.
+Download.ClientMetadata.Name:
+  Description: If set, contains text that identifies and provides context for
+    the corresponding metadata value. For example, "OS" or "clientApplication"
+Download.ClientMetadata.Value:
+  Description: If set, contains a value corresponding to metadata name. For
+    example, "Windows 10" or "ndtJS"
