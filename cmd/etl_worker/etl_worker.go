@@ -45,13 +45,17 @@ func init() {
 }
 
 var (
-	jsonOutput     = flag.Bool("jsonOut", false, "Write output to json-[project] bucket")
-	maxActiveTasks = flag.Int64("maxActive", 200, "Maximum number of active tasks")
+	jsonOutput     = flag.Bool("json_out", false, "Write output to json-[project] bucket")
+	maxActiveTasks = flag.Int64("max_active", 0, "Maximum number of active tasks")
+	gardenerHost   = flag.String("gardener_host", "", "Gardener host for jobs")
 
 	servicePort     = flag.String("service_port", ":8080", "The main (private) service port")
 	shutdownTimeout = flag.Duration("shutdown_timeout", 1*time.Minute, "Graceful shutdown time allowance")
 
 	mainCtx, mainCancel = context.WithCancel(context.Background())
+
+	// In active polling mode, this holds the GardenerAPI.
+	gardenerAPI *active.GardenerAPI
 )
 
 // Task Queue can always submit to an admin restricted URL.
@@ -81,6 +85,14 @@ func Status(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Release: %s   Commit: unknown\n", os.Getenv("RELEASE_TAG"))
 	}
 
+	if gardenerAPI != nil {
+		gardenerAPI.Status(w)
+	}
+	if *jsonOutput {
+		fmt.Fprintf(w, "Writing output to %s\n", outputBucket())
+	} else {
+		fmt.Fprintf(w, "Writing output to BigQuery\n")
+	}
 	fmt.Fprintf(w, "<p>Workers: %d / %d</p>\n", atomic.LoadInt32(&inFlight), maxInFlight)
 	env := os.Environ()
 	for i := range env {
@@ -262,6 +274,10 @@ func (r *runnable) Info() string {
 	return r.Name
 }
 
+func outputBucket() string {
+	return "etl-" + os.Getenv("GCLOUD_PROJECT")
+}
+
 func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	c, err := storage.GetStorageClient(false)
 	if err != nil {
@@ -270,8 +286,7 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 
 	var sink factory.SinkFactory
 	if *jsonOutput {
-		outputBucket := "etl-" + os.Getenv("GCLOUD_PROJECT")
-		sink = storage.NewSinkFactory(c, outputBucket)
+		sink = storage.NewSinkFactory(c, outputBucket())
 	} else {
 		sink = bq.NewSinkFactory()
 	}
@@ -345,9 +360,9 @@ func main() {
 	if len(gardener) > 0 {
 		log.Println("Using", gardener)
 		minPollingInterval := 10 * time.Second
-		gapi := mustGardenerAPI(mainCtx, gardener)
+		gardenerAPI = mustGardenerAPI(mainCtx, gardener)
 		// Note that this does not currently track duration metric.
-		go gapi.Poll(mainCtx, toRunnable, (int)(*maxActiveTasks), minPollingInterval)
+		go gardenerAPI.Poll(mainCtx, toRunnable, (int)(*maxActiveTasks), minPollingInterval)
 	} else {
 		log.Println("GARDENER_HOST not specified or empty")
 	}

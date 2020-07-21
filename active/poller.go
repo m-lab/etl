@@ -3,6 +3,7 @@ package active
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -41,8 +42,8 @@ var JobFailures = promauto.NewCounterVec(
 
 // GardenerAPI encapsulates the backend paths and clients to connect to gardener and GCS.
 type GardenerAPI struct {
-	trackerBase url.URL
-	gcs         stiface.Client
+	trackerBase url.URL        // static after init
+	gcs         stiface.Client // static after init
 }
 
 // NewGardenerAPI creates a GardenerAPI.
@@ -200,6 +201,7 @@ func (g *GardenerAPI) Poll(ctx context.Context,
 	for {
 		select {
 		case <-ctx.Done():
+			log.Println("Poller context done")
 			return
 		default:
 			err := g.pollAndRun(ctx, toRunnable, throttle)
@@ -210,4 +212,10 @@ func (g *GardenerAPI) Poll(ctx context.Context,
 
 		<-ticker.C // Wait for next tick, to avoid fast spinning on errors.
 	}
+}
+
+// Status adds a small amount of status info to w.
+func (g *GardenerAPI) Status(w http.ResponseWriter) {
+	fmt.Fprintf(w, "Gardener API: %s\n", g.trackerBase.String())
+
 }
