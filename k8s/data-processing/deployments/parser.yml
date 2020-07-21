@@ -39,7 +39,7 @@ spec:
         args: ["--prometheusx.listen-address=:9090",
                "--service_port=:8080",  # TODO - can this be bound to service-port defined below?
                "--maxActive=200",
-               "--jsonOutput=true",]
+               "--jsonOutput=false",]
         env:
         - name: RELEASE_TAG
           value: {{RELEASE_TAG}}
