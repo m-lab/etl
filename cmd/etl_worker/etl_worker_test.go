@@ -37,7 +37,8 @@ func TestMain(t *testing.T) {
 	mainCtx, mainCancel = context.WithCancel(context.Background())
 
 	vars := map[string]string{
-		"PROJECT": "mlab-testing",
+		"PROJECT":     "mlab-testing",
+		"MAX_WORKERS": "25",
 	}
 	for k, v := range vars {
 		cleanup := osx.MustSetenv(k, v)
@@ -85,13 +86,16 @@ func TestMain(t *testing.T) {
 
 func TestPollingMode(t *testing.T) {
 	flag.Set("prometheusx.listen-address", ":9090")
+	flag.Set("json_out", "true")
 	mainCtx, mainCancel = context.WithCancel(context.Background())
 
 	vars := map[string]string{
-		"PROJECT":       "mlab-testing",
-		"GARDENER_HOST": "foobar",
-		"MAX_ACTIVE":    "200",
-		"SERVICE_PORT":  ":0",
+		"PROJECT":        "mlab-testing",
+		"GCLOUD_PROJECT": "mlab-testing",
+		"GARDENER_HOST":  "foobar",
+		"MAX_ACTIVE":     "200",
+		"SERVICE_PORT":   ":0",
+		"COMMIT_HASH":    "123456789ABCDEF",
 	}
 	for k, v := range vars {
 		cleanup := osx.MustSetenv(k, v)
@@ -126,7 +130,12 @@ func TestPollingMode(t *testing.T) {
 	data, err = ioutil.ReadAll(resp.Body)
 	// Check expected GardenerAPI
 	if !strings.Contains(string(data), "http://foobar:8080") {
-		t.Error("Should contain 'GardenerAPI: http://foobar:8080':\n", string(data))
+		t.Error("Should contain 'Gardener API: http://foobar:8080':\n", string(data))
+	}
+	// Check expected GardenerAPI
+	expect := "Writing output to etl-mlab-testing"
+	if !strings.Contains(string(data), expect) {
+		t.Errorf("Should contain '%s':\n%s", expect, string(data))
 	}
 	resp.Body.Close()
 
