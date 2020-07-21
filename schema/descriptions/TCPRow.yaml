@@ -44,8 +44,8 @@ TCPInfo.SndWScale:
   Kernel: snd_wscale in include/linux/tcp.h
 TCPInfo.RcvWScale:
   Description: Window scale used by the local receiver to encode seg.wnd
-  Discussion: This is determined by the server config, and nearly constant for MLab
-    Currently not accessible github.com/m-lab/etl/issues/790
+  Discussion: This is determined by the server config, and nearly constant for
+    M-Lab. Currently not accessible github.com/m-lab/etl/issues/790
   Reference: RFC 7323
   Kernel: rcv_wscale in include/linux/tcp.h
 TCPInfo.AppLimited:
