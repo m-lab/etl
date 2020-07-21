@@ -171,13 +171,12 @@ func pathAndFilename(uri string) (string, error) {
 
 // Get implements factory.SinkFactory
 func (sf *SinkFactory) Get(ctx context.Context, path etl.DataPath) (row.Sink, etl.ProcessingError) {
-
 	fn, err := pathAndFilename(path.URI)
 	if err != nil {
 		return nil, factory.NewError(path.DataType, "InvalidPath",
 			http.StatusInternalServerError, err)
 	}
-	s, err := NewRowWriter(context.Background(), sf.client, sf.outputBucket, fn+".json")
+	s, err := NewRowWriter(ctx, sf.client, sf.outputBucket, fn+".json")
 	if err != nil {
 		return nil, factory.NewError(path.DataType, "SinkFactory",
 			http.StatusInternalServerError, err)
