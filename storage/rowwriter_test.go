@@ -59,3 +59,22 @@ func TestRowWriter(t *testing.T) {
 		t.Error(diff)
 	}
 }
+
+func TestPathAndFilename(t *testing.T) {
+	if _, err := storage.PathAndFilename("foobar"); err == nil {
+		t.Error("Expected error")
+	}
+	if _, err := storage.PathAndFilename("gs://foobar"); err == nil {
+		t.Error("Expected error")
+	}
+	if _, err := storage.PathAndFilename("gs://foobar/"); err == nil {
+		t.Error("Expected error")
+	}
+	path, err := storage.PathAndFilename("gs://bucket/foo/bar.baz")
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	if path != "foo/bar.baz" {
+		t.Error("Incorrect path:", path)
+	}
+}

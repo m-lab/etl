@@ -6,12 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net/http"
+	"strings"
 
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
+	"google.golang.org/api/googleapi"
+
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
-	"google.golang.org/api/googleapi"
 )
 
 // ObjectWriter creates a writer to a named object.
@@ -49,17 +53,6 @@ func NewRowWriter(ctx context.Context, client stiface.Client, bucket string, pat
 	writing <- struct{}{}
 
 	return &RowWriter{bucket: bucket, path: path, w: w, encoding: encoding, writing: writing}, nil
-}
-
-// SinkFactory implements factory.SinkFactory.
-type SinkFactory struct {
-	client stiface.Client
-}
-
-// Get mplements factory.SinkFactory
-func (sf *SinkFactory) Get(
-	ctx context.Context, path etl.DataPath) (*RowWriter, error) {
-	return nil, errors.New("not implemented")
 }
 
 // Acquire the encoding token.
@@ -159,4 +152,40 @@ func (rw *RowWriter) Close() error {
 		log.Println(rw.w.Attrs())
 	}
 	return err
+}
+
+// SinkFactory implements factory.SinkFactory.
+type SinkFactory struct {
+	client       stiface.Client
+	outputBucket string
+}
+
+// returns the full path/filename from a gs://bucket/path/filename string.
+func pathAndFilename(uri string) (string, error) {
+	parts := strings.SplitN(uri, "/", 4)
+	if len(parts) != 4 || parts[0] != "gs:" || len(parts[3]) == 0 {
+		return "", errors.New("Bad GCS path")
+	}
+	return parts[3], nil
+}
+
+// Get implements factory.SinkFactory
+func (sf *SinkFactory) Get(ctx context.Context, path etl.DataPath) (row.Sink, etl.ProcessingError) {
+
+	fn, err := pathAndFilename(path.URI)
+	if err != nil {
+		return nil, factory.NewError(path.DataType, "InvalidPath",
+			http.StatusInternalServerError, err)
+	}
+	s, err := NewRowWriter(context.Background(), sf.client, sf.outputBucket, fn+".json")
+	if err != nil {
+		return nil, factory.NewError(path.DataType, "SinkFactory",
+			http.StatusInternalServerError, err)
+	}
+	return s, nil
+}
+
+// NewSinkFactory returns the default SinkFactory
+func NewSinkFactory(client stiface.Client, outputBucket string) factory.SinkFactory {
+	return &SinkFactory{client: client, outputBucket: outputBucket}
 }
