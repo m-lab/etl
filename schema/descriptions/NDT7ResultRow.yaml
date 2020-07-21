@@ -264,7 +264,7 @@ ClientMeasurements.AppInfo:
   Description: TBD
 ClientMeasurements.AppInfo.NumBytes:
   Description: The number of bytes exchanged between the client and the M-Lab
-  server during a measurement.
+    server during a measurement.
 ClientMeasurements.AppInfo.ElapsedTime:
   Description: The duration of the measurement as measured by the M-Lab server
     in milliseconds.
