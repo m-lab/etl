@@ -2,7 +2,8 @@ a:
   Description: Fields summarizing or derived from the raw data.
 a.UUID:
   Description: UUID for TCP connection.
-a.TestTime: The date and time of the measurement in UTC.
+a.TestTime:
+  Description: The date and time of the measurement in UTC.
 a.CongestionControl:
   Description: Congestion control algorithm used for connection.
 a.MeanThroughputMbps:
@@ -15,25 +16,6 @@ a.MinRTT:
   recorded in milliseconds.
 a.LossRate:
   Description: Loss rate from the lifetime of the connection.
-
-parser:
-  Description: Metadata about how the parser processed this measurement row.
-parser.Version:
-  Description: Version is the symbolic version (if any) of the running server 
-    code that produced this measurement.
-parser.Time:
-  Description: The time that the parser processed this row.
-parser.ArchiveURL:
-  Description: The Google Cloud Storage URL to the archive containing the
-    Filename for this row.
-parser.Filename:
-  Description: TBD
-parser.Priority:
-  Description: TBD
-
-date:
-  Description: Date is used by BigQuery to partition data to improve query 
-    performance.
 
 GitShortCommit:
   Description: GitShortCommit is the Git commit (short form) of the running
@@ -57,254 +39,254 @@ EndTime:
   Description: The date and time when the measurement ended in UTC.
 Upload:
   Description: Metadata for the NDT7 protocol for this measurement.
-Upload.UUID:
+UUID:
   Description: UUID for TCP connection for this measurement.
-Upload.StartTime:
+StartTime:
   Description: The date and time when the measurement began in UTC.
-Upload.EndTime:
+EndTime:
   Description: The date and time when the measurement ended in UTC.
-Upload.ServerMeasurements:
+ServerMeasurements:
   Description: TBD
-Upload.ServerMeasurements.AppInfo:
+ServerMeasurements.AppInfo:
   Description: TBD
-Upload.ServerMeasurements.AppInfo.NumBytes:
+ServerMeasurements.AppInfo.NumBytes:
   Description: The number of bytes to the M-Lab server during the measurement,
   as measured by the M-Lab server.
-Upload.ServerMeasurements.BBRInfo:
+ServerMeasurements.BBRInfo:
   Description: TBD
-Upload.ServerMeasurements.BBRInfo.BW:
+ServerMeasurements.BBRInfo.BW:
   Description: TBD
-Upload.ServerMeasurements.BBRInfo.MinRTT:
+ServerMeasurements.BBRInfo.MinRTT:
   Description: The minimum round trip time as measured by the M-Lab server
     using BBR.
-Upload.ServerMeasurements.BBRInfo.PacingGain:
+ServerMeasurements.BBRInfo.PacingGain:
   Description: TBD
-Upload.ServerMeasurements.BBRInfo.CwndGain:
+ServerMeasurements.BBRInfo.CwndGain:
   Description: TBD
-Upload.ServerMeasurements.ElapsedTime:
+ServerMeasurements.ElapsedTime:
   Description: The duration of the measurement as measured by the M-Lab server
     in milliseconds.
-Upload.ServerMeasurements.TCPInfo:
+ServerMeasurements.TCPInfo:
   Description:
-Upload.ServerMeasurements.TCPInfo.State:
+ServerMeasurements.TCPInfo.State:
   Description: TCP state is nominally 1 (Established). Other values reflect
     transient states having incomplete rows.
   Kernel: See TCP_ESTABLISHED in include/net/tcp_states.h
-Upload.ServerMeasurements.TCPInfo.CAState:
+ServerMeasurements.TCPInfo.CAState:
   Description: Loss recovery state machine. For traditional loss based 
     congestion control algorithms, CAState is also used to control window 
     adjustments.
   Kernel: tcp_set_ca_state in include/net/tcp.h
-Upload.ServerMeasurements.TCPInfo.Retransmits:
+ServerMeasurements.TCPInfo.Retransmits:
   Description: Number of timeouts (RTO based retransmissions) at this 
     sequence. Reset to zero on forward progress.
   Kernel: icsk_retransmits in include/net/inet_connection_sock.h
-Upload.ServerMeasurements.TCPInfo.Probes:
+ServerMeasurements.TCPInfo.Probes:
   Description: Consecutive zero window probes that have gone unanswered.
   Kernel: icsk_probes_out in include/net/inet_connection_sock.h
-Upload.ServerMeasurements.TCPInfo.Backoff:
+ServerMeasurements.TCPInfo.Backoff:
   Description: Exponential timeout backoff counter. Increment on RTO, reset on 
     successful RTT measurements.
   Kernel: icsk_backoff in include/net/inet_connection_sock.h
-Upload.ServerMeasurements.TCPInfo.Options:
+ServerMeasurements.TCPInfo.Options:
   Description: Bit encoded SYN options and other negotiations TIMESTAMPS 0x1;
     SACK 0x2; WSCALE 0x4; ECN 0x8 - Was negotiated; ECN_SEEN - At least one ECT
     seen; SYN_DATA - SYN-ACK acknowledged data in SYN sent or rcvd.
   Kernel: TCPI_OPT_TIMESTAMPS in include/uapi/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.WScale:
+ServerMeasurements.TCPInfo.WScale:
   Description: BUG Conflation of SndWScale and RcvWScale. See
     github.com/m-lab/etl/issues/790
-Upload.ServerMeasurements.TCPInfo.AppLimited:
+ServerMeasurements.TCPInfo.AppLimited:
   Description: Flag indicating that rate measurements reflect non-network
     bottlenecks. Note that even very short application stalls invalidate max_BW
     measurements.
   Kernel: rate_app_limited in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.RTO:
+ServerMeasurements.TCPInfo.RTO:
   Description: Retransmission Timeout. Quantized to system jiffies.
   Kernel: icsk_rto in include/net/inet_connection_sock.h
-Upload.ServerMeasurements.TCPInfo.ATO:
+ServerMeasurements.TCPInfo.ATO:
   Description: Delayed ACK Timeout. Quantized to system jiffies.
   Kernel: ato in icsk_ack in include/net/inet_connection_sock.h
-Upload.ServerMeasurements.TCPInfo.SndMSS:
+ServerMeasurements.TCPInfo.SndMSS:
   Description: Current Maximum Segment Size. Note that this can be smaller than
     the negotiated MSS for various reasons.
   Kernel: mss_cache in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.RcvMSS:
+ServerMeasurements.TCPInfo.RcvMSS:
   Description: Maximum observed segment size from the remote host. Used to
     trigger delayed ACKs.
   Kernel: rcv_mss in icsk_ack in include/net/inet_connection_sock.h
-Upload.ServerMeasurements.TCPInfo.Unacked:
+ServerMeasurements.TCPInfo.Unacked:
   Description: Number of segments between snd.nxt and snd.una. Accounting for
     the Pipe algorithm.
   Kernel: packets_out in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.Sacked:
+ServerMeasurements.TCPInfo.Sacked:
   Description: Scoreboard segment marked SACKED by sack blocks. Accounting for
     the Pipe algorithm.
   Kernel: sacked_out in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.Lost:
+ServerMeasurements.TCPInfo.Lost:
   Description: Scoreboard segments marked lost by loss detection heuristics.
     Accounting for the Pipe algorithm.
   Kernel: lost_out in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.Retrans:
+ServerMeasurements.TCPInfo.Retrans:
   Description: Scoreboard segments marked retransmitted. Accounting for the 
     Pipe algorithm.
   Kernel: retrans_out in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.Fackets:
+ServerMeasurements.TCPInfo.Fackets:
   Description: TBD
-Upload.ServerMeasurements.TCPInfo.LastDataSent:
+ServerMeasurements.TCPInfo.LastDataSent:
   Description: Time since last data segment was sent. Quantized to jiffies.
   Kernel: lsndtime in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.LastAckSent:
+ServerMeasurements.TCPInfo.LastAckSent:
   Description: Time since last ACK was sent (not implemented). Present in 
     TCP_INFO but not elsewhere in the kernel.
-Upload.ServerMeasurements.TCPInfo.LastDataRecv:
+ServerMeasurements.TCPInfo.LastDataRecv:
   Description: Time since last data segment was received. Quantized to jiffies.
   Kernel: lrcvtime in icsk_ack in include/net/inet_connection_sock.h
-Upload.ServerMeasurements.TCPInfo.PMTU:
+ServerMeasurements.TCPInfo.PMTU:
   Description: Maximum IP Transmission Unit for this path.
   Kernel: icsk_pmtu_cookie in include/net/inet_connection_sock.h
-Upload.ServerMeasurements.TCPInfo.RcvSsThresh:
+ServerMeasurements.TCPInfo.RcvSsThresh:
   Description: Current Window Clamp. Receiver algorithm to avoid allocating 
     excessive receive buffers.
   Kernel: rcv_ssthresh in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.RTT:
+ServerMeasurements.TCPInfo.RTT:
   Description: Smoothed Round Trip Time (RTT). The Linux implementation 
     differs from the standard.
   Kernel: srtt_us in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.RTTVar:
+ServerMeasurements.TCPInfo.RTTVar:
   Description: The variation in round trip time during the upload measurement
     as measured by the M-Lab server.
-Upload.ServerMeasurements.TCPInfo.SndSsThresh:
+ServerMeasurements.TCPInfo.SndSsThresh:
   Description: Slow Start Threshold. Value controlled by the selected 
     congestion control algorithm.
   Kernel: snd_ssthresh in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.SndCwnd:
+ServerMeasurements.TCPInfo.SndCwnd:
   Description: Congestion Window. Value controlled by the selected congestion 
     control algorithm.
   Kernel: snd_cwnd in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.AdvMSS:
+ServerMeasurements.TCPInfo.AdvMSS:
   Description: Advertised MSS.
   Kernel: advmss in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.Reordering:
+ServerMeasurements.TCPInfo.Reordering:
   Description: Maximum observed reordering distance.
   Kernel: reordering in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.RcvRTT:
+ServerMeasurements.TCPInfo.RcvRTT:
   Description: Receiver Side RTT estimate.
   Kernel: rcv_rtt_est.rtt_us in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.RcvSpace:
+ServerMeasurements.TCPInfo.RcvSpace:
   Description: Space reserved for the receive queue. Typically updated by 
     receiver side auto-tuning.
   Kernel: space in rcvq_space in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.TotalRetrans:
+ServerMeasurements.TCPInfo.TotalRetrans:
   Description: Total number of segments containing retransmitted data.
   Kernel: total_retrans in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.PacingRate:
+ServerMeasurements.TCPInfo.PacingRate:
   Description: Current Pacing Rate, nominally updated by congestion control.
   Kernel: sk_pacing_rate in include/net/sock.h
-Upload.ServerMeasurements.TCPInfo.MaxPacingRate:
+ServerMeasurements.TCPInfo.MaxPacingRate:
   Description: Settable pacing rate clamp. Set with 
     setsockopt( ..SO_MAX_PACING_RATE.. ).
   Kernel: sk_max_pacing_rate in include/net/sock.h
-Upload.ServerMeasurements.TCPInfo.BytesAcked:
+ServerMeasurements.TCPInfo.BytesAcked:
   Description: The number of data bytes for which cumulative acknowledgments 
     have been received.
   Kernel: bytes_acked in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.BytesReceived:
+ServerMeasurements.TCPInfo.BytesReceived:
   Description: The number of data bytes for which have been received.
   Kernel: bytes_received in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.SegsOut:
+ServerMeasurements.TCPInfo.SegsOut:
   Description: The number of segments transmitted. Includes data and pure ACKs.
   Kernel: segs_out in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.SegsIn:
+ServerMeasurements.TCPInfo.SegsIn:
   Description: The number of segments received. Includes data and pure ACKs.
   Kernel: segs_in in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.NotsentBytes:
+ServerMeasurements.TCPInfo.NotsentBytes:
   Description: Number of bytes queued in the send buffer that have not been 
     sent.
   Kernel: tcpi_notsent_bytes() in net/ipv4/tcp.c
-Upload.ServerMeasurements.TCPInfo.MinRTT:
+ServerMeasurements.TCPInfo.MinRTT:
   Description: Minimum Round Trip Time. From an older, pre-BBR algorithm.
   Kernel: tcp_min_rtt in include/net/tcp.h
-Upload.ServerMeasurements.TCPInfo.DataSegsIn:
+ServerMeasurements.TCPInfo.DataSegsIn:
   Description: Input segments carrying data (len>0).
   Kernel: data_segs_in in include/net/tcp.h
-Upload.ServerMeasurements.TCPInfo.DataSegsOut:
+ServerMeasurements.TCPInfo.DataSegsOut:
   Description: Transmitted segments carrying data (len>0).
   Kernel: data_segs_out in include/net/tcp.h
-Upload.ServerMeasurements.TCPInfo.DeliveryRate:
+ServerMeasurements.TCPInfo.DeliveryRate:
   Description: Observed Maximum Delivery Rate.
   Kernel: tcp_compute_delivery_rate() in net/ipv4/tcp.c
-Upload.ServerMeasurements.TCPInfo.BusyTime:
+ServerMeasurements.TCPInfo.BusyTime:
   Description: Time with outstanding (unacknowledged) data. Time when snd.una 
     is not equal to snd.next.
   Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
-Upload.ServerMeasurements.TCPInfo.RWndLimited:
+ServerMeasurements.TCPInfo.RWndLimited:
   Description: Time spend waiting for receiver window.
   Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
-Upload.ServerMeasurements.TCPInfo.SndBufLimited:
+ServerMeasurements.TCPInfo.SndBufLimited:
   Description: Time spent waiting for sender buffer space. This only includes
     the time when TCP transmissions are starved for data, but the application
     has been stopped because the buffer is full and can not be grown for some 
     reason.
   Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
-Upload.ServerMeasurements.TCPInfo.Delivered:
+ServerMeasurements.TCPInfo.Delivered:
   Description: Data segments delivered to the receiver including retransmits. 
     As reported by returning ACKs, used by ECN.
   Kernel: delivered in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.DeliveredCE:
+ServerMeasurements.TCPInfo.DeliveredCE:
   Description: ECE marked data segments delivered to the receiver including 
     retransmits. As reported by returning ACKs, used by ECN.
   Kernel: delivered_ce in include/linux/tcp.h
-Upload.ServerMeasurements.TCPInfo.BytesSent:
+ServerMeasurements.TCPInfo.BytesSent:
   Description: Payload bytes sent (excludes headers, includes retransmissions).
   Kernel: bytes_sent
-Upload.ServerMeasurements.TCPInfo.BytesRetrans:
+ServerMeasurements.TCPInfo.BytesRetrans:
   Description: Bytes retransmitted. May include headers and new data carried 
     with a retransmission (for thin flows).
   Kernel: bytes_retrans
-Upload.ServerMeasurements.TCPInfo.DSackDups:
+ServerMeasurements.TCPInfo.DSackDups:
   Description: Duplicate segments reported by DSACK. Not reported by some 
     Operating Systems.
   Kernel: dsack_dups
-Upload.ServerMeasurements.TCPInfo.ReordSeen:
+ServerMeasurements.TCPInfo.ReordSeen:
   Description: Received ACKs that were out of order. Estimates reordering on 
     the return path.
   Kernel: reord_seen
-Upload.ServerMeasurements.TCPInfo.ElapsedTime:
+ServerMeasurements.TCPInfo.ElapsedTime:
   Description: The duration of the measurement as measured by the M-Lab server
     in milliseconds.
 
-Upload.ClientMeasurements:
+ClientMeasurements:
   Description: Periodic measurements reported by the client. Not all clients
     report this information.
-Upload.ClientMeasurements.AppInfo:
+ClientMeasurements.AppInfo:
   Description: TBD
-Upload.ClientMeasurements.AppInfo.NumBytes:
+ClientMeasurements.AppInfo.NumBytes:
   Description: The number of bytes exchanged between the client and the M-Lab
   server during a measurement.
-Upload.ClientMeasurements.AppInfo.ElapsedTime:
+ClientMeasurements.AppInfo.ElapsedTime:
   Description: The duration of the measurement as measured by the M-Lab server
     in milliseconds.
-Upload.ClientMeasurements.BBRInfo:
+ClientMeasurements.BBRInfo:
   Description: TBD
-Upload.ClientMeasurements.BBRInfo.BW:
+ClientMeasurements.BBRInfo.BW:
   Description: The maximum end to end bandwidth between the client and server
     as measured the client using BBR.
-Upload.ClientMeasurements.BBRInfo.MinRTT:
+ClientMeasurements.BBRInfo.MinRTT:
   Description: The minimum round trip time as measured by the client using BBR.
-Upload.ClientMeasurements.BBRInfo.PacingGain:
+ClientMeasurements.BBRInfo.PacingGain:
   Description: TBD
-Upload.ClientMeasurements.BBRInfo.CwndGain:
+ClientMeasurements.BBRInfo.CwndGain:
   Description: TBD
-Upload.ClientMeasurements.ElapsedTime:
+ClientMeasurements.ElapsedTime:
   Description: The duration of the measurement as measured by the client in
     milliseconds.
 
-Upload.ClientMetadata:
+ClientMetadata:
   Description: Client-reported metadata as name/value pairs.
-Upload.ClientMetadata.Name:
+ClientMetadata.Name:
   Description: If set, contains text that identifies and provides context for
     the corresponding metadata value. For example, "OS" or "clientApplication"
-Upload.ClientMetadata.Value:
+ClientMetadata.Value:
   Description: If set, contains a value corresponding to metadata name. For
     example, "Windows 10" or "ndtJS"

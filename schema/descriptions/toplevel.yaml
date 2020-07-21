@@ -20,12 +20,14 @@ date:
 # Lower case parser for 'Standard Column' supporting schemas.
 parser:
   Description: Metadata about how the parser processed this measurement row.
-parser.ArchiveURL:
-  Description: GCS URL to the archive containing the Filename for this row.
-parser.Time:
-  Description: Time that the parser processed this row.
 parser.Version:
-  Description: Version of the parser that processed this row.
+  Description: Version is the symbolic version (if any) of the running server 
+    code that produced this measurement.
+parser.Time:
+  Description: The time that the parser processed this row.
+parser.ArchiveURL:
+  Description: The Google Cloud Storage URL to the archive containing the
+    Filename for this row.
 
 server:
   Description: Location information about the M-Lab server that collected the measurement.
