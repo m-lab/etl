@@ -13,7 +13,7 @@ a.MeanThroughputMbps:
     it is identified as "MeanThroughputMbps".
 a.MinRTT:
   Description: The minimum Round Trip Time observed during the measurement,
-  recorded in milliseconds.
+    recorded in milliseconds.
 a.LossRate:
   Description: Loss rate from the lifetime of the connection.
 
@@ -24,7 +24,7 @@ Version:
   Description: Version is the symbolic version (if any) of the running server
     code that produced this measurement.
 ServerIP:
-  Description: The IP address assigned to the M-Lab server that conducted the 
+  Description: The IP address assigned to the M-Lab server that conducted the
     measurement.
 ServerPort:
   Description: The port used by the server to conduct the measurement.
@@ -55,7 +55,8 @@ ServerMeasurements.AppInfo.NumBytes:
 ServerMeasurements.BBRInfo:
   Description: TBD
 ServerMeasurements.BBRInfo.BW:
-  Description: TBD
+  Description: The maximum end to end bandwidth between the client and server
+    as measured the client using BBR.
 ServerMeasurements.BBRInfo.MinRTT:
   Description: The minimum round trip time as measured by the M-Lab server
     using BBR.
@@ -73,19 +74,19 @@ ServerMeasurements.TCPInfo.State:
     transient states having incomplete rows.
   Kernel: See TCP_ESTABLISHED in include/net/tcp_states.h
 ServerMeasurements.TCPInfo.CAState:
-  Description: Loss recovery state machine. For traditional loss based 
-    congestion control algorithms, CAState is also used to control window 
+  Description: Loss recovery state machine. For traditional loss based
+    congestion control algorithms, CAState is also used to control window
     adjustments.
   Kernel: tcp_set_ca_state in include/net/tcp.h
 ServerMeasurements.TCPInfo.Retransmits:
-  Description: Number of timeouts (RTO based retransmissions) at this 
+  Description: Number of timeouts (RTO based retransmissions) at this
     sequence. Reset to zero on forward progress.
   Kernel: icsk_retransmits in include/net/inet_connection_sock.h
 ServerMeasurements.TCPInfo.Probes:
   Description: Consecutive zero window probes that have gone unanswered.
   Kernel: icsk_probes_out in include/net/inet_connection_sock.h
 ServerMeasurements.TCPInfo.Backoff:
-  Description: Exponential timeout backoff counter. Increment on RTO, reset on 
+  Description: Exponential timeout backoff counter. Increment on RTO, reset on
     successful RTT measurements.
   Kernel: icsk_backoff in include/net/inet_connection_sock.h
 ServerMeasurements.TCPInfo.Options:
@@ -128,7 +129,7 @@ ServerMeasurements.TCPInfo.Lost:
     Accounting for the Pipe algorithm.
   Kernel: lost_out in include/linux/tcp.h
 ServerMeasurements.TCPInfo.Retrans:
-  Description: Scoreboard segments marked retransmitted. Accounting for the 
+  Description: Scoreboard segments marked retransmitted. Accounting for the
     Pipe algorithm.
   Kernel: retrans_out in include/linux/tcp.h
 ServerMeasurements.TCPInfo.Fackets:
@@ -137,7 +138,7 @@ ServerMeasurements.TCPInfo.LastDataSent:
   Description: Time since last data segment was sent. Quantized to jiffies.
   Kernel: lsndtime in include/linux/tcp.h
 ServerMeasurements.TCPInfo.LastAckSent:
-  Description: Time since last ACK was sent (not implemented). Present in 
+  Description: Time since last ACK was sent (not implemented). Present in
     TCP_INFO but not elsewhere in the kernel.
 ServerMeasurements.TCPInfo.LastDataRecv:
   Description: Time since last data segment was received. Quantized to jiffies.
@@ -146,18 +147,18 @@ ServerMeasurements.TCPInfo.PMTU:
   Description: Maximum IP Transmission Unit for this path.
   Kernel: icsk_pmtu_cookie in include/net/inet_connection_sock.h
 ServerMeasurements.TCPInfo.RcvSsThresh:
-  Description: Current Window Clamp. Receiver algorithm to avoid allocating 
+  Description: Current Window Clamp. Receiver algorithm to avoid allocating
     excessive receive buffers.
   Kernel: rcv_ssthresh in include/linux/tcp.h
 ServerMeasurements.TCPInfo.RTT:
-  Description: Smoothed Round Trip Time (RTT). The Linux implementation 
+  Description: Smoothed Round Trip Time (RTT). The Linux implementation
     differs from the standard.
   Kernel: srtt_us in include/linux/tcp.h
 ServerMeasurements.TCPInfo.RTTVar:
   Description: The variation in round trip time during the upload measurement
     as measured by the M-Lab server.
 ServerMeasurements.TCPInfo.SndSsThresh:
-  Description: Slow Start Threshold. Value controlled by the selected 
+  Description: Slow Start Threshold. Value controlled by the selected
     congestion control algorithm.
   Kernel: snd_ssthresh in include/linux/tcp.h
 ServerMeasurements.TCPInfo.SndCwnd:
@@ -174,7 +175,7 @@ ServerMeasurements.TCPInfo.RcvRTT:
   Description: Receiver Side RTT estimate.
   Kernel: rcv_rtt_est.rtt_us in include/linux/tcp.h
 ServerMeasurements.TCPInfo.RcvSpace:
-  Description: Space reserved for the receive queue. Typically updated by 
+  Description: Space reserved for the receive queue. Typically updated by
     receiver side auto-tuning.
   Kernel: space in rcvq_space in include/linux/tcp.h
 ServerMeasurements.TCPInfo.TotalRetrans:
@@ -184,11 +185,11 @@ ServerMeasurements.TCPInfo.PacingRate:
   Description: Current Pacing Rate, nominally updated by congestion control.
   Kernel: sk_pacing_rate in include/net/sock.h
 ServerMeasurements.TCPInfo.MaxPacingRate:
-  Description: Settable pacing rate clamp. Set with 
+  Description: Settable pacing rate clamp. Set with
     setsockopt( ..SO_MAX_PACING_RATE.. ).
   Kernel: sk_max_pacing_rate in include/net/sock.h
 ServerMeasurements.TCPInfo.BytesAcked:
-  Description: The number of data bytes for which cumulative acknowledgments 
+  Description: The number of data bytes for which cumulative acknowledgments
     have been received.
   Kernel: bytes_acked in include/linux/tcp.h
 ServerMeasurements.TCPInfo.BytesReceived:
@@ -201,7 +202,7 @@ ServerMeasurements.TCPInfo.SegsIn:
   Description: The number of segments received. Includes data and pure ACKs.
   Kernel: segs_in in include/linux/tcp.h
 ServerMeasurements.TCPInfo.NotsentBytes:
-  Description: Number of bytes queued in the send buffer that have not been 
+  Description: Number of bytes queued in the send buffer that have not been
     sent.
   Kernel: tcpi_notsent_bytes() in net/ipv4/tcp.c
 ServerMeasurements.TCPInfo.MinRTT:
@@ -217,7 +218,7 @@ ServerMeasurements.TCPInfo.DeliveryRate:
   Description: Observed Maximum Delivery Rate.
   Kernel: tcp_compute_delivery_rate() in net/ipv4/tcp.c
 ServerMeasurements.TCPInfo.BusyTime:
-  Description: Time with outstanding (unacknowledged) data. Time when snd.una 
+  Description: Time with outstanding (unacknowledged) data. Time when snd.una
     is not equal to snd.next.
   Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
 ServerMeasurements.TCPInfo.RWndLimited:
@@ -226,30 +227,30 @@ ServerMeasurements.TCPInfo.RWndLimited:
 ServerMeasurements.TCPInfo.SndBufLimited:
   Description: Time spent waiting for sender buffer space. This only includes
     the time when TCP transmissions are starved for data, but the application
-    has been stopped because the buffer is full and can not be grown for some 
+    has been stopped because the buffer is full and can not be grown for some
     reason.
   Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
 ServerMeasurements.TCPInfo.Delivered:
-  Description: Data segments delivered to the receiver including retransmits. 
+  Description: Data segments delivered to the receiver including retransmits.
     As reported by returning ACKs, used by ECN.
   Kernel: delivered in include/linux/tcp.h
 ServerMeasurements.TCPInfo.DeliveredCE:
-  Description: ECE marked data segments delivered to the receiver including 
+  Description: ECE marked data segments delivered to the receiver including
     retransmits. As reported by returning ACKs, used by ECN.
   Kernel: delivered_ce in include/linux/tcp.h
 ServerMeasurements.TCPInfo.BytesSent:
   Description: Payload bytes sent (excludes headers, includes retransmissions).
   Kernel: bytes_sent
 ServerMeasurements.TCPInfo.BytesRetrans:
-  Description: Bytes retransmitted. May include headers and new data carried 
+  Description: Bytes retransmitted. May include headers and new data carried
     with a retransmission (for thin flows).
   Kernel: bytes_retrans
 ServerMeasurements.TCPInfo.DSackDups:
-  Description: Duplicate segments reported by DSACK. Not reported by some 
+  Description: Duplicate segments reported by DSACK. Not reported by some
     Operating Systems.
   Kernel: dsack_dups
 ServerMeasurements.TCPInfo.ReordSeen:
-  Description: Received ACKs that were out of order. Estimates reordering on 
+  Description: Received ACKs that were out of order. Estimates reordering on
     the return path.
   Kernel: reord_seen
 ServerMeasurements.TCPInfo.ElapsedTime:
