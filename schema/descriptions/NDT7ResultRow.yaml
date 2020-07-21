@@ -51,7 +51,7 @@ ServerMeasurements.AppInfo:
   Description: TBD
 ServerMeasurements.AppInfo.NumBytes:
   Description: The number of bytes to the M-Lab server during the measurement,
-  as measured by the M-Lab server.
+    as measured by the M-Lab server.
 ServerMeasurements.BBRInfo:
   Description: TBD
 ServerMeasurements.BBRInfo.BW:
