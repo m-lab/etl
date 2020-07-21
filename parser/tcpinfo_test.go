@@ -216,8 +216,8 @@ func TestTCPParser(t *testing.T) {
 		t.Error("Incorrect duration calculation", duration)
 	}
 
-	if totalSnaps != 1588 {
-		t.Error("expected 1588 (thinned) snapshots, got", totalSnaps)
+	if totalSnaps != 10429 {
+		t.Error("expected 10429 snapshots, got", totalSnaps)
 	}
 }
 
