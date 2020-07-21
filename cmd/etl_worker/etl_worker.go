@@ -15,9 +15,10 @@ import (
 	"time"
 
 	gcs "cloud.google.com/go/storage"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/m-lab/go/flagx"
+	"github.com/m-lab/go/httpx"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 
@@ -44,6 +45,15 @@ var (
 		Value:   "bigquery",
 	}
 
+	maxActiveTasks = flag.Int64("max_active", 1, "Maximum number of active tasks")
+	gardenerHost   = flag.String("gardener_host", "", "Gardener host for jobs")
+
+	servicePort     = flag.String("service_port", ":8080", "The main (private) service port")
+	shutdownTimeout = flag.Duration("shutdown_timeout", 1*time.Minute, "Graceful shutdown time allowance")
+
+	mainCtx, mainCancel = context.WithCancel(context.Background())
+
+	// In active polling mode, this holds the GardenerAPI.
 	gardenerAPI *active.GardenerAPI
 )
 
@@ -305,40 +315,74 @@ func mustGardenerAPI(ctx context.Context, jobServer string) *active.GardenerAPI 
 	return active.NewGardenerAPI(*base, active.MustStorageClient(ctx))
 }
 
-var mainCtx, mainCancel = context.WithCancel(context.Background())
+// Used for testing.
+var mainServerAddr = make(chan string, 1)
+
+// startServers does not return until context is cancelled.
+func startServers(ctx context.Context, mux http.Handler) *errgroup.Group {
+	// Expose prometheus and pprof metrics on a separate port.
+	promServer := prometheusx.MustServeMetrics()
+	defer promServer.Close() // Only relevant if ListenAndServeAsync fails below.
+
+	// Start up the main job and update server.
+	server := &http.Server{
+		Addr:    *servicePort, // This used to be :8080
+		Handler: mux,
+	}
+
+	rtx.Must(httpx.ListenAndServeAsync(server), "Could not start main server")
+	// This publishes the service port for use in unit tests.
+	mainServerAddr <- server.Addr
+
+	select {
+	case <-ctx.Done():
+		// This currently only executes when the context is cancelled
+		// by unit tests.  It does not yet execute in production.
+		log.Println("Shutting down servers")
+		ctx, cancel := context.WithTimeout(context.Background(), *shutdownTimeout)
+		defer cancel()
+		start := time.Now()
+		eg := errgroup.Group{}
+		eg.Go(func() error {
+			return server.Shutdown(ctx)
+		})
+		eg.Go(func() error {
+			return promServer.Shutdown(ctx)
+		})
+		eg.Wait()
+		log.Println("Shutdown took", time.Since(start))
+		return &eg
+	}
+}
 
 func main() {
 	defer mainCancel()
+
 	flag.Parse()
-
-	// Expose prometheus and pprof metrics on a separate port.
-	prometheusx.MustStartPrometheus(":9090")
-
-	http.HandleFunc("/", Status)
-	http.HandleFunc("/status", Status)
-	http.HandleFunc("/worker", metrics.DurationHandler("generic", handleRequest))
-	http.HandleFunc("/_ah/health", healthCheckHandler)
+	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from env")
 
 	// Enable block profiling
 	runtime.SetBlockProfileRate(1000000) // One event per msec.
 
 	setMaxInFlight()
 
-	// We also setup another prometheus handler on a non-standard path. This
-	// path name will be accessible through the AppEngine service address,
-	// however it will be served by a random instance.
-	http.Handle("/random-metrics", promhttp.Handler())
-
-	gardener := os.Getenv("GARDENER_HOST")
-	if len(gardener) > 0 {
-		log.Println("Using", gardener)
-		maxWorkers := 120
+	if len(*gardenerHost) > 0 {
+		log.Println("Using", *gardenerHost)
 		minPollingInterval := 10 * time.Second
-		gardenerAPI = mustGardenerAPI(mainCtx, gardener)
+		gardenerAPI = mustGardenerAPI(mainCtx, *gardenerHost)
 		// Note that this does not currently track duration metric.
-		go gardenerAPI.Poll(mainCtx, toRunnable, maxWorkers, minPollingInterval)
+		go gardenerAPI.Poll(mainCtx, toRunnable, (int)(*maxActiveTasks), minPollingInterval)
 	} else {
-		log.Println("GARDENER_HOST not specified or empty")
+		log.Println("GARDENER_HOST not specified or empty.  Running in passive mode.")
 	}
-	rtx.Must(http.ListenAndServe(":8080", nil), "failed to listen")
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", Status)
+	mux.HandleFunc("/status", Status)
+	mux.HandleFunc("/worker", metrics.DurationHandler("generic", handleRequest))
+	mux.HandleFunc("/_ah/health", healthCheckHandler) // legacy
+	mux.HandleFunc("/alive", healthCheckHandler)
+	mux.HandleFunc("/ready", healthCheckHandler)
+
+	_ = startServers(mainCtx, mux)
 }
