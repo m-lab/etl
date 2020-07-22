@@ -5,7 +5,7 @@ a.UUID:
 a.TestTime:
   Description: The date and time of the measurement in UTC.
 a.CongestionControl:
-  Description: Congestion control algorithm used for connection.
+  Description: The congestion control algorithm used for connection.
 a.MeanThroughputMbps:
   Description: The measured rate as calculated by the server. Presented in
     megabits per second, or Mbit/s, this value is the average of tcp-info
@@ -165,7 +165,7 @@ TCPInfo.SndSsThresh:
     congestion control algorithm.
   Kernel: snd_ssthresh in include/linux/tcp.h
 TCPInfo.SndCwnd:
-  Description: Congestion Window. Value controlled by the selected congestion 
+  Description: Congestion Window. Value controlled by the selected congestion
     control algorithm.
   Kernel: snd_cwnd in include/linux/tcp.h
 TCPInfo.AdvMSS:
