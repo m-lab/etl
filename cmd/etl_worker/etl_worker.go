@@ -275,7 +275,7 @@ func (r *runnable) Info() string {
 }
 
 func outputBucket() string {
-	return "etl-" + os.Getenv("GCLOUD_PROJECT")
+	return "json-" + os.Getenv("GCLOUD_PROJECT")
 }
 
 func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
