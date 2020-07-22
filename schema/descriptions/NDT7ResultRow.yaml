@@ -46,29 +46,32 @@ StartTime:
 EndTime:
   Description: The date and time when the measurement ended in UTC.
 ServerMeasurements:
-  Description: TBD
+  Description: Measurements reported by the M-Lab server.  Not all fields are
+    reported by all versions of the server.
 ServerMeasurements.AppInfo:
-  Description: TBD
+  Description: Server measurements performed outside of the kernel
 ServerMeasurements.AppInfo.NumBytes:
-  Description: The number of bytes to the M-Lab server during the measurement,
-    as measured by the M-Lab server.
+  Description: The number of bytes written to or read from the socket during
+    the measurement.
 ServerMeasurements.BBRInfo:
-  Description: TBD
+  Description: Instrumentation in the BBR TCP module in the kernel.
 ServerMeasurements.BBRInfo.BW:
-  Description: The maximum end to end bandwidth between the client and server
-    as measured the client using BBR.
+  Description: The maximum end-to-end bandwidth from the server to the client
+    as measured by BBR.
 ServerMeasurements.BBRInfo.MinRTT:
-  Description: The minimum round trip time as measured by the M-Lab server
-    using BBR.
+  Description: The minimum round trip time as measured by BBR.
 ServerMeasurements.BBRInfo.PacingGain:
-  Description: TBD
+  Description: Fixed point multiplier used to set the pacing rate from the
+    maximum bandwidth.  The binary point varies by kernel version but the
+    statistical mode is always 1.0.
 ServerMeasurements.BBRInfo.CwndGain:
-  Description: TBD
+  Description:  Fixed point multiplier used to set the maximum window size from
+    BW*MinRTT.   The denominator varies by kernel version.
 ServerMeasurements.ElapsedTime:
   Description: The duration of the measurement as measured by the M-Lab server
     in milliseconds.
 ServerMeasurements.TCPInfo:
-  Description:
+  Description: TCP Instrumentation in the kernel, as accessed by the server.
 ServerMeasurements.TCPInfo.State:
   Description: TCP state is nominally 1 (Established). Other values reflect
     transient states having incomplete rows.
@@ -133,7 +136,7 @@ ServerMeasurements.TCPInfo.Retrans:
     Pipe algorithm.
   Kernel: retrans_out in include/linux/tcp.h
 ServerMeasurements.TCPInfo.Fackets:
-  Description: TBD
+  Description: Not Used - obsolete kernel instrument.
 ServerMeasurements.TCPInfo.LastDataSent:
   Description: Time since last data segment was sent. Quantized to jiffies.
   Kernel: lsndtime in include/linux/tcp.h
@@ -261,24 +264,28 @@ ClientMeasurements:
   Description: Periodic measurements reported by the client. Not all clients
     report this information.
 ClientMeasurements.AppInfo:
-  Description: TBD
+  Description: Client measurements performed in the application outside of the
+    kernel.
 ClientMeasurements.AppInfo.NumBytes:
-  Description: The number of bytes exchanged between the client and the M-Lab
-    server during a measurement.
+  Description:  The number of bytes written to or read from the socket during
+    the measurement.
 ClientMeasurements.AppInfo.ElapsedTime:
   Description: The duration of the measurement as measured by the M-Lab server
     in milliseconds.
 ClientMeasurements.BBRInfo:
-  Description: TBD
+  Description: Instrumentation in the BBR TCP module in the kernel.  (This is not
+    currently supported by any clients.)
 ClientMeasurements.BBRInfo.BW:
-  Description: The maximum end to end bandwidth between the client and server
-    as measured the client using BBR.
+  Description: The maximum end-to-end bandwidth from the client to the server
+    as measured by BBR.
 ClientMeasurements.BBRInfo.MinRTT:
   Description: The minimum round trip time as measured by the client using BBR.
 ClientMeasurements.BBRInfo.PacingGain:
-  Description: TBD
+  Description: Fixed point multiplier used to set the pacing rate from the
+    maximum bandwidth.
 ClientMeasurements.BBRInfo.CwndGain:
-  Description: TBD
+  Description: Fixed point multiplier used to set the maximum window size from
+    BW*MinRTT.
 ClientMeasurements.ElapsedTime:
   Description: The duration of the measurement as measured by the client in
     milliseconds.
