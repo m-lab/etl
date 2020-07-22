@@ -1,7 +1,7 @@
 a:
   Description: Fields summarizing or derived from the raw data.
 a.UUID:
-  Description: UUID for TCP connection.
+  Description: UUID for the TCP connection.
 a.TestTime:
   Description: The date and time of the measurement in UTC.
 a.CongestionControl:
