@@ -1,5 +1,5 @@
-partition_date:
-  Description: The date when each measurement was conducted in UTC.
+log_time:
+  Description: Original measurement collection timestamp.
 
 GitShortCommit:
   Description: GitShortCommit is the Git commit (short form) of the running
@@ -12,7 +12,8 @@ ServerIP:
 ServerPort:
   Description: The port used by the server to conduct the measurement.
 ClientIP:
-  Description: The IP address assigned to the client that conducted the measurement.
+  Description: The IP address assigned to the client that conducted the 
+    measurement.
 ClientPort:
   Description: The port used by the client to conduct the measurement.
 StartTime:
@@ -41,248 +42,219 @@ Control.ClientMetadata.Value:
 C2S: 
   Description: Metadata for Client-to-Server (upload) measurements performed
     using the ndt5 protocol.
-C2S.ServerIP:
-  Description: The IP address assigned to the M-Lab server that conducted the
-    easurement.
-C2S.ServerPort: 
-  Description: The port used by the server to conduct the upload measurement.
-C2S.ClientIP:
-  Description: The IP address assigned to the client that conducted the
-    measurement.
-C2S.ClientPort:
-  Description: The port used by the client to conduct the upload measurement.
-C2S.UUID: 
-  Description: The Universally Unique Identifier assigned to the upload
-    measurement.
-C2S.MeanThroughputMbps: 
-  Description: The upload rate as calculated by the server. Presented in
+UUID: 
+  Description: The Universally Unique Identifier assigned to the measurement.
+MeanThroughputMbps: 
+  Description: The measured rate as calculated by the server. Presented in
     megabits per second, or Mbit/s, this value is the average of tcp-info
     snapshots taken at the beginning and end of an ndt5 measurement. Therefore
     it is identified as "MeanThroughputMbps".
-S2C.Error:
-  Description: Any error message(s) recorded during a download measurement.
+Error:
+  Description: Any error message(s) recorded during the measurement.
 
 S2C:
   Description: Metadata for Server-to-Client (download) measurements performed
     using the ndt5 protocol.
-S2C.UUID:
-  Description: The Universally Unique Identifier assigned to the download measurement.
-S2C.ServerIP:
-  Description: The IP address assigned to the M-Lab server that conducted the
-    measurement. 
-S2C.ServerPort:
-  Description: The port used by the server to conduct the download measurement.
-S2C.ClientIP:
-  Description: The IP address assigned to the client that conducted the
-    measurement.  
-S2C.ClientPort:
-  Description: The port used by the client to conduct the download measurement.
-S2C.StartTime:
-  Description: The date and time when the download measurement began in UTC.
-S2C.EndTime:
-  Description: The date and time when the download measurement ended in UTC.
-S2C.MeanThroughputMbps:
-  Description: The download rate as calculated by the server. Saved in megabits
-    per second, or Mbit/s, this value is the average of tcp-info snapshots 
-    taken at the beginning and end of an ndt5 measurement. Therefore it is
-    identified as "MeanThroughputMbps". 
-S2C.MinRTT:
-  Description: The minimum RTT observed during the download measurement, recorded in milliseconds.
-S2C.MaxRTT:
+MinRTT:
+  Description: The minimum RTT observed during the measurement, recorded in
+    milliseconds.
+MaxRTT:
   Description: The maximum sampled round trip time, recorded in milliseconds.
-S2C.SumRTT:
+SumRTT:
   Description: The sum of all sampled round trip times, recorded in 
     milliseconds.
-S2C.CountRTT:
-  Description: The number of round trip time samples included in S2C.SumRTT, 
+CountRTT:
+  Description: The number of round trip time samples included in SumRTT, 
     reported in milliseconds.
-S2C.ClientReportedMbps:
-  Description: The download rate as calculated by the client, in megabits per
-    second, or Mbit/s. Not all clients report this value.
-S2C.TCPInfo:
-  Description: The TCPInfo record provides results from the TCP_INFO netlink socket. These are the same values returned to clients at the end of the download (S2C) measurement.
-S2C.TCPInfo.State:
+ClientReportedMbps:
+  Description: The rate as calculated by the client, in megabits per second, or
+    Mbit/s. Not all clients report this value.
+TCPInfo:
+  Description: The TCPInfo record provides results from the TCP_INFO netlink
+    socket. These are the same values returned to clients at the end of the
+    measurement.
+TCPInfo.State:
   Description: TCP state is nominally 1 (Established). Other values reflect transient states having incomplete rows.
   Kernel: See TCP_ESTABLISHED in include/net/tcp_states.h
-S2C.TCPInfo.CAState:
+TCPInfo.CAState:
   Description: Loss recovery state machine. For traditional loss based 
     congestion control algorithms, CAState is also used to control window 
     adjustments.
   Kernel: tcp_set_ca_state in include/net/tcp.h
-S2C.TCPInfo.Retransmits:
+TCPInfo.Retransmits:
   Description: Number of timeouts (RTO based retransmissions) at this 
     sequence. Reset to zero on forward progress.
   Kernel: icsk_retransmits in include/net/inet_connection_sock.h
-S2C.TCPInfo.Probes:
+TCPInfo.Probes:
   Description: Consecutive zero window probes that have gone unanswered.
   Kernel: icsk_probes_out in include/net/inet_connection_sock.h
-S2C.TCPInfo.Backoff:
+TCPInfo.Backoff:
   Description: Exponential timeout backoff counter. Increment on RTO, reset on 
     successful RTT measurements.
   Kernel: icsk_backoff in include/net/inet_connection_sock.h
-S2C.TCPInfo.Options:
+TCPInfo.Options:
   Description: Bit encoded SYN options and other negotiations TIMESTAMPS 0x1;
     SACK 0x2; WSCALE 0x4; ECN 0x8 - Was negotiated; ECN_SEEN - At least one ECT
     seen; SYN_DATA - SYN-ACK acknowledged data in SYN sent or rcvd.
   Kernel: TCPI_OPT_TIMESTAMPS in include/uapi/linux/tcp.h
-S2C.TCPInfo.WScale:
+TCPInfo.WScale:
   Description: BUG Conflation of SndWScale and RcvWScale. See
     github.com/m-lab/etl/issues/790
-S2C.TCPInfo.AppLimited:
+TCPInfo.AppLimited:
   Description: Flag indicating that rate measurements reflect non-network
     bottlenecks. Note that even very short application stalls invalidate max_BW
     measurements.
   Kernel: rate_app_limited in include/linux/tcp.h
-S2C.TCPInfo.RTO:
+TCPInfo.RTO:
   Description: Retransmission Timeout. Quantized to system jiffies.
   Kernel: icsk_rto in include/net/inet_connection_sock.h
-S2C.TCPInfo.ATO:
+TCPInfo.ATO:
   Description: Delayed ACK Timeout. Quantized to system jiffies.
   Kernel: ato in icsk_ack in include/net/inet_connection_sock.h
-S2C.TCPInfo.SndMSS:
+TCPInfo.SndMSS:
   Description: Current Maximum Segment Size. Note that this can be smaller than
     the negotiated MSS for various reasons.
   Kernel: mss_cache in include/linux/tcp.h
-S2C.TCPInfo.RcvMSS:
+TCPInfo.RcvMSS:
   Description: Maximum observed segment size from the remote host. Used to trigger delayed ACKs.
   Kernel: rcv_mss in icsk_ack in include/net/inet_connection_sock.h
-S2C.TCPInfo.Unacked:
+TCPInfo.Unacked:
   Description: Number of segments between snd.nxt and snd.una. Accounting for
     the Pipe algorithm.
   Kernel: packets_out in include/linux/tcp.h
-S2C.TCPInfo.Sacked:
+TCPInfo.Sacked:
   Description: Scoreboard segment marked SACKED by sack blocks. Accounting for
     the Pipe algorithm.
   Kernel: sacked_out in include/linux/tcp.h
-S2C.TCPInfo.Lost:
+TCPInfo.Lost:
   Description: Scoreboard segments marked lost by loss detection heuristics.
     Accounting for the Pipe algorithm.
   Kernel: lost_out in include/linux/tcp.h
-S2C.TCPInfo.Retrans:
+TCPInfo.Retrans:
   Description: Scoreboard segments marked retransmitted. Accounting for the 
     Pipe algorithm.
   Kernel: retrans_out in include/linux/tcp.h
-S2C.TCPInfo.Fackets:
+TCPInfo.Fackets:
   Description: 
-S2C.TCPInfo.LastDataSent:
+TCPInfo.LastDataSent:
   Description: Time since last data segment was sent. Quantized to jiffies.
   Kernel: lsndtime in include/linux/tcp.h
-S2C.TCPInfo.LastAckSent:
+TCPInfo.LastAckSent:
   Description: Time since last ACK was sent (not implemented). Present in 
     TCP_INFO but not elsewhere in the kernel.
-S2C.TCPInfo.LastDataRecv:
+TCPInfo.LastDataRecv:
   Description: Time since last data segment was received. Quantized to jiffies.
   Kernel: lrcvtime in icsk_ack in include/net/inet_connection_sock.h
-S2C.TCPInfo.PMTU:
+TCPInfo.PMTU:
   Description: Maximum IP Transmission Unit for this path.
   Kernel: icsk_pmtu_cookie in include/net/inet_connection_sock.h
-S2C.TCPInfo.RcvSsThresh:
+TCPInfo.RcvSsThresh:
   Description: Current Window Clamp. Receiver algorithm to avoid allocating 
     excessive receive buffers.
   Kernel: rcv_ssthresh in include/linux/tcp.h
-S2C.TCPInfo.RTT:
+TCPInfo.RTT:
   Description: Smoothed Round Trip Time (RTT). The Linux implementation 
     differs from the standard.
   Kernel: srtt_us in include/linux/tcp.h
-S2C.TCPInfo.RTTVar:
+TCPInfo.RTTVar:
   Description: RTT variance. The Linux implementation differs from the 
     standard.
   Kernel: mdev_us in include/linux/tcp.h
-S2C.TCPInfo.SndSsThresh:
+TCPInfo.SndSsThresh:
   Description: Slow Start Threshold. Value controlled by the selected 
     congestion control algorithm.
   Kernel: snd_ssthresh in include/linux/tcp.h
-S2C.TCPInfo.SndCwnd:
+TCPInfo.SndCwnd:
   Description: Congestion Window. Value controlled by the selected congestion 
     control algorithm.
   Kernel: snd_cwnd in include/linux/tcp.h
-S2C.TCPInfo.AdvMSS:
+TCPInfo.AdvMSS:
   Description: Advertised MSS.
   Kernel: advmss in include/linux/tcp.h
-S2C.TCPInfo.Reordering:
+TCPInfo.Reordering:
   Description: Maximum observed reordering distance.
   Kernel: reordering in include/linux/tcp.h
-S2C.TCPInfo.RcvRTT:
+TCPInfo.RcvRTT:
   Description: Receiver Side RTT estimate.
   Kernel: rcv_rtt_est.rtt_us in include/linux/tcp.h
-S2C.TCPInfo.RcvSpace:
+TCPInfo.RcvSpace:
   Description: Space reserved for the receive queue. Typically updated by 
     receiver side auto-tuning.
   Kernel: space in rcvq_space in include/linux/tcp.h
-S2C.TCPInfo.TotalRetrans:
+TCPInfo.TotalRetrans:
   Description: Total number of segments containing retransmitted data.
   Kernel: total_retrans in include/linux/tcp.h
-S2C.TCPInfo.PacingRate:
+TCPInfo.PacingRate:
   Description: Current Pacing Rate, nominally updated by congestion control.
   Kernel: sk_pacing_rate in include/net/sock.h
-S2C.TCPInfo.MaxPacingRate:
+TCPInfo.MaxPacingRate:
   Description: Settable pacing rate clamp. Set with 
     setsockopt( ..SO_MAX_PACING_RATE.. ).
   Kernel: sk_max_pacing_rate in include/net/sock.h
-S2C.TCPInfo.BytesAcked:
+TCPInfo.BytesAcked:
   Description: The number of data bytes for which cumulative acknowledgments 
     have been received.
   Kernel: bytes_acked in include/linux/tcp.h
-S2C.TCPInfo.BytesReceived:
+TCPInfo.BytesReceived:
   Description: The number of data bytes for which have been received.
   Kernel: bytes_received in include/linux/tcp.h
-S2C.TCPInfo.SegsOut:
+TCPInfo.SegsOut:
   Description: The number of segments transmitted. Includes data and pure ACKs.
   Kernel: segs_out in include/linux/tcp.h
-S2C.TCPInfo.SegsIn:
+TCPInfo.SegsIn:
   Description: The number of segments received. Includes data and pure ACKs.
   Kernel: segs_in in include/linux/tcp.h
-S2C.TCPInfo.NotsentBytes:
+TCPInfo.NotsentBytes:
   Description: Number of bytes queued in the send buffer that have not been 
     sent.
   Kernel: tcpi_notsent_bytes() in net/ipv4/tcp.c
-S2C.TCPInfo.MinRTT:
+TCPInfo.MinRTT:
   Description: Minimum Round Trip Time. From an older, pre-BBR algorithm.
   Kernel: tcp_min_rtt in include/net/tcp.h
-S2C.TCPInfo.DataSegsIn:
+TCPInfo.DataSegsIn:
   Description: Input segments carrying data (len>0).
   Kernel: data_segs_in in include/net/tcp.h
-S2C.TCPInfo.DataSegsOut:
+TCPInfo.DataSegsOut:
   Description: Transmitted segments carrying data (len>0).
   Kernel: data_segs_out in include/net/tcp.h
-S2C.TCPInfo.DeliveryRate:
+TCPInfo.DeliveryRate:
   Description: Observed Maximum Delivery Rate.
   Kernel: tcp_compute_delivery_rate() in net/ipv4/tcp.c
-S2C.TCPInfo.BusyTime:
+TCPInfo.BusyTime:
   Description: Time with outstanding (unacknowledged) data. Time when snd.una 
     is not equal to snd.next.
   Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
-S2C.TCPInfo.RWndLimited:
+TCPInfo.RWndLimited:
   Description: Time spend waiting for receiver window.
   Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
-S2C.TCPInfo.SndBufLimited:
+TCPInfo.SndBufLimited:
   Description: Time spent waiting for sender buffer space. This only includes
     the time when TCP transmissions are starved for data, but the application
     has been stopped because the buffer is full and can not be grown for some 
     reason.
   Kernel: tcp_get_info_chrono_stats() in net/ipv4/tcp.c
-S2C.TCPInfo.Delivered:
+TCPInfo.Delivered:
   Description: Data segments delivered to the receiver including retransmits. 
     As reported by returning ACKs, used by ECN.
   Kernel: delivered in include/linux/tcp.h
-S2C.TCPInfo.DeliveredCE:
+TCPInfo.DeliveredCE:
   Description: ECE marked data segments delivered to the receiver including 
     retransmits. As reported by returning ACKs, used by ECN.
   Kernel: delivered_ce in include/linux/tcp.h
-S2C.TCPInfo.BytesSent:
+TCPInfo.BytesSent:
   Description: Payload bytes sent (excludes headers, includes retransmissions).
   Kernel: bytes_sent
-S2C.TCPInfo.BytesRetrans:
+TCPInfo.BytesRetrans:
   Description: Bytes retransmitted. May include headers and new data carried 
     with a retransmission (for thin flows).
   Kernel: bytes_retrans
-S2C.TCPInfo.DSackDups:
+TCPInfo.DSackDups:
   Description: Duplicate segments reported by DSACK. Not reported by some 
     Operating Systems.
   Kernel: dsack_dups
-S2C.TCPInfo.ReordSeen:
+TCPInfo.ReordSeen:
   Description: Received ACKs that were out of order. Estimates reordering on 
     the return path.
   Kernel: reord_seen
-S2C.Error:
+Error:
   Description: Any error message(s) recorded during a download measurement.
