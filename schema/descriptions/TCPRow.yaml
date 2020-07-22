@@ -97,7 +97,8 @@ TCPInfo.Retrans:
   Reference: RFC 6675
   Kernel: retrans_out in include/linux/tcp.h
 TCPInfo.Fackets:
-  Description: BUG This is gone now????  What field overlays it?
+  Description: Unused
+  Kernel: tcpi_fackets in include/uapi/linux/tcp.h
 TCPInfo.LastDataSent:
   Description: Time since last data segment was sent
   Discussion: Quantized to jiffies
@@ -399,8 +400,8 @@ SocketMem.Drops:
   Reference:
   Kernel:
 VegasInfo:
-  Description:
-  Discussion:
+  Description: Instrumntation in Vegas TCP
+  Discussion: Not used by M-Lab
   SMItype: Counter32
   Units:
   Reference:
@@ -434,8 +435,8 @@ VegasInfo.MinRTT:
   Reference:
   Kernel:
 DCTCPInfo:
-  Description:
-  Discussion:
+  Description: Instrumentation in DCTCP
+  Discussion: Not used by M-Lab
   SMItype: Counter32
   Units:
   Reference:
@@ -476,37 +477,41 @@ DCTCPInfo.ABTot:
   Reference:
   Kernel:
 BBRInfo:
-  Description:
+  Description: Instrumentation in the BBR TCP module in the kernel.
   Discussion:
   SMItype: Counter32
   Units:
   Reference:
   Kernel:
 BBRInfo.BW:
-  Description:
+  Description: The maximum end-to-end bandwidth from the server to the client
+    as measured by BBR.
   Discussion:
   SMItype: Counter32
   Units:
   Reference:
   Kernel:
 BBRInfo.MinRTT:
-  Description:
+  Description: The minimum round trip time as measured by BBR.
   Discussion:
-  SMItype: Counter32
+  SMItype:
   Units:
   Reference:
   Kernel:
 BBRInfo.PacingGain:
-  Description:
-  Discussion:
-  SMItype: Counter32
+  Description: Fixed point multiplier used to set the pacing rate from the
+    maximum bandwidth.
+  Discussion: The binary point varies by kernel version but the
+    statistical mode is always 1.0.
+  SMItype:
   Units:
   Reference:
   Kernel:
 BBRInfo.CwndGain:
-  Description:
+  Description: Fixed point multiplier used to set the maximum window size from
+    BW*MinRTT.
   Discussion:
-  SMItype: Counter32
+  SMItype:
   Units:
   Reference:
   Kernel:

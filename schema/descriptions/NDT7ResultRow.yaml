@@ -46,30 +46,32 @@ StartTime:
 EndTime:
   Description: The date and time when the measurement ended in UTC.
 ServerMeasurements:
-  Description: Periodic measurements reported by the M-Lab server that
-    conducted the measurement.
+  Description: Measurements reported by the M-Lab server. Not all fields are
+    reported by all versions of the server.
 AppInfo:
-  Description: TBD
+  Description: Server measurements performed outside of the kernel.
 AppInfo.NumBytes:
-  Description: The number of bytes to the M-Lab server during the measurement,
-    as measured by the M-Lab server.
+  Description: The number of bytes written to or read from the socket during
+    the measurement.
 BBRInfo:
-  Description: TBD
+  Description: Instrumentation in the BBR TCP module in the kernel.
 BBRInfo.BW:
-  Description: The maximum end to end bandwidth between the client and server
-    as measured the client using BBR.
+  Description: The maximum end-to-end bandwidth from the server to the client
+    as measured by BBR.
 BBRInfo.MinRTT:
-  Description: The minimum round trip time as measured by the M-Lab server
-    using BBR.
+  Description: The minimum round trip time as measured by BBR.
 BBRInfo.PacingGain:
-  Description: TBD
+  Description: Fixed point multiplier used to set the pacing rate from the
+    maximum bandwidth.  The binary point varies by kernel version but the
+    statistical mode is always 1.0.
 BBRInfo.CwndGain:
-  Description: TBD
+  Description: Fixed point multiplier used to set the maximum window size from
+    BW*MinRTT. The denominator varies by kernel version.
 ElapsedTime:
   Description: The duration of the measurement as measured by the M-Lab server
     in milliseconds.
 TCPInfo:
-  Description:
+  Description: TCP Instrumentation in the kernel, as accessed by the server.
 TCPInfo.State:
   Description: TCP state is nominally 1 (Established). Other values reflect
     transient states having incomplete rows.
@@ -134,7 +136,7 @@ TCPInfo.Retrans:
     Pipe algorithm.
   Kernel: retrans_out in include/linux/tcp.h
 TCPInfo.Fackets:
-  Description: TBD
+  Description: Not Used - obsolete kernel instrument.
 TCPInfo.LastDataSent:
   Description: Time since last data segment was sent. Quantized to jiffies.
   Kernel: lsndtime in include/linux/tcp.h
