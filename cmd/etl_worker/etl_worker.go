@@ -45,7 +45,7 @@ func init() {
 }
 
 var (
-	maxActiveTasks = flag.Int64("max_active", 0, "Maximum number of active tasks")
+	maxActiveTasks = flag.Int64("max_active", 1, "Maximum number of active tasks")
 	gardenerHost   = flag.String("gardener_host", "", "Gardener host for jobs")
 
 	servicePort     = flag.String("service_port", ":8080", "The main (private) service port")
@@ -300,7 +300,7 @@ var mainServerAddr = make(chan string, 1)
 func startServers(ctx context.Context, mux http.Handler) *errgroup.Group {
 	// Expose prometheus and pprof metrics on a separate port.
 	promServer := prometheusx.MustServeMetrics()
-	defer promServer.Close()
+	defer promServer.Close() // Only relevant if ListenAndServeAsync fails below.
 
 	// Start up the main job and update server.
 	server := &http.Server{
@@ -314,6 +314,8 @@ func startServers(ctx context.Context, mux http.Handler) *errgroup.Group {
 
 	select {
 	case <-ctx.Done():
+		// This currently only executes when the context is cancelled
+		// by unit tests.  It does not yet execute in production.
 		log.Println("Shutting down servers")
 		ctx, cancel := context.WithTimeout(context.Background(), *shutdownTimeout)
 		defer cancel()
@@ -342,22 +344,21 @@ func main() {
 
 	setMaxInFlight()
 
-	gardener := os.Getenv("GARDENER_HOST")
-	if len(gardener) > 0 {
-		log.Println("Using", gardener)
+	if len(*gardenerHost) > 0 {
+		log.Println("Using", *gardenerHost)
 		minPollingInterval := 10 * time.Second
-		gardenerAPI = mustGardenerAPI(mainCtx, gardener)
+		gardenerAPI = mustGardenerAPI(mainCtx, *gardenerHost)
 		// Note that this does not currently track duration metric.
 		go gardenerAPI.Poll(mainCtx, toRunnable, (int)(*maxActiveTasks), minPollingInterval)
 	} else {
-		log.Println("GARDENER_HOST not specified or empty")
+		log.Println("GARDENER_HOST not specified or empty.  Running in passive mode.")
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", Status)
 	mux.HandleFunc("/status", Status)
 	mux.HandleFunc("/worker", metrics.DurationHandler("generic", handleRequest))
-	mux.HandleFunc("/_ah/health", healthCheckHandler)
+	mux.HandleFunc("/_ah/health", healthCheckHandler) // legacy
 	mux.HandleFunc("/alive", healthCheckHandler)
 	mux.HandleFunc("/ready", healthCheckHandler)
 
