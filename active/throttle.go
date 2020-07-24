@@ -45,10 +45,10 @@ type throttledRunnable struct {
 }
 
 // Run implements Source.Run
-func (tr *throttledRunnable) Run() error {
+func (tr *throttledRunnable) Run(ctx context.Context) error {
 	// The run function must release the token when it completes.
 	defer tr.release()
-	return tr.Runnable.Run()
+	return tr.Runnable.Run(ctx)
 }
 
 // Next implements Source.Next

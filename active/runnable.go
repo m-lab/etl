@@ -10,7 +10,7 @@ import (
 // A Runnable may return ErrShouldRetry if there was a non-persistent error.
 // TODO - should this instead be and interface, with Run() and ShouldRetry()?
 type Runnable interface {
-	Run() error
+	Run(context.Context) error
 	Info() string
 }
 

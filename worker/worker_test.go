@@ -203,7 +203,7 @@ func TestNilUploader(t *testing.T) {
 		t.Fatal(err, filename)
 	}
 	// TODO create a TaskFactory and use ProcessGKETask
-	pErr := worker.ProcessGKETask(path, &fakeFactory)
+	pErr := worker.ProcessGKETask(context.Background(), path, &fakeFactory)
 	if pErr == nil || pErr.Code() != http.StatusInternalServerError {
 		t.Fatal("Expected error with", http.StatusInternalServerError, "Got:", pErr)
 	}
@@ -231,7 +231,7 @@ func TestProcessGKETask(t *testing.T) {
 		t.Fatal(err, filename)
 	}
 	// TODO create a TaskFactory and use ProcessGKETask
-	pErr := worker.ProcessGKETask(path, &fakeFactory)
+	pErr := worker.ProcessGKETask(context.Background(), path, &fakeFactory)
 	if pErr != nil {
 		t.Fatal("Expected", http.StatusOK, "Got:", pErr)
 	}

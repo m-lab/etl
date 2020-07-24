@@ -74,7 +74,7 @@ func (s *source) Label() string {
 	return "label"
 }
 
-func (sr *statsRunnable) Run() error {
+func (sr *statsRunnable) Run(ctx context.Context) error {
 	now := sr.stats.add()
 	defer sr.stats.end()
 

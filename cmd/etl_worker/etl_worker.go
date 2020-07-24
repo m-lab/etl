@@ -223,7 +223,7 @@ type runnable struct {
 	gcs.ObjectAttrs
 }
 
-func (r *runnable) Run() error {
+func (r *runnable) Run(ctx context.Context) error {
 	path := fmt.Sprintf("gs://%s/%s", r.Bucket, r.Name)
 	dp, err := etl.ValidateTestPath(path)
 	if err != nil {
@@ -235,7 +235,7 @@ func (r *runnable) Run() error {
 	log.Println("Processing", path)
 
 	statusCode := http.StatusOK
-	pErr := worker.ProcessGKETask(dp, r.tf)
+	pErr := worker.ProcessGKETask(ctx, dp, r.tf)
 	if pErr != nil {
 		statusCode = pErr.Code()
 	}
