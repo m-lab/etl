@@ -36,10 +36,7 @@ spec:
       containers:
       - image: gcr.io/{{GCLOUD_PROJECT}}/github.com/m-lab/etl:{{GIT_COMMIT}}
         name: etl-parser
-        args: ["--prometheusx.listen-address=:9090",
-               "--service_port=:8080",  # If we move to jsonnet, this could be bound to service-port defined below
-               "--maxActive=200",
-               ]
+        args: ["--prometheusx.listen-address=:9090"]
         env:
         - name: RELEASE_TAG
           value: {{RELEASE_TAG}}
