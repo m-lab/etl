@@ -54,7 +54,7 @@ type runnable struct {
 	obj *storage.ObjectAttrs
 }
 
-func (r *runnable) Run() error {
+func (r *runnable) Run(ctx context.Context) error {
 	log.Println(r.obj.Name)
 	time.Sleep(10 * time.Millisecond)
 	return r.c.err()
@@ -107,7 +107,7 @@ func runAll(ctx context.Context, rSrc active.RunnableSource) (*errgroup.Group, e
 		log.Println("Starting func")
 
 		f := func() error {
-			err := run.Run()
+			err := run.Run(ctx)
 			return err
 		}
 

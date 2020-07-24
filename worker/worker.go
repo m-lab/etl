@@ -184,7 +184,7 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 // Used default BQ Sink, and GCS Source.
 // Returns an http status code and an error if the task did not complete
 // successfully.
-func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
+func ProcessGKETask(ctx context.Context, path etl.DataPath, tf task.Factory) etl.ProcessingError {
 	// Count number of workers operating on each table.
 	metrics.WorkerCount.WithLabelValues(path.DataType).Inc()
 	defer metrics.WorkerCount.WithLabelValues(path.DataType).Dec()
@@ -193,11 +193,11 @@ func ProcessGKETask(path etl.DataPath, tf task.Factory) etl.ProcessingError {
 	metrics.WorkerState.WithLabelValues(path.DataType, "worker").Inc()
 	defer metrics.WorkerState.WithLabelValues(path.DataType, "worker").Dec()
 
-	tsk, err := tf.Get(nil, path)
+	tsk, err := tf.Get(ctx, path)
 	if err != nil {
 		metrics.TaskCount.WithLabelValues(err.DataType(), err.Detail()).Inc()
 		log.Printf("TaskFactory error: %v", err)
-		return err // http.StatusBadRequest, err
+		return err
 	}
 
 	defer tsk.Close()
