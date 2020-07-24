@@ -17,6 +17,7 @@ import (
 	gcs "cloud.google.com/go/storage"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 
@@ -37,16 +38,21 @@ import (
 	_ "expvar"
 )
 
-func init() {
-	// Always prepend the filename and line number.
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
-
 var (
-	jsonOutput = flag.Bool("json_out", false, "Write output to json-[project] bucket")
+	outputType = flagx.Enum{
+		Options: []string{"gcs", "bigquery"},
+		Value:   "bigquery",
+	}
 
 	gardenerAPI *active.GardenerAPI
 )
+
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	flag.Var(&outputType, "output", "Output to bigquery or gcs.")
+}
 
 // Task Queue can always submit to an admin restricted URL.
 //   login: admin
@@ -78,10 +84,11 @@ func Status(w http.ResponseWriter, r *http.Request) {
 	if gardenerAPI != nil {
 		gardenerAPI.Status(w)
 	}
-	if *jsonOutput {
-		fmt.Fprintf(w, "Writing output to %s\n", outputBucket())
-	} else {
+	switch outputType.Value {
+	case "bigquery":
 		fmt.Fprintf(w, "Writing output to BigQuery\n")
+	case "gcs":
+		fmt.Fprintf(w, "Writing output to %s\n", outputBucket())
 	}
 	fmt.Fprintf(w, "<p>Workers: %d / %d</p>\n", atomic.LoadInt32(&inFlight), maxInFlight)
 	env := os.Environ()
@@ -265,7 +272,7 @@ func (r *runnable) Info() string {
 }
 
 func outputBucket() string {
-	return "json-" + os.Getenv("GCLOUD_PROJECT")
+	return "etl-" + os.Getenv("GCLOUD_PROJECT")
 }
 
 func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
@@ -275,10 +282,11 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	}
 
 	var sink factory.SinkFactory
-	if *jsonOutput {
-		sink = storage.NewSinkFactory(c, outputBucket())
-	} else {
+	switch outputType.Value {
+	case "bigquery":
 		sink = bq.NewSinkFactory()
+	case "gcs":
+		sink = storage.NewSinkFactory(c, outputBucket())
 	}
 
 	taskFactory := worker.StandardTaskFactory{
