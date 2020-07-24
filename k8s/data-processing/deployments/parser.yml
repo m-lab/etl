@@ -36,7 +36,9 @@ spec:
       containers:
       - image: gcr.io/{{GCLOUD_PROJECT}}/github.com/m-lab/etl:{{GIT_COMMIT}}
         name: etl-parser
-        args: ["--prometheusx.listen-address=:9090"]
+        args: ["--prometheusx.listen-address=:9090",
+               "--jsonOutput=true",
+               ]
         env:
         - name: RELEASE_TAG
           value: {{RELEASE_TAG}}

@@ -41,6 +41,10 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+var (
+	jsonOutput     = flag.Bool("json_out", false, "Write output to json-[project] bucket")
+)
+
 // Task Queue can always submit to an admin restricted URL.
 //   login: admin
 // Return 200 status code.
@@ -68,6 +72,14 @@ func Status(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Release: %s   Commit: unknown\n", os.Getenv("RELEASE_TAG"))
 	}
 
+	if gardenerAPI != nil {
+		gardenerAPI.Status(w)
+	}
+	if *jsonOutput {
+		fmt.Fprintf(w, "Writing output to %s\n", outputBucket())
+	} else {
+		fmt.Fprintf(w, "Writing output to BigQuery\n")
+	}
 	fmt.Fprintf(w, "<p>Workers: %d / %d</p>\n", atomic.LoadInt32(&inFlight), maxInFlight)
 	env := os.Environ()
 	for i := range env {
@@ -249,16 +261,26 @@ func (r *runnable) Info() string {
 	return r.Name
 }
 
+func outputBucket() string {
+	return "json-" + os.Getenv("GCLOUD_PROJECT")
+}
+
 func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	c, err := storage.GetStorageClient(false)
 	if err != nil {
 		return nil // TODO add an error?
 	}
-	// HACK for now
-	outputBucket := "json-" + os.Getenv("GCLOUD_PROJECT")
+
+	var sink factory.SinkFactory
+	if *jsonOutput {
+		sink = storage.NewSinkFactory(c, outputBucket())
+	} else {
+		sink = bq.NewSinkFactory()
+	}
+
 	taskFactory := worker.StandardTaskFactory{
 		Annotator: factory.DefaultAnnotatorFactory(),
-		Sink:      storage.NewSinkFactory(c, outputBucket),
+		Sink:      sink,
 		Source:    storage.GCSSourceFactory(c),
 	}
 	return &runnable{&taskFactory, *obj}
