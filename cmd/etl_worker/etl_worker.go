@@ -17,6 +17,7 @@ import (
 	gcs "cloud.google.com/go/storage"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 
@@ -37,9 +38,20 @@ import (
 	_ "expvar"
 )
 
+var (
+	outputType = flagx.Enum{
+		Options: []string{"gcs", "bigquery"},
+		Value:   "bigquery",
+	}
+
+	gardenerAPI *active.GardenerAPI
+)
+
 func init() {
 	// Always prepend the filename and line number.
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	flag.Var(&outputType, "output", "Output to bigquery or gcs.")
 }
 
 // Task Queue can always submit to an admin restricted URL.
@@ -69,6 +81,15 @@ func Status(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Release: %s   Commit: unknown\n", os.Getenv("RELEASE_TAG"))
 	}
 
+	if gardenerAPI != nil {
+		gardenerAPI.Status(w)
+	}
+	switch outputType.Value {
+	case "bigquery":
+		fmt.Fprintf(w, "Writing output to BigQuery\n")
+	case "gcs":
+		fmt.Fprintf(w, "Writing output to %s\n", outputBucket())
+	}
 	fmt.Fprintf(w, "<p>Workers: %d / %d</p>\n", atomic.LoadInt32(&inFlight), maxInFlight)
 	env := os.Environ()
 	for i := range env {
@@ -250,14 +271,27 @@ func (r *runnable) Info() string {
 	return r.Name
 }
 
+func outputBucket() string {
+	return "etl-" + os.Getenv("GCLOUD_PROJECT")
+}
+
 func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	c, err := storage.GetStorageClient(false)
 	if err != nil {
 		return nil // TODO add an error?
 	}
+
+	var sink factory.SinkFactory
+	switch outputType.Value {
+	case "bigquery":
+		sink = bq.NewSinkFactory()
+	case "gcs":
+		sink = storage.NewSinkFactory(c, outputBucket())
+	}
+
 	taskFactory := worker.StandardTaskFactory{
 		Annotator: factory.DefaultAnnotatorFactory(),
-		Sink:      bq.NewSinkFactory(),
+		Sink:      sink,
 		Source:    storage.GCSSourceFactory(c),
 	}
 	return &runnable{&taskFactory, *obj}
@@ -300,9 +334,9 @@ func main() {
 		log.Println("Using", gardener)
 		maxWorkers := 120
 		minPollingInterval := 10 * time.Second
-		gapi := mustGardenerAPI(mainCtx, gardener)
+		gardenerAPI = mustGardenerAPI(mainCtx, gardener)
 		// Note that this does not currently track duration metric.
-		go gapi.Poll(mainCtx, toRunnable, maxWorkers, minPollingInterval)
+		go gardenerAPI.Poll(mainCtx, toRunnable, maxWorkers, minPollingInterval)
 	} else {
 		log.Println("GARDENER_HOST not specified or empty")
 	}
