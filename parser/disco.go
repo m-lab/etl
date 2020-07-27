@@ -42,8 +42,11 @@ func (dp *DiscoParser) TaskError() error {
 func (dp *DiscoParser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like: "<date>-to-<date>-switch.json.gz"
 	// Notice the "-" before switch.
+	// Look for JSON and JSONL files.
 	if strings.HasSuffix(testName, "switch.json") ||
-		strings.HasSuffix(testName, "switch.json.gz") {
+		strings.HasSuffix(testName, "switch.jsonl") ||
+		strings.HasSuffix(testName, "switch.json.gz") ||
+		strings.HasSuffix(testName, "switch.jsonl.gz") {
 		return "switch", true
 	}
 	return "unknown", false
