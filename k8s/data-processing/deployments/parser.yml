@@ -39,7 +39,7 @@ spec:
         args: ["--prometheusx.listen-address=:9090",
                "--output=gcs",
                "--service_port=:8080",  # If we move to jsonnet, this could be bound to service-port defined below
-               "--max_active=200",
+               "--max_active=100",
                ]
         env:
         - name: RELEASE_TAG
