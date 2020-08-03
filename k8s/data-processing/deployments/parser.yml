@@ -83,12 +83,12 @@ spec:
 
         resources:
           requests:
-            memory: "40Gi"
-            cpu: "14"
+            memory: "15Gi"
+            cpu: "7"
           limits:
-            memory: "55Gi"
-            cpu: "15"
+            memory: "20Gi"
+            cpu: "7"
 
       nodeSelector:
-        parser-node: "true"
+        parser-node2: "true"
 
