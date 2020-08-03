@@ -60,9 +60,15 @@ func TestJSONParsing(t *testing.T) {
 	if len(uploader.Rows) != 3 {
 		t.Error("Expected 3, got", len(uploader.Rows))
 	}
+	// The testName was that of a DISCOv1 filename, for which the parser omits
+	// the last sample for each metric, so even though there are two input
+	// samples there should only be one in the resulting row.
+	if uploader.Rows[1].Row["sample"] != nil && len(uploader.Rows[1].Row["sample"].([]bigquery.Value)) != 1 {
+		t.Error("Expected 1, got", len(uploader.Rows[1].Row["sample"].([]bigquery.Value)))
+	}
 
 	// Adds two more rows, triggering an upload of 3 rows.
-	err = parser.ParseAndInsert(meta, "testName", test_data)
+	err = parser.ParseAndInsert(meta, "testName-switch.jsonl", test_data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,6 +85,12 @@ func TestJSONParsing(t *testing.T) {
 
 	if uploader.Rows[0].Row["sample"] != nil && len(uploader.Rows[0].Row["sample"].([]bigquery.Value)) != 1 {
 		t.Error("Expected 1, got", len(uploader.Rows[0].Row["sample"].([]bigquery.Value)))
+	}
+	// The testName was that of a DISCOv2 filename (suffix of -switch.jsonl),
+	// for which the parser should include all samples. Therefore, since the
+	// input had two samples, so should the resulting row.
+	if uploader.Rows[1].Row["sample"] != nil && len(uploader.Rows[1].Row["sample"].([]bigquery.Value)) != 2 {
+		t.Error("Expected 2, got", len(uploader.Rows[1].Row["sample"].([]bigquery.Value)))
 	}
 	if uploader.Rows[0].Row["task_filename"].(string) != "fake-filename.tar" {
 		t.Error("task_filename incorrect: Expected 'fake-filename.tar', got",
