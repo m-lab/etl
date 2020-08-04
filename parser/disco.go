@@ -88,13 +88,22 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 		}
 		rowCount++
 
-		// By design, the raw data time range starts and ends on the hour. This means
-		// that the raw dataset inclues 361 time bins (360 + 1 extra). Originally,
-		// this was so the last sample of the current time range would overlap with
-		// the first sample of the next time range. However, this parser does not use
-		// the extra sample, so we unconditionally ignore it here.
+		// For collectd in the "utilization" experiment, by design, the raw data
+		// time range starts and ends on the hour. This means that the raw
+		// dataset inclues 361 time bins (360 + 1 extra). Originally, this was
+		// so the last sample of the current time range would overlap with the
+		// first sample of the next time range. However, this parser does not
+		// use the extra sample, so we unconditionally ignore it here. However,
+		// this is not the case for DISCOv2, so we use the whole sample from
+		// DISCOv2. DISCOv2 can be differentiated from collectd by the "jsonl"
+		// suffix.
 		if len(tmp.Sample) > 0 {
-			stats.Sample = tmp.Sample[:len(tmp.Sample)-1]
+			if strings.HasSuffix(testName, "switch.jsonl") ||
+				strings.HasSuffix(testName, "switch.jsonl.gz") {
+				stats.Sample = tmp.Sample
+			} else {
+				stats.Sample = tmp.Sample[:len(tmp.Sample)-1]
+			}
 		}
 
 		// Copy remaining fields.
