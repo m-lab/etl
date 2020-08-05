@@ -13,7 +13,7 @@ import (
 // Not complete, but verifies basic functionality.
 func TestMetaParser(t *testing.T) {
 	metaName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:53000.meta`
-	metaData, err := ioutil.ReadFile(`testdata/` + metaName)
+	metaData, err := ioutil.ReadFile(`testdata/web100/` + metaName)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

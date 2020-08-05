@@ -86,7 +86,7 @@ func TestSSInserter(t *testing.T) {
 	defer ts.Close()
 
 	p := parser.NewSSParser(ins, v2as.GetAnnotator(ts.URL))
-	filename := "testdata/20170203T00:00:00Z_ALL0.web100"
+	filename := "testdata/sidestream/20170203T00:00:00Z_ALL0.web100"
 	rawData, err := ioutil.ReadFile(filename)
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
