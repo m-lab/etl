@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/m-lab/etl/web100"
+	"github.com/m-lab/pipe"
 )
 
 func init() {
@@ -17,7 +19,7 @@ func init() {
 
 func TestHeaderParsing(t *testing.T) {
 	c2sName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:48716.c2s_snaplog`
-	c2sData, err := ioutil.ReadFile(`testdata/` + c2sName)
+	c2sData, err := ioutil.ReadFile(`testdata/web100/` + c2sName)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -77,7 +79,7 @@ var old2000 = `{"Integers":{"AbruptTimeouts":0,"ActiveOpen":0,"CERcvd":0,"CongAv
 // This tests parsing of snapshot content for three snapshots.
 func TestSnapshotContent(t *testing.T) {
 	c2sName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:48716.c2s_snaplog`
-	c2sData, err := ioutil.ReadFile(`testdata/` + c2sName)
+	c2sData, err := ioutil.ReadFile(`testdata/web100/` + c2sName)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -124,7 +126,7 @@ func TestSnapshotContent(t *testing.T) {
 // The remaining tests just verify that the parser produces valid snapshots.  They
 // do not verify the content accuracy.
 func OneSnapshot(t *testing.T, name string, n int) {
-	data, err := ioutil.ReadFile(`testdata/` + name)
+	data, err := ioutil.ReadFile(`testdata/web100/` + name)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -200,7 +202,7 @@ func TestNewVar(t *testing.T) {
 
 func TestChangeIndices(t *testing.T) {
 	c2sName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:48716.c2s_snaplog`
-	c2sData, err := ioutil.ReadFile(`testdata/` + c2sName)
+	c2sData, err := ioutil.ReadFile(`testdata/web100/` + c2sName)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -218,7 +220,7 @@ func TestChangeIndices(t *testing.T) {
 func BenchmarkChangeIndices(b *testing.B) {
 	b.StopTimer()
 	s2cName := `20090601T22:19:19.325928000Z-75.133.69.98:60631.s2c_snaplog`
-	data, err := ioutil.ReadFile(`testdata/` + s2cName)
+	data, err := ioutil.ReadFile(`testdata/web100/` + s2cName)
 	if err != nil {
 		b.Fatalf(err.Error())
 	}
@@ -241,7 +243,7 @@ func BenchmarkSliceInt(b *testing.B) {
 	//s2cName := `20090401T09:01:09.490730000Z_131.169.137.246:14881.c2s_snaplog`
 	//s2cName := `20170430T11:54:26.658288000Z_p508486E9.dip0.t-ipconnect.de:53088.s2c_snaplog`
 	s2cName := `20090601T22:19:19.325928000Z-75.133.69.98:60631.s2c_snaplog`
-	data, err := ioutil.ReadFile(`testdata/` + s2cName)
+	data, err := ioutil.ReadFile(`testdata/web100/` + s2cName)
 	if err != nil {
 		b.Fatalf(err.Error())
 	}
@@ -278,4 +280,16 @@ func BenchmarkSaver(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		v.Save(data, &ns)
 	}
+}
+
+func TestMain(m *testing.M) {
+	p := pipe.Script(
+		"unpacking testdata files",
+		pipe.Exec("tar", "-C", "testdata", "-xvf", "testdata/web100-files.tar.gz"),
+	)
+	_, err := pipe.CombinedOutput(p)
+	if err != nil {
+		log.Fatal(err)
+	}
+	os.Exit(m.Run())
 }

@@ -129,7 +129,7 @@ func TestNDTParser(t *testing.T) {
 	// TODO(prod) - why are so many of the tests to this endpoint and a few others?
 	// A: because this is EB, which runs all the health tests.
 	s2cName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:44160.s2c_snaplog`
-	s2cData, err := ioutil.ReadFile(`testdata/` + s2cName)
+	s2cData, err := ioutil.ReadFile(`testdata/web100/` + s2cName)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -145,7 +145,7 @@ func TestNDTParser(t *testing.T) {
 	}
 
 	metaName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:53000.meta`
-	metaData, err := ioutil.ReadFile(`testdata/` + metaName)
+	metaData, err := ioutil.ReadFile(`testdata/web100/` + metaName)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -156,7 +156,7 @@ func TestNDTParser(t *testing.T) {
 	}
 
 	c2sName := `20170509T13:45:13.590210000Z_eb.measurementlab.net:48716.c2s_snaplog`
-	c2sData, err := ioutil.ReadFile(`testdata/` + c2sName)
+	c2sData, err := ioutil.ReadFile(`testdata/web100/` + c2sName)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

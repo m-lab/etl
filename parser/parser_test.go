@@ -4,6 +4,8 @@ package parser_test
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -11,6 +13,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/pipe"
 )
 
 // countingInserter counts the calls to InsertRows and Flush.
@@ -93,4 +96,18 @@ func TestPlumbing(t *testing.T) {
 	if tci.CallCount != 1 {
 		t.Error("Should have called the inserter")
 	}
+}
+
+func TestMain(m *testing.M) {
+	p := pipe.Script(
+		"unpacking testdata files",
+		pipe.Exec("tar", "-C", "testdata", "-xvf", "testdata/pt-files.tar.gz"),
+		pipe.Exec("tar", "-C", "testdata", "-xvf", "testdata/web100-files.tar.gz"),
+		pipe.Exec("tar", "-C", "testdata", "-xvf", "testdata/sidestream-files.tar.gz"),
+	)
+	_, err := pipe.CombinedOutput(p)
+	if err != nil {
+		log.Fatal(err)
+	}
+	os.Exit(m.Run())
 }

@@ -179,12 +179,12 @@ func TestCreateTestId(t *testing.T) {
 }
 
 func TestParseLegacyFormatData(t *testing.T) {
-	rawData, err := ioutil.ReadFile("testdata/20160112T00:45:44Z_ALL27409.paris")
+	rawData, err := ioutil.ReadFile("testdata/PT/20160112T00:45:44Z_ALL27409.paris")
 	if err != nil {
 		fmt.Println("cannot load test data")
 		return
 	}
-	cachedTest, err := parser.Parse(nil, "testdata/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily")
+	cachedTest, err := parser.Parse(nil, "testdata/PT/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -216,8 +216,8 @@ func TestJSONParser(t *testing.T) {
 }
 
 func TestPTParser(t *testing.T) {
-	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	cachedTest, err := parser.Parse(nil, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
+	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
+	cachedTest, err := parser.Parse(nil, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -269,12 +269,12 @@ func TestPTParser(t *testing.T) {
 func TestPTInserter(t *testing.T) {
 	ins := newInMemoryInserter()
 	pt := parser.NewPTParser(ins, &fakeAnnotator{})
-	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
+	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
 	}
 	meta := map[string]bigquery.Value{"filename": "gs://fake-bucket/fake-archive.tgz"}
-	err = pt.ParseAndInsert(meta, "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
+	err = pt.ParseAndInsert(meta, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
