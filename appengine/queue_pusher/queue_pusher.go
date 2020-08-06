@@ -1,6 +1,6 @@
 // Package pushqueue provides a microservice that accepts HTTP requests, creates
 // a Task from given parameters, and adds the Task to a TaskQueue.
-package pushqueue
+package main
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/m-lab/etl/etl"
+
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/taskqueue"
@@ -32,12 +33,6 @@ func isDirectQueueNameOK(name string) bool {
 		}
 	}
 	return true
-}
-
-func init() {
-	http.HandleFunc("/", defaultHandler)
-	http.HandleFunc("/receiver", receiver)
-	http.HandleFunc("/stats", queueStats)
 }
 
 // A default handler for root path.
@@ -143,4 +138,11 @@ func receiver(w http.ResponseWriter, r *http.Request) {
 
 		}
 	}
+}
+
+func main() {
+	http.HandleFunc("/", defaultHandler)
+	http.HandleFunc("/receiver", receiver)
+	http.HandleFunc("/stats", queueStats)
+	appengine.Main()
 }

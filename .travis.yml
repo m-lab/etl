@@ -175,6 +175,15 @@ deploy:
 
 ## Service: queue-pusher -- AppEngine Standard Environment.
 ## Removed for issue https://github.com/m-lab/etl/issues/751
+- provider: script
+  script:
+    GOPATH=$HOME/go111 $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
+    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/queue_pusher
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == qp-sandbox-*
 
 ## Service: cloud function -- AppEngine Flexible Environment.
 - provider: script
@@ -231,7 +240,7 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == sandbox-* 
+    condition: $TRAVIS_BRANCH == sandbox-*
 
 
 ## Service: etl-universal-parser -- AppEngine Flexible Environment.
@@ -275,16 +284,15 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_staging
     && gcloud app deploy --project=mlab-staging $TRAVIS_BUILD_DIR/appengine/queue.yaml
-    &&
-    travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
-    &&
-    $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-staging
-    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
-    &&
-    BIGQUERY_DATASET="tmp_ndt"
-    $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
+    && GOPATH=$HOME/go111 $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
+       SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
+    && travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-staging
+       SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    && BIGQUERY_DATASET="tmp_ndt"
+       $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-    SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
+       SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
     && cd $TRAVIS_BUILD_DIR/functions
     && gcloud functions deploy createStagingTaskOnFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-staging
     && gcloud functions deploy createStagingTaskOnEmbargoFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-staging
@@ -333,7 +341,9 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+    && GOPATH=$HOME/go111 $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/appengine/queue_pusher
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
   skip_cleanup: true
   on:
