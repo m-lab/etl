@@ -1,6 +1,6 @@
 module github.com/m-lab/etl-queue-pusher
 
-go 1.14
+go 1.11
 
 require (
 	cloud.google.com/go v0.62.0 // indirect
