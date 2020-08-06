@@ -1,35 +1,40 @@
+#!/bin/bash
+
 PROJECT=mlab-oti
 REGION=us-central1
-
-#gcloud --project=$PROJECT \
-#  compute networks create data-processing --subnet-mode=custom \
-#  --description="Network for communication among backend processing services."
-
-#gcloud --project=$PROJECT compute firewall-rules create dp-allow-ssh \
-#  --network=data-processing --allow=tcp:22 --direction=INGRESS \
-#  --description='Allow SSH from anywhere'
 
 set -x
 set -e
 
+# The network for comms among the components has to be created first.
+gcloud --project=$PROJECT \
+  compute networks create data-processing --subnet-mode=custom \
+  --description="Network for communication among backend processing services."
+
+gcloud --project=$PROJECT compute firewall-rules create dp-allow-ssh \
+  --network=data-processing --allow=tcp:22 --direction=INGRESS \
+  --description='Allow SSH from anywhere'
+
+# This allows internal connections between components.
 gcloud --project=$PROJECT compute firewall-rules create \
   dp-allow-internal --network=data-processing \
   --allow=tcp:0-65535,udp:0-65535,icmp --direction=INGRESS \
   --source-ranges=10.128.0.0/9,10.100.0.0/16 \
   --description='Allow internal traffic from anywhere'
 
-# Then the subnet and the static IP address...
-
+# Then add the subnet 
 gcloud --project=$PROJECT \
   compute networks subnets create dp-gardener \
   --network=data-processing --range=10.100.0.0/16 \
   --enable-private-ip-google-access --region=$REGION \
   --description="Subnet for gardener,etl,annotation-service. Subnet has the same name and address range across projects, but each is in a distinct (data-processing) VPC network."
 
+# And define the static IP address that will be used by etl parsers to reach gardener.
 gcloud --project=$PROJECT compute addresses create etl-gardener \
   --region=$REGION --subnet=dp-gardener --addresses=10.100.1.2
 
-# The node-pool isn't actually needed?
+# Now we can create the cluster.
+# It includes a default node-pool, though it isn't actually needed?
 gcloud --project=$PROJECT container clusters create data-processing \
   --region=$REGION --enable-autorepair --enable-autoupgrade \
   --network=data-processing --subnetwork=dp-gardener \
