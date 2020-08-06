@@ -329,6 +329,15 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == cf-prod-* || $TRAVIS_BRANCH == ndt-prod-* || $TRAVIS_BRANCH == prod-*
 
+#########################################
+- provider: script
+  script:
+    BIGQUERY_DATASET="tmp_ndt"
+    $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-oti data-processing ./apply-cluster.sh
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_TAG == prod-* || $TRAVIS_BRANCH == u-prod-*
 
 ###################### SMALLER ETL SERVICES ###############################
 # Deploys smaller production services: PT, SS, DISCO
