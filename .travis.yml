@@ -175,7 +175,7 @@ deploy:
 
 ## Service: queue-pusher -- AppEngine Standard Environment.
 ## Removed for issue https://github.com/m-lab/etl/issues/751
-- provider: script	## Removed for issue https://github.com/m-lab/etl/issues/751
+- provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
     SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/queue_pusher
