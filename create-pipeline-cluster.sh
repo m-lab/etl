@@ -5,8 +5,9 @@
 set -x
 set -e
 
-PROJECT=${1:?Please provide the GCP project id, e.g. mlab-sandbox}
-REGION=${2:?Please provide the cluster region, e.g. us-central1}
+USAGE="$0 <project> <region>"
+PROJECT=${1:?Please provide the GCP project id, e.g. mlab-sandbox: $USAGE}
+REGION=${2:?Please provide the cluster region, e.g. us-central1: $USAGE}
 
 gcloud config set project $PROJECT
 gcloud config set compute/region $REGION
@@ -56,6 +57,7 @@ gcloud container clusters create data-processing \
 
 # Set up node pools for parser and gardener pods.
 # Parser needs write access to storage.  Gardener needs only read access.
+# TODO - narrow the cloud-platform scope? https://github.com/m-lab/etl-gardener/issues/308
 gcloud container node-pools create parser-pool \
   --cluster=data-processing --num-nodes=3 --machine-type=n1-standard-8 \
   --enable-autorepair --enable-autoupgrade \
@@ -63,6 +65,7 @@ gcloud container node-pools create parser-pool \
   --node-labels=parser-node=true \
  # --service-account=etl-k8s-parser@mlab-staging.iam.gserviceaccount.com
 
+# TODO - narrow the cloud-platform scope? https://github.com/m-lab/etl-gardener/issues/308
 gcloud container node-pools create gardener-pool \
 --cluster=data-processing --num-nodes=2 --machine-type=n1-standard-2 \
 --enable-autorepair --enable-autoupgrade \
