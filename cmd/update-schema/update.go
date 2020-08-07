@@ -144,6 +144,18 @@ func main() {
 		if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
 			errCount++
 		}
+		if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
+			errCount++
+		}
 
 	case "tcpinfo":
 		if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {

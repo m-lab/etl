@@ -178,7 +178,7 @@ deploy:
 - provider: script
   script:
     GOPATH=$HOME/go111 $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/queue_pusher
+       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/queue_pusher
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -218,9 +218,9 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
+       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox batch nodryrun
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
   skip_cleanup: true
@@ -234,7 +234,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
-    SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
 #   && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
   skip_cleanup: true
   on:
@@ -249,9 +249,12 @@ deploy:
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
-    &&
-    BIGQUERY_DATASET="tmp_ndt"
-    $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-sandbox data-processing ./apply-cluster.sh
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
+       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=ndt7
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
+       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=annotation
+    && BIGQUERY_DATASET="tmp_ndt"
+       $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-sandbox data-processing ./apply-cluster.sh
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -313,11 +316,12 @@ deploy:
 ######################################################################
 
 ## Service: cloud function -- AppEngine Flexible Environment.
+# TODO - update-schema is run on many triggers, often multiple times.  Should clean it up.
 - provider: script
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && cd $TRAVIS_BUILD_DIR/functions
     && gcloud functions deploy createProdTaskOnFileNotification --project=mlab-oti --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-oti
     && gcloud functions deploy createProdTaskOnEmbargoFileNotification --project=mlab-oti --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-oti
@@ -329,11 +333,18 @@ deploy:
     all_branches: true
     condition: $TRAVIS_BRANCH == cf-prod-* || $TRAVIS_BRANCH == ndt-prod-* || $TRAVIS_BRANCH == prod-*
 
-#########################################
+###################### UNIVERSAL PARSER ###############################
+# Deploys Universal K8S Parser.
+# Triggers when *ANY* branch is tagged with u-prod-* OR prod-*
 - provider: script
   script:
-    BIGQUERY_DATASET="tmp_ndt"
-    $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-oti data-processing ./apply-cluster.sh
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=ndt7
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=annotation
+    && BIGQUERY_DATASET="tmp_ndt"
+       $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-oti data-processing ./apply-cluster.sh
   on:
     repo: m-lab/etl
     all_branches: true
@@ -365,10 +376,12 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
+    && BIGQUERY_DATASET="tmp_ndt"
+       $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-oti data-processing ./apply-cluster.sh
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti batch nodryrun
   skip_cleanup: true
   on:
@@ -383,7 +396,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-    SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
   skip_cleanup: true
