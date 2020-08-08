@@ -23,7 +23,7 @@ type AnnotationRow struct {
 	// uuid-annotator output schema was designed to be used directly by the parser.
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
+	row.NullAnnotator `bigquery:"-" json:"-"`
 }
 
 // Schema returns the BigQuery schema for NDT7ResultRow.

@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
+
+	"github.com/m-lab/pipe"
+
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/pipe"
 )
 
 // countingInserter counts the calls to InsertRows and Flush.
