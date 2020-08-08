@@ -90,5 +90,5 @@ spec:
             cpu: "7"
 
       nodeSelector:
-        parser-node: "true"
+        parser-node4: "true"
 
