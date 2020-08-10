@@ -148,6 +148,7 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 	}
 
 	// TODO - these may not be committed, so the returned value may be wrong.
+	rw.rows += len(rows)
 	return len(rows), nil
 }
 
