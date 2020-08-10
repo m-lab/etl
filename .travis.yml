@@ -250,9 +250,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
-       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=ndt7
-    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
-       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=annotation
+       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=standard
     && BIGQUERY_DATASET="tmp_ndt"
        $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-sandbox data-processing ./apply-cluster.sh
   skip_cleanup: true
@@ -340,9 +338,7 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=ndt7
-    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=annotation
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema -updateType=standard
     && BIGQUERY_DATASET="tmp_ndt"
        $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-oti data-processing ./apply-cluster.sh
   on:
