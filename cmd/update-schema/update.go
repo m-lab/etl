@@ -103,8 +103,50 @@ func CreateOrUpdate(schema bigquery.Schema, project, dataset, table, partField s
 	return err
 }
 
+// Only tables that support Standard Columns should be included here.
+func updateStandardTables(project string) int {
+	errCount := 0
+	if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
+		errCount++
+	}
+	return errCount
+}
+
+func updateLegacyTables(project string) int {
+	errCount := 0
+	if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateTCPInfo(project, "batch", "tcpinfo"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdatePT(project, "base_tables", "traceroute"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateNDT5ResultRow(project, "base_tables", "ndt5"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
+		errCount++
+	}
+	return errCount
+}
+
 var (
 	updateType = flag.String("updateType", "", "Short name of datatype to be updated (tcpinfo, scamper, ...).")
+	project    = flag.String("gcloud_project", "", "GCP project to update")
 )
 
 // For now, this just updates all known tables for the provided project.
@@ -114,8 +156,7 @@ func main() {
 
 	errCount := 0
 
-	project := os.Getenv("GCLOUD_PROJECT")
-	if project == "" {
+	if *project == "" {
 		log.Fatal("Missing GCLOUD_PROJECT environment variable.")
 	}
 
@@ -126,74 +167,52 @@ func main() {
 		}
 		fallthrough
 	case "all": // Do everything
-		if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateTCPInfo(project, "batch", "tcpinfo"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdatePT(project, "base_tables", "traceroute"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateNDT5ResultRow(project, "base_tables", "ndt5"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
-			errCount++
-		}
+		errCount += updateLegacyTables(*project)
+		errCount += updateStandardTables(*project)
+
+	case "legacy":
+		errCount += updateLegacyTables(*project)
+
+	case "standard":
+		errCount += updateStandardTables(*project)
 
 	case "tcpinfo":
-		if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {
+		if err := CreateOrUpdateTCPInfo(*project, "base_tables", "tcpinfo"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateTCPInfo(project, "batch", "tcpinfo"); err != nil {
+		if err := CreateOrUpdateTCPInfo(*project, "batch", "tcpinfo"); err != nil {
 			errCount++
 		}
 
 	case "traceroute":
-		if err := CreateOrUpdatePT(project, "base_tables", "traceroute"); err != nil {
+		if err := CreateOrUpdatePT(*project, "base_tables", "traceroute"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
+		if err := CreateOrUpdatePT(*project, "batch", "traceroute"); err != nil {
 			errCount++
 		}
 
 	case "ndt5":
-		if err := CreateOrUpdateNDT5ResultRow(project, "base_tables", "ndt5"); err != nil {
+		if err := CreateOrUpdateNDT5ResultRow(*project, "base_tables", "ndt5"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
+		if err := CreateOrUpdateNDT5ResultRow(*project, "batch", "ndt5"); err != nil {
 			errCount++
 		}
 
 	case "ndt7":
-		if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7"); err != nil {
+		if err := CreateOrUpdateNDT7ResultRow(*project, "tmp_ndt", "ndt7"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7"); err != nil {
+		if err := CreateOrUpdateNDT7ResultRow(*project, "raw_ndt", "ndt7"); err != nil {
 			errCount++
 		}
 
 	case "annotation":
-		if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
+		if err := CreateOrUpdateAnnotationRow(*project, "tmp_ndt", "annotation"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
+		if err := CreateOrUpdateAnnotationRow(*project, "raw_ndt", "annotation"); err != nil {
 			errCount++
 		}
 
