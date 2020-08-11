@@ -16,7 +16,9 @@ import (
 	"google.golang.org/api/iterator"
 
 	"github.com/m-lab/etl/active"
+	"github.com/m-lab/go/cloud/gcs"
 	"github.com/m-lab/go/logx"
+	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/go/cloudtest/gcsfake"
 )
@@ -94,7 +96,9 @@ func testClient() stiface.Client {
 }
 
 func standardLister() active.FileLister {
-	return active.FileListerFunc(testClient(), "gs://foobar/ndt/ndt5/2019/01/01/", nil)
+	bh, err := gcs.GetBucket(context.Background(), testClient(), "foobar")
+	rtx.Must(err, "GetBucket failed")
+	return active.FileListerFunc(bh, "ndt/ndt5/2019/01/01/", nil)
 }
 
 func runAll(ctx context.Context, rSrc active.RunnableSource) (*errgroup.Group, error) {

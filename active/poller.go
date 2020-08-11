@@ -20,6 +20,7 @@ import (
 
 	job "github.com/m-lab/etl-gardener/client"
 	"github.com/m-lab/etl-gardener/tracker"
+	"github.com/m-lab/go/cloud/gcs"
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/metrics"
@@ -128,21 +129,34 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 	}
 }
 
+func failMetric(j tracker.Job, label string) {
+	JobFailures.WithLabelValues(
+		j.Experiment+"/"+j.Datatype, j.Date.Format("2006"), label).Inc()
+}
+
 // JobFileSource creates a gcsSource for the job.
 func (g *GardenerAPI) JobFileSource(ctx context.Context, job tracker.Job,
 	toRunnable func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
 
 	filter, err := regexp.Compile(job.Filter)
 	if err != nil {
-		JobFailures.WithLabelValues(
-			job.Experiment+"/"+job.Datatype, job.Date.Format("2006"), "filter compile").Inc()
+		failMetric(job, "filter compile")
 		return nil, err
 	}
-	lister := FileListerFunc(g.gcs, job.Path(), filter)
+	bh, err := gcs.GetBucket(ctx, g.gcs, job.Bucket)
+	if err != nil {
+		failMetric(job, "filesource")
+		return nil, err
+	}
+	prefix, err := job.Prefix()
+	if err != nil {
+		failMetric(job, "prefix")
+		return nil, err
+	}
+	lister := FileListerFunc(bh, prefix, filter)
 	gcsSource, err := NewGCSSource(ctx, job.Path(), lister, toRunnable)
 	if err != nil {
-		JobFailures.WithLabelValues(
-			job.Experiment+"/"+job.Datatype, job.Date.Format("2006"), "filesource").Inc()
+		failMetric(job, "GCSSource")
 		return nil, err
 	}
 	return gcsSource, nil
@@ -217,5 +231,4 @@ func (g *GardenerAPI) Poll(ctx context.Context,
 // Status adds a small amount of status info to w.
 func (g *GardenerAPI) Status(w http.ResponseWriter) {
 	fmt.Fprintf(w, "Gardener API: %s\n", g.trackerBase.String())
-
 }

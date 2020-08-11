@@ -17,12 +17,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/storage"
-	"github.com/m-lab/etl/cloud/gcs"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/go/cloud/gcs"
 	"github.com/m-lab/go/logx"
 )
 
@@ -46,9 +45,9 @@ type FileLister func(ctx context.Context) ([]*storage.ObjectAttrs, int64, error)
 // FileListerFunc creates a function that returns a slice of *storage.ObjectAttrs.
 // On certain GCS errors, it may return partial result and an error.
 // TODO - consider moving this to GardenerAPI.
-func FileListerFunc(sc stiface.Client, prefix string, filter *regexp.Regexp) FileLister {
+func FileListerFunc(bh *gcs.BucketHandle, prefix string, filter *regexp.Regexp) FileLister {
 	return func(ctx context.Context) ([]*storage.ObjectAttrs, int64, error) {
-		return gcs.GetFilesSince(ctx, sc, prefix, filter, time.Time{})
+		return bh.GetFilesSince(ctx, prefix, filter, time.Time{})
 	}
 }
 
