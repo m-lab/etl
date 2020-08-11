@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"google.golang.org/appengine/aetest"
 )
@@ -68,7 +69,8 @@ func TestStats(t *testing.T) {
 		},
 	}
 
-	inst, err := aetest.NewInstance(nil)
+	opts := aetest.Options{StartupTimeout: time.Minute}
+	inst, err := aetest.NewInstance(&opts)
 	if err != nil {
 		t.Fatal(err)
 	}
