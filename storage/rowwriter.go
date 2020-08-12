@@ -21,18 +21,6 @@ import (
 	"github.com/m-lab/etl/row"
 )
 
-// ObjectWriter creates a writer to a named object.
-// It may overwrite an existing object.
-// Caller must Close() the writer, or cancel the context.
-func ObjectWriter(ctx context.Context, client stiface.Client, bucket string, path string) stiface.Writer {
-	b := client.Bucket(bucket)
-	o := b.Object(path)
-	w := o.NewWriter(ctx)
-	// Set smaller chunk size to conserve memory.
-	w.SetChunkSize(4 * 1024 * 1024)
-	return w
-}
-
 // RowWriter implements row.Sink to a GCS file backend.
 type RowWriter struct {
 	w stiface.Writer
