@@ -10,14 +10,17 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
-	"github.com/m-lab/go/logx"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 
-	"cloud.google.com/go/storage"
 	"github.com/m-lab/etl/active"
-	"github.com/m-lab/go/cloudtest"
+	"github.com/m-lab/go/cloud/gcs"
+	"github.com/m-lab/go/logx"
+	"github.com/m-lab/go/rtx"
+
+	"github.com/m-lab/go/cloudtest/gcsfake"
 )
 
 func init() {
@@ -77,23 +80,25 @@ func newCounter(t *testing.T) *counter {
 }
 
 func testClient() stiface.Client {
-	client := cloudtest.GCSClient{}
+	client := gcsfake.GCSClient{}
 	client.AddTestBucket("foobar",
-		cloudtest.BucketHandle{
+		gcsfake.BucketHandle{
 			ObjAttrs: []*storage.ObjectAttrs{
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj1", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj2", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/subdir/obj4", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/subdir/obj5", Updated: time.Now()},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "ndt/tcpinfo/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
-				&storage.ObjectAttrs{Bucket: "foobar", Name: "obj6", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj1", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj2", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/subdir/obj4", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/subdir/obj5", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/tcpinfo/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
+				{Bucket: "foobar", Name: "obj6", Updated: time.Now()},
 			}})
 	return client
 }
 
 func standardLister() active.FileLister {
-	return active.FileListerFunc(testClient(), "gs://foobar/ndt/ndt5/2019/01/01/", nil)
+	bh, err := gcs.GetBucket(context.Background(), testClient(), "foobar")
+	rtx.Must(err, "GetBucket failed")
+	return active.FileListerFunc(bh, "ndt/ndt5/2019/01/01/", nil)
 }
 
 func runAll(ctx context.Context, rSrc active.RunnableSource) (*errgroup.Group, error) {
