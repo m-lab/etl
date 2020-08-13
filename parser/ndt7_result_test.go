@@ -57,7 +57,7 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 					TestTime:           row.A.TestTime,
 					CongestionControl:  "bbr",
 					MeanThroughputMbps: 38.714033637501984,
-					MinRTT:             0.285804,
+					MinRTT:             285.804,
 					LossRate:           0.12029169202467564,
 				}
 				if diff := deep.Equal(row.A, exp); diff != nil {
@@ -96,7 +96,7 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 					TestTime:           row.A.TestTime,
 					CongestionControl:  "bbr",
 					MeanThroughputMbps: 2.6848341983403983,
-					MinRTT:             0.173733,
+					MinRTT:             173.733,
 					LossRate:           0,
 				}
 				if diff := deep.Equal(row.A, exp); diff != nil {
