@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
+	gcs "cloud.google.com/go/storage"
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"google.golang.org/api/googleapi"
 
@@ -18,21 +21,14 @@ import (
 	"github.com/m-lab/etl/row"
 )
 
-// ObjectWriter creates a writer to a named object.
-// It may overwrite an existing object.
-// Caller must Close() the writer, or cancel the context.
-func ObjectWriter(ctx context.Context, client stiface.Client, bucket string, path string) stiface.Writer {
-	b := client.Bucket(bucket)
-	o := b.Object(path)
-	w := o.NewWriter(ctx)
-	// Set smaller chunk size to conserve memory.
-	w.SetChunkSize(4 * 1024 * 1024)
-	return w
-}
-
 // RowWriter implements row.Sink to a GCS file backend.
 type RowWriter struct {
 	w stiface.Writer
+	o stiface.ObjectHandle
+	a gcs.ObjectAttrsToUpdate
+
+	rows     int
+	writeErr error
 
 	bucket string
 	path   string
@@ -40,19 +36,24 @@ type RowWriter struct {
 	// These act as tokens to serialize access to the writer.
 	// This allows concurrent encoding and writing, while ensuring
 	// that single client access is correctly ordered.
-	encoding chan struct{} // Token required for metric updates.
-	writing  chan struct{} // Token required for metric updates.
+	encoding chan struct{} // Token required for encoding.
+	writing  chan struct{} // Token required for writing.
 }
 
 // NewRowWriter creates a RowWriter.
 func NewRowWriter(ctx context.Context, client stiface.Client, bucket string, path string) (row.Sink, error) {
-	w := ObjectWriter(ctx, client, bucket, path)
+	b := client.Bucket(bucket)
+	o := b.Object(path)
+	w := o.NewWriter(ctx)
+	// Set smaller chunk size to conserve memory.
+	w.SetChunkSize(4 * 1024 * 1024)
+
 	encoding := make(chan struct{}, 1)
 	encoding <- struct{}{}
 	writing := make(chan struct{}, 1)
 	writing <- struct{}{}
 
-	return &RowWriter{bucket: bucket, path: path, w: w, encoding: encoding, writing: writing}, nil
+	return &RowWriter{bucket: bucket, path: path, o: o, w: w, encoding: encoding, writing: writing}, nil
 }
 
 // Acquire the encoding token.
@@ -110,6 +111,7 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 	defer rw.releaseWritingToken()
 	n, err := buf.WriteTo(rw.w) // This is buffered (by 4MB chunks).  Are the writes to GCS synchronous?
 	if err != nil {
+		rw.writeErr = err
 		switch typedErr := err.(type) {
 		case *googleapi.Error:
 			metrics.BackendFailureCount.WithLabelValues(
@@ -128,10 +130,13 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 		// The caller should likely abandon the archive at this point,
 		// as further writing will likely result in a corrupted file.
 		// See https://github.com/m-lab/etl/issues/899
-		return int(n) * len(rows) / numBytes, err
+		rowEstimate := int(n) * len(rows) / numBytes
+		rw.rows += rowEstimate
+		return rowEstimate, err
 	}
 
 	// TODO - these may not be committed, so the returned value may be wrong.
+	rw.rows += len(rows)
 	return len(rows), nil
 }
 
@@ -148,10 +153,22 @@ func (rw *RowWriter) Close() error {
 	err := rw.w.Close()
 	if err != nil {
 		log.Println(err)
-	} else {
-		log.Println(rw.w.Attrs())
+		return err
 	}
+
+	oa := gcs.ObjectAttrsToUpdate{}
+	oa.Metadata = make(map[string]string, 1)
+	oa.Metadata["rows"] = fmt.Sprint(rw.rows)
+	if rw.writeErr != nil {
+		oa.Metadata["writeError"] = rw.writeErr.Error()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	attr, err := rw.o.Update(ctx, oa)
+	log.Println(attr, err)
 	return err
+
 }
 
 // SinkFactory implements factory.SinkFactory.
