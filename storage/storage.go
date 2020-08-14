@@ -108,13 +108,19 @@ func (src *GCSSource) nextData(h *tar.Header, trial int) ([]byte, bool, error) {
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, phase, strconv.Itoa(trial), "stream error").Inc()
 		} else if strings.Contains(err.Error(), "unexpected EOF") {
-			// We ARE seeing 438 of these for ndt7/read-zip, June 2020.
-			// They are consistent for each reprocessing.
+			// We ARE seeing 438 of these for ndt7, from 2020/03/06 to 2020/05/01.
+			// They are consistent for each reprocessing.  Most of the files have just 10 bytes,
+			// but a minority have 250 or more.
 			// They occur when there is a truncated gz file within an archive.  For example:
 			//   ERROR nextData:1 [unexpected EOF] 2020/04/20/ndt7-upload-20200420T051229.808987688Z.ndt-s5hxm_1583551492_000000000021ADBB.json.gz
 			//   (10 bytes) from gs://archive-measurement-lab/ndt/ndt7/2020/04/20/20200420T060456.005849Z-ndt7-mlab3-lhr03-ndt.tgz
-			metrics.GCSRetryCount.WithLabelValues(
-				src.TableBase, phase, strconv.Itoa(trial), "unexpected EOF").Inc()
+			if h.Size <= 10 && strings.HasSuffix(phase, "zip") {
+				metrics.GCSRetryCount.WithLabelValues(
+					src.TableBase, phase, strconv.Itoa(trial), "truncated zip file").Inc()
+			} else {
+				metrics.GCSRetryCount.WithLabelValues(
+					src.TableBase, phase, strconv.Itoa(trial), "unexpected EOF").Inc()
+			}
 		} else {
 			metrics.GCSRetryCount.WithLabelValues(
 				src.TableBase, phase, strconv.Itoa(trial), "other error").Inc()
