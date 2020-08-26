@@ -6,7 +6,7 @@ import "time"
 type Sample struct {
 	Timestamp int64   `json:"timestamp,int64" bigquery:"timestamp"`
 	Value     float32 `json:"value,float32" bigquery:"value"`
-	Counter   float64 `json:"counter,float64" bigquery:"counter"`
+	Counter   uint64  `json:"counter,float64" bigquery:"counter"`
 }
 
 // SwitchStats represents a row of data taken from the raw DISCO export file.
