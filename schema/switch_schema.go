@@ -4,9 +4,9 @@ import "time"
 
 // Sample is an individual measurement taken by DISCO.
 type Sample struct {
-	Timestamp int64   `json:"timestamp,int64" bigquery:"timestamp"`
-	Value     float32 `json:"value,float32" bigquery:"value"`
-	Counter   uint64  `json:"counter,float64" bigquery:"counter"`
+	Timestamp int64   `json:"timestamp" bigquery:"timestamp"`
+	Value     float64 `json:"value" bigquery:"value"`
+	Counter   int64   `json:"counter" bigquery:"counter"`
 }
 
 // SwitchStats represents a row of data taken from the raw DISCO export file.
