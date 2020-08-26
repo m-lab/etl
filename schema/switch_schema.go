@@ -11,11 +11,11 @@ type Sample struct {
 
 // SwitchStats represents a row of data taken from the raw DISCO export file.
 type SwitchStats struct {
-	TaskFilename  string    `json:"task_filename,string" bigquery:"task_filename"`
-	TestID        string    `json:"test_id,string" bigquery:"test_id"`
+	TaskFilename  string    `json:"task_filename" bigquery:"task_filename"`
+	TestID        string    `json:"test_id" bigquery:"test_id"`
 	ParseTime     time.Time `json:"parse_time" bigquery:"parse_time"`
-	ParserVersion string    `json:"parser_version,string" bigquery:"parser_version"`
-	LogTime       int64     `json:"log_time,int64" bigquery:"log_time"`
+	ParserVersion string    `json:"parser_version" bigquery:"parser_version"`
+	LogTime       int64     `json:"log_time" bigquery:"log_time"`
 	Sample        []Sample  `json:"sample" bigquery:"sample"`
 	Metric        string    `json:"metric" bigquery:"metric"`
 	Hostname      string    `json:"hostname" bigquery:"hostname"`
