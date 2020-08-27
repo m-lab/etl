@@ -3,6 +3,12 @@ package schema
 import "time"
 
 // Sample is an individual measurement taken by DISCO.
+// NOTE: the types of the fields in this struct differ from the types used
+// natively by the structs in DISCOv2. In DiSCOv2 Value is a uint64, but must
+// be a float here because DISCOv1 outputs floats. float64 should be able to
+// accommodate both types of input values safely. For Counter, DISCOv2 uses a
+// uint64, but BigQuery does not support the notion of unsigned integers, so we
+// use int64 here, which should be safe, too.
 type Sample struct {
 	Timestamp int64   `json:"timestamp" bigquery:"timestamp"`
 	Value     float64 `json:"value" bigquery:"value"`
