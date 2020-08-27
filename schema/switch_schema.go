@@ -1,6 +1,12 @@
 package schema
 
-import "time"
+import (
+	"cloud.google.com/go/bigquery"
+
+	"github.com/m-lab/go/cloud/bqx"
+
+	"time"
+)
 
 // Sample is an individual measurement taken by DISCO.
 // NOTE: the types of the fields in this struct differ from the types used
@@ -29,7 +35,21 @@ type SwitchStats struct {
 }
 
 // Size estimates the number of bytes in the SwitchStats object.
-func (s *SwitchStats) Size() int {
+func (row *SwitchStats) Size() int {
 	return (len(s.TaskFilename) + len(s.TestID) + 8 +
-		12*len(s.Sample) + len(s.Metric) + len(s.Hostname) + len(s.Experiment))
+		12*len(row.Sample) + len(row.Metric) + len(row.Hostname) + len(row.Experiment))
+}
+
+// Schema returns the BigQuery schema for SwitchStats.
+func (row *SwitchStats) Schema() (bigquery.Schema, error) {
+	sch, err := bigquery.InferSchema(row)
+	if err != nil {
+		return bigquery.Schema{}, err
+	}
+	docs := FindSchemaDocsFor(row)
+	for _, doc := range docs {
+		bqx.UpdateSchemaDescription(sch, doc)
+	}
+	rr := bqx.RemoveRequired(sch)
+	return rr, err
 }

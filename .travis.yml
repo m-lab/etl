@@ -348,3 +348,17 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_TAG == ndt-prod-* || $TRAVIS_TAG == prod-*
+
+
+##################### UPDATE SCHEMAS ###############################
+# Updates or creates schemas in BigQuery
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == cf-prod-* || $TRAVIS_BRANCH == ndt-prod-* || $TRAVIS_BRANCH == prod-*

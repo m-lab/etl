@@ -66,6 +66,13 @@ func CreateOrUpdateAnnotationRow(project string, dataset string, table string) e
 	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
+func CreateOrUpdateSwitchStats(project string, dataset string, table string) error {
+	row := schema.SwitchStats{}
+	schema, err := row.Schema()
+	rtx.Must(err, "SwitchStats.Schema")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
+}
+
 // CreateOrUpdate will update or create a table from the given schema.
 func CreateOrUpdate(schema bigquery.Schema, project, dataset, table, partField string) error {
 	name := project + "." + dataset + "." + table
