@@ -16,9 +16,9 @@ import (
 // uint64, but BigQuery does not support the notion of unsigned integers, so we
 // use int64 here, which should be safe, too.
 type Sample struct {
-	Timestamp time.Time `json:"timestamp" bigquery:"timestamp"`
-	Value     float64   `json:"value" bigquery:"value"`
-	Counter   int64     `json:"counter" bigquery:"counter"`
+	Timestamp int64   `json:"timestamp" bigquery:"timestamp"`
+	Value     float64 `json:"value" bigquery:"value"`
+	Counter   int64   `json:"counter" bigquery:"counter"`
 }
 
 // SwitchStats represents a row of data taken from the raw DISCO export file.
@@ -51,5 +51,11 @@ func (row *SwitchStats) Schema() (bigquery.Schema, error) {
 		bqx.UpdateSchemaDescription(sch, doc)
 	}
 	rr := bqx.RemoveRequired(sch)
-	return rr, err
+
+	subs := map[string]bigquery.FieldSchema{
+		"timestamp": bigquery.FieldSchema{Name: "timestamp", Description: "", Repeated: false, Required: false, Type: "TIMESTAMP"},
+	}
+	s := bqx.Customize(rr, subs)
+
+	return s, err
 }
