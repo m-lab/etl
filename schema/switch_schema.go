@@ -36,7 +36,7 @@ type SwitchStats struct {
 
 // Size estimates the number of bytes in the SwitchStats object.
 func (row *SwitchStats) Size() int {
-	return (len(s.TaskFilename) + len(s.TestID) + 8 +
+	return (len(row.TaskFilename) + len(row.TestID) + 8 +
 		12*len(row.Sample) + len(row.Metric) + len(row.Hostname) + len(row.Experiment))
 }
 
