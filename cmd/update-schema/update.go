@@ -70,7 +70,7 @@ func CreateOrUpdateSwitchStats(project string, dataset string, table string) err
 	row := schema.SwitchStats{}
 	schema, err := row.Schema()
 	rtx.Must(err, "SwitchStats.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "Date")
+	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
 // CreateOrUpdate will update or create a table from the given schema.
