@@ -52,8 +52,17 @@ func (row *SwitchStats) Schema() (bigquery.Schema, error) {
 	}
 	rr := bqx.RemoveRequired(sch)
 
+	// The raw data from DISCO stores the timestamp of a sample as an integer (a
+	// UNIX timestamp), but BigQuery represent the value as type TIMESTAMP.
+	// TODO: DISCO should probably store the value as time.Time to avoid the
+	// need for this.
 	subs := map[string]bigquery.FieldSchema{
-		"timestamp": bigquery.FieldSchema{Name: "timestamp", Description: "", Repeated: false, Required: false, Type: "TIMESTAMP"},
+		"timestamp": bigquery.FieldSchema{
+			Name:        "timestamp",
+			Description: "",
+			Repeated:    false,
+			Required:    false,
+			Type:        "TIMESTAMP"},
 	}
 	s := bqx.Customize(rr, subs)
 
