@@ -9,9 +9,6 @@
 #  * test and build the go code
 #  * on success, deploy the result when the origin branch matches a supported
 #    deployment target.
-#
-# TODO(soltesz): Add deployment automation when fine-grained permissions are
-# possible.
 
 dist: bionic
 language: go
@@ -361,4 +358,4 @@ deploy:
   on:
     repo: m-lab/etl
     all_branches: true
-    condition: $TRAVIS_BRANCH == cf-prod-* || $TRAVIS_BRANCH == ndt-prod-* || $TRAVIS_BRANCH == prod-*
+    condition: $TRAVIS_BRANCH == ndt-prod-* || $TRAVIS_BRANCH == prod-*
