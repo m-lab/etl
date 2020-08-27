@@ -148,6 +148,12 @@ func updateLegacyTables(project string) int {
 	if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
 		errCount++
 	}
+	if err := CreateOrUpdateSwitchStats(project, "base_tables", "switch"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateSwitchStats(project, "batch", "switch"); err != nil {
+		errCount++
+	}
 	return errCount
 }
 
@@ -220,6 +226,14 @@ func main() {
 			errCount++
 		}
 		if err := CreateOrUpdateAnnotationRow(*project, "raw_ndt", "annotation"); err != nil {
+			errCount++
+		}
+
+	case "switch":
+		if err := CreateOrUpdateSwitchStats(*project, "base_tables", "switch"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateSwitchStats(*project, "batch", "switch"); err != nil {
 			errCount++
 		}
 
