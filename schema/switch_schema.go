@@ -46,11 +46,6 @@ func (row *SwitchStats) Schema() (bigquery.Schema, error) {
 	if err != nil {
 		return bigquery.Schema{}, err
 	}
-	docs := FindSchemaDocsFor(row)
-	for _, doc := range docs {
-		bqx.UpdateSchemaDescription(sch, doc)
-	}
-	rr := bqx.RemoveRequired(sch)
 
 	// The raw data from DISCO stores the timestamp of a sample as an integer (a
 	// UNIX timestamp), but BigQuery represent the value as type TIMESTAMP.
@@ -64,7 +59,13 @@ func (row *SwitchStats) Schema() (bigquery.Schema, error) {
 			Required:    false,
 			Type:        "TIMESTAMP"},
 	}
-	s := bqx.Customize(rr, subs)
+	c := bqx.Customize(sch, subs)
 
-	return s, err
+	docs := FindSchemaDocsFor(row)
+	for _, doc := range docs {
+		bqx.UpdateSchemaDescription(c, doc)
+	}
+	rr := bqx.RemoveRequired(c)
+
+	return rr, err
 }
