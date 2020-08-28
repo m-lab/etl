@@ -9,11 +9,6 @@
 #  * test and build the go code
 #  * on success, deploy the result when the origin branch matches a supported
 #    deployment target.
-#
-# NOTE: Cloud functions only support primitive IAM roles: Owner, Editor, Viewer.
-# See: https://cloud.google.com/functions/docs/concepts/iam
-# TODO(soltesz): Add deployment automation when fine-grained permissions are
-# possible.
 
 dist: bionic
 language: go
@@ -25,12 +20,6 @@ env:
 
 before_install:
 - sudo apt-get install -y jq  # Dependency for sync_tables_with_schema.sh.
-# Install javascript libraries
-- pushd $TRAVIS_BUILD_DIR/functions
-- npm install --verbose
-- pushd embargo
-- npm install --verbose
-- popd; popd
 
 # Coverage tools
 - go get github.com/mattn/goveralls
@@ -83,13 +72,6 @@ script:
 - go generate ./schema
 - diff /tmp/current-bindata.go schema/bindata.go || (
   echo "Files do not match; run 'update go-bindata, go generate ./schema' and commit changes" && false )
-
-# Run all javascript tests.
-- pushd $TRAVIS_BUILD_DIR/functions
-- npm test
-- pushd embargo
-- npm test
-- popd; popd
 
 # To start the Go tests, run all the non-integration tests.
 # Currently skipping storage tests, because they depend on GCS, and there is
@@ -184,20 +166,6 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_BRANCH == qp-sandbox-*
-
-## Service: cloud function -- AppEngine Flexible Environment.
-- provider: script
-  script:
-    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
-    && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud config set project mlab-sandbox
-    && gcloud functions deploy createSandboxTaskOnFileNotification --stage-bucket=functions-mlab-sandbox --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-sandbox
-    && gcloud functions deploy createSandboxTaskOnEmbargoFileNotification --stage-bucket=functions-mlab-sandbox --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-sandbox
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_BRANCH == cf-sandbox-* || $TRAVIS_BRANCH == sandbox-*
 
 ## Task Queues
 - provider: script
@@ -294,11 +262,6 @@ deploy:
        $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
        SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
-    && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud functions deploy createStagingTaskOnFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-staging
-    && gcloud functions deploy createStagingTaskOnEmbargoFileNotification --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-staging
-    && cd $TRAVIS_BUILD_DIR/functions/embargo
-    && gcloud functions deploy embargoOnFileNotificationStaging --project=mlab-staging --stage-bucket=functions-mlab-staging --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=scraper-mlab-staging
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging batch nodryrun
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging base_tables nodryrun
   skip_cleanup: true
@@ -312,24 +275,6 @@ deploy:
 #  Should be used AFTER code review, commit to master, and staging soak.
 #  Triggers when *ANY* branch is tagged with one of these tags'
 ######################################################################
-
-## Service: cloud function -- AppEngine Flexible Environment.
-# TODO - update-schema is run on many triggers, often multiple times.  Should clean it up.
-- provider: script
-  script:
-    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
-    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
-       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
-    && cd $TRAVIS_BUILD_DIR/functions
-    && gcloud functions deploy createProdTaskOnFileNotification --project=mlab-oti --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=archive-mlab-oti
-    && gcloud functions deploy createProdTaskOnEmbargoFileNotification --project=mlab-oti --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=embargo-mlab-oti
-    && cd $TRAVIS_BUILD_DIR/functions/embargo
-    && gcloud functions deploy embargoOnFileNotificationOti --project=mlab-oti --stage-bucket=functions-mlab-oti --trigger-event=providers/cloud.storage/eventTypes/object.change --trigger-resource=scraper-mlab-oti
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_BRANCH == cf-prod-* || $TRAVIS_BRANCH == ndt-prod-* || $TRAVIS_BRANCH == prod-*
 
 ###################### UNIVERSAL PARSER ###############################
 # Deploys Universal K8S Parser.
@@ -400,3 +345,17 @@ deploy:
     repo: m-lab/etl
     all_branches: true
     condition: $TRAVIS_TAG == ndt-prod-* || $TRAVIS_TAG == prod-*
+
+
+##################### UPDATE SCHEMAS ###############################
+# Updates or creates schemas in BigQuery
+- provider: script
+  script:
+    $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
+    && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
+       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
+  skip_cleanup: true
+  on:
+    repo: m-lab/etl
+    all_branches: true
+    condition: $TRAVIS_BRANCH == ndt-prod-* || $TRAVIS_BRANCH == prod-*

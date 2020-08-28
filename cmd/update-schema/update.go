@@ -66,6 +66,13 @@ func CreateOrUpdateAnnotationRow(project string, dataset string, table string) e
 	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
+func CreateOrUpdateSwitchStats(project string, dataset string, table string) error {
+	row := schema.SwitchStats{}
+	schema, err := row.Schema()
+	rtx.Must(err, "SwitchStats.Schema")
+	return CreateOrUpdate(schema, project, dataset, table, "")
+}
+
 // CreateOrUpdate will update or create a table from the given schema.
 func CreateOrUpdate(schema bigquery.Schema, project, dataset, table, partField string) error {
 	name := project + "." + dataset + "." + table
@@ -141,6 +148,12 @@ func updateLegacyTables(project string) int {
 	if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
 		errCount++
 	}
+	if err := CreateOrUpdateSwitchStats(project, "base_tables", "switch"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateSwitchStats(project, "batch", "switch"); err != nil {
+		errCount++
+	}
 	return errCount
 }
 
@@ -213,6 +226,14 @@ func main() {
 			errCount++
 		}
 		if err := CreateOrUpdateAnnotationRow(*project, "raw_ndt", "annotation"); err != nil {
+			errCount++
+		}
+
+	case "switch":
+		if err := CreateOrUpdateSwitchStats(*project, "base_tables", "switch"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateSwitchStats(*project, "batch", "switch"); err != nil {
 			errCount++
 		}
 
