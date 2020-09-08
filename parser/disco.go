@@ -103,6 +103,15 @@ func (dp *DiscoParser) ParseAndInsert(meta map[string]bigquery.Value, testName s
 				stats.Sample = tmp.Sample
 			} else {
 				stats.Sample = tmp.Sample[:len(tmp.Sample)-1]
+				// DISCOv1's Timestamp field in each sample represents the
+				// *beginning* of a 10s sample window, while v2's Timestamp
+				// represents the time at which the sample was taken, which is
+				// representative of the previous 10s. Since v2's behavior is
+				// what we want, we add 10s to all v1 Timestamps so that the
+				// timestamps represent the same thing for v1 and v2.
+				for i, v := range stats.Sample {
+					stats.Sample[i].Timestamp = v.Timestamp + 10
+				}
 			}
 		}
 
