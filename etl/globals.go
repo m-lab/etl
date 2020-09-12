@@ -95,9 +95,15 @@ type DataPath struct {
 	Suffix     string // the archive suffix, e.g. .tgz
 }
 
+// ParseTestName parses a general ( prefix yyyyddmmThh:mm:ss.ddddddddZ remainder ) testname string
+func ParseTestName(path string) []string {
+	// e.g. 2018/01/01/20180101T00:00:49.163110000Z_205.237.134.34.s2c_ndttrace.gz
+	return basicTaskPattern.FindStringSubmatch(path)
+}
+
 // ValidateTestPath validates a task filename.
 func ValidateTestPath(path string) (DataPath, error) {
-	basic := basicTaskPattern.FindStringSubmatch(path)
+	basic := ParseTestName(path)
 	if basic == nil {
 		return DataPath{}, errors.New("Path missing date-time string")
 	}

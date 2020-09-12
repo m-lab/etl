@@ -147,6 +147,9 @@ type TestSource interface {
 	Detail() string   // Detail for logs.
 	Type() string     // Data type for logs and metrics
 	Date() civil.Date // Date associated with test source
+
+	Site() string // The site that collected the data, e.g. atl02
+	Host() string // The machine that collected the data, e.g. mlab1
 }
 
 //========================================================================
