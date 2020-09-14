@@ -49,7 +49,7 @@ type NDT5ResultRowV1 struct {
 	Date   civil.Date      `bigquery:"date"`
 	Raw    data.NDT5Result `bigquery:"raw"`
 
-	// These will be populated by the join with tthe annoator data.
+	// These will be populated by the join with the annotator data.
 	Server annotator.ServerAnnotations `bigquery:"server" json:"server"`
 	Client annotator.ClientAnnotations `bigquery:"client" json:"client"`
 
