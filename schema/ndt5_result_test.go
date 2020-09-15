@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -43,9 +44,19 @@ func TestNDT5ResultV1_Schema(t *testing.T) {
 		return
 	}
 	count := 0
+	fields := 0
+	descriptions := 0
 	// The complete schema is large, so verify that field descriptions
 	// are present for select fields by walking the schema and looking for them.
 	bqx.WalkSchema(got, func(prefix []string, field *bigquery.FieldSchema) error {
+		fields++
+		if field.Description != "" {
+			descriptions++
+		} else if field.Type == bigquery.RecordFieldType {
+			t.Logf("No description for %s", strings.Join(prefix, "."))
+		} else {
+			t.Logf("No description for %s.%s", strings.Join(prefix, "."), field.Name)
+		}
 		for _, name := range []string{"a", "parser", "GitShortCommit"} {
 			if field.Name == name {
 				if field.Description == "" {
@@ -59,5 +70,8 @@ func TestNDT5ResultV1_Schema(t *testing.T) {
 	})
 	if count != 3 {
 		t.Errorf("NDT5ResultV1.Schema() missing expected fields; got %d, want 3", count)
+	}
+	if descriptions != fields {
+		t.Log(descriptions, "!=", fields)
 	}
 }
