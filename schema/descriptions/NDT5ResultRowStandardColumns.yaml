@@ -1,3 +1,9 @@
+id:
+  Description: A unique id for the test, in this case identical to a.UUID.
+date:
+  Description: The date of the test, for partitioning.
+raw:
+  Description: Fields from the raw data.
 a:
   Description: Fields summarizing or derived from the raw data.
 a.UUID:

@@ -37,7 +37,7 @@ func TestNDT5Result_Schema(t *testing.T) {
 }
 
 func TestNDT5ResultV1_Schema(t *testing.T) {
-	row := &NDT5ResultRowV1{}
+	row := &NDT5ResultRowStandardColumns{}
 	got, err := row.Schema()
 	if err != nil {
 		t.Errorf("NDT5ResultV1.Schema() error = %v, expected nil", err)
@@ -59,7 +59,7 @@ func TestNDT5ResultV1_Schema(t *testing.T) {
 		}
 		// a and parser are top level records
 		// GitShortCommit is a field in raw
-		for _, name := range []string{"a", "parser", "GitShortCommit"} {
+		for _, name := range []string{"id", "a", "parser", "GitShortCommit"} {
 			if field.Name == name {
 				if field.Description == "" {
 					t.Errorf("NDT5ResultV1.Schema() missing field.Description for %q", field.Name)
@@ -70,8 +70,8 @@ func TestNDT5ResultV1_Schema(t *testing.T) {
 		}
 		return nil
 	})
-	if count != 3 {
-		t.Errorf("NDT5ResultV1.Schema() missing expected fields; got %d, want 3", count)
+	if count != 4 {
+		t.Errorf("NDT5ResultV1.Schema() missing expected fields; got %d, want 4", count)
 	}
 	if descriptions != fields {
 		// Log if there are missing descriptions

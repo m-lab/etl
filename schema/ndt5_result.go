@@ -40,9 +40,9 @@ func (row *NDT5ResultRow) Schema() (bigquery.Schema, error) {
 	return rr, err
 }
 
-// NDT5ResultRowV1 defines the BQ schema for the data.NDT5Result produced by the
+// NDT5ResultRowStandardColumns defines the BQ schema for the data.NDT5Result produced by the
 // ndt-server for NDT client measurements.
-type NDT5ResultRowV1 struct {
+type NDT5ResultRowStandardColumns struct {
 	ID     string          `bigquery:"id"`
 	A      NDT5Summary     `bigquery:"a"`
 	Parser ParseInfo       `bigquery:"parser"`
@@ -69,7 +69,7 @@ type NDT5Summary struct {
 }
 
 // Schema returns the BigQuery schema for NDT5ResultRow.
-func (row *NDT5ResultRowV1) Schema() (bigquery.Schema, error) {
+func (row *NDT5ResultRowStandardColumns) Schema() (bigquery.Schema, error) {
 	sch, err := bigquery.InferSchema(row)
 	if err != nil {
 		return bigquery.Schema{}, err
