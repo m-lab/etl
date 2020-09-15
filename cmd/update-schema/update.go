@@ -52,6 +52,15 @@ func CreateOrUpdateNDT5ResultRow(project string, dataset string, table string) e
 	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
+func CreateOrUpdateNDT5ResultRowStandardColumns(project string, dataset string, table string) error {
+	row := schema.NDT5ResultRowStandardColumns{}
+	schema, err := row.Schema()
+	rtx.Must(err, "NDT5ResultRowStandardColumns.Schema")
+
+	// NOTE: NDT5ResultRow does not support the TestTime field yet.
+	return CreateOrUpdate(schema, project, dataset, table, "")
+}
+
 func CreateOrUpdateNDT7ResultRow(project string, dataset string, table string) error {
 	row := schema.NDT7ResultRow{}
 	schema, err := row.Schema()
@@ -110,6 +119,20 @@ func CreateOrUpdate(schema bigquery.Schema, project, dataset, table, partField s
 	return err
 }
 
+func updateNDT5SC(project string) int {
+	errCount := 0
+	if err := CreateOrUpdateNDT5ResultRowStandardColumns(project, "raw_ndt", "ndt5"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateNDT5ResultRowStandardColumns(project, "tmp_ndt", "ndt5"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateNDT5ResultRowStandardColumns(project, "ndt", "ndt5"); err != nil {
+		errCount++
+	}
+	return errCount
+}
+
 // Only tables that support Standard Columns should be included here.
 func updateStandardTables(project string) int {
 	errCount := 0
@@ -119,6 +142,9 @@ func updateStandardTables(project string) int {
 	if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7"); err != nil {
 		errCount++
 	}
+
+	errCount += updateNDT5SC(project)
+
 	if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
 		errCount++
 	}
@@ -204,6 +230,9 @@ func main() {
 		if err := CreateOrUpdatePT(*project, "batch", "traceroute"); err != nil {
 			errCount++
 		}
+
+	case "ndt5sc":
+		errCount += updateNDT5SC(*project)
 
 	case "ndt5":
 		if err := CreateOrUpdateNDT5ResultRow(*project, "base_tables", "ndt5"); err != nil {
