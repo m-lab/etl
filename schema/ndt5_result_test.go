@@ -57,6 +57,8 @@ func TestNDT5ResultV1_Schema(t *testing.T) {
 		} else {
 			t.Logf("No description for %s.%s", strings.Join(prefix, "."), field.Name)
 		}
+		// a and parser are top level records
+		// GitShortCommit is a field in raw
 		for _, name := range []string{"a", "parser", "GitShortCommit"} {
 			if field.Name == name {
 				if field.Description == "" {
@@ -72,6 +74,7 @@ func TestNDT5ResultV1_Schema(t *testing.T) {
 		t.Errorf("NDT5ResultV1.Schema() missing expected fields; got %d, want 3", count)
 	}
 	if descriptions != fields {
+		// Log if there are missing descriptions
 		t.Log(descriptions, "!=", fields)
 	}
 }
