@@ -127,9 +127,11 @@ func updateNDT5SC(project string) int {
 	if err := CreateOrUpdateNDT5ResultRowStandardColumns(project, "tmp_ndt", "ndt5"); err != nil {
 		errCount++
 	}
-	if err := CreateOrUpdateNDT5ResultRowStandardColumns(project, "ndt", "ndt5"); err != nil {
-		errCount++
-	}
+	// TODO enable this after removing ndt.ndt5 views from etl-schema, and migrating
+	// measurement-lab:ndt.ndt5 to point to mlab-oti:base_tables.ndt5
+	//	if err := CreateOrUpdateNDT5ResultRowStandardColumns(project, "ndt", "ndt5"); err != nil {
+	//		errCount++
+	//	}
 	return errCount
 }
 
