@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"net"
+	"log"
 
 	"github.com/m-lab/go/content"
 	"github.com/m-lab/go/flagx"
@@ -20,11 +20,14 @@ var (
 
 func init() {
 	flag.Var(&siteinfo, "siteinfo.url", "The URL for the Siteinfo JSON file containing server location and ASN metadata. gs:// and file:// schemes accepted.")
+	globalAnnotator = nil
 }
 
 // Annotate adds site annotation for a site/machine
 func Annotate(site, machine string, server *annotator.ServerAnnotations) {
-	globalAnnotator.annotate(site, machine, server)
+	if globalAnnotator != nil {
+		globalAnnotator.annotate(site, machine, server)
+	}
 }
 
 // LoadFrom loads the site annotation source from the provider.
@@ -33,16 +36,14 @@ func LoadFrom(ctx context.Context, js content.Provider) error {
 		siteinfoSource: js,
 		sites:          make(map[string]annotator.ServerAnnotations, 200),
 	}
-	return globalAnnotator.load(ctx)
+	err := globalAnnotator.load(ctx)
+	log.Println(len(globalAnnotator.sites), "sites loaded")
+	return err
 }
 
 // MustLoad loads the site annotation source.
 func MustLoad() {
 	ctx := context.Background()
-
-	flag.Parse()
-	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment variables")
-
 	js, err := content.FromURL(ctx, siteinfo.URL)
 	rtx.Must(err, "Could not load siteinfo URL")
 
@@ -93,26 +94,6 @@ type siteinfoAnnotation struct {
 	Annotation annotator.ServerAnnotations
 }
 
-// We may want this later to verify the network is consistent.
-func parseCIDR(v4, v6 string) (net.IPNet, net.IPNet, error) {
-	var v4ret, v6ret net.IPNet
-	_, v4net, err := net.ParseCIDR(v4)
-	if err != nil && v4 != "" {
-		return v4ret, v6ret, err
-	}
-	if v4 != "" {
-		v4ret = *v4net
-	}
-	_, v6net, err := net.ParseCIDR(v6)
-	if err != nil && v6 != "" {
-		return v4ret, v6ret, err
-	}
-	if v6 != "" {
-		v6ret = *v6net
-	}
-	return v4ret, v6ret, nil
-}
-
 // load loads siteinfo dataset and returns them.
 func (sa *siteAnnotator) load(ctx context.Context) error {
 	js, err := sa.siteinfoSource.Get(ctx)
@@ -127,7 +108,7 @@ func (sa *siteAnnotator) load(ctx context.Context) error {
 	for _, ann := range s {
 		// Machine should always be empty, filled in later.
 		ann.Annotation.Machine = ""
-		sa.sites[ann.Site] = ann.Annotation // Copy out of array.
+		sa.sites[ann.Annotation.Site] = ann.Annotation // Copy out of array.
 	}
 	return nil
 }
