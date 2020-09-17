@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-test/deep"
 	"github.com/m-lab/etl/site"
@@ -110,7 +111,7 @@ func TestMustLoad(t *testing.T) {
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment variables")
 
-	site.MustLoad()
+	site.MustLoad(5 * time.Second)
 }
 
 func TestNilServer(t *testing.T) {

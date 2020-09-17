@@ -6,16 +6,17 @@ import (
 	"encoding/json"
 	"flag"
 	"log"
+	"time"
 
 	"github.com/m-lab/go/content"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
-	"github.com/m-lab/uuid-annotator/annotator"
+	uuid "github.com/m-lab/uuid-annotator/annotator"
 )
 
 var (
 	siteinfo        = flagx.URL{}
-	globalAnnotator *siteAnnotator
+	globalAnnotator *annotator
 )
 
 func init() {
@@ -24,51 +25,69 @@ func init() {
 }
 
 // Annotate adds site annotation for a site/machine
-func Annotate(site, machine string, server *annotator.ServerAnnotations) {
+func Annotate(site, machine string, server *uuid.ServerAnnotations) {
 	if globalAnnotator != nil {
-		globalAnnotator.annotate(site, machine, server)
+		globalAnnotator.Annotate(site, machine, server)
 	}
 }
 
 // LoadFrom loads the site annotation source from the provider.
 func LoadFrom(ctx context.Context, js content.Provider) error {
-	globalAnnotator = &siteAnnotator{
+	globalAnnotator = &annotator{
 		siteinfoSource: js,
-		sites:          make(map[string]annotator.ServerAnnotations, 200),
+		sites:          make(map[string]uuid.ServerAnnotations, 200),
 	}
 	err := globalAnnotator.load(ctx)
 	log.Println(len(globalAnnotator.sites), "sites loaded")
 	return err
 }
 
-// MustLoad loads the site annotation source.
-func MustLoad() {
+// MustLoad loads the site annotation source.  Will try at least once,
+// and retry for up to timeout
+func MustLoad(timeout time.Duration) {
+	start := time.Now()
 	ctx := context.Background()
-	js, err := content.FromURL(ctx, siteinfo.URL)
+	// Retry for up to 30 seconds
+	var js content.Provider
+	var err error
+	for ; time.Since(start) < timeout; time.Sleep(time.Second) {
+		js, err = content.FromURL(ctx, siteinfo.URL)
+		if err == nil {
+			break
+		}
+	}
 	rtx.Must(err, "Could not load siteinfo URL")
 
-	err = LoadFrom(ctx, js)
+	for ; time.Since(start) < timeout; time.Sleep(time.Second) {
+		err = LoadFrom(ctx, js)
+		if err == nil {
+			break
+		}
+	}
 	rtx.Must(err, "Could not load annotation db")
+
 }
 
-// siteAnnotator is the central struct for this module.
-type siteAnnotator struct {
+// annotator stores the annotations, and provides Annotate method.
+type annotator struct {
 	siteinfoSource content.Provider
 	// Each site has a single ServerAnnotations struct, which
 	// is later customized for each machine.
-	sites map[string]annotator.ServerAnnotations
+	sites map[string]uuid.ServerAnnotations
 }
 
-var missing = annotator.ServerAnnotations{
-	Geo: &annotator.Geolocation{
+// missing is used if annotation is requested for a non-existant server.
+var missing = uuid.ServerAnnotations{
+	Geo: &uuid.Geolocation{
 		Missing: true,
 	},
-	Network: &annotator.Network{
+	Network: &uuid.Network{
 		Missing: true,
 	},
 }
 
-func (sa *siteAnnotator) annotate(site, machine string, server *annotator.ServerAnnotations) {
+// Annotate annotates the server with the approprate annotations.
+func (sa *annotator) Annotate(site, machine string, server *uuid.ServerAnnotations) {
 	if server == nil {
 		return
 	}
@@ -85,17 +104,18 @@ func (sa *siteAnnotator) annotate(site, machine string, server *annotator.Server
 	server.Network = s.Network
 }
 
-type siteinfoAnnotation struct {
-	Site    string
-	Network struct {
-		IPv4 string
-		IPv6 string
-	}
-	Annotation annotator.ServerAnnotations
-}
-
 // load loads siteinfo dataset and returns them.
-func (sa *siteAnnotator) load(ctx context.Context) error {
+func (sa *annotator) load(ctx context.Context) error {
+	// siteinfoAnnotation struct is used for parsing the json annotation source.
+	type siteinfoAnnotation struct {
+		Site    string
+		Network struct {
+			IPv4 string
+			IPv6 string
+		}
+		Annotation uuid.ServerAnnotations
+	}
+
 	js, err := sa.siteinfoSource.Get(ctx)
 	if err != nil {
 		return err
