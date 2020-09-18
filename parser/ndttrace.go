@@ -21,8 +21,18 @@ import (
 //                       NDTTraceToAnnotation Parser
 //=====================================================================================
 
-// Unfortunately, there are only about 50 to 100 ndttrace files per archive, so there will be a LOT
-// of archives - roughly 20K per day in 2018, and 50K per day in 2019.
+// Legacy web100 ndt archives include metadata, web100, and ndttrace files.  The latter
+// contain pcap data.  To date, the desired datatype (and parser) have been determined by
+// the directory structure in the gs:// archive.  But we wish to handle the nddtrace files
+// separately from the test files, so we have to depart from this convention, OR move
+// the ndttrace files, OR invoke multiple parsers per archive.
+
+// Also, there are only about 50 to 100 ndttrace files per archive, so there will be a LOT
+// of archives - roughly 20K per day in 2018, and 50K per day in 2019.  So, for the synthetic
+// uuid-annotations, we will be generating the same number of small JSONL files.
+// Of course, since JSONL files contain one JSON record per newline separated record,
+// we can, if we wish, consolidate these by concatenating them, though we would lose
+// information about the original archives.
 
 // NDTTraceToAnnotation parses the NDTTrace datatype and produces synthetic uuid-annotator records.
 type NDTTraceToAnnotation struct {

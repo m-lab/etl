@@ -119,8 +119,8 @@ func ValidateTestPath(path string) (DataPath, error) {
 	dp := DataPath{
 		URI:        path,
 		Bucket:     preamble[1],
-		ExpDir:     preamble[2],
-		DataType:   preamble[3],
+		ExpDir:     preamble[2], // Such as legacy, ndt, host, neubot, wehe
+		DataType:   preamble[3], // Such as ndt7, ndt5, tcpinfo
 		DatePath:   preamble[4],
 		PackedDate: basic[2],
 		PackedTime: basic[3],
@@ -232,14 +232,16 @@ func (dt DataType) BQBufferSize() int {
 const (
 	ANNOTATION      = DataType("annotation")
 	NDT             = DataType("ndt")
+	NDT_OMIT_DELTAS = DataType("ndt_nodelta") // to support larger buffer size.
 	NDT5            = DataType("ndt5")
 	NDT7            = DataType("ndt7")
-	NDT_OMIT_DELTAS = DataType("ndt_nodelta") // to support larger buffer size.
-	SS              = DataType("sidestream")
-	PT              = DataType("traceroute")
-	SW              = DataType("switch")
-	TCPINFO         = DataType("tcpinfo")
-	INVALID         = DataType("invalid")
+	NDT_TRACE       = DataType("ndttrace")
+
+	SS      = DataType("sidestream")
+	PT      = DataType("traceroute")
+	SW      = DataType("switch")
+	TCPINFO = DataType("tcpinfo")
+	INVALID = DataType("invalid")
 )
 
 var (
@@ -250,6 +252,7 @@ var (
 		"ndt":              NDT,
 		"ndt5":             NDT5,
 		"ndt7":             NDT7,
+		"ndttrace":         NDT_TRACE,
 		"sidestream":       SS,
 		"paris-traceroute": PT,
 		"switch":           SW,
