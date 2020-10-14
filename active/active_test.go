@@ -82,7 +82,7 @@ func newCounter(t *testing.T) *counter {
 func testClient() stiface.Client {
 	client := gcsfake.GCSClient{}
 	client.AddTestBucket("foobar",
-		gcsfake.BucketHandle{
+		&gcsfake.BucketHandle{
 			ObjAttrs: []*storage.ObjectAttrs{
 				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj1", Updated: time.Now()},
 				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj2", Updated: time.Now()},
@@ -92,7 +92,7 @@ func testClient() stiface.Client {
 				{Bucket: "foobar", Name: "ndt/tcpinfo/2019/01/01/obj3", Updated: time.Date(2000, 01, 01, 02, 03, 04, 0, time.UTC)},
 				{Bucket: "foobar", Name: "obj6", Updated: time.Now()},
 			}})
-	return client
+	return &client
 }
 
 func standardLister() active.FileLister {
