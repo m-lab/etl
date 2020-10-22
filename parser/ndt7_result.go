@@ -157,6 +157,7 @@ func upSummary(up *model.ArchivalData) schema.NDT7Summary {
 	}
 }
 
+// TODO - shouldn't we use packet loss rate?
 func lossRate(m []model.Measurement) float64 {
 	var loss float64
 	if len(m) > 0 {
@@ -186,7 +187,7 @@ func upRate(m []model.Measurement) float64 {
 func minRTT(m []model.Measurement) float64 {
 	var rtt float64
 	if len(m) > 0 {
-		// Convert to milliseconds.
+		// Convert to milliseconds*s2c.ArchivalData.
 		rtt = float64(m[len(m)-1].TCPInfo.MinRTT) / 1000
 	}
 	return rtt
