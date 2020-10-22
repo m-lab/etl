@@ -3,7 +3,6 @@ package parser
 // This file defines the Parser subtype that handles NDT5Result data.
 
 import (
-	"bytes"
 	"encoding/json"
 	"log"
 	"regexp"
@@ -11,8 +10,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 
 	v2as "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/ndt-server/ndt5/c2s"
+	"github.com/m-lab/ndt-server/ndt5/s2c"
 
 	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
@@ -30,10 +32,11 @@ type NDT5ResultParser struct {
 	*row.Base
 	table  string
 	suffix string
+	legacy bool
 }
 
-// NewNDT5ResultParser returns a parser for NDT5Result archives.
-func NewNDT5ResultParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
+// NewLegacyNDT5ResultParser returns a parser for NDT5Result archives.
+func NewLegacyNDT5ResultParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.NDT5.BQBufferSize()
 	if ann == nil {
 		ann = v2as.GetAnnotator(annotation.BatchURL)
@@ -43,6 +46,22 @@ func NewNDT5ResultParser(sink row.Sink, label, suffix string, ann v2as.Annotator
 		Base:   row.NewBase(label, sink, bufSize, ann),
 		table:  label,
 		suffix: suffix,
+		legacy: true,
+	}
+}
+
+// NewNDT5ResultParser returns a parser for NDT5Result archives.
+func NewNDT5ResultParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
+	bufSize := etl.NDT5.BQBufferSize()
+	if ann == nil {
+		ann = &nullAnnotator{}
+	}
+
+	return &NDT5ResultParser{
+		Base:   row.NewBase(label, sink, bufSize, ann),
+		table:  label,
+		suffix: suffix,
+		legacy: false,
 	}
 }
 
@@ -72,6 +91,76 @@ func (dp *NDT5ResultParser) IsParsable(testName string, data []byte) (string, bo
 // We read the value into a struct, for compatibility with current inserter
 // backend and to eventually rely on the schema inference in m-lab/go/cloud/bqx.CreateTable().
 
+func legacy(test []byte, testName string, meta map[string]bigquery.Value) (row.Annotatable, error) {
+	stats := schema.NDT5ResultRow{
+		TestID: testName,
+		ParseInfo: &schema.ParseInfoV0{
+			TaskFileName:  meta["filename"].(string),
+			ParseTime:     time.Now(),
+			ParserVersion: Version(),
+		},
+	}
+	err := json.Unmarshal(test, &stats.Result)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the LogTime to the Result.StartTime
+	stats.LogTime = stats.Result.StartTime.Unix()
+	return &stats, nil
+}
+
+func s2cSummary(down *s2c.ArchivalData) schema.NDT5Summary {
+	summary := schema.NDT5Summary{
+		UUID:               down.UUID,
+		TestTime:           down.StartTime,
+		CongestionControl:  "cubic",
+		MeanThroughputMbps: down.MeanThroughputMbps,
+		// Convert to milliseconds*s2c.ArchivalData.
+		MinRTT: down.MinRTT.Seconds() / 1000,
+	}
+	if down.TCPInfo != nil {
+		// TODO
+		summary.LossRate = 0 // down.TCPInfo.S
+	}
+	return summary
+}
+
+func c2sSummary(c2s *c2s.ArchivalData) schema.NDT5Summary {
+	summary := schema.NDT5Summary{
+		UUID:               c2s.UUID,
+		TestTime:           c2s.StartTime,
+		CongestionControl:  "cubic",
+		MeanThroughputMbps: c2s.MeanThroughputMbps,
+		MinRTT:             0, // TODO
+		LossRate:           0, // TODO
+	}
+	return summary
+}
+
+func standard(test []byte, testName string, meta map[string]bigquery.Value) (row.Annotatable, error) {
+	stats := schema.NDT5ResultRowStandardColumns{
+		Parser: schema.ParseInfo{
+			Version:    Version(),
+			Time:       time.Now(),
+			ArchiveURL: meta["filename"].(string),
+			Filename:   testName,
+		},
+	}
+	err := json.Unmarshal(test, &stats.Raw)
+	if err != nil {
+		return nil, err
+	}
+	stats.Date = meta["date"].(civil.Date)
+	if stats.Raw.S2C != nil {
+		stats.A = s2cSummary(stats.Raw.S2C)
+	} else if stats.Raw.C2S != nil {
+		stats.A = c2sSummary(stats.Raw.C2S)
+	}
+	stats.ID = stats.A.UUID
+	return &stats, nil
+}
+
 // ParseAndInsert decodes the data.NDT5Result JSON and inserts it into BQ.
 func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
@@ -86,39 +175,30 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	var re = regexp.MustCompile(`,"ClientMetadata":{[^}]+}`)
 	test = []byte(re.ReplaceAllString(string(test), ``))
 
-	rdr := bytes.NewReader(test)
-	dec := json.NewDecoder(rdr)
-
-	for dec.More() {
-		stats := schema.NDT5ResultRow{
-			TestID: testName,
-			ParseInfo: &schema.ParseInfoV0{
-				TaskFileName:  meta["filename"].(string),
-				ParseTime:     time.Now(),
-				ParserVersion: Version(),
-			},
-		}
-		err := dec.Decode(&stats.Result)
-		if err != nil {
-			log.Println(err)
-			metrics.TestCount.WithLabelValues(
-				dp.TableName(), "ndt5_result", "Decode").Inc()
-			return err
-		}
-
-		// Set the LogTime to the Result.StartTime
-		stats.LogTime = stats.Result.StartTime.Unix()
-
-		// Estimate the row size based on the input JSON size.
-		metrics.RowSizeHistogram.WithLabelValues(
-			dp.TableName()).Observe(float64(len(test)))
-
-		if err = dp.Base.Put(&stats); err != nil {
-			return err
-		}
-		// Count successful inserts.
-		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
+	var stats row.Annotatable
+	var err error
+	if dp.legacy {
+		stats, err = legacy(test, testName, meta)
+	} else {
+		stats, err = standard(test, testName, meta)
 	}
+
+	if err != nil {
+		log.Println(err)
+		metrics.TestCount.WithLabelValues(
+			dp.TableName(), "ndt5_result", "Decode").Inc()
+		return err
+	}
+
+	// Estimate the row size based on the input JSON size.
+	metrics.RowSizeHistogram.WithLabelValues(
+		dp.TableName()).Observe(float64(len(test)))
+
+	if err = dp.Base.Put(stats); err != nil {
+		return err
+	}
+	// Count successful inserts.
+	metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
 
 	return nil
 }
