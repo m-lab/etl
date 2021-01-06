@@ -44,6 +44,12 @@ var (
 	// NDTEstimateBW flag indicates if we should run BW estimation code
 	// and annotate rows.
 	NDTEstimateBW, _ = strconv.ParseBool(os.Getenv("NDT_ESTIMATE_BW"))
+
+	// NDTDeltaMode may be None, All, Congestion, or a numeric string for subsampling.
+	// In Congestion mode, it will save the snapshots immediately before and after each
+	// congestion event, plus the first snapshot, the first non-zero snapshot, and the
+	// last snapshot for which the packet count changes.
+	NDTDeltaMode = os.Getenv("NDT_DELTA_MODE")
 )
 
 const (
@@ -396,6 +402,32 @@ func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 	defer metrics.WorkerState.WithLabelValues(n.TableName(), "ndt").Dec()
 
 	n.getAndInsertValues(test, testType)
+}
+
+func (n *NDTParser) getCongestionSnaps(snaplog *web100.SnapLog, testType string) ([]schema.Web100ValueMap, int) {
+	deltas := []schema.Web100ValueMap{}
+	deltaFieldCount := 0
+	snapshotCount := 0
+
+	upChange = snaplog.ChangeIndices()
+	// This is not terribly useful as is.  Intended as a place holder for code
+	// we are working on in parallel.
+	congEvents := make(schema.Web100ValueMap, 10)
+	snapNums, snapErr := snaplog.ChangeIndices("SmoothedRTT")
+	for count := 0; count < snaplog.SnapCount() && count < maxNumSnapshots; count++ {
+		snap, err := snaplog.Snapshot(count)
+		if err != nil {
+			// TODO - refine label and maybe write a log?
+			metrics.TestCount.WithLabelValues(
+				n.TableName(), testType, "snapshot failure").Inc()
+			return nil, 0
+		}
+		// Proper sizing avoids evacuate, saving about 20%, excluding BQ code.
+		delta := schema.EmptySnap10()
+		snap.SnapshotDeltas(last, delta)
+	}
+
+	return deltas, deltaFieldCount
 }
 
 func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schema.Web100ValueMap, int) {

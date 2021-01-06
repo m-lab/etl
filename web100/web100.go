@@ -587,6 +587,24 @@ func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 	return nil
 }
 
+// SnapshotNonZero writes non-zero values into the provided Saver.
+func (snap *Snapshot) SnapshotNonZero(snapValues Saver) error {
+	if snap.raw == nil {
+		return errors.New("Empty/Invalid Snaplog")
+	}
+	var field Variable
+	for _, field = range snap.fields.Fields {
+		val := snap.raw[field.Offset : field.Offset+field.Size]
+		for i := 0; i < len(val); i++ {
+			if val[i] != 0 {
+				field.Save(val, snapValues)
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
 // ChangeIndices finds all snapshot indices where the specified field
 // changes value.
 func (sl *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
