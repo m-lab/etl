@@ -20,8 +20,8 @@ resources:
 
 automatic_scaling:
   # This is intended for batch jobs.
-  min_num_instances: 10
-  max_num_instances: 40
+  min_num_instances: 5
+  max_num_instances: 10
   # Very long cool down period, to reduce the likelihood of tasks being truncated.
   cool_down_period_sec: 1800
   # We don't care much about latency, so a high utilization is desireable.
