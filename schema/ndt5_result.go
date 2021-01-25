@@ -8,7 +8,6 @@ import (
 
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/ndt-server/data"
-	"github.com/m-lab/uuid-annotator/annotator"
 
 	"github.com/m-lab/etl/row"
 )
@@ -48,10 +47,6 @@ type NDT5ResultRowStandardColumns struct {
 	Parser ParseInfo       `bigquery:"parser"`
 	Date   civil.Date      `bigquery:"date"`
 	Raw    data.NDT5Result `bigquery:"raw"`
-
-	// These will be populated by the join with the annotator data.
-	Server annotator.ServerAnnotations `bigquery:"server" json:"server"`
-	Client annotator.ClientAnnotations `bigquery:"client" json:"client"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
 	row.NullAnnotator `bigquery:"-"`
