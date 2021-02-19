@@ -1,6 +1,6 @@
 module github.com/m-lab/etl
 
-go 1.16
+go 1.13
 
 require (
 	cloud.google.com/go v0.75.0
