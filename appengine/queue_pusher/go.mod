@@ -1,6 +1,6 @@
 module github.com/m-lab/appengine/queue-pusher
 
-go 1.11
+go 1.13
 
 require (
 	cloud.google.com/go v0.62.0 // indirect
