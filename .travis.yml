@@ -77,7 +77,7 @@ script:
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
 # TODO - separate storage tests into integration and lightweight.
-- MODULES="active annotation appengine/queue_pusher bq etl metrics parser schema task web100"
+- MODULES="active annotation bq etl metrics parser schema task web100"
 - for module in $MODULES; do
     COVER_PKGS=${COVER_PKGS}./$module/..., ;
   done
@@ -89,6 +89,14 @@ script:
     EC=$[ $EC || $? ] ;
     echo "status $EC" ;
   done
+# Test the appengine/queue_pusher package separately as it's another go module.
+# We need to change the cwd to appengine/queue_pusher to prevent go test from 
+# failing because this directory is not part of the "main" go module. 
+- cd appengine/queue_pusher
+- go test -v -coverprofile=queue_pusher.cov ./...
+- EC=$[ $EC || $? ] ;
+# Go back to the root build dir
+- cd $TRAVIS_BUILD_DIR
 - echo "summary status $EC" ;
 - if [[ $EC != 0 ]]; then false; fi ;
 
