@@ -1,4 +1,4 @@
-module github.com/m-lab/etl-queue-pusher
+module github.com/m-lab/appengine/queue-pusher
 
 go 1.11
 
