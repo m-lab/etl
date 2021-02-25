@@ -93,6 +93,7 @@ script:
 # We need to change the cwd to appengine/queue_pusher to prevent go test from 
 # failing because this directory is not part of the "main" go module. 
 - cd appengine/queue_pusher
+- go get -v
 - go test -v -coverprofile=queue_pusher.cov ./...
 - EC=$[ $EC || $? ] ;
 # Go back to the root build dir
