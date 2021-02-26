@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"flag"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestNDT7Result_Schema(t *testing.T) {
+	flag.CommandLine.Set("schema.descriptions", "descriptions")
 	row := &NDT7ResultRow{}
 	got, err := row.Schema()
 	if err != nil {

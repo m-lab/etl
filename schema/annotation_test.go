@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"flag"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestAnnotationRow_Schema(t *testing.T) {
+	flag.CommandLine.Set("schema.descriptions", "descriptions")
 	row := &AnnotationRow{}
 	got, err := row.Schema()
 	if err != nil {

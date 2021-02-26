@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/m-lab/go/cloud/bqx"
-	"github.com/m-lab/go/rtx"
 )
 
 // ParseInfo provides details about the parsed row. Uses 'Standard Column' names.
@@ -27,7 +26,9 @@ func FindSchemaDocsFor(value interface{}) []bqx.SchemaDoc {
 	docs := []bqx.SchemaDoc{}
 	// Always include top level schema docs (should be common across row types).
 	b, err := readAsset("toplevel.yaml")
-	rtx.Must(err, "Failed to read toplevel.yaml")
+	if err != nil {
+		log.Printf("WARNING: failed to read toplevel.yaml")
+	}
 	docs = append(docs, bqx.NewSchemaDoc(b))
 	t := reflect.TypeOf(value)
 	if t.Kind() == reflect.Ptr {

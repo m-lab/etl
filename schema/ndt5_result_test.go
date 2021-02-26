@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"flag"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 )
 
 func TestNDT5Result_Schema(t *testing.T) {
+	flag.CommandLine.Set("schema.descriptions", "descriptions")
 	row := &NDT5ResultRow{}
 	got, err := row.Schema()
 	if err != nil {
