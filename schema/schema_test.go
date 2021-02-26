@@ -19,7 +19,7 @@ func assertAnnotatable(r *schema.SS) {
 
 type unsupportedType struct{}
 
-func mustReadAll(t *testing.T, f string) []byte {
+func mustReadFile(t *testing.T, f string) []byte {
 	b, err := ioutil.ReadFile(f)
 	testingx.Must(t, err, "failed to read %s", f)
 	return b
@@ -35,23 +35,23 @@ func Test_findSchemaDocsFor(t *testing.T) {
 			name:  "literal",
 			value: schema.NDT5ResultRow{},
 			want: []bqx.SchemaDoc{
-				bqx.NewSchemaDoc(mustReadAll(t, "descriptions/toplevel.yaml")),
-				bqx.NewSchemaDoc(mustReadAll(t, "descriptions/NDT5ResultRow.yaml")),
+				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/toplevel.yaml")),
+				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/NDT5ResultRow.yaml")),
 			},
 		},
 		{
 			name:  "pointer",
 			value: &schema.NDT5ResultRow{},
 			want: []bqx.SchemaDoc{
-				bqx.NewSchemaDoc(mustReadAll(t, "descriptions/toplevel.yaml")),
-				bqx.NewSchemaDoc(mustReadAll(t, "descriptions/NDT5ResultRow.yaml")),
+				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/toplevel.yaml")),
+				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/NDT5ResultRow.yaml")),
 			},
 		},
 		{
 			name:  "unsupported-type-does-not-crash",
 			value: &unsupportedType{},
 			want: []bqx.SchemaDoc{
-				bqx.NewSchemaDoc(mustReadAll(t, "descriptions/toplevel.yaml")),
+				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/toplevel.yaml")),
 			},
 		},
 	}
