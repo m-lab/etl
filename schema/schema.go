@@ -26,10 +26,11 @@ func FindSchemaDocsFor(value interface{}) []bqx.SchemaDoc {
 	docs := []bqx.SchemaDoc{}
 	// Always include top level schema docs (should be common across row types).
 	b, err := readAsset("toplevel.yaml")
-	if err != nil {
+	if err == nil {
+		docs = append(docs, bqx.NewSchemaDoc(b))
+	} else {
 		log.Printf("WARNING: failed to read toplevel.yaml")
 	}
-	docs = append(docs, bqx.NewSchemaDoc(b))
 	t := reflect.TypeOf(value)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
