@@ -25,10 +25,6 @@ before_install:
 - go get github.com/mattn/goveralls
 - go get github.com/wadey/gocovmerge
 
-# Tool to generate and embed binary assets.
-- go get github.com/go-bindata/go-bindata/go-bindata
-- go-bindata -version
-
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
 # Install gcloud, for integration tests.
@@ -67,12 +63,6 @@ install:
 - git submodule
 
 script:
-# Enforce that the local binary assets match the generated ones.
-- cp schema/bindata.go /tmp/current-bindata.go
-- go generate ./schema
-- diff /tmp/current-bindata.go schema/bindata.go || (
-  echo "Files do not match; run 'update go-bindata, go generate ./schema' and commit changes" && false )
-
 # To start the Go tests, run all the non-integration tests.
 # Currently skipping storage tests, because they depend on GCS, and there is
 # no emulator.
