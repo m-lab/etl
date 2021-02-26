@@ -3,7 +3,6 @@ package schema_test
 import (
 	"flag"
 	"io/ioutil"
-	"log"
 	"reflect"
 	"testing"
 
@@ -13,10 +12,6 @@ import (
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 )
-
-func init() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
 
 func assertAnnotatable(r *schema.SS) {
 	func(row.Annotatable) {}(r)
@@ -70,5 +65,6 @@ func Test_findSchemaDocsFor(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
+	// This sets the flag globally for all "schema" package tests.
 	flag.CommandLine.Set("schema.descriptions", "descriptions")
 }
