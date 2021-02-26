@@ -11,6 +11,7 @@ RUN go get -v github.com/m-lab/etl/cmd/generate_schema_docs
 # Now copy the resulting command into the minimal base image.
 FROM alpine:3.12
 COPY --from=build /go/bin/generate_schema_docs /
+COPY --from=build /go/src/github.com/m-lab/etl/schema/descriptions /schema/descriptions/
 WORKDIR /
 ENTRYPOINT ["/generate_schema_docs"]
 
