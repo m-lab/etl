@@ -21,11 +21,6 @@ type ParseInfo struct {
 	Priority   int64
 }
 
-// Requires go-bindata tool in environment:
-//   go get -u github.com/go-bindata/go-bindata/go-bindata
-//
-//go:generate go-bindata -pkg schema -nometadata -prefix descriptions descriptions
-
 // FindSchemaDocsFor should be used by parser row types to associate bigquery
 // field descriptions with a schema generated from a row type.
 func FindSchemaDocsFor(value interface{}) []bqx.SchemaDoc {
@@ -52,12 +47,10 @@ func FindSchemaDocsFor(value interface{}) []bqx.SchemaDoc {
 var assetDir string
 
 func init() {
-	flag.StringVar(&assetDir, "schema-asset-dir", "", "Read description files from the given directory instead of embedded files.")
+	flag.StringVar(&assetDir, "schema.descriptions", "schema/descriptions",
+		"Read description files from the given directory.")
 }
 
 func readAsset(name string) ([]byte, error) {
-	if assetDir == "" {
-		return Asset(name)
-	}
 	return ioutil.ReadFile(path.Join(assetDir, name))
 }
