@@ -31,7 +31,6 @@ func mustReadAll(t *testing.T, f string) []byte {
 }
 
 func Test_findSchemaDocsFor(t *testing.T) {
-	flag.CommandLine.Set("schema.descriptions", "descriptions")
 	tests := []struct {
 		name  string
 		value interface{}
@@ -68,4 +67,8 @@ func Test_findSchemaDocsFor(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMain(m *testing.M) {
+	flag.CommandLine.Set("schema.descriptions", "descriptions")
 }
