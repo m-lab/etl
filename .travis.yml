@@ -25,13 +25,6 @@ before_install:
 - go get github.com/mattn/goveralls
 - go get github.com/wadey/gocovmerge
 
-<<<<<<< HEAD
-# Tool to generate and embed binary assets.
-- go get github.com/go-bindata/go-bindata/v3/go-bindata
-- go-bindata -version
-
-=======
->>>>>>> master
 - echo Branch is ${TRAVIS_BRANCH} and Tag is $TRAVIS_TAG
 
 # Install gcloud, for integration tests.
