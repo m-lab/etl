@@ -22,6 +22,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
+	ptschema "github.com/m-lab/traceroute-caller/schema"
 )
 
 // -------------------------------------------------
@@ -143,7 +144,9 @@ type CyclestopLine struct {
 	Stop_time float64 `json:"stop_time"`
 }
 
-// ParsonPT the json test file into schema.PTTest
+// ParsePT the traceroute json test file into schema.PTTest
+// The json format was defined at m-lab/traceroute-caller/schema,
+// struct PTTestRaw
 func ParsePT(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
 	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Dec()
@@ -154,7 +157,7 @@ func ParsePT(testName string, rawContent []byte, tableName string, taskFilename 
 		return schema.PTTest{}, err
 	}
 
-	var ptTest schema.PTTest
+	var ptTest ptschema.PTTestRaw
 	err = json.Unmarshal([]byte(rawContent), &ptTest)
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
