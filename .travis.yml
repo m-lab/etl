@@ -89,15 +89,6 @@ script:
     EC=$[ $EC || $? ] ;
     echo "status $EC" ;
   done
-# Test the appengine/queue_pusher package separately as it's another go module.
-# We need to change the cwd to appengine/queue_pusher to prevent go test from 
-# failing because this directory is not part of the "main" go module. 
-- cd appengine/queue_pusher
-- go get -v ./...
-- go test -v -coverprofile=queue_pusher.cov ./...
-- EC=$[ $EC || $? ] ;
-# Go back to the root build dir
-- cd $TRAVIS_BUILD_DIR
 - echo "summary status $EC" ;
 - if [[ $EC != 0 ]]; then false; fi ;
 
@@ -163,18 +154,6 @@ deploy:
 #  Sandbox deployments
 #  - before code review for development code in a specific branch.
 ######################################################################
-
-## Service: queue-pusher -- AppEngine Standard Environment.
-## Removed for issue https://github.com/m-lab/etl/issues/751
-- provider: script
-  script:
-    GOPATH=$HOME/go111 $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-       SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/appengine/queue_pusher
-  skip_cleanup: true
-  on:
-    repo: m-lab/etl
-    all_branches: true
-    condition: $TRAVIS_BRANCH == qp-sandbox-*
 
 ## Task Queues
 - provider: script
@@ -252,7 +231,7 @@ deploy:
 ######################################################################
 
 ###################### ALL ETL SERVICES ###############################
-# Deploys all staging services: NDT, BATCH, PT, SS, DISCO, QUEUE_PUSHER, GARDENER
+# Deploys all staging services: NDT, BATCH, PT, SS, DISCO, GARDENER
 # NOTE:
 #  Failure in one of the deployments will terminate the deployment sequence, leaving
 #  the system in a mixed state.  This should be manually addresses ASAP.
@@ -262,8 +241,6 @@ deploy:
   script:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_staging
     && gcloud app deploy --project=mlab-staging $TRAVIS_BUILD_DIR/appengine/queue.yaml
-    && GOPATH=$HOME/go111 $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
-       SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/appengine/queue_pusher
     && travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-staging
        SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
@@ -312,8 +289,6 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
        SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
-    && GOPATH=$HOME/go111 $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-oti
-       SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/appengine/queue_pusher
 #    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
   skip_cleanup: true
   on:
