@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/go/osx"
+	"github.com/m-lab/etl/etl"
 )
 
 func init() {
@@ -34,16 +34,9 @@ func TestMain(t *testing.T) {
 	flag.Set("service_port", ":0")
 	flag.Set("max_active", "200")
 	flag.Set("prometheusx.listen-address", ":9090")
+	flag.Set("max_workers", "25")
+	flag.Set("gcloud_project", "mlab-testing")
 	mainCtx, mainCancel = context.WithCancel(context.Background())
-
-	vars := map[string]string{
-		"PROJECT":     "mlab-testing",
-		"MAX_WORKERS": "25",
-	}
-	for k, v := range vars {
-		cleanup := osx.MustSetenv(k, v)
-		defer cleanup()
-	}
 
 	go main()
 	defer mainCancel()
@@ -85,21 +78,14 @@ func TestMain(t *testing.T) {
 }
 
 func TestPollingMode(t *testing.T) {
+	flag.Set("service_port", ":0")
+	flag.Set("max_active", "200")
 	flag.Set("prometheusx.listen-address", ":9090")
+	flag.Set("max_workers", "25")
+	flag.Set("gcloud_project", "mlab-testing")
+	flag.Set("gardener_host", "gardener")
+	etl.GitCommit = "123456789ABCDEF"
 	mainCtx, mainCancel = context.WithCancel(context.Background())
-
-	vars := map[string]string{
-		"PROJECT":        "mlab-testing",
-		"GCLOUD_PROJECT": "mlab-testing",
-		"GARDENER_HOST":  "gardener",
-		"MAX_ACTIVE":     "200",
-		"SERVICE_PORT":   ":0",
-		"COMMIT_HASH":    "123456789ABCDEF",
-	}
-	for k, v := range vars {
-		cleanup := osx.MustSetenv(k, v)
-		defer cleanup()
-	}
 
 	go main()
 	defer mainCancel()
