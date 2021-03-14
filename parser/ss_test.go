@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -67,9 +66,6 @@ func TestParseOneLine(t *testing.T) {
 }
 
 func TestSSInserter(t *testing.T) {
-	os.Setenv("RELEASE_TAG", "foobar")
-	parser.InitParserVersionForTest()
-
 	ins := &inMemoryInserter{}
 	// Completely fake annotation data.
 	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
