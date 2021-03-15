@@ -1,0 +1,24 @@
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:331.0.0
+
+
+# Fetch recent go version.
+ENV GOLANG_VERSION 1.15.8
+ENV GOLANG_DOWNLOAD_URL https://golang.org/dl/go$GOLANG_VERSION.linux-amd64.tar.gz
+ENV GOLANG_DOWNLOAD_SHA256 d3379c32a90fdf9382166f8f48034c459a8cc433730bc9476d39d9082c94583b
+
+RUN curl -fsSL "$GOLANG_DOWNLOAD_URL" -o golang.tar.gz \
+    && echo "$GOLANG_DOWNLOAD_SHA256  golang.tar.gz" | sha256sum -c - \
+    && tar -C /usr/local/ -xzf golang.tar.gz \
+    && rm golang.tar.gz
+
+ENV GOPATH /go
+ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
+RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
+WORKDIR $GOPATH
+
+# Install binaries needed for builds and testing.
+RUN apt-get update
+RUN apt-get install -y jq gcc netcat
+RUN go get -v github.com/m-lab/gcp-config/cmd/cbif
+
+ENTRYPOINT ["/go/bin/cbif"]
