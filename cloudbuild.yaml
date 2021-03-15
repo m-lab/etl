@@ -95,7 +95,7 @@ steps:
      '-c', 'echo "FROM gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG" > /workspace/cmd/etl_worker/Dockerfile',
   ]
 
-- name: gcr.io/cloud-builders/gcloud
+- name: etl-testing
   id: "Update table schemas before deploying parsers"
   entrypoint: bash
   args: [
