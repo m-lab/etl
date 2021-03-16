@@ -44,7 +44,7 @@ steps:
   args: ["submodule", "update", "--init", "--recursive"]
 
 - name: gcr.io/cloud-builders/kubectl
-  id: "Deploy etl parser to data-processing cluster"
+  id: "Deploy etl parser to data-processing cluster1"
   entrypoint: /bin/bash
   args: [
    '-c', '/builder/kubectl.bash get pods'
