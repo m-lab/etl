@@ -20,9 +20,9 @@ if [[ ! -f ${HOME}/google-cloud-sdk/path.bash.inc ]] ; then
   touch ${HOME}/google-cloud-sdk/path.bash.inc || :
 fi
 # Make credentials available for gcloud commands.
-travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_testing
+#travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_testing
 
 # NOTE: do this after setting the service account.
-gcloud config set project mlab-testing
+#gcloud config set project mlab-testing
 
 go test -v -tags=integration -coverprofile=_integration.cov ./...
