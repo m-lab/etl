@@ -43,6 +43,19 @@ steps:
   id: "Update travis submodule"
   args: ["submodule", "update", "--init", "--recursive"]
 
+- name: gcr.io/cloud-builders/kubectl
+  id: "Deploy etl parser to data-processing cluster"
+  entrypoint: /bin/bash
+  args: [
+   '-c', '/builder/kubectl.bash get pods'
+  ]
+  env:
+  - BIGQUERY_DATASET=tmp_ndt
+  - CLOUDSDK_COMPUTE_REGION=$_CLUSTER_REGION
+  - CLOUDSDK_CONTAINER_CLUSTER=$_CLUSTER
+  - CLOUDSDK_CORE_PROJECT=$PROJECT_ID
+
+
 # TODO: while local docker builds cache intermediate layers, CB does not.
 # Combine the Dockerfile.testing with the Dockerfile using --target and
 # --from-cache to speed up builds: See also:
