@@ -87,14 +87,6 @@ steps:
     "push", "gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG"
   ]
 
-- name: gcr.io/cloud-builders/gcloud
-  id: "Generate Dockerfile for AppEngine deployment"
-  entrypoint: bash
-  # Use the GCR image as the base for the AppEngine deployment.
-  args: [
-     '-c', 'echo "FROM gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG" > /workspace/cmd/etl_worker/Dockerfile',
-  ]
-
 - name: etl-testing
   id: "Update table schemas before deploying parsers"
   entrypoint: bash
@@ -116,16 +108,30 @@ steps:
   - CLOUDSDK_COMPUTE_REGION=$_CLUSTER_REGION
   - CLOUDSDK_CONTAINER_CLUSTER=$_CLUSTER
 
+- name: gcr.io/cloud-builders/gcloud
+  id: "Generate Dockerfile for AppEngine deployment"
+  entrypoint: bash
+  # Use the GCR image as the base for the AppEngine deployment.
+  args: [
+     '-c', 'echo "FROM gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG" > /workspace/cmd/etl_worker/Dockerfile',
+  ]
+
+# TODO: delete once legacy cluster services are retired.
 # LEGACY PARSER: Deploy to app engine.
-#- cd $TRAVIS_BUILD_DIR/cmd/etl_worker &&
-#  go build -v -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)
-#    -X github.com/m-lab/etl/etl.Version=$TRAVIS_BRANCH$TRAVIS_TAG
-#    -X github.com/m-lab/etl/etl.GitCommit=$(git log -1 --format=%H)" .
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Deploy etl batch parser to app engine"
+  args: [
+    'gcloud', 'app', 'deploy', '--project=$PROJECT_ID', 'appengine/queue.yaml'
+  ]
 
-## LEGACY CLUSTER: Run apply-cluster.sh
-## TODO: delete once legacy cluster services are retired.
-#- name: gcr.io/cloud-builders/kubectl
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Deploy etl queue.yaml"
+  args: [
+    'gcloud', 'app', 'deploy', '--project=$PROJECT_ID', 'appengine/queue.yaml'
+  ]
 
-#    gcloud app deploy --project=$PROJECT_ID appengine/queue.yaml
-#    && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-sandbox
-#       $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Deploy etl batch parser to AppEngine"
+  args: [
+    'bash', '-c', 'cd cmd/etl_worker && gcloud app deploy --promote app-batch.yaml'
+  ]
