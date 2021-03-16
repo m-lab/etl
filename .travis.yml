@@ -50,7 +50,7 @@ script:
 # test tag is set, then we would need to have separate cov files.
 # Note: we do not run integration tests from forked PRs b/c the SA is unavailable.
 # Note that for modules in subdirectories, this replaces separating slashes with _.
-- integration-testing.sh
+- ./integration-testing.sh
 
 # Coveralls
 - $HOME/gopath/bin/gocovmerge *.cov > merge.cov
