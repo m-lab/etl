@@ -109,6 +109,23 @@ steps:
   env:
   - GCLOUD_PROJECT=$PROJECT_ID
 
+- name: etl-testing
+  id: "print gcloud settings"
+  entrypoint: bash
+  args: [
+     '-c', 'gcloud config configurations describe default && gcloud auth list'
+  ]
+  env:
+  - GCLOUD_PROJECT=$PROJECT_ID
+
+- name: gcr.io/cloud-builders/gcloud
+  id: "look at gcloud settings again"
+  entrypoint: bash
+  # Use the GCR image as the base for the AppEngine deployment.
+  args: [
+     '-c', 'gcloud config configurations describe default && gcloud auth list'
+  ]
+
 # UNIVERSAL PARSER: Run apply-cluster.sh
 - name: gcr.io/cloud-builders/kubectl
   id: "Deploy etl parser to data-processing cluster"
