@@ -68,6 +68,8 @@ steps:
   - ./integration-testing.sh
   # Build update-schema command, with binary in cloudbuild /workspace.
   - go build ./cmd/update-schema
+  - ls -l ./update-schema
+  - bash -c "ldd ./update-schema || echo $?"
   env:
   - SERVICE_ACCOUNT_mlab_testing=$_SERVICE_ACCOUNT_MLAB_TESTING
   - WORKSPACE_LINK=/go/src/github.com/m-lab/etl
@@ -99,8 +101,10 @@ steps:
   id: "Update table schemas before deploying parsers"
   entrypoint: bash
   args: [
-     './update-schema'
+     '-c', 'pwd && ls -l ./update-schema && ./update-schema'
   ]
+  env:
+  - WORKSPACE_LINK=/go/src/github.com/m-lab/etl
 
 # UNIVERSAL PARSER: Run apply-cluster.sh
 - name: gcr.io/cloud-builders/kubectl
