@@ -107,6 +107,7 @@ steps:
   - BIGQUERY_DATASET=tmp_ndt
   - CLOUDSDK_COMPUTE_REGION=$_CLUSTER_REGION
   - CLOUDSDK_CONTAINER_CLUSTER=$_CLUSTER
+  - CLOUDSDK_CORE_PROJECT=$PROJECT_ID
 
 - name: gcr.io/cloud-builders/gcloud
   id: "Generate Dockerfile for AppEngine deployment"
