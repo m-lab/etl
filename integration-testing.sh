@@ -15,9 +15,9 @@ echo "$SERVICE_ACCOUNT_mlab_testing" > $PWD/creds.json
 # Make credentials available for Go libraries.
 export GOOGLE_APPLICATION_CREDENTIALS=$PWD/creds.json
 # TODO: update travis script to make this optional.
-if [[ ! -f /builder/home/google-cloud-sdk/path.bash.inc ]] ; then
-  mkdir -p /builder/home/google-cloud-sdk/
-  touch /builder/home/google-cloud-sdk/path.bash.inc
+if [[ ! -f ${HOME}/google-cloud-sdk/path.bash.inc ]] ; then
+  mkdir -p ${HOME}/google-cloud-sdk/ || :
+  touch ${HOME}/google-cloud-sdk/path.bash.inc || :
 fi
 # Make credentials available for gcloud commands.
 travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_testing
