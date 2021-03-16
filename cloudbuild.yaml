@@ -125,13 +125,7 @@ steps:
   ]
 
 - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-  id: "Deploy etl queue.yaml"
-  args: [
-    'gcloud', 'app', 'deploy', '--project=$PROJECT_ID', 'appengine/queue.yaml'
-  ]
-
-- name: gcr.io/google.com/cloudsdktool/cloud-sdk
   id: "Deploy etl batch parser to AppEngine"
   args: [
-    'bash', '-c', 'cd cmd/etl_worker && gcloud app deploy --promote app-batch.yaml'
+    'bash', '-c', 'cd cmd/etl_worker && gcloud --project=$PROJECT_ID app deploy --promote app-batch.yaml'
   ]
