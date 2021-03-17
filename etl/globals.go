@@ -6,24 +6,39 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"regexp"
-	"strconv"
 	"strings"
-
-	"github.com/m-lab/etl/metrics"
 )
 
-// IsBatch indicates this process is a batch processing service.
-var IsBatch bool
+// TODO: Eliminate these global variables using config or env struct.
+var (
+	// IsBatch indicates this process is a batch processing service.
+	IsBatch bool
 
-// OmitDeltas indicates we should NOT process all snapshots.
-var OmitDeltas bool
+	// OmitDeltas indicates we should NOT process all snapshots.
+	OmitDeltas bool
 
-func init() {
-	IsBatch, _ = strconv.ParseBool(os.Getenv("BATCH_SERVICE"))
-	OmitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
-}
+	// GCloudProject contains the current operating environment.
+	GCloudProject string
+
+	// BigqueryProject overrides GCloudProject for BQ output.
+	BigqueryProject string
+
+	// BigqueryDataset overrides the default BQ dataset for output.
+	BigqueryDataset string
+)
+
+var (
+	// GitCommit and Version hold the git commit id and git tags of this build.
+	// It is recommended that the strings be set as part of the build/link
+	// process, using commands like:
+	//
+	//   version="-X github.com/m-lab/etl/metrics.Version=$(git describe --tags)"
+	//   commit="-X github.com/m-lab/etl/metrics.GitCommit=$(git log -1 --format=%H)"
+	//   go build -ldflags "$version $commit" ./cmd/gardener
+	GitCommit = "nocommit"
+	Version   = "noversion"
+)
 
 // We currently have two filename patterns:
 // Legacy: gs://archive-mlab-sandbox/ndt/2018/03/29/20180329T000001Z-mlab1-acc02-ndt-0000.tgz
@@ -129,7 +144,6 @@ func ValidateTestPath(path string) (DataPath, error) {
 
 	dataType := dp.GetDataType()
 	if dataType == INVALID {
-		metrics.TaskCount.WithLabelValues(string(dataType), "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", path)
 		return DataPath{}, ErrBadDataType
 	}
@@ -296,17 +310,17 @@ func DirToTablename(dir string) string {
 
 // BigqueryProject returns the appropriate project.
 func (dt DataType) BigqueryProject() string {
-	project := os.Getenv("BIGQUERY_PROJECT")
+	project := BigqueryProject
 	if project != "" {
 		return project
 	}
-	return os.Getenv("GCLOUD_PROJECT")
+	return GCloudProject
 }
 
 // Dataset returns the appropriate dataset to use.
 // This is a bit of a hack, but works for our current needs.
 func (dt DataType) Dataset() string {
-	dataset := os.Getenv("BIGQUERY_DATASET")
+	dataset := BigqueryDataset
 	if dataset != "" {
 		return dataset
 	}

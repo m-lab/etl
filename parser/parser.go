@@ -4,7 +4,6 @@ package parser
 
 import (
 	"log"
-	"os"
 	"reflect"
 
 	"cloud.google.com/go/bigquery"
@@ -24,12 +23,12 @@ var gParserVersion = "uninitialized"
 
 // initParserVersion initializes the gParserVersion variable for use by all parsers.
 func initParserVersion() string {
-	release, ok := os.LookupEnv("RELEASE_TAG")
-	if ok && release != "empty_tag" {
+	release := etl.Version
+	if release != "noversion" {
 		gParserVersion = "https://github.com/m-lab/etl/tree/" + release
 	} else {
-		hash := os.Getenv("COMMIT_HASH")
-		if len(hash) >= 8 {
+		hash := etl.GitCommit
+		if hash != "nocommit" && len(hash) >= 8 {
 			gParserVersion = "https://github.com/m-lab/etl/tree/" + hash[0:8]
 		} else {
 			gParserVersion = "local development"

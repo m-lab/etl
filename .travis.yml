@@ -19,8 +19,6 @@ env:
 - PATH=$PATH:$HOME/gopath/bin
 
 before_install:
-- sudo apt-get install -y jq  # Dependency for sync_tables_with_schema.sh.
-
 # Coverage tools
 - go get github.com/mattn/goveralls
 - go get github.com/wadey/gocovmerge
@@ -107,7 +105,9 @@ script:
 
 # Clean build and prepare for deployment
 - cd $TRAVIS_BUILD_DIR/cmd/etl_worker &&
-  go build -v -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" .
+  go build -v -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)
+    -X github.com/m-lab/etl/etl.Version=$TRAVIS_BRANCH$TRAVIS_TAG
+    -X github.com/m-lab/etl/etl.GitCommit=$(git log -1 --format=%H)" .
 - cd $TRAVIS_BUILD_DIR/cmd/update-schema &&
   go build -v
 - cd $TRAVIS_BUILD_DIR
@@ -167,8 +167,6 @@ deploy:
        SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
        SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
-#    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox batch nodryrun
-#    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -181,7 +179,6 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_sandbox
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-sandbox
        SERVICE_ACCOUNT_mlab_sandbox $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
-#   && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-sandbox base_tables nodryrun
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -238,8 +235,6 @@ deploy:
        $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-staging data-processing ./apply-cluster.sh
     && $TRAVIS_BUILD_DIR/travis/deploy_app.sh mlab-staging
        SERVICE_ACCOUNT_mlab_staging $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
-#    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging batch nodryrun
-#    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-staging base_tables nodryrun
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -279,7 +274,6 @@ deploy:
     $TRAVIS_BUILD_DIR/travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_oti
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
        SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
-#    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -297,7 +291,6 @@ deploy:
        SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/etl_worker app-batch.yaml
     && BIGQUERY_DATASET="tmp_ndt"
        $TRAVIS_BUILD_DIR/travis/kubectl.sh mlab-oti data-processing ./apply-cluster.sh
-#    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti batch nodryrun
   skip_cleanup: true
   on:
     repo: m-lab/etl
@@ -313,7 +306,6 @@ deploy:
     && $TRAVIS_BUILD_DIR/travis/run_with_application_credentials.sh mlab-oti
        SERVICE_ACCOUNT_mlab_oti $TRAVIS_BUILD_DIR/cmd/update-schema update-schema
     && gcloud app deploy --project=mlab-oti $TRAVIS_BUILD_DIR/appengine/queue.yaml
-#    && $TRAVIS_BUILD_DIR/etl-schema/schema/sync_tables_with_schema.sh mlab-oti base_tables nodryrun
   skip_cleanup: true
   on:
     repo: m-lab/etl

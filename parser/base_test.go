@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -54,9 +53,6 @@ func assertTestRowAnnotatable(r *Row) {
 }
 
 func TestBase(t *testing.T) {
-	os.Setenv("RELEASE_TAG", "foobar")
-	parser.InitParserVersionForTest()
-
 	ins := &inMemoryInserter{}
 
 	// Set up fake annotation service
@@ -122,9 +118,6 @@ func TestBase(t *testing.T) {
 }
 
 func TestAsyncPut(t *testing.T) {
-	os.Setenv("RELEASE_TAG", "foobar")
-	parser.InitParserVersionForTest()
-
 	ins := &inMemoryInserter{}
 
 	// Set up fake annotation service
@@ -187,9 +180,6 @@ func TestAsyncPut(t *testing.T) {
 }
 
 func TestEmptyAnnotations(t *testing.T) {
-	os.Setenv("RELEASE_TAG", "foobar")
-	parser.InitParserVersionForTest()
-
 	ins := &inMemoryInserter{}
 
 	// Set up fake annotation service

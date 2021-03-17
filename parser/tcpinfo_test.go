@@ -113,7 +113,6 @@ func (nc nullCloser) Close() error { return nil }
 // NOTE: This uses a fake annotator which returns no annotations.
 // TODO: This test seems to be flakey in travis - sometimes only 357 tests instead of 362
 func TestTCPParser(t *testing.T) {
-	os.Setenv("RELEASE_TAG", "foobar")
 	parserVersion := parser.InitParserVersionForTest()
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
@@ -223,9 +222,6 @@ func TestTCPParser(t *testing.T) {
 
 // This is a subset of TestTCPParser, but simpler, so might be useful.
 func TestTCPTask(t *testing.T) {
-	os.Setenv("RELEASE_TAG", "foobar")
-	parser.InitParserVersionForTest()
-
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
 	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
@@ -248,9 +244,6 @@ func TestTCPTask(t *testing.T) {
 }
 
 func TestBQSaver(t *testing.T) {
-	os.Setenv("RELEASE_TAG", "foobar")
-	parser.InitParserVersionForTest()
-
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
 	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
@@ -288,9 +281,6 @@ func TestBQSaver(t *testing.T) {
 func TestTaskToGCS(t *testing.T) {
 	t.Skip("Skipping test intended for manual experimentation")
 
-	os.Setenv("RELEASE_TAG", "foobar")
-	parser.InitParserVersionForTest()
-
 	c, err := storage.GetStorageClient(true)
 	if err != nil {
 		t.Fatal(err)
@@ -326,9 +316,6 @@ func TestTaskToGCS(t *testing.T) {
 }
 
 func BenchmarkTCPParser(b *testing.B) {
-	os.Setenv("RELEASE_TAG", "foobar")
-	parser.InitParserVersionForTest()
-
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
 	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})

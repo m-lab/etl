@@ -16,6 +16,11 @@ import (
 	"github.com/m-lab/pipe"
 )
 
+func init() {
+	etl.Version = "foobar"
+	parser.InitParserVersionForTest()
+}
+
 // countingInserter counts the calls to InsertRows and Flush.
 // Inject into Parser for testing.
 type countingInserter struct {

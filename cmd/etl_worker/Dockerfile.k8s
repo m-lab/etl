@@ -1,5 +1,7 @@
 FROM golang:1.13 as builder
 
+ARG VERSION
+
 WORKDIR /go/src/github.com/m-lab/etl
 COPY . .
 
@@ -7,13 +9,15 @@ RUN go get -v ./...
 
 # This leave some dynamically linked lookups, but seems to work anyway.  But
 # it is unclear whether we might see random segfaults.
-RUN go install \
-    -tags netgo -a \
-    -v \
-    -ldflags "-linkmode external -extldflags -static -X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
-    ./cmd/etl_worker/...
+RUN go get \
+    -tags netgo -a -v \
+    -ldflags "-linkmode external -extldflags -static \
+      -X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h) \
+      -X github.com/m-lab/etl/etl.Version=$VERSION \
+      -X github.com/m-lab/etl/etl.GitCommit=$(git log -1 --format=%H)" \
+    ./cmd/etl_worker
 
-FROM alpine
+FROM alpine:3.12
 RUN apk add --no-cache ca-certificates
 
 COPY --from=builder /go/bin/etl_worker /bin/etl_worker

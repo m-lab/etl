@@ -3,7 +3,6 @@ package etl_test
 import (
 	"fmt"
 	"log"
-	"os"
 	"testing"
 
 	"github.com/go-test/deep"
@@ -207,7 +206,7 @@ func TestDataset(t *testing.T) {
 	}
 
 	// Project shouldn't matter, so test different values to confirm.
-	os.Setenv("GCLOUD_PROJECT", "mlab-sandbox")
+	etl.GCloudProject = "mlab-sandbox"
 	for _, test := range tests {
 		etl.IsBatch = test.isBatch
 		got := test.dt.Dataset()
@@ -215,7 +214,7 @@ func TestDataset(t *testing.T) {
 			t.Errorf("for %s want: %s, got: %s.", test.dt, test.want, got)
 		}
 	}
-	os.Setenv("GCLOUD_PROJECT", "mlab-oti")
+	etl.GCloudProject = "mlab-oti"
 	for _, test := range tests {
 		etl.IsBatch = test.isBatch
 		got := test.dt.Dataset()
@@ -238,7 +237,7 @@ func TestDataset(t *testing.T) {
 	}
 
 	// Test override
-	os.Setenv("BIGQUERY_DATASET", "override")
+	etl.BigqueryDataset = "override"
 	for _, test := range override_tests {
 		etl.IsBatch = test.isBatch
 		got := test.dt.Dataset()
@@ -265,7 +264,7 @@ func TestBQProject(t *testing.T) {
 	// isBatch  state shouldn't matter, so test with both values
 	etl.IsBatch = true
 	for _, test := range tests {
-		os.Setenv("GCLOUD_PROJECT", test.gproject)
+		etl.GCloudProject = test.gproject
 		got := test.dt.BigqueryProject()
 		if got != test.want {
 			t.Errorf("for %s,%s, want: %s, got: %s.", test.dt, test.gproject, test.want, got)
@@ -273,7 +272,7 @@ func TestBQProject(t *testing.T) {
 	}
 	etl.IsBatch = false
 	for _, test := range tests {
-		os.Setenv("GCLOUD_PROJECT", test.gproject)
+		etl.GCloudProject = test.gproject
 		got := test.dt.BigqueryProject()
 		if got != test.want {
 			t.Errorf("for %s,%s, want: %s, got: %s.", test.dt, test.gproject, test.want, got)
@@ -281,7 +280,7 @@ func TestBQProject(t *testing.T) {
 	}
 
 	// Test override
-	os.Setenv("BIGQUERY_PROJECT", "override_project")
+	etl.BigqueryProject = "override_project"
 	override_tests := []struct {
 		dt       etl.DataType
 		gproject string
@@ -295,7 +294,7 @@ func TestBQProject(t *testing.T) {
 	}
 	etl.IsBatch = false
 	for _, test := range override_tests {
-		os.Setenv("GCLOUD_PROJECT", test.gproject)
+		etl.GCloudProject = test.gproject
 		got := test.dt.BigqueryProject()
 		if got != test.want {
 			t.Errorf("for %s,%s, want: %s, got: %s.", test.dt, test.gproject, test.want, got)

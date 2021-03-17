@@ -23,6 +23,7 @@ import (
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/active"
+	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/factory"
@@ -39,6 +40,16 @@ import (
 	_ "expvar"
 )
 
+// Basic throttling to restrict the number of tasks in flight.
+const defaultMaxInFlight = 20
+
+var (
+	// This limits the number of workers available for externally requested single task files.
+	maxInFlight int32 // Max number of concurrent workers (and tasks in flight).
+	inFlight    int32 // Current number of tasks in flight.
+)
+
+// Flags.
 var (
 	outputType = flagx.Enum{
 		Options: []string{"gcs", "bigquery"},
@@ -50,10 +61,20 @@ var (
 
 	servicePort     = flag.String("service_port", ":8080", "The main (private) service port")
 	shutdownTimeout = flag.Duration("shutdown_timeout", 1*time.Minute, "Graceful shutdown time allowance")
+	gcloudProject   = flag.String("gcloud_project", "", "GCP Project id")
+	maxWorkers      = flag.Int("max_workers", defaultMaxInFlight, "Maximum number of workers")
+	isBatch         = flag.Bool("batch_service", false, "Whether to run the parser in batch mode")
+	omitDeltas      = flag.Bool("ndt_omit_deltas", false, "Whether to skip ndt.web100 snapshot deltas")
+	bigqueryProject = flag.String("bigquery_project", "", "Override GCLOUD_PROJECT for BigQuery operations")
+	bigqueryDataset = flag.String("bigquery_dataset", "", "Override the BigQuery dataset for output tables")
+)
 
+// Other global values.
+var (
 	mainCtx, mainCancel = context.WithCancel(context.Background())
 
 	// In active polling mode, this holds the GardenerAPI.
+	// TODO: eliminate this global by making the Status handler a receiver.
 	gardenerAPI *active.GardenerAPI
 )
 
@@ -62,6 +83,7 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	flag.Var(&outputType, "output", "Output to bigquery or gcs.")
+
 }
 
 // Task Queue can always submit to an admin restricted URL.
@@ -83,12 +105,12 @@ func init() {
 func Status(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "<html><body>\n")
 	fmt.Fprintf(w, "<p>NOTE: This is just one of potentially many instances.</p>\n")
-	commit := os.Getenv("COMMIT_HASH")
+	commit := etl.GitCommit
 	if len(commit) >= 8 {
 		fmt.Fprintf(w, "Release: %s <br>  Commit: <a href=\"https://github.com/m-lab/etl/tree/%s\">%s</a><br>\n",
-			os.Getenv("RELEASE_TAG"), os.Getenv("COMMIT_HASH"), os.Getenv("COMMIT_HASH")[0:7])
+			etl.Version, etl.GitCommit, etl.GitCommit[0:7])
 	} else {
-		fmt.Fprintf(w, "Release: %s   Commit: unknown\n", os.Getenv("RELEASE_TAG"))
+		fmt.Fprintf(w, "Release: %s   Commit: %s\n", etl.Version, etl.GitCommit)
 	}
 
 	if gardenerAPI != nil {
@@ -107,13 +129,6 @@ func Status(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintf(w, "</body></html>\n")
 }
-
-// Basic throttling to restrict the number of tasks in flight.
-const defaultMaxInFlight = 20
-
-// This limits the number of workers available for externally requested single task files.
-var maxInFlight int32 // Max number of concurrent workers (and tasks in flight).
-var inFlight int32    // Current number of tasks in flight.
 
 // Returns true if request should be rejected.
 // If the max concurrency (MC) exceeds (or matches) the instances*workers, then
@@ -233,22 +248,6 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "ok")
 }
 
-func setMaxInFlight() {
-	maxInFlightString, ok := os.LookupEnv("MAX_WORKERS")
-	if ok {
-		maxInFlightInt, err := strconv.Atoi(maxInFlightString)
-		if err == nil {
-			maxInFlight = int32(maxInFlightInt)
-		} else {
-			log.Println("MAX_WORKERS not configured.  Using 20.")
-			maxInFlight = defaultMaxInFlight
-		}
-	} else {
-		log.Println("MAX_WORKERS not configured.  Using 20.")
-		maxInFlight = defaultMaxInFlight
-	}
-}
-
 type runnable struct {
 	tf task.Factory
 	gcs.ObjectAttrs
@@ -259,6 +258,7 @@ func (r *runnable) Run(ctx context.Context) error {
 	dp, err := etl.ValidateTestPath(path)
 	if err != nil {
 		log.Printf("Invalid filename: %v\n", err)
+		metrics.TaskCount.WithLabelValues(string(etl.INVALID), "BadRequest").Inc()
 		return err
 	}
 
@@ -282,7 +282,7 @@ func (r *runnable) Info() string {
 }
 
 func outputBucket() string {
-	return "etl-" + os.Getenv("GCLOUD_PROJECT")
+	return "etl-" + *gcloudProject
 }
 
 func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
@@ -357,6 +357,7 @@ func startServers(ctx context.Context, mux http.Handler) *errgroup.Group {
 
 func main() {
 	defer mainCancel()
+	fmt.Println("Version:", etl.Version, "GitCommit:", etl.GitCommit)
 
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from env")
@@ -364,7 +365,14 @@ func main() {
 	// Enable block profiling
 	runtime.SetBlockProfileRate(1000000) // One event per msec.
 
-	setMaxInFlight()
+	maxInFlight = (int32)(*maxWorkers)
+	annotation.SetupURLs(*gcloudProject)
+	// TODO: eliminate global variables in favor of config/env object.
+	etl.IsBatch = *isBatch
+	etl.OmitDeltas = *omitDeltas
+	etl.GCloudProject = *gcloudProject
+	etl.BigqueryProject = *bigqueryProject
+	etl.BigqueryDataset = *bigqueryDataset
 
 	if len(*gardenerHost) > 0 {
 		log.Println("Using", *gardenerHost)
