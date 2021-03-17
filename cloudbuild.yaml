@@ -1,0 +1,134 @@
+#################################################################################
+# Deployment Section
+#
+#  Overview:
+#   1.  Test in sandbox during development
+#   2.  Deploy to staging on commit to master
+#   3.  Deploy to prod when a branch is tagged with prod-* or xxx-prod-*
+#
+#  We want to test individual components in sandbox, and avoid stepping on each
+#  other, so we do NOT automate deployment to sandbox.  Each person should
+#  use a branch name to trigger the single deployment that they are working on.
+#
+#  We want to soak all code in staging before deploying to prod.  To avoid
+#  incompatible components, we deploy ALL elements to staging when we merge
+#  to master branch.
+#
+#  Deployments to prod are done by deliberately tagging a specific commit,
+#  typically in the master branch, with a tag starting with prod-*.
+#  DO NOT just tag the latest version in master, as someone may have
+#  pushed new code that hasn't had a chance to soak in staging.
+#
+#
+# Deploy steps never trigger on a new Pull Request. Deploy steps will trigger
+# on specific branch name patterns, after a merge to master, or on
+# an explicit tag that matches "on:" conditions.
+#################################################################################
+
+timeout: 1800s
+
+options:
+  env:
+  - PROJECT_ID=$PROJECT_ID
+  - GIT_COMMIT=$COMMIT_SHA
+
+steps:
+# Make all git tags available.
+- name: gcr.io/cloud-builders/git
+  id: "Unshallow git clone"
+  args: ["fetch", "--unshallow"]
+
+# Fetch travis submodule.
+- name: gcr.io/cloud-builders/git
+  id: "Update travis submodule"
+  args: ["submodule", "update", "--init", "--recursive"]
+
+# TODO: while local docker builds cache intermediate layers, CB does not.
+# Combine the Dockerfile.testing with the Dockerfile using --target and
+# --from-cache to speed up builds: See also:
+# https://andrewlock.net/caching-docker-layers-on-serverless-build-hosts-with-multi-stage-builds---target,-and---cache-from/
+- name: gcr.io/cloud-builders/docker
+  id: "Build the testing docker container"
+  args: [
+    "build", "-t", "etl-testing", "-f", "Dockerfile.testing", "."
+  ]
+
+- name: etl-testing
+  id: "Run all etl unit tests"
+  args:
+  - go version
+  - go get -v -t ./...
+  - go get -v -tags=integration -t ./...
+
+  # Run tests.
+  - go test -v -coverprofile=_unit.cov ./...
+  # TODO: race detected in TestGardenerAPI_RunAll
+  # - go test -v ./... -race
+  # Integration testing requires additional SA credentials.
+  - ./integration-testing.sh
+  # Build update-schema command, with binary in cloudbuild /workspace.
+  - go build ./cmd/update-schema
+  env:
+  - SERVICE_ACCOUNT_mlab_testing=$_SERVICE_ACCOUNT_MLAB_TESTING
+  - WORKSPACE_LINK=/go/src/github.com/m-lab/etl
+
+- name: gcr.io/cloud-builders/docker
+  id: "Build the etl docker container"
+  args: [
+    "build",
+      "--build-arg", "VERSION=${TAG_NAME}${BRANCH_NAME}",
+      "-t", "gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG",
+      "-f", "cmd/etl_worker/Dockerfile.k8s", "."
+  ]
+
+- name: gcr.io/cloud-builders/docker
+  id: "Push the docker container to gcr.io"
+  args: [
+    "push", "gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG"
+  ]
+
+- name: etl-testing
+  id: "Update table schemas before deploying parsers"
+  entrypoint: bash
+  args: [
+     '-c', './update-schema'
+  ]
+  env:
+  - GCLOUD_PROJECT=$PROJECT_ID
+
+# UNIVERSAL PARSER: Run apply-cluster.sh
+- name: gcr.io/cloud-builders/kubectl
+  id: "Deploy etl parser to data-processing cluster"
+  entrypoint: /bin/bash
+  args: [
+   '-c', '/builder/kubectl.bash version && ./apply-cluster.sh'
+  ]
+  env:
+  - BIGQUERY_DATASET=tmp_ndt
+  - CLOUDSDK_COMPUTE_REGION=$_CLUSTER_REGION
+  - CLOUDSDK_CONTAINER_CLUSTER=$_CLUSTER
+  - CLOUDSDK_CORE_PROJECT=$PROJECT_ID
+
+#########################################################
+# TODO: delete once legacy services are retired.
+
+# Use the GCR image as the base for the AppEngine deployment.
+- name: gcr.io/cloud-builders/gcloud
+  id: "Generate Dockerfile for AppEngine deployment"
+  entrypoint: bash
+  args: [
+     '-c', 'echo "FROM gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG" > /workspace/cmd/etl_worker/Dockerfile',
+  ]
+
+# LEGACY PARSER: Deploy to app engine.
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Deploy etl batch parser to app engine"
+  args: [
+    'gcloud', 'app', 'deploy', '--project=$PROJECT_ID', 'appengine/queue.yaml'
+  ]
+
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Deploy etl batch parser to AppEngine"
+  args: [
+    'bash', '-c', 'cd cmd/etl_worker && gcloud --project=$PROJECT_ID app deploy --promote app-batch.yaml'
+  ]
