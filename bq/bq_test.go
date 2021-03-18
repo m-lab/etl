@@ -1,3 +1,5 @@
+// +build integration
+
 package bq_test
 
 import (

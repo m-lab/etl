@@ -6,30 +6,24 @@
 #
 # Example:
 #
-#   PROJECT=mlab-sandbox CLUSTER=scraper-cluster ./apply-cluster.sh
+#   PROJECT_ID=mlab-sandbox CLOUDSDK_CONTAINER_CLUSTER=data-processing ./apply-cluster.sh
 
 set -x
 set -e
 set -u
 
-USAGE="PROJECT=<projectid> CLUSTER=<cluster> TRAVIS_TAG=<tag> TRAVIS_COMMIT=<commit> $0"
-PROJECT=${PROJECT:?Please provide project id: $USAGE}
-CLUSTER=${CLUSTER:?Please provide cluster name: $USAGE}
-TRAVIS_TAG=${TRAVIS_TAG:-empty_tag}
+USAGE="PROJECT_ID=<projectid> CLOUDSDK_CONTAINER_CLUSTER=<cluster> $0"
+PROJECT_ID=${PROJECT_ID:?Please provide project id: $USAGE}
+CLUSTER=${CLOUDSDK_CONTAINER_CLUSTER:?Please provide cluster name: $USAGE}
 BIGQUERY_DATASET=${BIGQUERY_DATASET:-empty_tag}
-TRAVIS_COMMIT=${TRAVIS_COMMIT:?Please provide travis commit: $USAGE}
 
 # Apply templates
-CFG=/tmp/${CLUSTER}-${PROJECT}.yml
-touch ${CFG}
-pwd
-kexpand expand --ignore-missing-keys k8s/${CLUSTER}/*/*.yml \
-    --value GCLOUD_PROJECT=${PROJECT} \
-    --value RELEASE_TAG=${TRAVIS_TAG} \
-    --value GIT_COMMIT=${TRAVIS_COMMIT} \
-    --value BIGQUERY_DATASET=${BIGQUERY_DATASET} \
-    > ${CFG}
-cat ${CFG}
+find k8s/${CLUSTER}/ -type f -exec \
+    sed -i \
+      -e 's/{{GIT_COMMIT}}/'${GIT_COMMIT}'/g' \
+      -e 's/{{GCLOUD_PROJECT}}/'${PROJECT_ID}'/g' \
+      -e 's/{{BIGQUERY_DATASET}}/'${BIGQUERY_DATASET}'/g' \
+      {} \;
 
 # This triggers deployment of the pod.
-kubectl apply -f ${CFG}
+kubectl apply --recursive -f k8s/${CLUSTER}

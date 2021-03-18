@@ -1,3 +1,5 @@
+// +build integration
+
 package main
 
 import (
@@ -33,7 +35,7 @@ func waitFor(url string) (resp *http.Response, err error) {
 func TestMain(t *testing.T) {
 	flag.Set("service_port", ":0")
 	flag.Set("max_active", "200")
-	flag.Set("prometheusx.listen-address", ":9090")
+	flag.Set("prometheusx.listen-address", ":0")
 	flag.Set("max_workers", "25")
 	flag.Set("gcloud_project", "mlab-testing")
 	mainCtx, mainCancel = context.WithCancel(context.Background())
@@ -80,7 +82,7 @@ func TestMain(t *testing.T) {
 func TestPollingMode(t *testing.T) {
 	flag.Set("service_port", ":0")
 	flag.Set("max_active", "200")
-	flag.Set("prometheusx.listen-address", ":9090")
+	flag.Set("prometheusx.listen-address", ":0")
 	flag.Set("max_workers", "25")
 	flag.Set("gcloud_project", "mlab-testing")
 	flag.Set("gardener_host", "gardener")
