@@ -178,8 +178,8 @@ func ParsePT(testName string, rawContent []byte, tableName string, taskFilename 
 	return ptTest, nil
 }
 
-// ParseJSON the raw jsonl test file into schema.PTTest.
-func ParseJSON(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
+// ParseJSONL the raw jsonl test file into schema.PTTest.
+func ParseJSONL(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
 	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Dec()
 
@@ -582,7 +582,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 
 	// Process the jsonl output of Scamper binary.
 	if strings.HasSuffix(testName, ".jsonl") {
-		ptTest, err := ParseJSON(testName, rawContent, pt.TableName(), pt.taskFileName)
+		ptTest, err := ParseJSONL(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
 			err := pt.AddRow(&ptTest)
 			if err == etl.ErrBufferFull {
