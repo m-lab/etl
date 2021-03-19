@@ -114,5 +114,9 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	os.Exit(m.Run())
+	exitCode := m.Run()
+	for _, dir := range []string{"testdata/PT", "testdata/web100", "testdata/sidestream"} {
+		os.RemoveAll(dir)
+	}
+	os.Exit(exitCode)
 }
