@@ -544,7 +544,8 @@ func (pt *PTParser) NumBufferedTests() int {
 
 // IsParsable returns the canonical test type and whether to parse data.
 func (pt *PTParser) IsParsable(testName string, data []byte) (string, bool) {
-	if strings.HasSuffix(testName, ".paris") || strings.HasSuffix(testName, ".jsonl") {
+	if strings.HasSuffix(testName, ".paris") || strings.HasSuffix(testName, ".jsonl") ||
+		strings.HasSuffix(testName, ".json") {
 		return "paris", true
 	}
 	return "unknown", false
