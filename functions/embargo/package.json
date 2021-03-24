@@ -7,7 +7,7 @@
     "url": "https://github.com/m-lab/etl"
   },
   "dependencies": {
-    "googleapis": "~19.0.0"
+    "googleapis": "~59.0.0"
   },
   "scripts": {
     "test": "echo THIS CODE IS UNTESTED"
