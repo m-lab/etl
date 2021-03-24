@@ -13,7 +13,7 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
-func TestParseTraceroute(t *testing.T) {
+func TestParsePT(t *testing.T) {
 	fileName := "20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.json"
 	bytes, err := ioutil.ReadFile(filepath.Join("testdata/PT", fileName))
 	if err != nil {
@@ -86,7 +86,7 @@ func TestGetLogtime(t *testing.T) {
 	}
 }
 
-func TestParseJsonSimple(t *testing.T) {
+func TestParseJSONLSimple(t *testing.T) {
 	fileName := "20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl"
 	bytes, err := ioutil.ReadFile(filepath.Join("testdata/PT", fileName))
 	if err != nil {
@@ -121,7 +121,7 @@ func TestParseJsonSimple(t *testing.T) {
 	}
 }
 
-func TestParseJsonNoLinks(t *testing.T) {
+func TestParseJSONLNoLinks(t *testing.T) {
 	// Last object on the "type":"tracelb" line has "linkc":1 but no "links" set.
 	fileName := "20190825T000138Z_ndt-plh7v_1566050090_000000000004D64F.jsonl"
 	bytes, err := ioutil.ReadFile(filepath.Join("testdata/PT", fileName))
@@ -134,7 +134,7 @@ func TestParseJsonNoLinks(t *testing.T) {
 	}
 }
 
-func TestParseJsonComplex(t *testing.T) {
+func TestParseJSONLComplex(t *testing.T) {
 	fileName := "20190825T000138Z_ndt-plh7v_1566050090_000000000004D64C.jsonl"
 	bytes, err := ioutil.ReadFile(filepath.Join("testdata/PT", fileName))
 	if err != nil {
@@ -251,7 +251,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 	}
 }
 
-func TestJSONParser(t *testing.T) {
+func TestParseJSONL(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/PT/20190927T070859Z_ndt-qtfh8_1565996043_0000000000003B64.jsonl")
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -267,7 +267,7 @@ func TestJSONParser(t *testing.T) {
 	}
 }
 
-func TestPTParser(t *testing.T) {
+func TestParse(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	cachedTest, err := parser.Parse(nil, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
 	if err != nil {
@@ -318,7 +318,7 @@ func TestPTParser(t *testing.T) {
 	}
 }
 
-func TestPTInserter(t *testing.T) {
+func TestAnnotateAndPutAsync(t *testing.T) {
 	ins := newInMemoryInserter()
 	pt := parser.NewPTParser(ins, &fakeAnnotator{})
 	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
@@ -346,7 +346,7 @@ func TestPTInserter(t *testing.T) {
 	}
 }
 
-func TestPTInserterLastTest(t *testing.T) {
+func TestParseAndInsert(t *testing.T) {
 	ins := newInMemoryInserter()
 	pt := parser.NewPTParser(ins, &fakeAnnotator{})
 	rawData, err := ioutil.ReadFile("testdata/PT/20130524T00:04:44Z_ALL5729.paris")
@@ -374,7 +374,7 @@ func TestPTInserterLastTest(t *testing.T) {
 	}
 }
 
-func TestPTPollutionCheck(t *testing.T) {
+func TestProcessLastTests(t *testing.T) {
 	ins := &inMemoryInserter{}
 	pt := parser.NewPTParser(ins)
 
@@ -452,7 +452,7 @@ func TestPTPollutionCheck(t *testing.T) {
 	}
 }
 
-func TestPTEmptyTest(t *testing.T) {
+func TestParseEmpty(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris")
 	if err != nil {
 		fmt.Println("cannot load test data")
