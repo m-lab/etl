@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"runtime"
 	"strconv"
 	"time"
@@ -23,18 +22,22 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// AnnotatorURL holds the https address of the annotator.
-// TODO(gfr) See if there is a better way of determining
-// where to send the request (there almost certainly is)
-var AnnotatorURL = "https://annotator-dot-" +
-	os.Getenv("GCLOUD_PROJECT") +
-	".appspot.com"
+var (
+	// AnnotatorURL holds the https address of the annotator.
+	AnnotatorURL string
 
-// BaseURL provides the base URL for single annotation requests
-var BaseURL = AnnotatorURL + "/annotate?"
+	// BaseURL provides the base URL for single annotation requests
+	BaseURL string
 
-// BatchURL provides the base URL for batch annotation requests
-var BatchURL = AnnotatorURL + "/batch_annotate"
+	// BatchURL provides the base URL for batch annotation requests
+	BatchURL string
+)
+
+func SetupURLs(project string) {
+	AnnotatorURL = "https://annotator-dot-" + project + ".appspot.com"
+	BaseURL = AnnotatorURL + "/annotate?"
+	BatchURL = AnnotatorURL + "/batch_annotate"
+}
 
 // trackMissingResponses generates metrics for missing annotations.
 func trackMissingResponses(anno *api.GeoData) {

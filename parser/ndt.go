@@ -39,8 +39,6 @@ import (
 )
 
 var (
-	// NDTOmitDeltas flag indicates if deltas should be suppressed.
-	NDTOmitDeltas, _ = strconv.ParseBool(os.Getenv("NDT_OMIT_DELTAS"))
 	// NDTEstimateBW flag indicates if we should run BW estimation code
 	// and annotate rows.
 	NDTEstimateBW, _ = strconv.ParseBool(os.Getenv("NDT_ESTIMATE_BW"))
@@ -401,7 +399,7 @@ func (n *NDTParser) processTest(test *fileInfoAndData, testType string) {
 func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schema.Web100ValueMap, int) {
 	deltas := []schema.Web100ValueMap{}
 	deltaFieldCount := 0
-	if NDTOmitDeltas {
+	if etl.OmitDeltas {
 		return deltas, deltaFieldCount
 	}
 	snapshotCount := 0

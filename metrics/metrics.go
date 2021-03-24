@@ -12,27 +12,20 @@ import (
 	"log"
 	"math"
 	"net/http"
-	"os"
 	"runtime"
 	"runtime/debug"
 	"time"
 
+	"github.com/m-lab/etl/etl"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 func init() {
 	NumCPU.Set(float64(runtime.NumCPU()))
-
-	commit, ok := os.LookupEnv("GIT_COMMIT")
-	if ok {
-		CommitHash.WithLabelValues(commit).Set(1)
-	}
-
-	release, ok := os.LookupEnv("RELEASE_TAG")
-	if ok {
-		ReleaseTag.WithLabelValues(release).Set(1)
-	}
+	// Update metrics with static commit and version.
+	CommitHash.WithLabelValues(etl.GitCommit).Set(1)
+	ReleaseTag.WithLabelValues(etl.Version).Set(1)
 }
 
 var (

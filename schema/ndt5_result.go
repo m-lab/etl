@@ -1,7 +1,10 @@
 package schema
 
 import (
+	"time"
+
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/ndt-server/data"
@@ -11,6 +14,7 @@ import (
 
 // NDT5ResultRow defines the BQ schema for the data.NDT5Result produced by the
 // ndt-server for NDT client measurements.
+// Deprecated - use V1 for Gardener 2.0
 type NDT5ResultRow struct {
 	ParseInfo *ParseInfoV0
 	TestID    string          `json:"test_id,string" bigquery:"test_id"`
@@ -23,6 +27,44 @@ type NDT5ResultRow struct {
 
 // Schema returns the BigQuery schema for NDT5ResultRow.
 func (row *NDT5ResultRow) Schema() (bigquery.Schema, error) {
+	sch, err := bigquery.InferSchema(row)
+	if err != nil {
+		return bigquery.Schema{}, err
+	}
+	docs := FindSchemaDocsFor(row)
+	for _, doc := range docs {
+		bqx.UpdateSchemaDescription(sch, doc)
+	}
+	rr := bqx.RemoveRequired(sch)
+	return rr, err
+}
+
+// NDT5ResultRowStandardColumns defines the BQ schema for the data.NDT5Result produced by the
+// ndt-server for NDT client measurements.
+type NDT5ResultRowStandardColumns struct {
+	ID     string          `bigquery:"id"`
+	A      NDT5Summary     `bigquery:"a"`
+	Parser ParseInfo       `bigquery:"parser"`
+	Date   civil.Date      `bigquery:"date"`
+	Raw    data.NDT5Result `bigquery:"raw"`
+
+	// NOT part of struct schema. Included only to provide a fake annotator interface.
+	row.NullAnnotator `bigquery:"-"`
+}
+
+// NDT5Summary contains fields summarizing or derived from the raw data.
+// This should be consolidated with NDT7Summary, and also used for web100.
+type NDT5Summary struct {
+	UUID               string
+	TestTime           time.Time
+	CongestionControl  string
+	MeanThroughputMbps float64
+	MinRTT             float64
+	LossRate           float64
+}
+
+// Schema returns the BigQuery schema for NDT5ResultRow.
+func (row *NDT5ResultRowStandardColumns) Schema() (bigquery.Schema, error) {
 	sch, err := bigquery.InferSchema(row)
 	if err != nil {
 		return bigquery.Schema{}, err

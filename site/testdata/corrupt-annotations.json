@@ -1,0 +1,11 @@
+[
+   {
+      "Geo": {
+         "City": "New York",
+         "ContinentCode": "NA",
+         "CountryCode": "US",
+         "Latitude": 40.7667,
+         "Longitude": -73.8667,
+         "State": "NY"
+      },
+   // INCOMPLETE AND CORRUPT JSON.

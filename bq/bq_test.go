@@ -1,3 +1,5 @@
+// +build integration
+
 package bq_test
 
 import (
@@ -135,7 +137,7 @@ func TestInsertConfig(t *testing.T) {
 	if isTravis {
 		return
 	}
-	os.Setenv("GCLOUD_PROJECT", "mlab-oti")
+	etl.GCloudProject = "mlab-oti"
 	in, err := bq.NewInserter(etl.SS, time.Now())
 	if err != nil {
 		t.Fatal(err)
