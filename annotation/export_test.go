@@ -1,5 +1,3 @@
 package annotation
 
-var (
-	BatchParseJSONGeoDataResponse = batchParseJSONGeoDataResponse
-)
+var ()
