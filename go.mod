@@ -23,7 +23,6 @@ require (
 	github.com/m-lab/uuid-annotator v0.4.2
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/sirupsen/logrus v1.8.0
 	github.com/valyala/gozstd v1.9.0
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	google.golang.org/api v0.40.0
