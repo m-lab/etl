@@ -13,7 +13,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/pipe"
+	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
 func init() {

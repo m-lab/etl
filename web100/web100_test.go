@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/m-lab/etl/web100"
-	"github.com/m-lab/pipe"
+	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
 func init() {
