@@ -18,11 +18,13 @@ var (
 	// For example of how siteinfo is loaded on production servers, see
 	// https://github.com/m-lab/k8s-support/blob/ff5b53faef7828d11d45c2a4f27d53077ddd080c/k8s/daemonsets/templates.jsonnet#L350
 	siteinfo        = flagx.URL{}
+	siteinfoRetired = flagx.URL{}
 	globalAnnotator *annotator
 )
 
 func init() {
 	flag.Var(&siteinfo, "siteinfo.url", "The URL for the Siteinfo JSON file containing server location and ASN metadata. gs:// and file:// schemes accepted.")
+	flag.Var(&siteinfoRetired, "siteinfo.retired-url", "The URL for the Siteinfo retired JSON file. gs:// and file:// schemes accepted.")
 	globalAnnotator = nil
 }
 
@@ -34,10 +36,11 @@ func Annotate(site, machine string, server *uuid.ServerAnnotations) {
 }
 
 // LoadFrom loads the site annotation source from the provider.
-func LoadFrom(ctx context.Context, js content.Provider) error {
+func LoadFrom(ctx context.Context, js content.Provider, retiredJS content.Provider) error {
 	globalAnnotator = &annotator{
-		siteinfoSource: js,
-		sites:          make(map[string]uuid.ServerAnnotations, 200),
+		siteinfoSource:        js,
+		siteinfoRetiredSource: retiredJS,
+		sites:                 make(map[string]uuid.ServerAnnotations, 200),
 	}
 	err := globalAnnotator.load(ctx)
 	log.Println(len(globalAnnotator.sites), "sites loaded")
@@ -60,8 +63,18 @@ func MustLoad(timeout time.Duration) {
 	}
 	rtx.Must(err, "Could not load siteinfo URL")
 
+	var retiredJS content.Provider
+	// Retry for up to 30 seconds.
+	start = time.Now()
 	for ; time.Since(start) < timeout; time.Sleep(time.Second) {
-		err = LoadFrom(ctx, js)
+		retiredJS, err = content.FromURL(ctx, siteinfoRetired.URL)
+		if err == nil {
+			break
+		}
+	}
+
+	for ; time.Since(start) < timeout; time.Sleep(time.Second) {
+		err = LoadFrom(ctx, js, retiredJS)
 		if err == nil {
 			break
 		}
@@ -72,7 +85,8 @@ func MustLoad(timeout time.Duration) {
 
 // annotator stores the annotations, and provides Annotate method.
 type annotator struct {
-	siteinfoSource content.Provider
+	siteinfoSource        content.Provider
+	siteinfoRetiredSource content.Provider
 	// Each site has a single ServerAnnotations struct, which
 	// is later customized for each machine.
 	sites map[string]uuid.ServerAnnotations
@@ -127,6 +141,17 @@ func (sa *annotator) load(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// Read the retired sites JSON file, and merge it with the current sites.
+	retiredJS, err := sa.siteinfoRetiredSource.Get(ctx)
+	if err != nil {
+		return err
+	}
+	var retired []siteinfoAnnotation
+	err = json.Unmarshal(retiredJS, &retired)
+	if err != nil {
+		return err
+	}
+	s = append(s, retired...)
 	for _, ann := range s {
 		// Machine should always be empty, filled in later.
 		ann.Annotation.Machine = ""
