@@ -80,10 +80,10 @@ spec:
         resources:
           requests:
             memory: "15Gi"
-            cpu: "7"
+            cpu: "15"
           limits:
             memory: "20Gi"
-            cpu: "7"
+            cpu: "15"
 
       nodeSelector:
         parser-node: "true"
