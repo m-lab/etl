@@ -54,10 +54,10 @@ func MustLoad(timeout time.Duration) {
 	defer cancel()
 
 	js, err := content.FromURL(ctx, siteinfo.URL)
-	rtx.Must(err, "Could not load siteinfo URL")
+	rtx.Must(err, "Invalid annotations URL")
 
 	retiredJS, err := content.FromURL(ctx, siteinfoRetired.URL)
-	rtx.Must(err, "Could not load retired annotations URL")
+	rtx.Must(err, "Invalid retired annotations URL")
 
 	for ; ctx.Err() == nil; time.Sleep(time.Second) {
 		err = LoadFrom(ctx, js, retiredJS)
