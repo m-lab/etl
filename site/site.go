@@ -50,30 +50,16 @@ func LoadFrom(ctx context.Context, js content.Provider, retiredJS content.Provid
 // MustLoad loads the site annotation source.  Will try at least once,
 // and retry for up to timeout
 func MustLoad(timeout time.Duration) {
-	start := time.Now()
-	ctx := context.Background()
-	// Retry for up to 30 seconds
-	var js content.Provider
-	var err error
-	for ; time.Since(start) < timeout; time.Sleep(time.Second) {
-		js, err = content.FromURL(ctx, siteinfo.URL)
-		if err == nil {
-			break
-		}
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	js, err := content.FromURL(ctx, siteinfo.URL)
 	rtx.Must(err, "Could not load siteinfo URL")
 
-	var retiredJS content.Provider
-	// Retry for up to 30 seconds.
-	start = time.Now()
-	for ; time.Since(start) < timeout; time.Sleep(time.Second) {
-		retiredJS, err = content.FromURL(ctx, siteinfoRetired.URL)
-		if err == nil {
-			break
-		}
-	}
+	retiredJS, err := content.FromURL(ctx, siteinfoRetired.URL)
+	rtx.Must(err, "Could not load retired annotations URL")
 
-	for ; time.Since(start) < timeout; time.Sleep(time.Second) {
+	for ; ctx.Err() == nil; time.Sleep(time.Second) {
 		err = LoadFrom(ctx, js, retiredJS)
 		if err == nil {
 			break
