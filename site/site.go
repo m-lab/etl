@@ -58,10 +58,10 @@ func MustLoad(timeout time.Duration) {
 // timeout and return an error if unsuccessful.
 func Load(timeout time.Duration) error {
 	js, err := content.FromURL(context.Background(), siteinfo.URL)
-	rtx.Must(err, "Invalid annotations URL")
+	rtx.Must(err, "Invalid server annotations URL", siteinfo.URL.String())
 
 	retiredJS, err := content.FromURL(context.Background(), siteinfoRetired.URL)
-	rtx.Must(err, "Invalid retired annotations URL")
+	rtx.Must(err, "Invalid retired server annotations URL", siteinfoRetired.URL.String())
 
 	// When annotations are read via HTTP, which is the default, a timeout of
 	// 1 minute is used for the GET request.
