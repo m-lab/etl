@@ -48,6 +48,7 @@ type GCSSource struct {
 	RetryBaseTime time.Duration // The base time for backoff and retry.
 	TableBase     string        // TableBase is BQ table associated with this source, or "invalid".
 	PathDate      civil.Date    // Date associated with YYYY/MM/DD in FilePath.
+	dataPath      etl.DataPath
 }
 
 // Retrieve next file header.
@@ -139,6 +140,16 @@ func (src *GCSSource) Detail() string {
 // Date returns a civil.Date associated with the GCSSource archive path.
 func (src *GCSSource) Date() civil.Date {
 	return src.PathDate
+}
+
+// Site returns the site name, e.g. atl02
+func (src *GCSSource) Site() string {
+	return src.dataPath.Site
+}
+
+// Host returns the short host name, e.g. mlab1
+func (src *GCSSource) Host() string {
+	return src.dataPath.Host
 }
 
 // NextTest reads the next test object from the tar file.
@@ -298,6 +309,7 @@ func NewTestSource(client stiface.Client, dp etl.DataPath, label string) (etl.Te
 		RetryBaseTime: baseTimeout,
 		TableBase:     label,
 		PathDate:      civil.DateOf(archiveDate),
+		dataPath:      dp,
 	}
 	return gcs, nil
 }

@@ -53,6 +53,8 @@ func NewTask(filename string, src etl.TestSource, prsr etl.Parser, closer io.Clo
 	meta["parse_time"] = time.Now()
 	meta["attempt"] = 1
 	meta["date"] = src.Date()
+	meta["site"] = src.Site()
+	meta["host"] = src.Host()
 	t := Task{
 		TestSource:  src,
 		Parser:      prsr,
