@@ -115,6 +115,7 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 		switch typedErr := err.(type) {
 		case *googleapi.Error:
 			// Retry the write...
+			time.Sleep(2 * time.Second)
 			log.Println("Retrying", typedErr, rw.bucket, rw.path)
 			n, err = buf.WriteTo(rw.w)
 			if err == nil {
