@@ -166,7 +166,9 @@ func (rw *RowWriter) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	attr, err := rw.o.Update(ctx, oa)
-	log.Println(attr, err)
+	if err != nil {
+		log.Println(attr, err)
+	}
 	return err
 
 }
