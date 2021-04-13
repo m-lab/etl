@@ -116,11 +116,13 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 		case *googleapi.Error:
 			// Retry the write...
 			time.Sleep(2 * time.Second)
-			log.Println("Retrying", typedErr, rw.bucket, rw.path)
-			n, err = buf.WriteTo(rw.w)
+			log.Println("Retrying after", n, "of", numBytes, "bytes", typedErr, rw.bucket, rw.path)
+			var n2 int64
+			n2, err = buf.WriteTo(rw.w)
 			if err == nil {
-				log.Println("Retry succeeded")
+				log.Println("Retry succeeded", n, n2)
 			}
+			n += n2
 		default:
 		}
 	}
@@ -130,7 +132,7 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 		case *googleapi.Error:
 			metrics.BackendFailureCount.WithLabelValues(
 				label, "googleapi.Error").Inc()
-			log.Println(typedErr, rw.bucket, rw.path)
+			log.Println(typedErr, "after", n, "of", numBytes, "bytes", rw.bucket, rw.path)
 			for _, e := range typedErr.Errors {
 				log.Println(e)
 			}
