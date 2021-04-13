@@ -116,7 +116,7 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 		case *googleapi.Error:
 			metrics.BackendFailureCount.WithLabelValues(
 				label, "googleapi.Error").Inc()
-			log.Println(typedErr, rw.bucket, rw.path)
+			log.Println(typedErr, "after", n, "of", numBytes, "bytes", rw.bucket, rw.path)
 			for _, e := range typedErr.Errors {
 				log.Println(e)
 			}
@@ -152,8 +152,12 @@ func (rw *RowWriter) Close() error {
 	log.Println("Closing", rw.bucket, rw.path)
 	err := rw.w.Close()
 	if err != nil {
-		log.Println(err)
-		return err
+		switch typedErr := err.(type) {
+		case *googleapi.Error:
+			log.Println(typedErr, "when closing:", rw.bucket, rw.path)
+		default:
+			log.Println(typedErr, "when closing:", rw.bucket, rw.path)
+		}
 	}
 
 	oa := gcs.ObjectAttrsToUpdate{}
