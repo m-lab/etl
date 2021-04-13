@@ -47,26 +47,29 @@ func LoadFrom(ctx context.Context, js content.Provider, retiredJS content.Provid
 	return err
 }
 
-// MustLoad loads the site annotation source.  Will try at least once,
-// and retry for up to timeout
+// MustLoad loads the site annotation source. Will try at least once,
+// and retry for up to timeout.
 func MustLoad(timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	js, err := content.FromURL(ctx, siteinfo.URL)
+	js, err := content.FromURL(context.Background(), siteinfo.URL)
 	rtx.Must(err, "Invalid annotations URL")
 
-	retiredJS, err := content.FromURL(ctx, siteinfoRetired.URL)
+	retiredJS, err := content.FromURL(context.Background(), siteinfoRetired.URL)
 	rtx.Must(err, "Invalid retired annotations URL")
 
+	// When annotations are read via HTTP, which is the default, a timeout of
+	// 1 minute is used for the GET request.
+	// The timeout specified here must be > 1 * time.Minute for the retry loop
+	// to make sense.
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	for ; ctx.Err() == nil; time.Sleep(time.Second) {
-		err = LoadFrom(ctx, js, retiredJS)
+		err = LoadFrom(context.Background(), js, retiredJS)
 		if err == nil {
 			break
 		}
 	}
 	rtx.Must(err, "Could not load annotation db")
-
 }
 
 // annotator stores the annotations, and provides Annotate method.
