@@ -28,6 +28,7 @@ func (b badProvider) Get(_ context.Context) ([]byte, error) {
 var (
 	localRawfile content.Provider
 	corruptFile  content.Provider
+	retiredFile  content.Provider
 )
 
 func setUp() {
@@ -40,12 +41,17 @@ func setUp() {
 	rtx.Must(err, "Could not parse URL")
 	corruptFile, err = content.FromURL(context.Background(), u)
 	rtx.Must(err, "Could not create content.Provider")
+
+	u, err = url.Parse("file:testdata/retired-annotations.json")
+	rtx.Must(err, "Could not parse URL")
+	retiredFile, err = content.FromURL(context.Background(), u)
+	rtx.Must(err, "Could not create content.Provider")
 }
 
 func TestBasic(t *testing.T) {
 	setUp()
 	ctx := context.Background()
-	site.LoadFrom(ctx, localRawfile)
+	site.LoadFrom(ctx, localRawfile, retiredFile)
 	missingServerAnn := annotator.ServerAnnotations{
 		Machine: "foo",
 		Site:    "bar",
@@ -76,6 +82,25 @@ func TestBasic(t *testing.T) {
 		},
 	}
 
+	retiredServerann := annotator.ServerAnnotations{
+		Machine: "mlab1",
+		Site:    "acc01",
+		Geo: &annotator.Geolocation{
+			ContinentCode: "AF",
+			CountryCode:   "GH",
+			City:          "Accra",
+			Latitude:      5.606,
+			Longitude:     -0.1681,
+		},
+		Network: &annotator.Network{
+			ASNumber: 30997,
+			ASName:   "Ghana Internet Exchange Association",
+			Systems: []annotator.System{
+				{ASNs: []uint32{30997}},
+			},
+		},
+	}
+
 	tests := []struct {
 		name          string
 		site, machine string
@@ -86,6 +111,12 @@ func TestBasic(t *testing.T) {
 			site:    "lga03",
 			machine: "mlab1",
 			want:    defaultServerAnn,
+		},
+		{
+			name:    "success-retired-site",
+			site:    "acc01",
+			machine: "mlab1",
+			want:    retiredServerann,
 		},
 		{
 			name:    "missing",
@@ -106,8 +137,10 @@ func TestBasic(t *testing.T) {
 }
 
 func TestMustLoad(t *testing.T) {
-	cleanup := osx.MustSetenv("SITEINFO_URL", "file:testdata/annotations.json")
-	defer cleanup()
+	cleanupURL := osx.MustSetenv("SITEINFO_URL", "file:testdata/annotations.json")
+	defer cleanupURL()
+	cleanupRetiredURL := osx.MustSetenv("SITEINFO_RETIRED_URL", "file:testdata/retired-annotations.json")
+	defer cleanupRetiredURL()
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment variables")
 
@@ -117,7 +150,7 @@ func TestMustLoad(t *testing.T) {
 func TestNilServer(t *testing.T) {
 	setUp()
 	ctx := context.Background()
-	err := site.LoadFrom(ctx, localRawfile)
+	err := site.LoadFrom(ctx, localRawfile, retiredFile)
 	if err != nil {
 		t.Error(err)
 	}
@@ -128,7 +161,7 @@ func TestNilServer(t *testing.T) {
 func TestCorrupt(t *testing.T) {
 	setUp()
 	ctx := context.Background()
-	err := site.LoadFrom(ctx, corruptFile)
+	err := site.LoadFrom(ctx, corruptFile, corruptFile)
 	if err == nil {
 		t.Error("Expected load error")
 	}
