@@ -43,6 +43,14 @@ func CreateOrUpdatePT(project string, dataset string, table string) error {
 	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
+func CreateOrUpdateSS(project string, dataset string, table string) error {
+	row := schema.SS{}
+	schema, err := row.Schema()
+	rtx.Must(err, "SS.Schema")
+
+	return CreateOrUpdate(schema, project, dataset, table, "")
+}
+
 func CreateOrUpdateNDT5ResultRow(project string, dataset string, table string) error {
 	row := schema.NDT5ResultRow{}
 	schema, err := row.Schema()
@@ -170,6 +178,12 @@ func updateLegacyTables(project string) int {
 	if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
 		errCount++
 	}
+	if err := CreateOrUpdateSS(project, "base_tables", "sidestream"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateSS(project, "batch", "sidestream"); err != nil {
+		errCount++
+	}
 	if err := CreateOrUpdateNDT5ResultRow(project, "base_tables", "ndt5"); err != nil {
 		errCount++
 	}
@@ -230,6 +244,13 @@ func main() {
 			errCount++
 		}
 		if err := CreateOrUpdatePT(*project, "batch", "traceroute"); err != nil {
+			errCount++
+		}
+	case "sidestream":
+		if err := CreateOrUpdateSS(*project, "base_tables", "sidestream"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateSS(*project, "batch", "sidestream"); err != nil {
 			errCount++
 		}
 
