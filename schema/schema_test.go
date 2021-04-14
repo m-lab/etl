@@ -3,6 +3,7 @@ package schema_test
 import (
 	"flag"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -67,4 +68,5 @@ func Test_findSchemaDocsFor(t *testing.T) {
 func TestMain(m *testing.M) {
 	// This sets the flag globally for all "schema" package tests.
 	flag.CommandLine.Set("schema.descriptions", "descriptions")
+	os.Exit(m.Run())
 }
