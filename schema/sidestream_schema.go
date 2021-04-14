@@ -5,17 +5,19 @@ package schema
 import (
 	"time"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/annotation-service/api"
+	"github.com/m-lab/go/cloud/bqx"
 )
 
 type Web100ConnectionSpecification struct {
-	Local_ip           string            `json:"local_ip,string"`
-	Local_af           int64             `json:"local_af,int64"`
-	Local_port         int64             `json:"local_port,int64"`
-	Remote_ip          string            `json:"remote_ip,string"`
-	Remote_port        int64             `json:"remote_port,int64"`
-	Local_geolocation  api.GeolocationIP `json:"local_geolocation"`
-	Remote_geolocation api.GeolocationIP `json:"remote_geolocation"`
+	Local_ip           string            `json:"local_ip,string" bigquery:"local_ip"`
+	Local_af           int64             `json:"local_af,int64" bigquery:"local_af"`
+	Local_port         int64             `json:"local_port,int64" bigquery:"local_port"`
+	Remote_ip          string            `json:"remote_ip,string" bigquery:"remote_ip"`
+	Remote_port        int64             `json:"remote_port,int64" bigquery:"remote_port"`
+	Local_geolocation  api.GeolocationIP `json:"local_geolocation" bigquery:"local_geolocation"`
+	Remote_geolocation api.GeolocationIP `json:"remote_geolocation" bigquery:"remote_geolocation"`
 }
 
 type Web100Snap struct {
@@ -172,23 +174,27 @@ type Web100Snap struct {
 }
 
 type Web100LogEntry struct {
-	LogTime         int64                         `json:"log_time,int64" bigquery:"log_time"`
-	Version         string                        `json:"version,string"`
-	Group_name      string                        `json:"group_name,string"`
-	Connection_spec Web100ConnectionSpecification `json:"connection_spec"`
-	Snap            Web100Snap                    `json:"snap"`
+	LogTime         int64                         `json:"log_time" bigquery:"log_time"`
+	Version         string                        `json:"version,string" bigquery:"version"`
+	Group_name      string                        `json:"group_name,string" bigquery:"group_name"`
+	Connection_spec Web100ConnectionSpecification `json:"connection_spec" bigquery:"connection_spec"`
+	Snap            Web100Snap                    `json:"snap" bigquery:"snap"`
+}
+
+type Anomalies struct {
+	Exclusion_level int64 `json:"exclusion_level" bigquery:"exclusion_level"`
 }
 
 type SS struct {
-	TestID        string    `json:"test_id,string" bigquery:"test_id"`
-	Project       int64     `json:"project,int64" bigquery:"project"`
-	LogTime       int64     `json:"log_time,int64" bigquery:"log_time"`
-	ParseTime     time.Time `bigquery:"parse_time" bigquery:"parse_time"`
-	ParserVersion string    `bigquery:"parser_version" bigquery:"parser_version"`
-	TaskFileName  string    `bigquery:"task_filename" bigquery:"task_filename"`
-
-	Type             int64          `json:"type,int64"`
-	Web100_log_entry Web100LogEntry `json:"web100_log_entry"`
+	TestID           string         `json:"test_id,string" bigquery:"test_id"`
+	Project          int64          `json:"project" bigquery:"project"`
+	LogTime          int64          `json:"log_time" bigquery:"log_time"`
+	ParseTime        time.Time      `json:"parse_time" bigquery:"parse_time"`
+	ParserVersion    string         `json:"parser_version" bigquery:"parser_version"`
+	TaskFileName     string         `json:"task_filename" bigquery:"task_filename"`
+	Type             int64          `json:"type" bigquery:"type"`
+	Anomalies        Anomalies      `json:"anomalies" bigquery:"anomalies"`
+	Web100_log_entry Web100LogEntry `json:"web100_log_entry" bigquery:"web100_log_entry"`
 }
 
 // Implement parser.Annotatable
@@ -231,4 +237,20 @@ func (ss *SS) AnnotateServer(local *api.Annotations) error {
 		// TODO Handle ASN
 	}
 	return nil
+}
+
+func (ss *SS) Schema() (bigquery.Schema, error) {
+	sch, err := bigquery.InferSchema(ss)
+	if err != nil {
+		return bigquery.Schema{}, err
+	}
+	// NOTE: ideally, we would use bqx.Customize for this fix. However, the SS
+	// schema uses two fields with the same name but different types (log_time
+	// and web100_log_entry.log_time), and bqx.Customize would change them both.
+	// This only changes the type of the necessary field.
+	if len(sch) > 2 && sch[2].Name == "log_time" {
+		sch[2].Type = "TIMESTAMP"
+	}
+	rr := bqx.RemoveRequired(sch)
+	return rr, nil
 }
