@@ -110,6 +110,7 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 	rw.swapForWritingToken()
 	defer rw.releaseWritingToken()
 
+	start := time.Now()
 	n, err := buf.WriteTo(rw.w) // This is buffered (by 4MB chunks).  Are the writes to GCS synchronous?
 retry:
 	// Retry for up to 1 minute
@@ -117,12 +118,12 @@ retry:
 		switch typedErr := err.(type) {
 		case *googleapi.Error:
 			// Retry the write...
-			time.Sleep(2 * time.Second)
-			log.Println("Retrying after", n, "of", numBytes, "bytes", typedErr, rw.bucket, rw.path)
+			time.Sleep(20 * time.Second)
+			log.Printf("Retrying after %d of %d bytes %s %v %v/%v\n", n, numBytes, time.Since(start).Round(time.Second).String(), typedErr, rw.bucket, rw.path)
 			var n2 int64
 			n2, err = buf.WriteTo(rw.w)
 			if err == nil {
-				log.Println("Retry succeeded", n, n2)
+				log.Printf("Retry succeeded after %s, %d of %d bytes\n", time.Since(start).Round(time.Second).String(), n, n2)
 				break retry
 			}
 			n += n2
