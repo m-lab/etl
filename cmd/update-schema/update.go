@@ -50,6 +50,13 @@ func CreateOrUpdateSS(project string, dataset string, table string) error {
 
 	return CreateOrUpdate(schema, project, dataset, table, "")
 }
+func CreateOrUpdateNDTWeb100(project string, dataset string, table string) error {
+	row := schema.NDTWeb100{}
+	schema, err := row.Schema()
+	rtx.Must(err, "NDTWeb100.Schema")
+
+	return CreateOrUpdate(schema, project, dataset, table, "")
+}
 
 func CreateOrUpdateNDT5ResultRow(project string, dataset string, table string) error {
 	row := schema.NDT5ResultRow{}
@@ -184,6 +191,12 @@ func updateLegacyTables(project string) int {
 	if err := CreateOrUpdateSS(project, "batch", "sidestream"); err != nil {
 		errCount++
 	}
+	if err := CreateOrUpdateNDTWeb100(project, "base_tables", "ndt"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateNDTWeb100(project, "batch", "ndt"); err != nil {
+		errCount++
+	}
 	if err := CreateOrUpdateNDT5ResultRow(project, "base_tables", "ndt5"); err != nil {
 		errCount++
 	}
@@ -251,6 +264,13 @@ func main() {
 			errCount++
 		}
 		if err := CreateOrUpdateSS(*project, "batch", "sidestream"); err != nil {
+			errCount++
+		}
+	case "ndt":
+		if err := CreateOrUpdateNDTWeb100(*project, "base_tables", "ndt"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateNDTWeb100(*project, "batch", "ndt"); err != nil {
 			errCount++
 		}
 
