@@ -14,6 +14,20 @@ import (
 	v2as "github.com/m-lab/annotation-service/api/v2"
 )
 
+// unused, but performs compile time validation
+func assertTestRowAnnotatable(r *Row) {
+	func(row.Annotatable) {}(r)
+}
+
+// unused, but performs compile time validation
+func assertSink(in row.Sink) {
+	func(in row.Sink) {}(&inMemorySink{})
+}
+
+func assertBQInserterIsSink(in row.Sink) {
+	func(in row.Sink) {}(&bq.BQInserter{})
+}
+
 // Implement parser.Annotatable
 
 type Row struct {
@@ -22,8 +36,6 @@ type Row struct {
 	clientAnn *api.Annotations
 	serverAnn *api.Annotations
 }
-
-type BadRow struct{}
 
 func (row *Row) GetClientIPs() []string {
 	return []string{row.client}
@@ -47,14 +59,6 @@ func (row *Row) GetLogTime() time.Time {
 	return time.Now()
 }
 
-func assertTestRowAnnotatable(r *Row) {
-	func(row.Annotatable) {}(r)
-}
-
-func assertSink(in row.Sink) {
-	func(in row.Sink) {}(&inMemorySink{})
-}
-
 type inMemorySink struct {
 	data      []interface{}
 	committed int
@@ -75,7 +79,7 @@ func (in *inMemorySink) Commit(data []interface{}, label string) (int, error) {
 func (in *inMemorySink) Close() error { return nil }
 
 func TestBase(t *testing.T) {
-	ins := &inMemorySink{}
+	ins := newInMemorySink()
 
 	// Set up fake annotation service
 	r1 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
@@ -129,7 +133,7 @@ func TestBase(t *testing.T) {
 }
 
 func TestAsyncPut(t *testing.T) {
-	ins := &inMemorySink{}
+	ins := newInMemorySink()
 
 	// Set up fake annotation service
 	r1 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
@@ -180,8 +184,4 @@ func TestAsyncPut(t *testing.T) {
 	if inserted.serverAnn == nil || inserted.serverAnn.Geo.PostalCode != "10584" {
 		t.Error("Failed server annotation")
 	}
-}
-
-func assertBQInserterIsSink(in row.Sink) {
-	func(in row.Sink) {}(&bq.BQInserter{})
 }
