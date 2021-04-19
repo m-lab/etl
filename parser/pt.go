@@ -203,7 +203,7 @@ func ParseJSONL(testName string, rawContent []byte, tableName string, taskFilena
 	if len(jsonStrings) != 5 {
 		log.Println("Invalid test", taskFilename, "  ", testName)
 		log.Println(len(jsonStrings))
-		return schema.PTTest{}, errors.New("Invalid test")
+		return schema.PTTest{}, errors.New("invalid test")
 	}
 
 	// Parse the first line for meta info.
@@ -247,7 +247,7 @@ func ParseJSONL(testName string, rawContent []byte, tableName string, taskFilena
 			return schema.PTTest{}, err
 		}
 	}
-	for i, _ := range tracelb.Nodes {
+	for i := range tracelb.Nodes {
 		oneNode := &tracelb.Nodes[i]
 		var links []schema.HopLink
 		if len(oneNode.Links) == 0 {
@@ -438,20 +438,20 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 		if index == 0 {
 			segments := strings.Split(part, " ")
 			if len(segments) != 4 {
-				return "", "", "", errors.New("corrupted first line.")
+				return "", "", "", errors.New("corrupted first line")
 			}
 			if len(segments[1]) <= 2 || !strings.HasPrefix(segments[1], "[(") || len(segments[3]) <= 2 || !strings.HasPrefix(segments[3], "(") {
-				return "", "", "", errors.New("Invalid data format in the first line.")
+				return "", "", "", errors.New("invalid data format in the first line")
 			}
 			serverIPIndex := strings.LastIndex(segments[1], ":")
 			destIPIndex := strings.LastIndex(segments[3], ":")
 			if serverIPIndex < 3 || destIPIndex < 2 {
-				return "", "", "", errors.New("Invalid data format in the first line.")
+				return "", "", "", errors.New("invalid data format in the first line")
 			}
 			serverIP = segments[1][2:serverIPIndex]
 			destIP = segments[3][1:destIPIndex]
 			if net.ParseIP(serverIP) == nil || net.ParseIP(destIP) == nil {
-				return "", "", "", errors.New("Invalid IP address in the first line.")
+				return "", "", "", errors.New("invalid IP address in the first line")
 			}
 			continue
 		}
@@ -465,7 +465,7 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 			if mm[0] == "protocol" {
 				if mm[1] != "icmp" && mm[1] != "udp" && mm[1] != "tcp" {
 					log.Printf("Unknown protocol")
-					return "", "", "", errors.New("Unknown protocol")
+					return "", "", "", errors.New("unknown protocol")
 				} else {
 					protocol = mm[1]
 				}
@@ -555,13 +555,11 @@ func (pt *PTParser) IsParsable(testName string, data []byte) (string, bool) {
 func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(pt.TableName(), "pt").Inc()
 	defer metrics.WorkerState.WithLabelValues(pt.TableName(), "pt").Dec()
-	testId := filepath.Base(testName)
-	if meta["filename"] != nil {
-		testId = CreateTestId(meta["filename"].(string), filepath.Base(testName))
-		pt.taskFileName = meta["filename"].(string)
-	} else {
+	if meta["filename"] == nil {
 		return errors.New("empty filename")
 	}
+	testId := CreateTestId(meta["filename"].(string), filepath.Base(testName))
+	pt.taskFileName = meta["filename"].(string)
 
 	// Process json output from traceroute-caller
 	if strings.HasSuffix(testName, ".json") {
@@ -669,7 +667,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 		return errors.New("corrupted input")
 	}
 	if parts[3] != "ms" {
-		return errors.New("Malformed line. Expected 'ms'")
+		return errors.New("malformed line. Expected 'ms'")
 	}
 	var rtt []float64
 	//TODO: to use regexp here.
@@ -688,7 +686,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 	case protocol == "icmp":
 		nums := strings.Split(parts[2], "/")
 		if len(nums) != 4 {
-			return errors.New("Failed to parse rtts for icmp test. 4 numbers expected")
+			return errors.New("failed to parse rtts for icmp test. 4 numbers expected")
 		}
 		for _, num := range nums {
 			oneRtt, err := strconv.ParseFloat(num, 64)
@@ -765,7 +763,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 			}
 		}
 	default:
-		return errors.New("Wrong format for IP address.")
+		return errors.New("wrong format for IP address")
 	}
 	return nil
 }
@@ -859,7 +857,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 
 	if len(allNodes) == 0 {
 		// Empty test, stop here.
-		return cachedPTData{}, errors.New("Empty test")
+		return cachedPTData{}, errors.New("empty test")
 	}
 	// Check whether the last hop is the destIP
 	fileName := ""

@@ -169,16 +169,16 @@ func TestParseJSONLComplex(t *testing.T) {
 		Source: schema.HopIP{IP: "2001:550:1b01:1::1", ASN: 0},
 		Linkc:  1,
 		Links: []schema.HopLink{
-			schema.HopLink{
+			{
 				HopDstIP: "2001:550:3::1ca",
 				TTL:      2,
 				Probes: []schema.HopProbe{
-					schema.HopProbe{Flowid: 1, Rtt: []float64{36.803}},
-					schema.HopProbe{Flowid: 2, Rtt: []float64{0.332}},
-					schema.HopProbe{Flowid: 3, Rtt: []float64{0.329}},
-					schema.HopProbe{Flowid: 4, Rtt: []float64{0.567}},
-					schema.HopProbe{Flowid: 5, Rtt: []float64{0.329}},
-					schema.HopProbe{Flowid: 6, Rtt: []float64{1.237}},
+					{Flowid: 1, Rtt: []float64{36.803}},
+					{Flowid: 2, Rtt: []float64{0.332}},
+					{Flowid: 3, Rtt: []float64{0.329}},
+					{Flowid: 4, Rtt: []float64{0.567}},
+					{Flowid: 5, Rtt: []float64{0.329}},
+					{Flowid: 6, Rtt: []float64{1.237}},
 				},
 			},
 		},
@@ -204,14 +204,14 @@ func TestParseFirstLine(t *testing.T) {
 	}
 
 	line = "Exception : [ERROR](Probe.cc, 109)Can't send the probe : Invalid argument"
-	protocol, dest_ip, server_ip, err = parser.ParseFirstLine(line)
+	_, _, _, err = parser.ParseFirstLine(line)
 	if err == nil {
 		t.Errorf("Should return error for err message on the first line!\n")
 		return
 	}
 
 	line = "traceroute to 35.243.216.203 (35.243.216.203), 30 hops max, 30 bytes packets"
-	protocol, dest_ip, server_ip, err = parser.ParseFirstLine(line)
+	_, _, _, err = parser.ParseFirstLine(line)
 	if err == nil {
 		t.Errorf("Should return error for unknown first line format!\n")
 		return
@@ -268,7 +268,7 @@ func TestParseJSONL(t *testing.T) {
 }
 
 func TestParse(t *testing.T) {
-	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
+	rawData, _ := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	cachedTest, err := parser.Parse(nil, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -295,11 +295,11 @@ func TestParse(t *testing.T) {
 		},
 		Linkc: 0,
 		Links: []schema.HopLink{
-			schema.HopLink{
+			{
 				HopDstIP: "74.125.224.100",
 				TTL:      0,
 				Probes: []schema.HopProbe{
-					schema.HopProbe{
+					{
 						Flowid: 0,
 						Rtt:    []float64{0.895},
 					},
