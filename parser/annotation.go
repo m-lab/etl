@@ -33,7 +33,7 @@ type AnnotationParser struct {
 type nullAnnotator struct{}
 
 func (ann *nullAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2as.Response, error) {
-	return &v2as.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
+	return &v2as.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations)}, nil
 }
 
 // NewAnnotationParser creates a new parser for annotation data.

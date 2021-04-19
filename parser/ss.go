@@ -48,7 +48,7 @@ func ExtractLogtimeFromFilename(fileName string) (time.Time, error) {
 	testName := filepath.Base(fileName)
 	if len(testName) < 19 || !strings.Contains(testName, ".web100") {
 		log.Println(testName)
-		return time.Time{}, errors.New("Invalid sidestream filename")
+		return time.Time{}, errors.New("invalid sidestream filename")
 	}
 
 	t, err := time.Parse("20060102T15:04:05.999999999Z_", testName[0:17]+".000000000Z_")
@@ -64,7 +64,7 @@ func ParseKHeader(header string) ([]string, error) {
 	var varNames []string
 	web100Vars := strings.Split(header, " ")
 	if web100Vars[0] != "K:" {
-		return varNames, errors.New("Corrupted header")
+		return varNames, errors.New("corrupted header")
 	}
 
 	data, err := web100.Asset("tcp-kis.txt")
@@ -148,7 +148,7 @@ func ParseOneLine(snapshot string, varNames []string) (map[string]string, error)
 	ssValue := make(map[string]string)
 	if value[0] != "C:" || len(value) != len(varNames)+1 {
 		log.Printf("corrupted content:")
-		log.Printf(snapshot)
+		log.Println(snapshot)
 		return ssValue, errors.New("corrupted content")
 	}
 

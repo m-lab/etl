@@ -48,7 +48,8 @@ func (row *Row) GetLogTime() time.Time {
 	return time.Now()
 }
 
-func assertTestRowAnnotatable(r *Row) {
+// AssertTestRowAnnotatable isn't called anywhere, but confirms interface at compile time.
+func AssertTestRowAnnotatable(r *Row) {
 	func(row.Annotatable) {}(r)
 }
 
