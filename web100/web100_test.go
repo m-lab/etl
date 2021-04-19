@@ -93,7 +93,7 @@ func TestSnapshotContent(t *testing.T) {
 	var old SimpleSaver
 
 	json.Unmarshal([]byte(old1), &old)
-	snapshot, err := slog.Snapshot(1)
+	snapshot, _ := slog.Snapshot(1)
 	snapshot.SnapshotValues(&saver)
 	if !reflect.DeepEqual(old, saver) {
 		t.Error("Does not match old output")
@@ -103,7 +103,7 @@ func TestSnapshotContent(t *testing.T) {
 	}
 
 	json.Unmarshal([]byte(old1000), &old)
-	snapshot, err = slog.Snapshot(1000)
+	snapshot, _ = slog.Snapshot(1000)
 	snapshot.SnapshotValues(&saver)
 	if !reflect.DeepEqual(old, saver) {
 		t.Error("Does not match old output")
@@ -113,7 +113,7 @@ func TestSnapshotContent(t *testing.T) {
 	}
 
 	json.Unmarshal([]byte(old2000), &old)
-	snapshot, err = slog.Snapshot(2000)
+	snapshot, _ = slog.Snapshot(2000)
 	snapshot.SnapshotValues(&saver)
 	if !reflect.DeepEqual(old, saver) {
 		t.Error("Does not match old output")
@@ -151,7 +151,8 @@ func OneSnapshot(t *testing.T, name string, n int) {
 }
 
 // These files are in a different format, so don't try to parse them.
-func xTestSnapshot200903(t *testing.T) {
+func TestSnapshot200903(t *testing.T) {
+	t.Skip("Different format - skip test")
 	OneSnapshot(t, "20090301T22:29:43.653205000Z-78.61.75.41:33538.s2c_snaplog", 2000)
 	OneSnapshot(t, "20090301T22:29:43.653205000Z_78.61.75.41:46267.c2s_snaplog", 2000)
 }
@@ -207,7 +208,7 @@ func TestChangeIndices(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	slog, err := web100.NewSnapLog(c2sData)
+	slog, _ := web100.NewSnapLog(c2sData)
 
 	x, err := slog.ChangeIndices("CongestionSignals")
 	if err != nil {
@@ -225,7 +226,7 @@ func BenchmarkChangeIndices(b *testing.B) {
 		b.Fatalf(err.Error())
 	}
 
-	slog, err := web100.NewSnapLog(data)
+	slog, _ := web100.NewSnapLog(data)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {

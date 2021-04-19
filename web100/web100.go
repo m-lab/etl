@@ -197,7 +197,7 @@ func NewVariable(s string) (*Variable, error) {
 // IPFromBytes handles the 17 byte web100 IP address fields.
 func IPFromBytes(data []byte) (net.IP, error) {
 	if len(data) != 17 {
-		return net.IP{}, errors.New("Wrong number of bytes")
+		return net.IP{}, errors.New("wrong number of bytes")
 	}
 	switch addrType(data[16]) {
 	case WEB100_ADDRTYPE_IPV4:
@@ -207,7 +207,7 @@ func IPFromBytes(data []byte) (net.IP, error) {
 	case WEB100_ADDRTYPE_UNKNOWN:
 		fallthrough
 	default:
-		return nil, errors.New("Invalid IP encoding")
+		return nil, errors.New("invalid IP encoding")
 	}
 }
 
@@ -271,7 +271,7 @@ func (v *Variable) Save(data []byte, snapValues Saver) error {
 		// TODO - use byte array?
 		snapValues.SetInt64(canonicalName, int64(data[0]))
 	default:
-		return errors.New("Invalid field type")
+		return errors.New("invalid field type")
 	}
 	return nil
 }
@@ -363,7 +363,7 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (*fieldS
 		return nil, err
 	}
 	if pre != preamble {
-		return nil, errors.New("Expected preamble: " +
+		return nil, errors.New("expected preamble: " +
 			// Strip terminal \n from each string for readability.
 			preamble[:len(preamble)-1] + " != " + pre[:len(pre)-1])
 	}
@@ -373,9 +373,9 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (*fieldS
 		// line length is max var name size, plus 20 bytes for the 3 numeric fields.
 		if err != nil || len(line) > VARNAME_LEN_MAX+20 {
 			if err == io.EOF {
-				return nil, errors.New("Encountered EOF")
+				return nil, errors.New("encountered EOF")
 			}
-			return nil, errors.New("Corrupted header")
+			return nil, errors.New("corrupted header")
 		}
 		if line == terminator {
 			return fields, nil
@@ -385,7 +385,7 @@ func parseFields(buf *bytes.Buffer, preamble string, terminator string) (*fieldS
 			return nil, err
 		}
 		if fields.Length != v.Offset {
-			return nil, errors.New("Bad offset at " + line[:len(line)-2])
+			return nil, errors.New("bad offset at " + line[:len(line)-2])
 		}
 		fields.FieldMap[v.Name] = len(fields.Fields)
 		fields.Fields = append(fields.Fields, *v)
@@ -401,7 +401,7 @@ func parseConnectionSpec(buf *bytes.Buffer) (connectionSpec, error) {
 	raw := make([]byte, 16)
 	n, err := buf.Read(raw)
 	if err != nil || n < 16 {
-		return connectionSpec{}, errors.New("Too few bytes for connection spec")
+		return connectionSpec{}, errors.New("too few bytes for connection spec")
 	}
 	// WARNING - the web100 code seemingly depends on a 32 bit architecture.
 	// There is no "packed" directive for the web100_connection_spec, and the
@@ -433,7 +433,7 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	}
 	if empty != "\n" {
 		fmt.Printf("%v\n", []byte(empty))
-		return nil, errors.New("Expected empty string")
+		return nil, errors.New("expected empty string")
 	}
 
 	// TODO - do these header elements always come in this order.
@@ -460,7 +460,7 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	t := make([]byte, 4)
 	n, err := buf.Read(t)
 	if err != nil || n < 4 {
-		return nil, errors.New("Too few bytes for logTime")
+		return nil, errors.New("too few bytes for logTime")
 	}
 	logTime := binary.LittleEndian.Uint32(t)
 
@@ -472,13 +472,13 @@ func NewSnapLog(raw []byte) (*SnapLog, error) {
 	gn := make([]byte, GROUPNAME_LEN_MAX)
 	n, err = buf.Read(gn)
 	if err != nil || n != GROUPNAME_LEN_MAX {
-		return nil, errors.New("Too few bytes for groupName")
+		return nil, errors.New("too few bytes for groupName")
 	}
 	// The groupname is a C char*, terminated with a null character.
 	groupName := strings.SplitN(string(gn), "\000", 2)[0]
 	if groupName != "read" {
 		fmt.Println(groupName)
-		return nil, errors.New("Only 'read' group is supported")
+		return nil, errors.New("only 'read' group is supported")
 	}
 
 	connSpecOffset := len(raw) - buf.Len()
@@ -556,7 +556,7 @@ func (snap *Snapshot) reset(data []byte, fields *fieldSet) {
 // SnapshotValues writes all values into the provided Saver.
 func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 	if snap.raw == nil {
-		return errors.New("Empty/Invalid Snaplog")
+		return errors.New("empty/invalid Snaplog")
 	}
 	var field Variable
 	for _, field = range snap.fields.Fields {
@@ -569,7 +569,7 @@ func (snap *Snapshot) SnapshotValues(snapValues Saver) error {
 // SnapshotDeltas writes changed values into the provided Saver.
 func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 	if snap.raw == nil {
-		return errors.New("Empty/Invalid Snaplog")
+		return errors.New("empty/invalid Snaplog")
 	}
 	if other.raw == nil {
 		// If other is empty, return full snapshot
@@ -579,7 +579,7 @@ func (snap *Snapshot) SnapshotDeltas(other *Snapshot, snapValues Saver) error {
 	for _, field = range snap.fields.Fields {
 		a := other.raw[field.Offset : field.Offset+field.Size]
 		b := snap.raw[field.Offset : field.Offset+field.Size]
-		if bytes.Compare(a, b) != 0 {
+		if !bytes.Equal(a, b) {
 			// Interpret and save the web100 field value.
 			field.Save(b, snapValues)
 		}
@@ -593,7 +593,7 @@ func (sl *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
 	result := make([]int, 0, 100)
 	field := sl.read.find(fieldName)
 	if field == nil {
-		return nil, errors.New("Field not found")
+		return nil, errors.New("field not found")
 	}
 	last := make([]byte, field.Size)
 	var s Snapshot // This saves about 2 usec, compared with creating new Snapshot for each row.
@@ -607,7 +607,7 @@ func (sl *SnapLog) ChangeIndices(fieldName string) ([]int, error) {
 		s.reset(sl.raw[offset+len(BEGIN_SNAP_DATA):offset+sl.read.Length], &sl.read)
 
 		data := s.raw[field.Offset : field.Offset+field.Size]
-		if bytes.Compare(data, last) != 0 {
+		if !bytes.Equal(data, last) {
 			result = append(result, i)
 		}
 		last = data
