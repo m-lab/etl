@@ -215,7 +215,7 @@ func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 	rawFileName := rq.FormValue("filename")
 	status, msg := subworker(rawFileName, executionCount, retryCount, age)
 	rwr.WriteHeader(status)
-	fmt.Fprintf(rwr, msg)
+	fmt.Fprint(rwr, msg)
 }
 
 func subworker(rawFileName string, executionCount, retryCount int, age time.Duration) (status int, msg string) {
@@ -334,25 +334,25 @@ func startServers(ctx context.Context, mux http.Handler) *errgroup.Group {
 	// This publishes the service port for use in unit tests.
 	mainServerAddr <- server.Addr
 
-	select {
-	case <-ctx.Done():
-		// This currently only executes when the context is cancelled
-		// by unit tests.  It does not yet execute in production.
-		log.Println("Shutting down servers")
-		ctx, cancel := context.WithTimeout(context.Background(), *shutdownTimeout)
-		defer cancel()
-		start := time.Now()
-		eg := errgroup.Group{}
-		eg.Go(func() error {
-			return server.Shutdown(ctx)
-		})
-		eg.Go(func() error {
-			return promServer.Shutdown(ctx)
-		})
-		eg.Wait()
-		log.Println("Shutdown took", time.Since(start))
-		return &eg
-	}
+	// Wait for shutdown
+	<-ctx.Done()
+
+	// This currently only executes when the context is cancelled
+	// by unit tests.  It does not yet execute in production.
+	log.Println("Shutting down servers")
+	ctx, cancel := context.WithTimeout(context.Background(), *shutdownTimeout)
+	defer cancel()
+	start := time.Now()
+	eg := errgroup.Group{}
+	eg.Go(func() error {
+		return server.Shutdown(ctx)
+	})
+	eg.Go(func() error {
+		return promServer.Shutdown(ctx)
+	})
+	eg.Wait()
+	log.Println("Shutdown took", time.Since(start))
+	return &eg
 }
 
 func main() {

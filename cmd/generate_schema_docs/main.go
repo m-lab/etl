@@ -60,7 +60,7 @@ func init() {
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, usage)
+		fmt.Fprint(os.Stderr, usage)
 		fmt.Fprintln(os.Stderr, "Flags:")
 		flag.PrintDefaults()
 	}

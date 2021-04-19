@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"google.golang.org/api/googleapi"
 
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/go/flagx"
@@ -108,11 +107,6 @@ func CreateOrUpdate(schema bigquery.Schema, project, dataset, table, partField s
 	}
 	log.Println("UpdateTable failed:", err)
 	// TODO add specific error handling for incompatible schema change
-
-	apiErr, ok := err.(*googleapi.Error)
-	if !ok || apiErr.Code != 404 {
-		// TODO - different behavior on specific error types?
-	}
 
 	partitioning := &bigquery.TimePartitioning{
 		Field: partField,
