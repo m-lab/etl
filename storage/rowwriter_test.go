@@ -25,7 +25,7 @@ func TestRowWriter(t *testing.T) {
 	defer server.Stop()
 
 	bucket := "fake-bucket"
-	server.CreateBucket(bucket)
+	server.CreateBucketWithOpts(fgs.CreateBucketOpts{Name: bucket})
 	c := server.Client()
 
 	file := "foobar-file"

@@ -181,7 +181,7 @@ type SinkFactory struct {
 func pathAndFilename(uri string) (string, error) {
 	parts := strings.SplitN(uri, "/", 4)
 	if len(parts) != 4 || parts[0] != "gs:" || len(parts[3]) == 0 {
-		return "", errors.New("Bad GCS path")
+		return "", errors.New("bad GCS path")
 	}
 	return parts[3], nil
 }
