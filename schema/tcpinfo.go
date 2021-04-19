@@ -68,10 +68,6 @@ func (row *TCPRow) CopySocketInfo() {
 	row.Client = &ClientInfo{IP: row.SockID.DstIP, Port: row.SockID.DPort}
 }
 
-func assertTCPRowIsValueSaver(r *TCPRow) {
-	func(bigquery.ValueSaver) {}(r)
-}
-
 func init() {
 	var err error
 	tcpSchema, err = (&TCPRow{}).Schema()

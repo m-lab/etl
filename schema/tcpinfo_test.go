@@ -1,54 +1,21 @@
 package schema_test
 
 import (
-	"archive/tar"
-	"compress/gzip"
-	"errors"
-	"io"
-	"os"
 	"reflect"
-	"strings"
 	"testing"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/tcp-info/inetdiag"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/schema"
-	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/tcp-info/snapshot"
 )
 
-// TODO - move this to storage for general use.
-func fileSource(fn string) (etl.TestSource, error) {
-	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
-		strings.HasSuffix(fn, ".tar.gz")) {
-		return nil, errors.New("not tar or tgz: " + fn)
-	}
-
-	var rdr io.ReadCloser
-	var raw io.ReadCloser
-	raw, err := os.Open(fn)
-	if err != nil {
-		return nil, err
-	}
-	// Handle .tar.gz, .tgz files.
-	if strings.HasSuffix(strings.ToLower(fn), "gz") {
-		rdr, err = gzip.NewReader(raw)
-		if err != nil {
-			raw.Close()
-			return nil, err
-		}
-	} else {
-		rdr = raw
-	}
-	tarReader := tar.NewReader(rdr)
-
-	timeout := 16 * time.Millisecond
-	return &storage.GCSSource{TarReader: tarReader, Closer: raw, RetryBaseTime: timeout, TableBase: "test"}, nil
+// unused, but performs compile time validation
+func assertTCPRowIsValueSaver(r *schema.TCPRow) {
+	func(bigquery.ValueSaver) {}(r)
 }
 
 func TestBQSaver(t *testing.T) {

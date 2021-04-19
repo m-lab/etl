@@ -17,23 +17,23 @@ type HopIP struct {
 	City        string `json:"city"`
 	CountryCode string `json:"country_code"`
 	Hostname    string `json:"hostname"`
-	ASN         uint32 `json:"asn,uint32"`
+	ASN         uint32 `json:"asn"`
 }
 
 type HopProbe struct {
-	Flowid int64     `json:"flowid,int64"`
+	Flowid int64     `json:"flowid"`
 	Rtt    []float64 `json:"rtt"`
 }
 
 type HopLink struct {
 	HopDstIP string     `json:"hop_dst_ip"`
-	TTL      int64      `json:"ttl,int64"`
+	TTL      int64      `json:"ttl"`
 	Probes   []HopProbe `json:"probes"`
 }
 
 type ScamperHop struct {
 	Source HopIP     `json:"source"`
-	Linkc  int64     `json:"linkc,int64"`
+	Linkc  int64     `json:"linkc"`
 	Links  []HopLink `json:"link"`
 }
 
@@ -41,16 +41,16 @@ type PTTest struct {
 	UUID           string       `json:"uuid" bigquery:"uuid"`
 	TestTime       time.Time    `json:"testtime"`
 	Parseinfo      ParseInfoV0  `json:"parseinfo"`
-	StartTime      int64        `json:"start_time,int64" bigquery:"start_time"`
-	StopTime       int64        `json:"stop_time,int64" bigquery:"stop_time"`
+	StartTime      int64        `json:"start_time" bigquery:"start_time"`
+	StopTime       int64        `json:"stop_time" bigquery:"stop_time"`
 	ScamperVersion string       `json:"scamper_version" bigquery:"scamper_version"`
 	Source         ServerInfo   `json:"source"`
 	Destination    ClientInfo   `json:"destination"`
-	ProbeSize      int64        `json:"probe_size,int64"`
-	ProbeC         int64        `json:"probec,int64"`
+	ProbeSize      int64        `json:"probe_size"`
+	ProbeC         int64        `json:"probec"`
 	Hop            []ScamperHop `json:"hop"`
 	ExpVersion     string       `json:"exp_version" bigquery:"exp_version"`
-	CachedResult   bool         `json:"cached_result,bool" bigquery:"cached_result"`
+	CachedResult   bool         `json:"cached_result" bigquery:"cached_result"`
 }
 
 // Schema returns the Bigquery schema for PTTest.
@@ -82,7 +82,7 @@ func (row *PTTest) GetClientIPs() []string {
 		requestIPs[hop.Source.IP] = true
 	}
 	batchRequest := make([]string, 0, len(requestIPs))
-	for key, _ := range requestIPs {
+	for key := range requestIPs {
 		batchRequest = append(batchRequest, key)
 	}
 	return batchRequest
@@ -94,7 +94,7 @@ func (row *PTTest) GetServerIP() string {
 }
 
 func (row *PTTest) AnnotateHops(annMap map[string]*api.Annotations) error {
-	for index, _ := range row.Hop {
+	for index := range row.Hop {
 		ann, ok := annMap[row.Hop[index].Source.IP]
 		if !ok {
 			metrics.AnnotationMissingCount.WithLabelValues("No annotation for PT hop").Inc()

@@ -17,8 +17,8 @@ import (
 // Deprecated - use V1 for Gardener 2.0
 type NDT5ResultRow struct {
 	ParseInfo *ParseInfoV0
-	TestID    string          `json:"test_id,string" bigquery:"test_id"`
-	LogTime   int64           `json:"log_time,int64" bigquery:"log_time"`
+	TestID    string          `json:"test_id" bigquery:"test_id"`
+	LogTime   int64           `json:"log_time" bigquery:"log_time"`
 	Result    data.NDT5Result `json:"result" bigquery:"result"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.

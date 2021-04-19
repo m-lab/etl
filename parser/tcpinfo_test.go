@@ -29,6 +29,7 @@ func assertTCPInfoParser(in *parser.TCPInfoParser) {
 	func(p etl.Parser) {}(in)
 }
 
+// TODO - move this to storage for general use.
 func fileSource(fn string) (etl.TestSource, error) {
 	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
 		strings.HasSuffix(fn, ".tar.gz")) {

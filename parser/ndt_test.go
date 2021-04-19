@@ -20,6 +20,11 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
+// unused, but performs a compile time validation
+func assertSaver(ms schema.Web100ValueMap) {
+	func(bigquery.ValueSaver) {}(ms)
+}
+
 // unused, but performs compile time validation
 func assertNDTTestIsAnnotatable(r parser.NDTTest) {
 	func(row.Annotatable) {}(r)

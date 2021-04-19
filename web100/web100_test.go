@@ -9,8 +9,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/m-lab/etl/web100"
 	pipe "gopkg.in/m-lab/pipe.v3"
+
+	"github.com/m-lab/etl/web100"
 )
 
 func init() {

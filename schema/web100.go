@@ -19,10 +19,6 @@ func (s Web100ValueMap) Save() (row map[string]bigquery.Value, insertID string, 
 	return s, "", nil
 }
 
-func assertSaver(ms Web100ValueMap) {
-	func(bigquery.ValueSaver) {}(ms)
-}
-
 // Get returns the contained map, or nil if it doesn't exist.
 // This works for either Web100ValueMap or map[string]bigquery.Value
 func (vm Web100ValueMap) Get(name string) Web100ValueMap {
@@ -30,10 +26,11 @@ func (vm Web100ValueMap) Get(name string) Web100ValueMap {
 	if !ok {
 		return nil
 	}
-	switch wl.(type) {
+	switch typed_wl := wl.(type) {
 	case map[string]bigquery.Value:
-		return Web100ValueMap(wl.(map[string]bigquery.Value))
+		return Web100ValueMap(typed_wl) // ok to cast - same underlying type
 	default:
+		// Could this cause a runtime exception?
 		return wl.(Web100ValueMap)
 	}
 }
