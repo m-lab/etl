@@ -24,12 +24,19 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+//lint:ignore U1000 compile time assertions
 func assertInserter(in etl.Inserter) {
 	func(in etl.Inserter) {}(&bq.BQInserter{})
 }
 
+//lint:ignore U1000 compile time assertions
 func assertSinkFactory(f factory.SinkFactory) {
 	func(f factory.SinkFactory) {}(bq.NewSinkFactory())
+}
+
+//lint:ignore U1000 compile time assertions
+func assertSaver(ms bq.MapSaver) {
+	func(bigquery.ValueSaver) {}(ms)
 }
 
 func TestSinkFactory(t *testing.T) {

@@ -17,14 +17,6 @@ import (
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
-type badProvider struct {
-	err error
-}
-
-func (b badProvider) Get(_ context.Context) ([]byte, error) {
-	return nil, b.err
-}
-
 var (
 	localRawfile content.Provider
 	corruptFile  content.Provider

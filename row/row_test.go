@@ -14,16 +14,17 @@ import (
 	v2as "github.com/m-lab/annotation-service/api/v2"
 )
 
-// unused, but performs compile time validation
+//lint:ignore U1000 compile time assertions
 func assertTestRowAnnotatable(r *Row) {
 	func(row.Annotatable) {}(r)
 }
 
-// unused, but performs compile time validation
+//lint:ignore U1000 compile time assertions
 func assertSink(in row.Sink) {
 	func(in row.Sink) {}(&inMemorySink{})
 }
 
+//lint:ignore U1000 compile time assertions
 func assertBQInserterIsSink(in row.Sink) {
 	func(in row.Sink) {}(&bq.BQInserter{})
 }

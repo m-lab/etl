@@ -20,17 +20,17 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
-// unused, but performs a compile time validation
+//lint:ignore U1000 compile time assertions
 func assertSaver(ms schema.Web100ValueMap) {
 	func(bigquery.ValueSaver) {}(ms)
 }
 
-// unused, but performs compile time validation
+//lint:ignore U1000 compile time assertions
 func assertNDTTestIsAnnotatable(r parser.NDTTest) {
 	func(row.Annotatable) {}(r)
 }
 
-// unused, but performs compile time validation
+//lint:ignore U1000 compile time assertions
 func assertNDTTestIsValueSaver(r parser.NDTTest) {
 	func(bigquery.ValueSaver) {}(r)
 }
@@ -296,7 +296,7 @@ func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100V
 	return match
 }
 
-// assertInserter does a compile time check.
+//lint:ignore U1000 compile time assertions
 func assertInserter(in etl.Inserter) {
 	func(in etl.Inserter) {}(&inMemoryInserter{})
 }

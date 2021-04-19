@@ -114,24 +114,6 @@ func generateRichMarkdown(s bigquery.Schema, t schemaGenerator) []byte {
 	return buf.Bytes()
 }
 
-// TODO: remove this function if it turns out to be replaced by generateRichMarkdown.
-func generateMarkdown(schema bigquery.Schema) []byte {
-	buf := &bytes.Buffer{}
-	fmt.Fprintln(buf, "| Field name       | Type       | Description    |")
-	fmt.Fprintln(buf, "| :----------------|:----------:|:---------------|")
-	bqx.WalkSchema(schema, func(prefix []string, field *bigquery.FieldSchema) error {
-		var path string
-		if len(prefix) == 1 {
-			path = ""
-		} else {
-			path = strings.Join(prefix[:len(prefix)-1], ".") + "."
-		}
-		fmt.Fprintf(buf, "| %s**%s** | %s | %s |\n", path, prefix[len(prefix)-1], field.Type, field.Description)
-		return nil
-	})
-	return buf.Bytes()
-}
-
 // All record structs define a Schema method. This interface allows us to
 // process each of them easily.
 type schemaGenerator interface {

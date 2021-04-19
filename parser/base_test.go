@@ -48,8 +48,8 @@ func (row *Row) GetLogTime() time.Time {
 	return time.Now()
 }
 
-// AssertTestRowAnnotatable isn't called anywhere, but confirms interface at compile time.
-func AssertTestRowAnnotatable(r *Row) {
+//lint:ignore U1000 compile time assertions
+func assertTestRowAnnotatable(r *Row) {
 	func(row.Annotatable) {}(r)
 }
 

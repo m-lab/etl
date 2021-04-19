@@ -25,6 +25,9 @@ import (
 type RowWriter struct {
 	w stiface.Writer
 	o stiface.ObjectHandle
+
+	// this attribute struct can be used to accumulate attributes that
+	// will be added to the final file on close.
 	a gcs.ObjectAttrsToUpdate
 
 	rows     int
@@ -156,16 +159,15 @@ func (rw *RowWriter) Close() error {
 		return err
 	}
 
-	oa := gcs.ObjectAttrsToUpdate{}
-	oa.Metadata = make(map[string]string, 1)
-	oa.Metadata["rows"] = fmt.Sprint(rw.rows)
+	rw.a.Metadata = make(map[string]string, 1)
+	rw.a.Metadata["rows"] = fmt.Sprint(rw.rows)
 	if rw.writeErr != nil {
-		oa.Metadata["writeError"] = rw.writeErr.Error()
+		rw.a.Metadata["writeError"] = rw.writeErr.Error()
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	attr, err := rw.o.Update(ctx, oa)
+	attr, err := rw.o.Update(ctx, rw.a)
 	log.Println(attr, err)
 	return err
 

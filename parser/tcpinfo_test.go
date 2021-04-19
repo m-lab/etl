@@ -24,7 +24,7 @@ import (
 	"github.com/m-lab/etl/task"
 )
 
-// unused, but performs compile time validation
+//lint:ignore U1000 compile time assertions
 func assertTCPInfoParser(in *parser.TCPInfoParser) {
 	func(p etl.Parser) {}(in)
 }

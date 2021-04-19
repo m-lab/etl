@@ -13,7 +13,7 @@ import (
 	"github.com/m-lab/tcp-info/snapshot"
 )
 
-// unused, but performs compile time validation
+//lint:ignore U1000 compile time assertions
 func assertTCPRowIsValueSaver(r *schema.TCPRow) {
 	func(bigquery.ValueSaver) {}(r)
 }
