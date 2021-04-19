@@ -25,9 +25,6 @@ import (
 // Stuff from params.go
 //---------------------------------------------------------------------------------------
 var (
-	// See https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#timestamp-type.
-	timestampFormat = "2006-01-02 15:04:05.999999-07:00"
-
 	// See https://cloud.google.com/bigquery/docs/reference/rest/v2/tables#schema.fields.name
 	validFieldName = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]{0,127}$")
 )
@@ -65,21 +62,6 @@ var (
 )
 
 var typeOfByteSlice = reflect.TypeOf([]byte{})
-
-var schemaCache Cache
-
-type cacheVal struct {
-	schema bigquery.Schema
-	err    error
-}
-
-func inferSchemaReflectCached(t reflect.Type) (bigquery.Schema, error) {
-	cv := schemaCache.Get(t, func() interface{} {
-		s, err := inferSchemaReflect(t)
-		return cacheVal{s, err}
-	}).(cacheVal)
-	return cv.schema, cv.err
-}
 
 func inferSchemaReflect(t reflect.Type) (bigquery.Schema, error) {
 	rec, err := hasRecursiveType(t, nil)
@@ -241,7 +223,6 @@ func hasRecursiveType(t reflect.Type, seen *typeList) (bool, error) {
 // FakeUploader is a fake for Uploader, for use in debugging, and tests.
 // See bigquery.Uploader for field info.
 type FakeUploader struct {
-	t                   *bigquery.Table
 	SkipInvalidRows     bool
 	IgnoreUnknownValues bool
 	TableTemplateSuffix string
