@@ -20,10 +20,12 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
+// unused, but performs compile time validation
 func assertNDTTestIsAnnotatable(r parser.NDTTest) {
 	func(row.Annotatable) {}(r)
 }
 
+// unused, but performs compile time validation
 func assertNDTTestIsValueSaver(r parser.NDTTest) {
 	func(bigquery.ValueSaver) {}(r)
 }
@@ -289,6 +291,7 @@ func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100V
 	return match
 }
 
+// assertInserter does a compile time check.
 func assertInserter(in etl.Inserter) {
 	func(in etl.Inserter) {}(&inMemoryInserter{})
 }
@@ -305,15 +308,6 @@ func newInMemoryInserter() *inMemoryInserter {
 	token := make(chan struct{}, 1)
 	token <- struct{}{}
 	return &inMemoryInserter{data, 0, 0, token}
-}
-
-// acquire and release handle the single token that protects the FlushSlice and
-// access to the metrics.
-func (in *inMemoryInserter) acquire() {
-	<-in.token
-}
-func (in *inMemoryInserter) release() {
-	in.token <- struct{}{} // return the token.
 }
 
 func (in *inMemoryInserter) Commit(data []interface{}, label string) error {
