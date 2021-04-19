@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -125,4 +126,14 @@ func TestPollingMode(t *testing.T) {
 		t.Error("Expected 200:", *maxActiveTasks)
 	}
 
+}
+
+func TestHandleRequest(t *testing.T) {
+	maxInFlight = 2
+	w := httptest.NewRecorder()
+	path := `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz`
+	r := httptest.NewRequest("GET", "http://foobar?filename="+path, nil)
+
+	handleRequest(w, r)
+	t.Fatal(w.Code, w.Result().Status, w.Body)
 }
