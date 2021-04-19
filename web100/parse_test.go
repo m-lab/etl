@@ -11,6 +11,7 @@ import (
 
 // shortTcpKisTxt is a snippet from the tcp-kis.txt file. It includes variables with
 // two legacy names, a single legacy name, and no legacy name.
+//lint:ignore ST1018 linefeed is intentional for legibility
 const shortTcpKisTxt = `
 ------------------------------------------------------------------------------
 VariableName:	StartTimeStamp
