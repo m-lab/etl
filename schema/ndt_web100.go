@@ -12,9 +12,9 @@ import (
 //
 // WARNING // WARNING // WARNING
 //
-// TODO: migrate parser/ndt.go to use native struct AFTER standard column migration.
+// TODO: migrate parser/ndt.go to use native struct, then migrate to standard columns.
 type NDTWeb100 struct {
-	TestId         string                  `bigquery:"test_id"`
+	TestID         string                  `bigquery:"test_id"`
 	TaskFilename   string                  `bigquery:"task_filename"`
 	ParseTime      time.Time               `bigquery:"parse_time"`
 	ParserVersion  string                  `bigquery:"parser_version"`
@@ -37,7 +37,7 @@ type ndtweb100ConnectionSpec struct {
 	ClientApplication   string                 `bigquery:"client_application"`
 	ClientBrowser       string                 `bigquery:"client_browser"`
 	ClientHostname      string                 `bigquery:"client_hostname"`
-	ClientIp            string                 `bigquery:"client_ip"`
+	ClientIP            string                 `bigquery:"client_ip"`
 	ClientKernelVersion string                 `bigquery:"client_kernel_version"`
 	ClientOS            string                 `bigquery:"client_os"`
 	ClientVersion       string                 `bigquery:"client_version"`
@@ -46,7 +46,7 @@ type ndtweb100ConnectionSpec struct {
 	ServerHostname      string                 `bigquery:"server_hostname"`
 	ServerIP            string                 `bigquery:"server_ip"`
 	ServerKernelVersion string                 `bigquery:"server_kernel_version"`
-	Tls                 bool                   `bigquery:"tls"`
+	TLS                 bool                   `bigquery:"tls"`
 	Websockets          bool                   `bigquery:"websockets"`
 	ClientGeolocation   api.GeolocationIP      `bigquery:"client_geolocation"`
 	ServerGeolocation   api.GeolocationIP      `bigquery:"server_geolocation"`
@@ -55,7 +55,7 @@ type ndtweb100ConnectionSpec struct {
 }
 
 type network struct {
-	Asn string `bigquery:"asn"`
+	ASN string `bigquery:"asn"`
 }
 
 type ndtweb100ClientNetwork struct {
