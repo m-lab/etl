@@ -13,7 +13,13 @@ import (
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
+	gcs "cloud.google.com/go/storage"
+	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
+
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/storage"
+	"github.com/m-lab/go/cloudtest/gcsfake"
 )
 
 func init() {
@@ -128,12 +134,42 @@ func TestPollingMode(t *testing.T) {
 
 }
 
+func testClient() stiface.Client {
+	client := gcsfake.GCSClient{}
+	client.AddTestBucket("foobar",
+		&gcsfake.BucketHandle{
+			ObjAttrs: []*gcs.ObjectAttrs{
+				{Bucket: "foobar",
+					Name:    "ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz",
+					Updated: time.Now()},
+			}})
+	return &client
+}
+
+func Foobar() {
+
+}
+
 func TestHandleRequest(t *testing.T) {
+	monkey.Patch(Foobar, func() { log.Println("foobar") })
+	defer monkey.Unpatch(Foobar)
+
+	panic("foo")
+
+	Foobar()
+
+	monkey.Patch(storage.GetStorageClient, func(bool) (stiface.Client, error) {
+		log.Println("Oh well, what the hell")
+		return testClient(), nil
+	})
+	defer monkey.Unpatch(storage.GetStorageClient)
+
 	maxInFlight = 2
 	w := httptest.NewRecorder()
 	path := `gs://m-lab-sandbox/ndt/2016/01/26/20160126T000000Z-mlab1-prg01-ndt-0007.tgz`
 	r := httptest.NewRequest("GET", "http://foobar?filename="+path, nil)
 
+	log.Println("boom")
 	handleRequest(w, r)
 	t.Fatal(w.Code, w.Result().Status, w.Body)
 }

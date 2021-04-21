@@ -3,6 +3,7 @@ module github.com/m-lab/etl
 go 1.16
 
 require (
+	bou.ke/monkey v1.0.2
 	cloud.google.com/go v0.80.0
 	cloud.google.com/go/bigquery v1.16.0
 	cloud.google.com/go/storage v1.14.0
