@@ -120,6 +120,12 @@ func (rw *RowWriter) Commit(rows []interface{}, label string) (int, error) {
 			for _, e := range typedErr.Errors {
 				log.Println(e)
 			}
+			// These types are terminal, so just abort the parsing.
+			if strings.Contains(typedErr.Error(), "Service Unavailable") ||
+				strings.Contains(typedErr.Error(), "insufficientPermissions") {
+				rw.rows = 0
+				return 0, err
+			}
 		default:
 			metrics.BackendFailureCount.WithLabelValues(
 				label, "other error").Inc()

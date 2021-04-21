@@ -200,8 +200,13 @@ func ProcessGKETask(ctx context.Context, path etl.DataPath, tf task.Factory) etl
 		return err
 	}
 
-	defer tsk.Close()
-	return DoGKETask(tsk, path)
+	procErr := DoGKETask(tsk, path)
+	taskErr := tsk.Close()
+	if taskErr != nil && (procErr == nil || procErr.Error() == "") {
+		return factory.NewError(
+			path.DataType, taskErr.Error(), http.StatusBadRequest, taskErr)
+	}
+	return procErr
 }
 
 // DoGKETask creates task, processes all tests and handle metrics

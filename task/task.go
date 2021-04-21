@@ -63,9 +63,13 @@ func NewTask(filename string, src etl.TestSource, prsr etl.Parser, closer io.Clo
 }
 
 // Close closes the source and sink.
-func (tt *Task) Close() {
-	tt.TestSource.Close()
-	tt.closer.Close()
+func (tt *Task) Close() error {
+	sinkErr := tt.closer.Close()
+	srcErr := tt.TestSource.Close()
+	if sinkErr != nil {
+		return sinkErr
+	}
+	return srcErr
 }
 
 // SetMaxFileSize overrides the default maxFileSize.
