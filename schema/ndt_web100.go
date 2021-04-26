@@ -60,10 +60,12 @@ type network struct {
 
 type ndtweb100ClientNetwork struct {
 	Network network `bigquery:"network"`
+	// api.ASData         // Include extended asn data from  annotation-service
 }
 type ndtweb100ServerNetwork struct {
 	IataCode string  `bigquery:"iata_code"`
 	Network  network `bigquery:"network"`
+	// api.ASData         // Include extended asn data from  annotation-service
 }
 
 type web100ConnectionSpec struct {
