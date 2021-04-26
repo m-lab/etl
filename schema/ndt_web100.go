@@ -85,6 +85,15 @@ type web100LogEntry struct {
 }
 
 type web100Snap struct {
+	LocalAddress     string
+	LocalAddressType int64
+	LocalPort        int64
+	RemAddress       string
+	RemPort          int64
+	web100SnapDelta
+}
+
+type web100SnapDelta struct {
 	AbruptTimeouts       int64
 	ActiveOpen           int64
 	CERcvd               int64
@@ -117,9 +126,6 @@ type web100Snap struct {
 	HCThruOctetsReceived int64
 	LimCwnd              int64
 	LimRwin              int64
-	LocalAddress         string
-	LocalAddressType     int64
-	LocalPort            int64
 	MSSRcvd              int64
 	MaxAppRQueue         int64
 	MaxAppWQueue         int64
@@ -152,8 +158,6 @@ type web100Snap struct {
 	RcvRTT               int64
 	RcvWindScale         int64
 	RecInitial           int64
-	RemAddress           string
-	RemPort              int64
 	RetranThresh         int64
 	SACK                 int64
 	SACKBlocksRcvd       int64
@@ -202,10 +206,10 @@ type web100Snap struct {
 }
 
 type web100Deltas struct {
-	IsLast      bool  `bigquery:"is_last"`
-	SnapshotNum int64 `bigquery:"snapshot_num"`
-	DeltaIndex  int64 `bigquery:"delta_index"`
-	web100Snap        // embed inline struct.
+	IsLast          bool  `bigquery:"is_last"`
+	SnapshotNum     int64 `bigquery:"snapshot_num"`
+	DeltaIndex      int64 `bigquery:"delta_index"`
+	web100SnapDelta       // embed inline struct.
 }
 
 func (n *NDTWeb100) Schema() (bigquery.Schema, error) {
