@@ -14,55 +14,55 @@ import (
 //
 // TODO: migrate parser/ndt.go to use native struct, then migrate to standard columns.
 type NDTWeb100 struct {
-	TestID         string                  `bigquery:"test_id"`
-	TaskFilename   string                  `bigquery:"task_filename"`
-	ParseTime      time.Time               `bigquery:"parse_time"`
-	ParserVersion  string                  `bigquery:"parser_version"`
-	LogTime        time.Time               `bigquery:"log_time"`
-	BlacklistFlags int64                   `bigquery:"blacklist_flags"`
-	Anomalies      ndtweb100Anomalies      `bigquery:"anomalies"`
-	ConnectionSpec ndtweb100ConnectionSpec `bigquery:"connection_spec"`
-	Web100LogEntry web100LogEntry          `bigquery:"web100_log_entry"`
+	TestID         string            `bigquery:"test_id"`
+	TaskFilename   string            `bigquery:"task_filename"`
+	ParseTime      time.Time         `bigquery:"parse_time"`
+	ParserVersion  string            `bigquery:"parser_version"`
+	LogTime        time.Time         `bigquery:"log_time"`
+	BlacklistFlags int64             `bigquery:"blacklist_flags"`
+	Anomalies      ndtAnomalies      `bigquery:"anomalies"`
+	ConnectionSpec ndtConnectionSpec `bigquery:"connection_spec"`
+	Web100LogEntry web100LogEntry    `bigquery:"web100_log_entry"`
 }
 
-type ndtweb100Anomalies struct {
+type ndtAnomalies struct {
 	NoMeta         bool  `bigquery:"no_meta"`
 	SnaplogError   bool  `bigquery:"snaplog_error"`
 	NumSnaps       int64 `bigquery:"num_snaps"`
 	BlacklistFlags int64 `bigquery:"blacklist_flags"`
 }
 
-type ndtweb100ConnectionSpec struct {
-	ClientAF            int64                  `bigquery:"client_af"`
-	ClientApplication   string                 `bigquery:"client_application"`
-	ClientBrowser       string                 `bigquery:"client_browser"`
-	ClientHostname      string                 `bigquery:"client_hostname"`
-	ClientIP            string                 `bigquery:"client_ip"`
-	ClientKernelVersion string                 `bigquery:"client_kernel_version"`
-	ClientOS            string                 `bigquery:"client_os"`
-	ClientVersion       string                 `bigquery:"client_version"`
-	DataDirection       int64                  `bigquery:"data_direction"`
-	ServerAF            int64                  `bigquery:"server_af"`
-	ServerHostname      string                 `bigquery:"server_hostname"`
-	ServerIP            string                 `bigquery:"server_ip"`
-	ServerKernelVersion string                 `bigquery:"server_kernel_version"`
-	TLS                 bool                   `bigquery:"tls"`
-	Websockets          bool                   `bigquery:"websockets"`
-	ClientGeolocation   api.GeolocationIP      `bigquery:"client_geolocation"`
-	ServerGeolocation   api.GeolocationIP      `bigquery:"server_geolocation"`
-	Client              ndtweb100ClientNetwork `bigquery:"client"`
-	Server              ndtweb100ServerNetwork `bigquery:"server"`
+type ndtConnectionSpec struct {
+	ClientAF            int64             `bigquery:"client_af"`
+	ClientApplication   string            `bigquery:"client_application"`
+	ClientBrowser       string            `bigquery:"client_browser"`
+	ClientHostname      string            `bigquery:"client_hostname"`
+	ClientIP            string            `bigquery:"client_ip"`
+	ClientKernelVersion string            `bigquery:"client_kernel_version"`
+	ClientOS            string            `bigquery:"client_os"`
+	ClientVersion       string            `bigquery:"client_version"`
+	DataDirection       int64             `bigquery:"data_direction"`
+	ServerAF            int64             `bigquery:"server_af"`
+	ServerHostname      string            `bigquery:"server_hostname"`
+	ServerIP            string            `bigquery:"server_ip"`
+	ServerKernelVersion string            `bigquery:"server_kernel_version"`
+	TLS                 bool              `bigquery:"tls"`
+	Websockets          bool              `bigquery:"websockets"`
+	ClientGeolocation   api.GeolocationIP `bigquery:"client_geolocation"`
+	ServerGeolocation   api.GeolocationIP `bigquery:"server_geolocation"`
+	Client              ndtClientNetwork  `bigquery:"client"`
+	Server              ndtServerNetwork  `bigquery:"server"`
 }
 
 type network struct {
 	ASN string `bigquery:"asn"`
 }
 
-type ndtweb100ClientNetwork struct {
+type ndtClientNetwork struct {
 	Network network `bigquery:"network"`
 	// api.ASData         // Include extended asn data from  annotation-service
 }
-type ndtweb100ServerNetwork struct {
+type ndtServerNetwork struct {
 	IataCode string  `bigquery:"iata_code"`
 	Network  network `bigquery:"network"`
 	// api.ASData         // Include extended asn data from  annotation-service
