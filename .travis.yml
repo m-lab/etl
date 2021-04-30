@@ -5,6 +5,7 @@
 # The travis-ci.com configuration performs unit and integration tests, and code
 # coverage only.
 
+
 dist: bionic
 language: go
 go:
