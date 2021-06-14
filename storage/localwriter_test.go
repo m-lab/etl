@@ -3,6 +3,7 @@ package storage_test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/m-lab/go/testingx"
@@ -132,10 +133,11 @@ func TestLocalWriter_Close(t *testing.T) {
 }
 func TestNewLocalWriter(t *testing.T) {
 	tests := []struct {
-		name        string
-		dir         string
-		path        string
-		wantOpenErr bool
+		name         string
+		dir          string
+		path         string
+		wantOpenErr  bool
+		wantMkdirErr bool
 	}{
 		{
 			name: "success",
@@ -145,24 +147,32 @@ func TestNewLocalWriter(t *testing.T) {
 		{
 			name:        "error-open",
 			dir:         "testdir",
-			path:        "this",
+			path:        "thisdir",
 			wantOpenErr: true,
 		},
 		{
-			name:        "error-mkdir",
-			dir:         "testdir",
-			path:        "this/file.dir",
-			wantOpenErr: true,
+			name:         "error-mkdir",
+			dir:          "testdir",
+			path:         "file.not-a-dir/fake",
+			wantMkdirErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.wantOpenErr {
-				// Make directory so open will fail.
-				err := os.MkdirAll(tt.dir, os.ModePerm)
+				// Make directory where the file should be, so open will fail.
+				err := os.MkdirAll(filepath.Join(tt.dir, tt.path), os.ModePerm)
 				testingx.Must(t, err, "failed to mkdir")
-				err = os.Chmod(tt.dir, 0000)
-				testingx.Must(t, err, "failed to chmod")
+			}
+			if tt.wantMkdirErr {
+				// Make a file where a directory should be, so mkdir will fail.
+				p := filepath.Join(tt.dir, tt.path)
+				err := os.MkdirAll(filepath.Dir(filepath.Dir(p)), os.ModePerm)
+				testingx.Must(t, err, "failed to mkdir")
+				// create a file where a directory should be.
+				f, err := os.Create(filepath.Dir(p))
+				testingx.Must(t, err, "failed to create file")
+				f.Close()
 			}
 			got, err := storage.NewLocalWriter(tt.dir, tt.path)
 			defer func() {
@@ -171,9 +181,9 @@ func TestNewLocalWriter(t *testing.T) {
 				}
 			}()
 
-			if tt.wantOpenErr {
+			if tt.wantOpenErr || tt.wantMkdirErr {
 				if err == nil {
-					t.Errorf("NewLocalWriter() wantOpenErr %v, want error", err)
+					t.Errorf("NewLocalWriter() got nil, wantErr true")
 				}
 				return
 			}
