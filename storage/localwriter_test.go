@@ -229,10 +229,9 @@ func TestNewLocalFactory(t *testing.T) {
 
 			if tt.wantOpenErr {
 				// Make directory so open will fail.
-				err := os.MkdirAll(tt.outputDir, os.ModePerm)
+				err := os.MkdirAll(filepath.Join(tt.outputDir,
+					"exp/ndt7/2021/06/01/20210601T101003.000001Z-ndt7-mlab4-foo01-exp.tgz.jsonl"), os.ModePerm)
 				testingx.Must(t, err, "failed to mkdir")
-				err = os.Chmod(tt.outputDir, 0000)
-				testingx.Must(t, err, "failed to chmod")
 			}
 
 			lw, err := lf.Get(context.Background(), d)
