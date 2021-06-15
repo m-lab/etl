@@ -157,17 +157,20 @@ func TestLocalMode(t *testing.T) {
 	resp.Body.Close()
 	log.Println("ok")
 
-	// Now get the status
-	resp, err = waitFor("http://" + mainSvr + "/worker?filename=gs://archive-mlab-testing/ndt/2020/03/18/20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz")
+	// Try a local parse job
+	// TODO store this locally in testdata, and move it to archive-mlab-testing as part of the test prep.
+	annoFilename := "gs://archive-mlab-oti/ndt/annotation/2020/12/01/20201201T003000.012446Z-annotation-mlab2-par03-ndt.tgz"
+	resp, err = waitFor("http://" + mainSvr + "/worker?filename=" + annoFilename)
 	if err != nil {
 		t.Fatal(err)
 	}
 	data, err = ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
 
 	// Hack just for now, to get some additional test coverage.
 	// We should work out proper auth, and use a valid file, perhaps from uuid-annotator.
 	if !strings.Contains(string(data), "invalid_grant") {
 		t.Error(string(data))
 	}
+
+	resp.Body.Close()
 }
