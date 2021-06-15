@@ -165,6 +165,17 @@ func (dp DataPath) TableBase() string {
 	return dp.GetDataType().Table()
 }
 
+// Path returns the GCS Path portion of a valid M-Lab GCS archive URI. Because
+// ValidateTestPath() has already validated the DataPath.URI, Path() returns
+// the empty string on error.
+func (dp DataPath) Path() string {
+	parts := strings.SplitN(dp.URI, "/", 4)
+	if len(parts) != 4 || parts[0] != "gs:" || len(parts[3]) == 0 {
+		return ""
+	}
+	return parts[3]
+}
+
 // IsBatchService return true if this is a batch service.
 func IsBatchService() bool {
 	return IsBatch

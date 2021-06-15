@@ -162,6 +162,42 @@ func TestDataPath_GetDataType(t *testing.T) {
 	}
 }
 
+func TestDataPath_Path(t *testing.T) {
+	tests := []struct {
+		name string
+		uri  string
+		want string
+	}{
+		{
+			name: "error-no-scheme",
+			uri:  "foobar",
+		},
+		{
+			name: "error-no-path",
+			uri:  "gs://foobar",
+		},
+		{
+			name: "error-empty-path",
+			uri:  "gs://foobar/",
+		},
+		{
+			name: "okay",
+			uri:  "gs://bucket/foo/bar.baz",
+			want: "foo/bar.baz",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dp := etl.DataPath{
+				URI: tt.uri,
+			}
+			if p := dp.Path(); p != tt.want {
+				t.Errorf("Expected error for %q, got %q", dp.URI, p)
+			}
+		})
+	}
+}
+
 func TestGetMetroName(t *testing.T) {
 	iata := etl.GetIATACode("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz")
 	if iata != "acc" {
