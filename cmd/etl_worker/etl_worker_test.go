@@ -126,3 +126,48 @@ func TestPollingMode(t *testing.T) {
 	}
 
 }
+
+func TestLocalMode(t *testing.T) {
+	flag.Set("service_port", ":0")
+	flag.Set("max_active", "200")
+	flag.Set("prometheusx.listen-address", ":0")
+	flag.Set("max_workers", "25")
+	flag.Set("gcloud_project", "mlab-testing")
+	flag.Set("output_type", "local")
+	flag.Set("output_dir", ".")
+	mainCtx, mainCancel = context.WithCancel(context.Background())
+
+	go main()
+	defer mainCancel()
+
+	// Wait for the server to start and publish address.
+	mainSvr := <-mainServerAddr
+
+	// Wait until the mainSvr is "ready"
+	resp, err := waitFor("http://" + mainSvr + "/ready")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// For now, the service comes up immediately serving "ok" for /ready
+	data, err := ioutil.ReadAll(resp.Body)
+	if string(data) != "ok" {
+		t.Fatal(string(data))
+	}
+	resp.Body.Close()
+	log.Println("ok")
+
+	// Now get the status
+	resp, err = waitFor("http://" + mainSvr + "/worker?filename=gs://archive-mlab-testing/ndt/2020/03/18/20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err = ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	// Hack just for now, to get some additional test coverage.
+	// We should work out proper auth, and use a valid file, perhaps from uuid-annotator.
+	if !strings.Contains(string(data), "invalid_grant") {
+		t.Error(string(data))
+	}
+}
