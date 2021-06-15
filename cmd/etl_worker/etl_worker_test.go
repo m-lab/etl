@@ -133,6 +133,7 @@ func TestLocalMode(t *testing.T) {
 	flag.Set("prometheusx.listen-address", ":0")
 	flag.Set("max_workers", "25")
 	flag.Set("gcloud_project", "mlab-testing")
+	flag.Set("gardener_host", "") // TODO - should restore flags when test completes.
 	flag.Set("output_type", "local")
 	flag.Set("output_dir", ".")
 	mainCtx, mainCancel = context.WithCancel(context.Background())
