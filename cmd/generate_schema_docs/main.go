@@ -60,7 +60,7 @@ func init() {
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, usage)
+		fmt.Fprint(os.Stderr, usage)
 		fmt.Fprintln(os.Stderr, "Flags:")
 		flag.PrintDefaults()
 	}
@@ -111,24 +111,6 @@ func generateRichMarkdown(s bigquery.Schema, t schemaGenerator) []byte {
 			return nil
 		},
 	)
-	return buf.Bytes()
-}
-
-// TODO: remove this function if it turns out to be replaced by generateRichMarkdown.
-func generateMarkdown(schema bigquery.Schema) []byte {
-	buf := &bytes.Buffer{}
-	fmt.Fprintln(buf, "| Field name       | Type       | Description    |")
-	fmt.Fprintln(buf, "| :----------------|:----------:|:---------------|")
-	bqx.WalkSchema(schema, func(prefix []string, field *bigquery.FieldSchema) error {
-		var path string
-		if len(prefix) == 1 {
-			path = ""
-		} else {
-			path = strings.Join(prefix[:len(prefix)-1], ".") + "."
-		}
-		fmt.Fprintf(buf, "| %s**%s** | %s | %s |\n", path, prefix[len(prefix)-1], field.Type, field.Description)
-		return nil
-	})
 	return buf.Bytes()
 }
 

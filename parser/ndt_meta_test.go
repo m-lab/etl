@@ -21,7 +21,7 @@ func TestMetaParser(t *testing.T) {
 	meta := parser.ProcessMetaFile("ndt", "suffix", metaName, metaData)
 
 	if meta == nil {
-		t.Error("metaFile has not been populated.")
+		t.Fatal("metaFile has not been populated.")
 	}
 	timestamp, _ := time.Parse("20060102T15:04:05.999999999Z", "20170509T13:45:13.59021Z")
 	if meta.DateTime != timestamp {

@@ -109,7 +109,7 @@ func NewGCSSource(ctx context.Context, label string, fl FileLister, toRunnable f
 		fileLister: fl,
 		toRunnable: toRunnable,
 
-		pendingChan: make(chan Runnable, 0),
+		pendingChan: make(chan Runnable),
 		label:       label,
 	}
 

@@ -83,9 +83,6 @@ var (
 		expNNNNE + // 4,5,6
 		suffix + `$`) // 7
 
-	dateTimePattern = regexp.MustCompile(dateTime)
-	sitePattern     = regexp.MustCompile(type2 + mlabNSiteNN)
-
 	justSitePattern = regexp.MustCompile(`.*` + mlabNSiteNN + `.*`)
 )
 
@@ -114,16 +111,16 @@ type DataPath struct {
 func ValidateTestPath(path string) (DataPath, error) {
 	basic := basicTaskPattern.FindStringSubmatch(path)
 	if basic == nil {
-		return DataPath{}, errors.New("Path missing date-time string")
+		return DataPath{}, errors.New("path missing date-time string")
 	}
 	preamble := startPattern.FindStringSubmatch(basic[1])
 	if preamble == nil {
-		return DataPath{}, errors.New("Invalid preamble: " + fmt.Sprint(basic))
+		return DataPath{}, errors.New("invalid preamble: " + fmt.Sprint(basic))
 	}
 
 	post := endPattern.FindStringSubmatch(basic[5])
 	if post == nil {
-		return DataPath{}, errors.New("Invalid postamble: " + basic[5])
+		return DataPath{}, errors.New("invalid postamble: " + basic[5])
 	}
 	dp := DataPath{
 		URI:        path,

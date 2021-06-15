@@ -55,8 +55,6 @@ func rePanic() {
 	}()
 	a := []int{1, 2, 3}
 	log.Println(a[4])
-	// This is never reached.
-	return
 }
 
 func TestCountPanics(t *testing.T) {

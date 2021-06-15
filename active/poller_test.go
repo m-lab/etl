@@ -35,7 +35,7 @@ func (g *fakeGardener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Should be POST") // Not t.Fatal because this is asynchronous.
 	}
 	g.lock.Lock()
-	g.lock.Unlock()
+	defer g.lock.Unlock()
 	switch r.URL.Path {
 	case "/job":
 		if len(g.jobs) < 1 {

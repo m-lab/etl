@@ -126,7 +126,8 @@ func TestJSONParsing(t *testing.T) {
 
 // DISABLED
 // This tests insertion into a test table in the cloud.  Should not normally be executed.
-func xTestRealBackend(t *testing.T) {
+func TestRealBackend(t *testing.T) {
+	t.Skip("Disabled")
 	ins, err := bq.NewInserter(etl.SW, time.Now())
 	var parser etl.Parser = parser.NewDiscoParser(ins)
 

@@ -48,6 +48,7 @@ func (row *Row) GetLogTime() time.Time {
 	return time.Now()
 }
 
+//lint:ignore U1000 compile time assertions
 func assertTestRowAnnotatable(r *Row) {
 	func(row.Annotatable) {}(r)
 }

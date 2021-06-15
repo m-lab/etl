@@ -164,10 +164,6 @@ func (s MapSaver) Save() (row map[string]bigquery.Value, insertID string, err er
 	return s, "", nil
 }
 
-func assertSaver(ms MapSaver) {
-	func(bigquery.ValueSaver) {}(ms)
-}
-
 //----------------------------------------------------------------------------
 
 // BQInserter provides an API for inserting rows into a specific BQ Table.

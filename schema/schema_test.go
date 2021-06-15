@@ -14,6 +14,7 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
+//lint:ignore U1000 compile time assertions
 func assertAnnotatable(r *schema.SS) {
 	func(row.Annotatable) {}(r)
 }

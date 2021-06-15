@@ -22,10 +22,10 @@ import (
 
 // Errors that may be returned by Buffer functions.
 var (
-	ErrAnnotationError = errors.New("Annotation error")
+	ErrAnnotationError = errors.New("annotation error")
 	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
-	ErrBufferFull      = errors.New("Buffer full")
-	ErrInvalidSink     = errors.New("Not a valid row.Sink")
+	ErrBufferFull      = errors.New("buffer full")
+	ErrInvalidSink     = errors.New("not a valid row.Sink")
 )
 
 // Annotatable interface enables integration of annotation into parser.Base.

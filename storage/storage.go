@@ -31,7 +31,7 @@ import (
 )
 
 // ErrOversizeFile is returned when exceptionally large files are skipped.
-var ErrOversizeFile = errors.New("Oversize file")
+var ErrOversizeFile = errors.New("oversize file")
 
 // TarReader provides Next and Read functions.
 type TarReader interface {

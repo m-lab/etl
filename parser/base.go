@@ -21,9 +21,9 @@ import (
 
 // Errors that may be returned by BaseRowBuffer functions.
 var (
-	ErrAnnotationError = errors.New("Annotation error")
+	ErrAnnotationError = errors.New("annotation error")
 	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
-	ErrRowNotPointer   = errors.New("Row should be a pointer type")
+	ErrRowNotPointer   = errors.New("row should be a pointer type")
 )
 
 // RowBuffer provides all basic functionality generally needed for buffering, annotating, and inserting

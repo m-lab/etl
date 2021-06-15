@@ -24,10 +24,12 @@ import (
 	"github.com/m-lab/etl/task"
 )
 
+//lint:ignore U1000 compile time assertions
 func assertTCPInfoParser(in *parser.TCPInfoParser) {
 	func(p etl.Parser) {}(in)
 }
 
+// TODO - move this to storage for general use.
 func fileSource(fn string) (etl.TestSource, error) {
 	if !(strings.HasSuffix(fn, ".tgz") || strings.HasSuffix(fn, ".tar") ||
 		strings.HasSuffix(fn, ".tar.gz")) {
@@ -60,7 +62,7 @@ func fileSource(fn string) (etl.TestSource, error) {
 type fakeAnnotator struct{}
 
 func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2.Response, error) {
-	return &v2.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
+	return &v2.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations)}, nil
 }
 
 type inMemorySink struct {

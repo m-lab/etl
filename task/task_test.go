@@ -58,7 +58,7 @@ func MakeTestSource(t *testing.T) etl.TestSource {
 
 	hdr = tar.Header{Name: "bar", Mode: 0666, Typeflag: tar.TypeReg, Size: int64(11)}
 	tw.WriteHeader(&hdr)
-	_, err = tw.Write([]byte("butter milk"))
+	tw.Write([]byte("butter milk"))
 	if err = tw.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestTarFileInput(t *testing.T) {
 	}
 
 	// Here we expect an oversize file error, with filename = big_file.
-	fn, bb, err = tt.NextTest(100)
+	fn, _, err = tt.NextTest(100)
 	if fn != "big_file" {
 		t.Error("Expected big_file: " + fn)
 	}
