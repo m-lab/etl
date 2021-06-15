@@ -214,9 +214,14 @@ func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 	}
 
 	rawFileName := rq.FormValue("filename")
-	status, msg := subworker(rawFileName, executionCount, retryCount, age)
-	rwr.WriteHeader(status)
-	fmt.Fprintf(rwr, msg)
+	// For local mode, we want to use ProcessGKETask
+	if outputType.Value == "local" {
+
+	} else {
+		status, msg := subworker(rawFileName, executionCount, retryCount, age)
+		rwr.WriteHeader(status)
+		fmt.Fprintf(rwr, msg)
+	}
 }
 
 func subworker(rawFileName string, executionCount, retryCount int, age time.Duration) (status int, msg string) {
