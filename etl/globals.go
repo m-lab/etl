@@ -91,7 +91,8 @@ var (
 
 // DataPath breaks out the components of a task filename.
 type DataPath struct {
-	URI string // The full URI
+	URI  string // The full URI
+	Path string // The path portion of the complete URI (without scheme or bucket).
 
 	// These fields are from the bucket and path
 	Bucket   string // the GCS bucket name.
@@ -111,8 +112,8 @@ type DataPath struct {
 }
 
 // ValidateTestPath validates a task filename.
-func ValidateTestPath(path string) (DataPath, error) {
-	basic := basicTaskPattern.FindStringSubmatch(path)
+func ValidateTestPath(uri string) (DataPath, error) {
+	basic := basicTaskPattern.FindStringSubmatch(uri)
 	if basic == nil {
 		return DataPath{}, errors.New("Path missing date-time string")
 	}
@@ -126,7 +127,8 @@ func ValidateTestPath(path string) (DataPath, error) {
 		return DataPath{}, errors.New("Invalid postamble: " + basic[5])
 	}
 	dp := DataPath{
-		URI:        path,
+		URI:        uri,
+		Path:       path(uri),
 		Bucket:     preamble[1],
 		ExpDir:     preamble[2],
 		DataType:   preamble[3],
@@ -144,7 +146,7 @@ func ValidateTestPath(path string) (DataPath, error) {
 
 	dataType := dp.GetDataType()
 	if dataType == INVALID {
-		log.Printf("Invalid filename: %s\n", path)
+		log.Printf("Invalid filename: %s\n", uri)
 		return DataPath{}, ErrBadDataType
 	}
 
@@ -165,11 +167,11 @@ func (dp DataPath) TableBase() string {
 	return dp.GetDataType().Table()
 }
 
-// Path returns the GCS Path portion of a valid M-Lab GCS archive URI. Because
-// ValidateTestPath() has already validated the DataPath.URI, Path() returns
-// the empty string on error.
-func (dp DataPath) Path() string {
-	parts := strings.SplitN(dp.URI, "/", 4)
+// path returns the portion of the GCS path for a valid M-Lab GCS archive URI.
+// Because ValidateTestPath() verifies other aspects of DataPath.URI, path()
+// returns the empty string if it is malformed.
+func path(uri string) string {
+	parts := strings.SplitN(uri, "/", 4)
 	if len(parts) != 4 || parts[0] != "gs:" || len(parts[3]) == 0 {
 		return ""
 	}
