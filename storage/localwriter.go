@@ -81,14 +81,10 @@ type LocalFactory struct {
 }
 
 // Get implements factory.SinkFactory for LocalWriters.
-func (lf *LocalFactory) Get(ctx context.Context, path etl.DataPath) (row.Sink, etl.ProcessingError) {
-	fn, err := pathAndFilename(path.URI)
+func (lf *LocalFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, etl.ProcessingError) {
+	s, err := NewLocalWriter(lf.outputDir, dp.Path+".jsonl")
 	if err != nil {
-		return nil, factory.NewError(path.DataType, "InvalidPath", http.StatusInternalServerError, err)
-	}
-	s, err := NewLocalWriter(lf.outputDir, fn+".jsonl")
-	if err != nil {
-		return nil, factory.NewError(path.DataType, "LocalFactory", http.StatusInternalServerError, err)
+		return nil, factory.NewError(dp.DataType, "LocalFactory", http.StatusInternalServerError, err)
 	}
 	return s, nil
 }

@@ -199,17 +199,11 @@ func TestNewLocalFactory(t *testing.T) {
 	tests := []struct {
 		name        string
 		outputDir   string
-		wantPathErr bool
 		wantOpenErr bool
 	}{
 		{
 			name:      "success",
 			outputDir: t.TempDir(),
-		},
-		{
-			name:        "error-path",
-			outputDir:   t.TempDir(),
-			wantPathErr: true,
 		},
 		{
 			name:        "error-open",
@@ -223,10 +217,6 @@ func TestNewLocalFactory(t *testing.T) {
 			d, err := etl.ValidateTestPath("gs://bucket/exp/ndt7/2021/06/01/20210601T101003.000001Z-ndt7-mlab4-foo01-exp.tgz")
 			rtx.Must(err, "failed to validate path")
 
-			if tt.wantPathErr {
-				d.URI = "gs://broken" // force URI parse to fail.
-			}
-
 			if tt.wantOpenErr {
 				// Make directory so open will fail.
 				err := os.MkdirAll(filepath.Join(tt.outputDir,
@@ -235,8 +225,8 @@ func TestNewLocalFactory(t *testing.T) {
 			}
 
 			lw, err := lf.Get(context.Background(), d)
-			if (err != nil) != (tt.wantPathErr || tt.wantOpenErr) {
-				t.Errorf("LocalFactory.Get() = %v, want %v", lw, tt.wantPathErr || tt.wantOpenErr)
+			if (err != nil) != tt.wantOpenErr {
+				t.Errorf("LocalFactory.Get() = %v, want %v", lw, tt.wantOpenErr)
 			}
 		})
 	}
