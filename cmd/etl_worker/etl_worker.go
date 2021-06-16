@@ -52,7 +52,7 @@ var (
 // Flags.
 var (
 	outputType = flagx.Enum{
-		Options: []string{"gcs", "bigquery"},
+		Options: []string{"gcs", "bigquery", "local"},
 		Value:   "bigquery",
 	}
 
@@ -67,6 +67,7 @@ var (
 	omitDeltas      = flag.Bool("ndt_omit_deltas", false, "Whether to skip ndt.web100 snapshot deltas")
 	bigqueryProject = flag.String("bigquery_project", "", "Override GCLOUD_PROJECT for BigQuery operations")
 	bigqueryDataset = flag.String("bigquery_dataset", "", "Override the BigQuery dataset for output tables")
+	outputDir       = flag.String("output_dir", "", "If output type is 'local', write output to this directory")
 )
 
 // Other global values.
@@ -297,6 +298,8 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 		sink = bq.NewSinkFactory()
 	case "gcs":
 		sink = storage.NewSinkFactory(c, outputBucket())
+	case "local":
+		sink = storage.NewLocalFactory(*outputDir)
 	}
 
 	taskFactory := worker.StandardTaskFactory{
