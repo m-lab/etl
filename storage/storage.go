@@ -243,7 +243,7 @@ func NewTestSource(client stiface.Client, dp etl.DataPath, label string) (etl.Te
 		return nil, errors.New("invalid file path: " + dp.URI)
 	}
 	bucket := dp.Bucket
-	fn := dp.Path()
+	fn := dp.Path
 
 	archiveDate, err := time.Parse("2006/01/02", dp.DatePath)
 	if err != nil {

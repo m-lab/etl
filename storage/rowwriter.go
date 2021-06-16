@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -178,12 +177,7 @@ type SinkFactory struct {
 
 // Get implements factory.SinkFactory
 func (sf *SinkFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, etl.ProcessingError) {
-	fn := dp.Path()
-	if fn == "" {
-		return nil, factory.NewError(dp.DataType, "InvalidPath",
-			http.StatusInternalServerError, errors.New("empty gcs path"))
-	}
-	s, err := NewRowWriter(ctx, sf.client, sf.outputBucket, fn+".json")
+	s, err := NewRowWriter(ctx, sf.client, sf.outputBucket, dp.Path+".json")
 	if err != nil {
 		return nil, factory.NewError(dp.DataType, "SinkFactory",
 			http.StatusInternalServerError, err)
