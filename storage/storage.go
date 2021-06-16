@@ -242,12 +242,8 @@ func NewTestSource(client stiface.Client, dp etl.DataPath, label string) (etl.Te
 	if !strings.HasPrefix(dp.URI, "gs://") {
 		return nil, errors.New("invalid file path: " + dp.URI)
 	}
-	parts := strings.SplitN(dp.URI, "/", 4)
-	if len(parts) != 4 {
-		return nil, errors.New("invalid file path: " + dp.URI)
-	}
-	bucket := parts[2]
-	fn := parts[3]
+	bucket := dp.Bucket
+	fn := dp.Path
 
 	archiveDate, err := time.Parse("2006/01/02", dp.DatePath)
 	if err != nil {

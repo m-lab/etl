@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	gcs "cloud.google.com/go/storage"
@@ -177,25 +175,11 @@ type SinkFactory struct {
 	outputBucket string
 }
 
-// returns the full path/filename from a gs://bucket/path/filename string.
-func pathAndFilename(uri string) (string, error) {
-	parts := strings.SplitN(uri, "/", 4)
-	if len(parts) != 4 || parts[0] != "gs:" || len(parts[3]) == 0 {
-		return "", errors.New("Bad GCS path")
-	}
-	return parts[3], nil
-}
-
 // Get implements factory.SinkFactory
-func (sf *SinkFactory) Get(ctx context.Context, path etl.DataPath) (row.Sink, etl.ProcessingError) {
-	fn, err := pathAndFilename(path.URI)
+func (sf *SinkFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, etl.ProcessingError) {
+	s, err := NewRowWriter(ctx, sf.client, sf.outputBucket, dp.Path+".json")
 	if err != nil {
-		return nil, factory.NewError(path.DataType, "InvalidPath",
-			http.StatusInternalServerError, err)
-	}
-	s, err := NewRowWriter(ctx, sf.client, sf.outputBucket, fn+".json")
-	if err != nil {
-		return nil, factory.NewError(path.DataType, "SinkFactory",
+		return nil, factory.NewError(dp.DataType, "SinkFactory",
 			http.StatusInternalServerError, err)
 	}
 	return s, nil
