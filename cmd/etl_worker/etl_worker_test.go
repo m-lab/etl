@@ -156,7 +156,7 @@ func TestLocalRequest(t *testing.T) {
 		},
 		{
 			name:       "error-malformed-uri",
-			uri:        "fake://bucket/path/not-found.tgz",
+			uri:        "gs://bucket/path/not-found.tgz",
 			wantStatus: http.StatusBadRequest,
 		},
 		{
