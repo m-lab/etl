@@ -175,10 +175,10 @@ func handleLocalRequest(rwr http.ResponseWriter, rq *http.Request) {
 	}
 	ctx := context.Background()
 
-	obj, err := c.Bucket(dp.Bucket).Object(dp.Path()).Attrs(ctx)
+	obj, err := c.Bucket(dp.Bucket).Object(dp.Path).Attrs(ctx)
 	if err != nil {
 		rwr.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(rwr, "failed to get object attrs for %s / %s", dp.Bucket, dp.Path())
+		fmt.Fprintf(rwr, "failed to get object attrs for %s / %s", dp.Bucket, dp.Path)
 		return
 	}
 
