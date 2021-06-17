@@ -160,6 +160,37 @@ func decrementInFlight() {
 	atomic.AddInt32(&inFlight, -1)
 }
 
+func handleLocalRequest(rwr http.ResponseWriter, rq *http.Request) {
+	rawFileName := rq.FormValue("filename")
+	fn, err := etl.GetFilename(rawFileName)
+
+	dp, err := etl.ValidateTestPath(fn)
+	rtx.Must(err, "failed to validate path")
+
+	c, err := storage.GetStorageClient(false)
+	if err != nil {
+		rwr.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(rwr, "failed to get storage client")
+		return
+	}
+	ctx := context.Background()
+
+	obj, err := c.Bucket(dp.Bucket).Object(dp.Path()).Attrs(ctx)
+	if err != nil {
+		rwr.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(rwr, "failed to get object attrs for %s / %s", dp.Bucket, dp.Path())
+		return
+	}
+
+	r := toRunnable(obj)
+	err = r.Run(ctx)
+	if err != nil {
+		log.Println(err)
+	}
+
+	fmt.Fprintf(rwr, "no observed errors")
+}
+
 // TODO(gfr) unify counting for http and pubsub paths?
 func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 	// This will add metric count and log message from any panic.
@@ -394,6 +425,9 @@ func main() {
 	mux.HandleFunc("/_ah/health", healthCheckHandler) // legacy
 	mux.HandleFunc("/alive", healthCheckHandler)
 	mux.HandleFunc("/ready", healthCheckHandler)
+	if outputType.Value == "local" {
+		mux.HandleFunc("/local/worker", handleLocalRequest)
+	}
 
 	_ = startServers(mainCtx, mux)
 }
