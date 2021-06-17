@@ -160,35 +160,45 @@ func decrementInFlight() {
 	atomic.AddInt32(&inFlight, -1)
 }
 
-func handleLocalRequest(rwr http.ResponseWriter, rq *http.Request) {
-	rawFileName := rq.FormValue("filename")
-	fn, err := etl.GetFilename(rawFileName)
+func handleLocalRequest(rw http.ResponseWriter, req *http.Request) {
+	fn, err := etl.GetFilename(req.FormValue("filename"))
+	if err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(rw, "failed to get valid filename= parameter from request")
+		return
+	}
 
 	dp, err := etl.ValidateTestPath(fn)
-	rtx.Must(err, "failed to validate path")
+	if err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(rw, "failed to validate test path: %q", fn)
+		return
+	}
 
 	c, err := storage.GetStorageClient(false)
 	if err != nil {
-		rwr.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(rwr, "failed to get storage client")
+		rw.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(rw, "failed to get storage client")
 		return
 	}
-	ctx := context.Background()
 
+	ctx := context.Background()
 	obj, err := c.Bucket(dp.Bucket).Object(dp.Path).Attrs(ctx)
 	if err != nil {
-		rwr.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(rwr, "failed to get object attrs for %s / %s", dp.Bucket, dp.Path)
+		rw.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(rw, "failed to get object attrs for %s / %s", dp.Bucket, dp.Path)
 		return
 	}
 
 	r := toRunnable(obj)
 	err = r.Run(ctx)
 	if err != nil {
-		log.Println(err)
+		rw.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(rw, "runnable failed to run on %s / %s", dp.Bucket, dp.Path)
+		return
 	}
 
-	fmt.Fprintf(rwr, "no observed errors")
+	fmt.Fprintf(rw, "no observed errors")
 }
 
 // TODO(gfr) unify counting for http and pubsub paths?
@@ -426,6 +436,7 @@ func main() {
 	mux.HandleFunc("/alive", healthCheckHandler)
 	mux.HandleFunc("/ready", healthCheckHandler)
 	if outputType.Value == "local" {
+		// Only register handler when output type is "local", e.g. for local development.
 		mux.HandleFunc("/local/worker", handleLocalRequest)
 	}
 
