@@ -435,10 +435,9 @@ func main() {
 	mux.HandleFunc("/_ah/health", healthCheckHandler) // legacy
 	mux.HandleFunc("/alive", healthCheckHandler)
 	mux.HandleFunc("/ready", healthCheckHandler)
-	if outputType.Value == "local" {
-		// Only register handler when output type is "local", e.g. for local development.
-		mux.HandleFunc("/local/worker", handleLocalRequest)
-	}
+
+	// Registers handler for v2 datatypes. Works with "local" output for local development.
+	mux.HandleFunc("/v2/worker", handleLocalRequest)
 
 	_ = startServers(mainCtx, mux)
 }

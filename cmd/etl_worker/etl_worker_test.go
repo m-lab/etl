@@ -173,12 +173,12 @@ func TestLocalRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, err := waitFor("http://" + mainSvr + "/local/worker?filename=" + tt.uri)
+			resp, err := waitFor("http://" + mainSvr + "/v2/worker?filename=" + tt.uri)
 			if err != nil {
 				t.Fatalf("http.Get returned unexpected error: %v", err)
 			}
 			if tt.wantStatus != resp.StatusCode {
-				t.Errorf("local/worker returned wrong status; got %d, want %d", resp.StatusCode, tt.wantStatus)
+				t.Errorf("v2/worker returned wrong status; got %d, want %d", resp.StatusCode, tt.wantStatus)
 			}
 			if tt.wantStatus != http.StatusOK {
 				return
