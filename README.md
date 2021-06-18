@@ -17,12 +17,12 @@ go get ./cmd/etl_worker
 ~/bin/etl_worker -service_port :8080 -output_dir ./output -output local
 ```
 
-From the command line (or with a browser) make a request to the `local/writer`
+From the command line (or with a browser) make a request to the `/v2/worker`
 resource with a `filename=` parameter that names a valid M-Lab GCS archive.
 
 ```sh
 URL=gs://archive-measurement-lab/ndt/ndt7/2021/06/14/20210614T003000.696927Z-ndt7-mlab1-yul04-ndt.tgz
-curl "http://localhost:8080/local/worker?filename=$URL"
+curl "http://localhost:8080/v2/worker?filename=$URL"
 ```
 
 ## Generating Schema Docs
