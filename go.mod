@@ -13,7 +13,7 @@ require (
 	github.com/google/go-jsonnet v0.17.0
 	github.com/googleapis/google-cloud-go-testing v0.0.0-20200911160855-bcd43fbb19e8
 	github.com/kr/pretty v0.2.1
-	github.com/m-lab/annotation-service v0.0.0-20200221173317-d968fe153a9c
+	github.com/m-lab/annotation-service v0.0.0-20210427141535-6f5ace9e5186
 	github.com/m-lab/etl-gardener v0.0.0-20210310164025-d9582f1131b5
 	github.com/m-lab/go v0.1.44
 	github.com/m-lab/ndt-server v0.20.5
@@ -22,6 +22,7 @@ require (
 	github.com/m-lab/uuid-annotator v0.4.3
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/client_model v0.2.0
+	github.com/sirupsen/logrus v1.8.1
 	github.com/valyala/gozstd v1.9.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/api v0.43.0
