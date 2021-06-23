@@ -14,10 +14,12 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/googleapi"
+	"google.golang.org/api/iterator"
 
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/go/flagx"
@@ -31,7 +33,9 @@ func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
 	row := schema.TCPRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "TCPRow.Schema")
-
+	if dataset == "batch" {
+		updateTemplateTables(schema, project, dataset, table, "")
+	}
 	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
@@ -39,7 +43,9 @@ func CreateOrUpdatePT(project string, dataset string, table string) error {
 	row := schema.PTTest{}
 	schema, err := row.Schema()
 	rtx.Must(err, "PTTest.Schema")
-
+	if dataset == "batch" {
+		updateTemplateTables(schema, project, dataset, table, "")
+	}
 	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
@@ -47,14 +53,18 @@ func CreateOrUpdateSS(project string, dataset string, table string) error {
 	row := schema.SS{}
 	schema, err := row.Schema()
 	rtx.Must(err, "SS.Schema")
-
+	if dataset == "batch" {
+		updateTemplateTables(schema, project, dataset, table, "")
+	}
 	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 func CreateOrUpdateNDTWeb100(project string, dataset string, table string) error {
 	row := schema.NDTWeb100{}
 	schema, err := row.Schema()
 	rtx.Must(err, "NDTWeb100.Schema")
-
+	if dataset == "batch" {
+		updateTemplateTables(schema, project, dataset, table, "")
+	}
 	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
@@ -95,6 +105,54 @@ func CreateOrUpdateSwitchStats(project string, dataset string, table string) err
 	schema, err := row.Schema()
 	rtx.Must(err, "SwitchStats.Schema")
 	return CreateOrUpdate(schema, project, dataset, table, "")
+}
+
+// listTemplateTables finds all template tables for the given project, datatype, and base table name.
+// Because this function must enumerate all tables in the dataset to find matching names, it may be slow.
+func listTemplateTables(project, dataset, table string) ([]string, error) {
+	tables := []string{}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	client, err := bigquery.NewClient(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	it := client.Dataset(dataset).Tables(ctx)
+	for {
+		t, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if strings.HasPrefix(t.TableID, table+"_") {
+			tables = append(tables, t.TableID)
+		}
+	}
+	return tables, nil
+}
+
+// updateTemplateTables updates the schema on all template tables for the named dataset and table.
+func updateTemplateTables(schema bigquery.Schema, project, dataset, table, partField string) error {
+	// Find all template tables for this table.
+	tables, err := listTemplateTables(project, dataset, table)
+	if err != nil {
+		return err
+	}
+	for i := range tables {
+		// Update the template table. There is a small chance that a template
+		// table may be deleted between the list and this call, such that the
+		// table is recreated here. However, the table will be empty, and used
+		// by the next pass of the parser. So, this is expected to be
+		// unconditionally safe.
+		err = CreateOrUpdate(schema, project, dataset, tables[i], partField)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // CreateOrUpdate will update or create a table from the given schema.
