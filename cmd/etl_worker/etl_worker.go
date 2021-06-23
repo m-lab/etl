@@ -160,6 +160,47 @@ func decrementInFlight() {
 	atomic.AddInt32(&inFlight, -1)
 }
 
+func handleLocalRequest(rw http.ResponseWriter, req *http.Request) {
+	fn, err := etl.GetFilename(req.FormValue("filename"))
+	if err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(rw, "failed to get valid filename= parameter from request")
+		return
+	}
+
+	dp, err := etl.ValidateTestPath(fn)
+	if err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(rw, "failed to validate test path: %q", fn)
+		return
+	}
+
+	c, err := storage.GetStorageClient(false)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(rw, "failed to get storage client")
+		return
+	}
+
+	ctx := context.Background()
+	obj, err := c.Bucket(dp.Bucket).Object(dp.Path).Attrs(ctx)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(rw, "failed to get object attrs for %s / %s", dp.Bucket, dp.Path)
+		return
+	}
+
+	r := toRunnable(obj)
+	err = r.Run(ctx)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(rw, "runnable failed to run on %s / %s", dp.Bucket, dp.Path)
+		return
+	}
+
+	fmt.Fprintf(rw, "no observed errors")
+}
+
 // TODO(gfr) unify counting for http and pubsub paths?
 func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 	// This will add metric count and log message from any panic.
@@ -394,6 +435,9 @@ func main() {
 	mux.HandleFunc("/_ah/health", healthCheckHandler) // legacy
 	mux.HandleFunc("/alive", healthCheckHandler)
 	mux.HandleFunc("/ready", healthCheckHandler)
+
+	// Registers handler for v2 datatypes. Works with "local" output for local development.
+	mux.HandleFunc("/v2/worker", handleLocalRequest)
 
 	_ = startServers(mainCtx, mux)
 }
