@@ -15,7 +15,7 @@ require (
 	github.com/kr/pretty v0.2.1
 	github.com/m-lab/annotation-service v0.0.0-20210427141535-6f5ace9e5186
 	github.com/m-lab/etl-gardener v0.0.0-20210310164025-d9582f1131b5
-	github.com/m-lab/go v0.1.44
+	github.com/m-lab/go v0.1.45
 	github.com/m-lab/ndt-server v0.20.5
 	github.com/m-lab/tcp-info v1.5.3
 	github.com/m-lab/uuid v0.0.0-20191115203855-549727171666 // indirect
@@ -24,6 +24,8 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/valyala/gozstd v1.9.0
+	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4
+	golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/api v0.43.0
 	gopkg.in/m-lab/pipe.v3 v3.0.0-20180108231244-604e84f43ee0

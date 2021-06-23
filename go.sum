@@ -295,6 +295,8 @@ github.com/m-lab/etl-gardener v0.0.0-20210310164025-d9582f1131b5 h1:jCFqYBvYPEHq
 github.com/m-lab/etl-gardener v0.0.0-20210310164025-d9582f1131b5/go.mod h1:4hAG+N9lfh+vQ+FEcMFad0SOP74VJi5yeWk7ioHkvs0=
 github.com/m-lab/go v0.1.44 h1:aVI5k1M8q919m+3HIvrXOY/eMVaHAZPAflxnZ28o3q4=
 github.com/m-lab/go v0.1.44/go.mod h1:+C0ZBlRKsF7wIbqHRtiL8bqD6cOwlZXDTK/KQ7Iv434=
+github.com/m-lab/go v0.1.45 h1:z3aNaDUXDKeZp1tl40HMzPmDFPcz9qtAWyDAkh3kCfo=
+github.com/m-lab/go v0.1.45/go.mod h1:05mdACIqCaSuf57iYC6mDhomYdyzSgkWeR5CgZIXU6Y=
 github.com/m-lab/ndt-server v0.20.5 h1:EeNzNb1cfhdszJhlGrJAewraKDJGTlx64pvy/d/dpp0=
 github.com/m-lab/ndt-server v0.20.5/go.mod h1:ZLVRCEbCBkhh0pwNjnLpwaZnHOHGEH76H/fzIIVFRWw=
 github.com/m-lab/tcp-info v1.5.3 h1:4IspTPcNc8D8LNRvuFnID8gDiz+hxPAtYvpKZaiGGe8=

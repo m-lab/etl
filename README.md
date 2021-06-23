@@ -1,15 +1,29 @@
 # etl
+
 | branch | travis-ci | report-card | coveralls |
 |--------|-----------|-----------|-------------|
 | master | [![Travis Build Status](https://travis-ci.org/m-lab/etl.svg?branch=master)](https://travis-ci.org/m-lab/etl) | | [![Coverage Status](https://coveralls.io/repos/m-lab/etl/badge.svg?branch=master)](https://coveralls.io/github/m-lab/etl?branch=master) |
 | integration | [![Travis Build Status](https://travis-ci.org/m-lab/etl.svg?branch=integration)](https://travis-ci.org/m-lab/etl) | [![Go Report Card](https://goreportcard.com/badge/github.com/m-lab/etl)](https://goreportcard.com/report/github.com/m-lab/etl) | [![Coverage Status](https://coveralls.io/repos/m-lab/etl/badge.svg?branch=integration)](https://coveralls.io/github/m-lab/etl?branch=integration) |
 
-MeasurementLab data ingestion pipeline.
+ETL (extract, transform, load) is a core component of the M-Lab data processing
+pipeline. The ETL worker is responsible for parsing data archives produced by
+[pusher](https://github.com/m-lab/pusher) and publishing M-Lab measurements to
+[BigQuery](https://www.measurementlab.net/data/docs/bq/quickstart/).
 
-To create e.g., NDT table (should rarely be required!!!):
-bq mk --time_partitioning_type=DAY --schema=schema/repeated.json mlab-sandbox:mlab_sandbox.ndt
+## Local Development
 
-Also see schema/README.md.
+```sh
+go get ./cmd/etl_worker
+~/bin/etl_worker -service_port :8080 -output_dir ./output -output local
+```
+
+From the command line (or with a browser) make a request to the `/v2/worker`
+resource with a `filename=` parameter that names a valid M-Lab GCS archive.
+
+```sh
+URL=gs://archive-measurement-lab/ndt/ndt7/2021/06/14/20210614T003000.696927Z-ndt7-mlab1-yul04-ndt.tgz
+curl "http://localhost:8080/v2/worker?filename=$URL"
+```
 
 ## Generating Schema Docs
 
