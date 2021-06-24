@@ -408,7 +408,7 @@ func main() {
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from env")
 
-	site.MustReload(mainCtx)
+	go site.MustReload(mainCtx)
 
 	// Enable block profiling
 	runtime.SetBlockProfileRate(1000000) // One event per msec.
