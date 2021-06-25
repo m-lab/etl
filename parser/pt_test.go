@@ -372,6 +372,9 @@ func TestParseAndInsert(t *testing.T) {
 	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
 		t.Fatalf("Task filename is wrong.")
 	}
+	if ins.data[0].(*schema.PTTest).UUID != "xyz" {
+		t.Fatalf("UUID is wrong; got %q, want %q", ins.data[0].(*schema.PTTest).UUID, "xyz")
+	}
 }
 
 func TestProcessLastTests(t *testing.T) {
