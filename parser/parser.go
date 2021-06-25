@@ -3,6 +3,8 @@
 package parser
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
 	"log"
 	"reflect"
 
@@ -127,4 +129,11 @@ func (np *NullParser) TableName() string {
 }
 func (np *NullParser) TaskError() error {
 	return nil
+}
+
+// syntheticUUID produces an opague, filename-safe string. The resulting string
+// should only be used to provide uniqueness. Strings are fixed length.
+func syntheticUUID(input string) string {
+	b := sha1.Sum([]byte(input))
+	return base64.RawURLEncoding.EncodeToString(b[:])
 }
