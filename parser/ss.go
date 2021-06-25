@@ -3,6 +3,7 @@ package parser
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"log"
 	"path/filepath"
 	"reflect"
@@ -132,7 +133,17 @@ func PackDataIntoSchema(ssValue map[string]string, logTime time.Time, testName s
 		Snap:            snap,
 	}
 
+	// The fields in this synthetic ID are the same used during gardener
+	// dedup, which guarantees uniqueness.
+	rawid := fmt.Sprintf("%d-%s-%d-%s-%d",
+		web100Log.Snap.StartTimeStamp,
+		web100Log.Connection_spec.Local_ip,
+		web100Log.Connection_spec.Local_port,
+		web100Log.Connection_spec.Remote_ip,
+		web100Log.Connection_spec.Remote_port)
+
 	ssTest := &schema.SS{
+		ID:               syntheticUUID(rawid),
 		TestID:           testName,
 		LogTime:          logTime.Unix(),
 		Type:             int64(1),
