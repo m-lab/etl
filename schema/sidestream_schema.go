@@ -186,6 +186,7 @@ type Anomalies struct {
 }
 
 type SS struct {
+	ID               string         `json:"id" bigquery:"id"`
 	TestID           string         `json:"test_id" bigquery:"test_id"`
 	Project          int64          `json:"project" bigquery:"project"`
 	LogTime          int64          `json:"log_time" bigquery:"log_time"`
