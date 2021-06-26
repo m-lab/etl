@@ -126,4 +126,8 @@ func TestSSInserter(t *testing.T) {
 	if inserted.ParserVersion != "https://github.com/m-lab/etl/tree/foobar" {
 		t.Error("ParserVersion not properly set")
 	}
+	// echo -n 1486123188191060-213.248.112.75-41131-5.228.253.100-52290 | openssl dgst -binary -sha1 | base64  | tr '/+' '_-' | tr -d '='
+	if inserted.ID != "Q3Wm8_nA-kOUKI9GpFv7MAbSjZY" {
+		t.Errorf("ss.ParseAndInsert() wrong ID; got %q, want %q", inserted.ID, "Q3Wm8_nA-kOUKI9GpFv7MAbSjZY")
+	}
 }
