@@ -13,7 +13,7 @@ require (
 	github.com/google/go-jsonnet v0.17.0
 	github.com/googleapis/google-cloud-go-testing v0.0.0-20200911160855-bcd43fbb19e8
 	github.com/kr/pretty v0.2.1
-	github.com/m-lab/annotation-service v0.0.0-20210510161905-66746c999334
+	github.com/m-lab/annotation-service v0.0.0-20210628135754-865549cb023e
 	github.com/m-lab/etl-gardener v0.0.0-20210310164025-d9582f1131b5
 	github.com/m-lab/go v0.1.45
 	github.com/m-lab/ndt-server v0.20.5
