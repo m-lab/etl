@@ -616,10 +616,8 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return nil
 	}
 
-	// The fields in this synthetic UUID are the same used during gardener
-	// dedup, which guarantees uniqueness.
-	cachedTest.UUID = syntheticUUID(
-		cachedTest.LogTime.Format(time.RFC3339) + "-" + cachedTest.Source.IP + "-" + cachedTest.Destination.IP)
+	// Since this is a .paris file, we create a synthetic UUID for joining with annotations.
+	cachedTest.UUID = ptSyntheticUUID(cachedTest.LogTime, cachedTest.Source.IP, cachedTest.Destination.IP)
 
 	// Check all buffered PT tests whether Client_ip in connSpec appear in
 	// the last hop of the buffered test.

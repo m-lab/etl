@@ -531,9 +531,8 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		snaplog.Version, int64(snaplog.LogTime),
 		nestedConnSpec, snapValues, deltas)
 
-	// The test filename includes a date path and timestamp, in addition to client IP or name.
-	// This field is the same one used during gardener dedup, which guarantees uniqueness.
-	results["id"] = syntheticUUID(test.fn)
+	// Create a synthetic UUID for joining with annotations.
+	results["id"] = ndtWeb100SyntheticUUID(test.fn)
 	results["test_id"] = test.fn
 	results["task_filename"] = n.taskFileName
 	if snaplog.SnapCount() > maxNumSnapshots || snaplog.SnapCount() < minNumSnapshots {
