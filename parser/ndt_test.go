@@ -182,8 +182,8 @@ func TestNDTParser(t *testing.T) {
 	// Extract the values saved to the inserter.
 	actualValues := ins.data[0].(parser.NDTTest).Web100ValueMap
 	expectedValues := schema.Web100ValueMap{
-		// echo -n 20170509T13:45:13.590210000Z_eb.measurementlab.net:44160.s2c_snaplog.gz | openssl dgst -binary -sha1 | base64  | tr '/+' '_-' | tr -d '='
-		"id": "Edjykv4X555O7fJsWs0C8QHdB8E",
+		// echo -n 20170509T13:45:13.590210000Z_eb.measurementlab.net:44160.s2c_snaplog.gz | openssl dgst -binary -md5 | base64  | tr '/+' '_-' | tr -d '='
+		"id": "nYjSCZhB0EfQPChl2tT8Fg",
 		"connection_spec": schema.Web100ValueMap{
 			"server_hostname": "mlab3.vie01.measurement-lab.org",
 			"client": schema.Web100ValueMap{

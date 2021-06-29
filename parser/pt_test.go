@@ -372,9 +372,9 @@ func TestParseAndInsert(t *testing.T) {
 	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
 		t.Fatalf("Task filename is wrong.")
 	}
-	// echo -n 2013-05-24T00:04:44Z-91.239.96.102-2.80.132.33 | openssl dgst -binary -sha1 | base64  | tr '/+' '_-' | tr -d '='
-	if ins.data[0].(*schema.PTTest).UUID != "vEsw_JvSPfP4qXp_JxdBa3x7xUI" {
-		t.Fatalf("UUID is wrong; got %q, want %q", ins.data[0].(*schema.PTTest).UUID, "vEsw_JvSPfP4qXp_JxdBa3x7xUI")
+	// echo -n 2013-05-24T00:04:44Z-91.239.96.102-2.80.132.33 | openssl dgst -binary -md5 | base64  | tr '/+' '_-' | tr -d '='
+	if ins.data[0].(*schema.PTTest).UUID != "R9_wGx1-cSmqtSAt5aQtNg" {
+		t.Fatalf("UUID is wrong; got %q, want %q", ins.data[0].(*schema.PTTest).UUID, "R9_wGx1-cSmqtSAt5aQtNg")
 	}
 }
 
