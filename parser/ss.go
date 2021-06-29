@@ -134,6 +134,7 @@ func PackDataIntoSchema(ssValue map[string]string, logTime time.Time, testName s
 
 	// Create a synthetic UUID for joining with annotations.
 	id := ssSyntheticUUID(
+		testName,
 		web100Log.Snap.StartTimeStamp,
 		web100Log.Connection_spec.Local_ip,
 		web100Log.Connection_spec.Local_port,
