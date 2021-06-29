@@ -3,7 +3,7 @@
 package parser
 
 import (
-	"crypto/sha1"
+	"crypto/md5"
 	"encoding/base64"
 	"fmt"
 	"log"
@@ -136,7 +136,7 @@ func (np *NullParser) TaskError() error {
 // base64hash produces an opaque, filename-safe string. The resulting string
 // should only be used to provide unique identifiers.
 func base64hash(input string) string {
-	b := sha1.Sum([]byte(input))
+	b := md5.Sum([]byte(input))
 	return base64.RawURLEncoding.EncodeToString(b[:])
 }
 
@@ -157,6 +157,6 @@ func ndtWeb100SyntheticUUID(fn string) string {
 // ssSyntheticUUID constructs a synthetic UUID for sidestream rows using the
 // same fields used by gardener's dedup, which guarantees uniqueness only for
 // joining with annotations.
-func ssSyntheticUUID(start int64, srcIP string, srcPort int64, dstIP string, dstPort int64) string {
-	return base64hash(fmt.Sprintf("%d-%s-%d-%s-%d", start, srcIP, srcPort, dstIP, dstPort))
+func ssSyntheticUUID(id string, start int64, srcIP string, srcPort int64, dstIP string, dstPort int64) string {
+	return base64hash(fmt.Sprintf("%s-%d-%s-%d-%s-%d", id, start, srcIP, srcPort, dstIP, dstPort))
 }
