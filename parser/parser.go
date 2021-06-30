@@ -3,8 +3,12 @@
 package parser
 
 import (
+	"crypto/md5"
+	"encoding/base64"
+	"fmt"
 	"log"
 	"reflect"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 
@@ -127,4 +131,32 @@ func (np *NullParser) TableName() string {
 }
 func (np *NullParser) TaskError() error {
 	return nil
+}
+
+// base64hash produces an opaque, filename-safe string. The resulting string
+// should only be used to provide unique identifiers.
+func base64hash(input string) string {
+	b := md5.Sum([]byte(input))
+	return base64.RawURLEncoding.EncodeToString(b[:])
+}
+
+// ptSyntheticUUID constructs a synthetic UUID for the .paris format for
+// traceroute rows using the same fields used by gardener's dedup, which
+// guarantees uniqueness only for joining with annotations.
+func ptSyntheticUUID(t time.Time, srcIP, dstIP string) string {
+	return base64hash(t.Format(time.RFC3339) + "-" + srcIP + "-" + dstIP)
+}
+
+// ndtWeb100SyntheticUUID constructs a synthetic UUID for ndt web100 rows using
+// the test filename.  The filename is the same field used by gardener's dedup,
+// which guarantees uniqueness only for joining with annotations.
+func ndtWeb100SyntheticUUID(fn string) string {
+	return base64hash(fn)
+}
+
+// ssSyntheticUUID constructs a synthetic UUID for sidestream rows using the
+// same fields used by gardener's dedup, which guarantees uniqueness only for
+// joining with annotations.
+func ssSyntheticUUID(id string, start int64, srcIP string, srcPort int64, dstIP string, dstPort int64) string {
+	return base64hash(fmt.Sprintf("%s-%d-%s-%d-%s-%d", id, start, srcIP, srcPort, dstIP, dstPort))
 }

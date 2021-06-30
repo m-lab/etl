@@ -531,6 +531,8 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		snaplog.Version, int64(snaplog.LogTime),
 		nestedConnSpec, snapValues, deltas)
 
+	// Create a synthetic UUID for joining with annotations.
+	results["id"] = ndtWeb100SyntheticUUID(test.fn)
 	results["test_id"] = test.fn
 	results["task_filename"] = n.taskFileName
 	if snaplog.SnapCount() > maxNumSnapshots || snaplog.SnapCount() < minNumSnapshots {

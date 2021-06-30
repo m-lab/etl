@@ -14,6 +14,7 @@ import (
 //
 // TODO: migrate parser/ndt.go to use native struct, then migrate to standard columns.
 type NDTWeb100 struct {
+	ID             string            `bigquery:"id"`
 	TestID         string            `bigquery:"test_id"`
 	TaskFilename   string            `bigquery:"task_filename"`
 	ParseTime      time.Time         `bigquery:"parse_time"`

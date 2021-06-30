@@ -616,6 +616,9 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return nil
 	}
 
+	// Since this is a .paris file, we create a synthetic UUID for joining with annotations.
+	cachedTest.UUID = ptSyntheticUUID(cachedTest.LogTime, cachedTest.Source.IP, cachedTest.Destination.IP)
+
 	// Check all buffered PT tests whether Client_ip in connSpec appear in
 	// the last hop of the buffered test.
 	// If it does appear, then the buffered test was polluted, and it will

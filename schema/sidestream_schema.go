@@ -186,6 +186,7 @@ type Anomalies struct {
 }
 
 type SS struct {
+	ID               string         `json:"id" bigquery:"id"`
 	TestID           string         `json:"test_id" bigquery:"test_id"`
 	Project          int64          `json:"project" bigquery:"project"`
 	LogTime          int64          `json:"log_time" bigquery:"log_time"`
@@ -248,8 +249,8 @@ func (ss *SS) Schema() (bigquery.Schema, error) {
 	// schema uses two fields with the same name but different types (log_time
 	// and web100_log_entry.log_time), and bqx.Customize would change them both.
 	// This only changes the type of the necessary field.
-	if len(sch) > 2 && sch[2].Name == "log_time" {
-		sch[2].Type = "TIMESTAMP"
+	if len(sch) > 3 && sch[3].Name == "log_time" {
+		sch[3].Type = "TIMESTAMP"
 	}
 	rr := bqx.RemoveRequired(sch)
 	return rr, nil
