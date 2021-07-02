@@ -203,6 +203,16 @@ func FullConnectionSpec() Web100ValueMap {
 		"websockets":            false,
 		"client_geolocation":    FullGeolocation(),
 		"server_geolocation":    FullGeolocation(),
+		"client":                Web100ValueMap{},
+		"server":                Web100ValueMap{},
+		"ClientX": Web100ValueMap{
+			"Geo":     Web100ValueMap{},
+			"Network": Web100ValueMap{},
+		},
+		"ServerX": Web100ValueMap{
+			"Geo":     Web100ValueMap{},
+			"Network": Web100ValueMap{},
+		},
 	}
 }
 
@@ -212,6 +222,26 @@ func EmptyConnectionSpec() Web100ValueMap {
 		"server_geolocation": EmptyGeolocation(),
 		"client":             Web100ValueMap{"network": make(Web100ValueMap, 2)},
 		"server":             Web100ValueMap{"network": make(Web100ValueMap, 2)},
+		"ClientX": Web100ValueMap{
+			"Geo": Web100ValueMap{},
+			"Network": Web100ValueMap{
+				"CIDR":     "",
+				"ASNumber": 0,
+				"ASName":   "",
+				"Missing":  false,
+				"Systems":  []Web100ValueMap{},
+			},
+		},
+		"ServerX": Web100ValueMap{
+			"Geo": Web100ValueMap{},
+			"Network": Web100ValueMap{
+				"CIDR":     "",
+				"ASNumber": 0,
+				"ASName":   "",
+				"Missing":  false,
+				"Systems":  []Web100ValueMap{},
+			},
+		},
 	}
 }
 
