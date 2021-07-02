@@ -800,6 +800,12 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 			if t == 0 {
 				continue
 			}
+		case uint32:
+			// NOTE: bigquery.Value does not support unsigned int types. The
+			// annotation-service API returns uint32 for the ASNumber field.
+			// When copying this value, convert it to an int64 so that it is
+			// BigQuery compatible.
+			v = int64(t)
 		}
 		jsonTag, ok := typeOfStruct.Field(i).Tag.Lookup("json")
 		name := strings.ToLower(typeOfStruct.Field(i).Name)
@@ -810,6 +816,33 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 			}
 		}
 		destinationMap[strings.ToLower(name)] = v
+	}
+}
+
+func CopyStructToMapDirectly(sourceStruct interface{}, destinationMap map[string]bigquery.Value) {
+	structToCopy := reflect.ValueOf(sourceStruct).Elem()
+	typeOfStruct := structToCopy.Type()
+	for i := 0; i < typeOfStruct.NumField(); i++ {
+		f := structToCopy.Field(i)
+		v := f.Interface()
+		switch t := v.(type) {
+		case string:
+			// TODO - are these still needed?  Does the omitempty cover it?
+			if t == "" {
+				continue
+			}
+		case int64:
+			if t == 0 {
+				continue
+			}
+		case uint32:
+			// NOTE: bigquery.Value does not support unsigned int types. The
+			// annotation-service API returns uint32 for the ASNumber field.
+			// When copying this value, convert it to an int64 so that it is
+			// BigQuery compatible.
+			v = int64(t)
+		}
+		destinationMap[typeOfStruct.Field(i).Name] = v
 	}
 }
 
@@ -833,6 +866,10 @@ func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 					Labels{"source": "NDTTest BestASN error on client IP."}).Inc()
 			} else {
 				spec.Get("client").Get("network")["asn"] = asn
+				// CopyStructToMap(data.Network, spec.Get("client"))
+				c := v2as.ConvertAnnotationsToClientAnnotations(data)
+				CopyStructToMapDirectly(c.Geo, spec.Get("ClientX").Get("Geo"))
+				CopyStructToMapDirectly(c.Network, spec.Get("ClientX").Get("Network"))
 			}
 		}
 	} else {
@@ -883,6 +920,9 @@ func (ndt NDTTest) AnnotateServer(local *api.Annotations) error {
 			return err
 		}
 		spec.Get("server").Get("network")["asn"] = asn
+		s := v2as.ConvertAnnotationsToServerAnnotations(local)
+		CopyStructToMapDirectly(s.Geo, spec.Get("ServerX").Get("Geo"))
+		CopyStructToMapDirectly(s.Network, spec.Get("ServerX").Get("Network"))
 	}
 
 	return nil
