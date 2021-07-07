@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/go-test/deep"
-	"github.com/m-lab/go/pretty"
+	"github.com/kr/pretty"
 
 	v2as "github.com/m-lab/annotation-service/api/v2"
 
@@ -200,8 +200,8 @@ func TestNDTParser(t *testing.T) {
 					"Missing":  false,
 				},
 				"Geo": schema.Web100ValueMap{
-					"Latitude":  float64(1),
-					"Longitude": float64(2),
+					"Latitude":  1.0,
+					"Longitude": 2.0,
 				},
 			},
 			"ServerX": schema.Web100ValueMap{
@@ -212,8 +212,8 @@ func TestNDTParser(t *testing.T) {
 					"Missing":  false,
 				},
 				"Geo": schema.Web100ValueMap{
-					"Latitude":  float64(3),
-					"Longitude": float64(4),
+					"Latitude":  3.0,
+					"Longitude": 4.0,
 				},
 			},
 		},
