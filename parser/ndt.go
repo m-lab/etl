@@ -823,7 +823,6 @@ func copyStructToMapDirectly(sourceStruct interface{}, destinationMap map[string
 		v := f.Interface()
 		switch t := v.(type) {
 		case string:
-			// TODO - are these still needed?  Does the omitempty cover it?
 			if t == "" {
 				continue
 			}
@@ -832,6 +831,9 @@ func copyStructToMapDirectly(sourceStruct interface{}, destinationMap map[string
 				continue
 			}
 		case uint32:
+			if t == 0 {
+				continue
+			}
 			// NOTE: bigquery.Value does not support unsigned int types. The
 			// annotation-service API returns uint32 for the ASNumber field.
 			// When copying this value, convert it to an int64 so that it is
