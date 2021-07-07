@@ -800,12 +800,6 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 			if t == 0 {
 				continue
 			}
-		case uint32:
-			// NOTE: bigquery.Value does not support unsigned int types. The
-			// annotation-service API returns uint32 for the ASNumber field.
-			// When copying this value, convert it to an int64 so that it is
-			// BigQuery compatible.
-			v = int64(t)
 		}
 		jsonTag, ok := typeOfStruct.Field(i).Tag.Lookup("json")
 		name := strings.ToLower(typeOfStruct.Field(i).Name)
@@ -819,7 +813,9 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 	}
 }
 
-func CopyStructToMapDirectly(sourceStruct interface{}, destinationMap map[string]bigquery.Value) {
+// copyStructToMapDirectly copies struct fields to the given bigquery.Value map.
+// Unlike CopyStructToMap, this function preserves the original field case.
+func copyStructToMapDirectly(sourceStruct interface{}, destinationMap map[string]bigquery.Value) {
 	structToCopy := reflect.ValueOf(sourceStruct).Elem()
 	typeOfStruct := structToCopy.Type()
 	for i := 0; i < typeOfStruct.NumField(); i++ {
@@ -868,8 +864,8 @@ func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 				spec.Get("client").Get("network")["asn"] = asn
 				// CopyStructToMap(data.Network, spec.Get("client"))
 				c := v2as.ConvertAnnotationsToClientAnnotations(data)
-				CopyStructToMapDirectly(c.Geo, spec.Get("ClientX").Get("Geo"))
-				CopyStructToMapDirectly(c.Network, spec.Get("ClientX").Get("Network"))
+				copyStructToMapDirectly(c.Geo, spec.Get("ClientX").Get("Geo"))
+				copyStructToMapDirectly(c.Network, spec.Get("ClientX").Get("Network"))
 			}
 		}
 	} else {
@@ -921,8 +917,8 @@ func (ndt NDTTest) AnnotateServer(local *api.Annotations) error {
 		}
 		spec.Get("server").Get("network")["asn"] = asn
 		s := v2as.ConvertAnnotationsToServerAnnotations(local)
-		CopyStructToMapDirectly(s.Geo, spec.Get("ServerX").Get("Geo"))
-		CopyStructToMapDirectly(s.Network, spec.Get("ServerX").Get("Network"))
+		copyStructToMapDirectly(s.Geo, spec.Get("ServerX").Get("Geo"))
+		copyStructToMapDirectly(s.Network, spec.Get("ServerX").Get("Network"))
 	}
 
 	return nil
