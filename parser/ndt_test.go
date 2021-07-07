@@ -200,8 +200,8 @@ func TestNDTParser(t *testing.T) {
 					"Missing":  false,
 				},
 				"Geo": schema.Web100ValueMap{
-					"Latitude":  1,
-					"Longitude": 2,
+					"Latitude":  float64(1),
+					"Longitude": float64(2),
 				},
 			},
 			"ServerX": schema.Web100ValueMap{
@@ -212,8 +212,8 @@ func TestNDTParser(t *testing.T) {
 					"Missing":  false,
 				},
 				"Geo": schema.Web100ValueMap{
-					"Latitude":  3,
-					"Longitude": 4,
+					"Latitude":  float64(3),
+					"Longitude": float64(4),
 				},
 			},
 		},
@@ -305,6 +305,12 @@ func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100V
 						key, v, act.([]float64))
 					match = false
 				}
+			}
+		case float64:
+			if v != act.(float64) {
+				t.Logf("Wrong floats for key %q: got %f; want %v",
+					key, v, act.(float64))
+				match = false
 			}
 		case bool:
 			if act.(bool) != v {
