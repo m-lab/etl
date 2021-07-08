@@ -6,6 +6,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/go/cloud/bqx"
+	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 // NDTWeb100 is a mirror struct of the BQ schema. This type is NOT USED by the parser.
@@ -53,6 +54,10 @@ type ndtConnectionSpec struct {
 	ServerGeolocation   api.GeolocationIP `bigquery:"server_geolocation"`
 	Client              ndtClientNetwork  `bigquery:"client"`
 	Server              ndtServerNetwork  `bigquery:"server"`
+
+	// ServerX and ClientX are for the synthetic UUID annotator export process.
+	ServerX annotator.ServerAnnotations
+	ClientX annotator.ClientAnnotations
 }
 
 type network struct {
@@ -61,12 +66,10 @@ type network struct {
 
 type ndtClientNetwork struct {
 	Network network `bigquery:"network"`
-	// api.ASData         // Include extended asn data from  annotation-service
 }
 type ndtServerNetwork struct {
 	IataCode string  `bigquery:"iata_code"`
 	Network  network `bigquery:"network"`
-	// api.ASData         // Include extended asn data from  annotation-service
 }
 
 type web100ConnectionSpec struct {

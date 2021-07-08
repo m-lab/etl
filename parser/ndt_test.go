@@ -116,9 +116,9 @@ func TestNDTParser(t *testing.T) {
 	// Completely fake annotation data.
 	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
 		"Annotations":{
-				   "45.56.98.222":{"Geo":{"postal_code":"45569"}, "Network":{"Systems":[{"ASNs":[123]}]}},
-				   "213.208.152.37":{"Geo":{"postal_code":"21320"}, "Network":{"Systems":[{"ASNs":[456]}]}}
-				   }}`
+		   "45.56.98.222":{"Geo":{"postal_code":"45569", "latitude": 1.0, "longitude": 2.0}, "Network":{"ASName":"Fake Client ISP", "ASNumber": 123, "Systems":[{"ASNs":[123]}]}},
+		   "213.208.152.37":{"Geo":{"postal_code":"21320", "latitude": 3.0, "longitude": 4.0}, "Network":{"ASName":"Fake Server ISP", "ASNumber": 456, "CIDR": "213.208.152.0/26", "Systems":[{"ASNs":[456]}]}}
+	   }}`
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, responseJSON)
 	}))
@@ -190,7 +190,31 @@ func TestNDTParser(t *testing.T) {
 				"network": schema.Web100ValueMap{"asn": int64(123)},
 			},
 			"server": schema.Web100ValueMap{
-				"network": schema.Web100ValueMap{"asn": int64(456)},
+				"network":   schema.Web100ValueMap{"asn": int64(456)},
+				"iata_code": "VIE",
+			},
+			"ClientX": schema.Web100ValueMap{
+				"Network": schema.Web100ValueMap{
+					"ASName":   "Fake Client ISP",
+					"ASNumber": int64(123),
+					"Missing":  false,
+				},
+				"Geo": schema.Web100ValueMap{
+					"Latitude":  1.0,
+					"Longitude": 2.0,
+				},
+			},
+			"ServerX": schema.Web100ValueMap{
+				"Network": schema.Web100ValueMap{
+					"ASName":   "Fake Server ISP",
+					"ASNumber": int64(456),
+					"CIDR":     "213.208.152.0/26",
+					"Missing":  false,
+				},
+				"Geo": schema.Web100ValueMap{
+					"Latitude":  3.0,
+					"Longitude": 4.0,
+				},
 			},
 		},
 		"web100_log_entry": schema.Web100ValueMap{
@@ -282,7 +306,18 @@ func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100V
 					match = false
 				}
 			}
-
+		case float64:
+			if v != act.(float64) {
+				t.Logf("Wrong floats for key %q: got %f; want %v",
+					key, v, act.(float64))
+				match = false
+			}
+		case bool:
+			if act.(bool) != v {
+				t.Logf("Wrong bool for key %q: got %t; want %t",
+					key, v, act.(bool))
+				match = false
+			}
 		default:
 			fmt.Printf("Unsupported type. %T\n", v)
 			panic(nil)

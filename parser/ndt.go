@@ -813,6 +813,37 @@ func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquer
 	}
 }
 
+// copyStructToMapDirectly copies struct fields to the given bigquery.Value map.
+// Unlike CopyStructToMap, this function preserves the original field case.
+func copyStructToMapDirectly(sourceStruct interface{}, destinationMap map[string]bigquery.Value) {
+	structToCopy := reflect.ValueOf(sourceStruct).Elem()
+	typeOfStruct := structToCopy.Type()
+	for i := 0; i < typeOfStruct.NumField(); i++ {
+		f := structToCopy.Field(i)
+		v := f.Interface()
+		switch t := v.(type) {
+		case string:
+			if t == "" {
+				continue
+			}
+		case int64:
+			if t == 0 {
+				continue
+			}
+		case uint32:
+			if t == 0 {
+				continue
+			}
+			// NOTE: bigquery.Value does not support unsigned int types. The
+			// annotation-service API returns uint32 for the ASNumber field.
+			// When copying this value, convert it to an int64 so that it is
+			// BigQuery compatible.
+			v = int64(t)
+		}
+		destinationMap[typeOfStruct.Field(i).Name] = v
+	}
+}
+
 var logMissing = logx.NewLogEvery(nil, 60*time.Second) // This is per instance.
 
 // AnnotateClients adds the client annotations. See parser.Annotatable
@@ -833,6 +864,10 @@ func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 					Labels{"source": "NDTTest BestASN error on client IP."}).Inc()
 			} else {
 				spec.Get("client").Get("network")["asn"] = asn
+				// CopyStructToMap(data.Network, spec.Get("client"))
+				c := v2as.ConvertAnnotationsToClientAnnotations(data)
+				copyStructToMapDirectly(c.Geo, spec.Get("ClientX").Get("Geo"))
+				copyStructToMapDirectly(c.Network, spec.Get("ClientX").Get("Network"))
 			}
 		}
 	} else {
@@ -883,6 +918,9 @@ func (ndt NDTTest) AnnotateServer(local *api.Annotations) error {
 			return err
 		}
 		spec.Get("server").Get("network")["asn"] = asn
+		s := v2as.ConvertAnnotationsToServerAnnotations(local)
+		copyStructToMapDirectly(s.Geo, spec.Get("ServerX").Get("Geo"))
+		copyStructToMapDirectly(s.Network, spec.Get("ServerX").Get("Network"))
 	}
 
 	return nil
