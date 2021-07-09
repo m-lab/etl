@@ -87,6 +87,17 @@ func NormalizeIPv6(ipStr string) (string, error) {
 	}
 }
 
+// NormalizeIP accepts an IPv4 or IPv6 address and returns a normalized version
+// of that string. This should be used to fix malformed IPv6 addresses in
+// web100 datasets.
+func NormalizeIP(ip string) string {
+	r, err := NormalizeIPv6(ip)
+	if err != nil {
+		return ip
+	}
+	return r
+}
+
 // ValidateIP validates (and possibly repairs) IP addresses.
 // Return nil if it is a valid IPv4 or IPv6 address (or can be repaired), non-nil otherwise.
 func ValidateIP(ipStr string) error {

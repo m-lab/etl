@@ -110,6 +110,8 @@ func PackDataIntoSchema(ssValue map[string]string, logTime time.Time, testName s
 		return schema.SS{}, err
 	}
 
+	ssValue["LocalAddress"] = web100.NormalizeIP(ssValue["LocalAddress"])
+	ssValue["RemAddress"] = web100.NormalizeIP(ssValue["RemAddress"])
 	connSpec := &schema.Web100ConnectionSpecification{
 		Local_ip:    ssValue["LocalAddress"],
 		Local_af:    web100.ParseIPFamily(ssValue["LocalAddress"]),
