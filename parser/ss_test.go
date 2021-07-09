@@ -9,9 +9,13 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/go-test/deep"
+
+	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 func TestExtractLogtimeFromFilename(t *testing.T) {
@@ -69,12 +73,12 @@ func TestSSInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
 	// Completely fake annotation data.
 	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-		"Annotations":{"5.228.253.100":{"Geo":{"postal_code":"52282"}, "Network":{"Systems":[{"ASNs":[456]}]}},
+		"Annotations":{"5.228.253.100":{"Geo":{"postal_code":"52282", "latitude": 1.0, "longitude": 2.0}, "Network":{"Systems":[{"ASNs":[456]}]}},
 				   "178.141.112.12":{"Geo":{"postal_code":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
 				   "193.169.96.33":{"Geo":{"postal_code":"19316"}, "Network":{"Systems":[{"ASNs":[456]}]}},
 				   "178.141.112.12":{"Geo":{"postal_code":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
 				   "45.56.98.222":{"Geo":{"postal_code":"45569"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "213.248.112.75":{"Geo":{"postal_code":"213248"}, "Network":{"Systems":[{"ASNs":[456]}]}}
+		           "213.248.112.75":{"Geo":{"postal_code":"21320", "latitude": 3.0, "longitude": 4.0}, "Network":{"ASName":"Fake Server ISP", "ASNumber": 456, "CIDR": "213.248.112.64/26", "Systems":[{"ASNs":[456]}]}}
 				   }}`
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, responseJSON)
@@ -130,5 +134,56 @@ func TestSSInserter(t *testing.T) {
 	//     openssl dgst -binary -md5 | base64  | tr '/+' '_-' | tr -d '='
 	if inserted.ID != "cjFOd7-tIa3RXxWMhCNSrQ" {
 		t.Errorf("ss.ParseAndInsert() wrong ID; got %q, want %q", inserted.ID, "cjFOd7-tIa3RXxWMhCNSrQ")
+	}
+
+	// The expected connection spec includes all legacy fields as well as fully
+	// populated ServerX and ClientX fields.
+	expectedSpec := schema.Web100ConnectionSpecification{
+		Local_ip:    "213.248.112.75",
+		Local_af:    2,
+		Local_port:  41131,
+		Remote_ip:   "5.228.253.100",
+		Remote_port: 52290,
+		Local_geolocation: api.GeolocationIP{
+			PostalCode: "21320",
+			Latitude:   3,
+			Longitude:  4,
+		},
+		Remote_geolocation: api.GeolocationIP{
+			PostalCode: "52282",
+			Latitude:   1,
+			Longitude:  2,
+		},
+		ServerX: annotator.ServerAnnotations{
+			Geo: &annotator.Geolocation{
+				PostalCode: "21320",
+				Latitude:   3.0,
+				Longitude:  4.0,
+			},
+			Network: &annotator.Network{
+				CIDR:     "213.248.112.64/26",
+				ASNumber: 456,
+				ASName:   "Fake Server ISP",
+				Systems: []annotator.System{
+					{ASNs: []uint32{456}},
+				},
+			},
+		},
+		ClientX: annotator.ClientAnnotations{
+			Geo: &annotator.Geolocation{
+				PostalCode: "52282",
+				Latitude:   1,
+				Longitude:  2,
+			},
+			Network: &annotator.Network{
+				Systems: []annotator.System{
+					{ASNs: []uint32{456}},
+				},
+			},
+		},
+	}
+
+	if diff := deep.Equal(inserted.Web100_log_entry.Connection_spec, expectedSpec); diff != nil {
+		t.Error("Connection spec does not match:", diff)
 	}
 }
