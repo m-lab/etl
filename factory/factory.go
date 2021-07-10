@@ -6,7 +6,6 @@ import (
 
 	v2 "github.com/m-lab/annotation-service/api/v2"
 
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/row"
 )
@@ -60,7 +59,7 @@ type defaultAnnotatorFactory struct{}
 
 // Get implements AnnotatorFactory.Get
 func (ann *defaultAnnotatorFactory) Get(ctx context.Context, dp etl.DataPath) (v2.Annotator, etl.ProcessingError) {
-	return v2.GetAnnotator(annotation.BatchURL), nil
+	return v2.GetAnnotator(etl.BatchAnnotatorURL), nil
 }
 
 // DefaultAnnotatorFactory returns the annotation service annotator.

@@ -14,7 +14,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
@@ -37,7 +36,7 @@ func NewSSParser(ins etl.Inserter, ann v2as.Annotator) *SSParser {
 // TODO get rid of this hack.
 func NewDefaultSSParser(ins etl.Inserter) *SSParser {
 	bufSize := etl.SS.BQBufferSize()
-	return &SSParser{*NewBase(ins, bufSize, v2as.GetAnnotator(annotation.BatchURL))}
+	return &SSParser{*NewBase(ins, bufSize, v2as.GetAnnotator(etl.BatchAnnotationURL))}
 }
 
 // ExtractLogtimeFromFilename extracts the log time.

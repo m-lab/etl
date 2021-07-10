@@ -23,7 +23,6 @@ import (
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/active"
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/factory"
@@ -70,6 +69,7 @@ var (
 	bigqueryProject = flag.String("bigquery_project", "", "Override GCLOUD_PROJECT for BigQuery operations")
 	bigqueryDataset = flag.String("bigquery_dataset", "", "Override the BigQuery dataset for output tables")
 	outputDir       = flag.String("output_dir", "", "If output type is 'local', write output to this directory")
+	annotatorURL    = flagx.URL{}
 )
 
 // Other global values.
@@ -86,7 +86,7 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	flag.Var(&outputType, "output", "Output to bigquery or gcs.")
-
+	flag.Var(&annotatorURL, "annotator_url", "Base URL for the annotation service.")
 }
 
 // Task Queue can always submit to an admin restricted URL.
@@ -414,13 +414,13 @@ func main() {
 	runtime.SetBlockProfileRate(1000000) // One event per msec.
 
 	maxInFlight = (int32)(*maxWorkers)
-	annotation.SetupURLs(*gcloudProject)
 	// TODO: eliminate global variables in favor of config/env object.
 	etl.IsBatch = *isBatch
 	etl.OmitDeltas = *omitDeltas
 	etl.GCloudProject = *gcloudProject
 	etl.BigqueryProject = *bigqueryProject
 	etl.BigqueryDataset = *bigqueryDataset
+	etl.BatchAnnotatorURL = annotatorURL.String() + "/batch_annotate"
 
 	if len(*gardenerHost) > 0 {
 		log.Println("Using", *gardenerHost)

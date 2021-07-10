@@ -12,7 +12,6 @@ import (
 
 	"cloud.google.com/go/civil"
 	v2as "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -36,7 +35,7 @@ type NDT7ResultParser struct {
 func NewNDT7ResultParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.NDT7.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(annotation.BatchURL)
+		ann = v2as.GetAnnotator(etl.BatchAnnotationURL)
 	}
 
 	return &NDT7ResultParser{

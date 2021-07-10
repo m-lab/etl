@@ -28,7 +28,6 @@ import (
 	"github.com/m-lab/tcp-info/netlink"
 	"github.com/m-lab/tcp-info/snapshot"
 
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -206,7 +205,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 func NewTCPInfoParser(sink row.Sink, table, suffix string, ann v2as.Annotator) *TCPInfoParser {
 	bufSize := etl.TCPINFO.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(annotation.BatchURL)
+		ann = v2as.GetAnnotator(etl.BatchAnnotationURL)
 	}
 
 	return &TCPInfoParser{
