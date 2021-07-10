@@ -610,6 +610,10 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 			deltaFieldCount, test.fn, n.taskFileName)
 	}
 
+	dp, _ := etl.ValidateTestPath(results["task_filename"].(string))
+	connSpec.Get("ServerX")["Site"] = dp.Site
+	connSpec.Get("ServerX")["Machine"] = dp.Host
+
 	// TODO - estimate the size of the json (or fields) to allow more rows per request,
 	// but avoid going over the 10MB limit.
 	// Add row to buffer, possibly flushing buffer if it is full.
@@ -627,6 +631,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		log.Println("insert-err: " + err.Error())
 		return
 	}
+
 	metrics.TestCount.WithLabelValues(
 		n.TableName(), testType, "ok").Inc()
 }

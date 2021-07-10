@@ -92,7 +92,9 @@ func TestSSInserter(t *testing.T) {
 		t.Fatalf("cannot read testdata.")
 	}
 
-	meta := map[string]bigquery.Value{"filename": filename}
+	taskFilename := "gs://archive-measurement-lab/sidestream/2019/11/20/20191120T010010Z-mlab1-ord03-sidestream-0000.tgz"
+
+	meta := map[string]bigquery.Value{"filename": taskFilename}
 	err = p.ParseAndInsert(meta, filename, rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -123,8 +125,8 @@ func TestSSInserter(t *testing.T) {
 	if inserted.ParseTime.After(time.Now()) {
 		t.Error("Should have inserted parse_time")
 	}
-	if inserted.TaskFileName != filename {
-		t.Error("Should have correct filename", filename, "!=", inserted.TaskFileName)
+	if inserted.TaskFileName != taskFilename {
+		t.Error("Should have correct filename", taskFilename, "!=", inserted.TaskFileName)
 	}
 
 	if inserted.ParserVersion != "https://github.com/m-lab/etl/tree/foobar" {
@@ -155,6 +157,8 @@ func TestSSInserter(t *testing.T) {
 			Longitude:  2,
 		},
 		ServerX: annotator.ServerAnnotations{
+			Site:    "ord03",
+			Machine: "mlab1",
 			Geo: &annotator.Geolocation{
 				PostalCode: "21320",
 				Latitude:   3.0,

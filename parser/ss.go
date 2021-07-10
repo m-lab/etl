@@ -294,6 +294,10 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			ssTest.TaskFileName = meta["filename"].(string)
 		}
 
+		dp, _ := etl.ValidateTestPath(ssTest.TaskFileName)
+		ssTest.Web100_log_entry.Connection_spec.ServerX.Site = dp.Site
+		ssTest.Web100_log_entry.Connection_spec.ServerX.Machine = dp.Host
+
 		// Add row to buffer, possibly flushing buffer if it is full.
 		err = ss.AddRow(&ssTest)
 		if err == etl.ErrBufferFull {
