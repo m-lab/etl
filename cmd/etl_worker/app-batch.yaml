@@ -48,4 +48,4 @@ env_variables:
   NDT_OMIT_DELTAS: 'true'
   # TODO add custom service-account, instead of using default credentials.
 
-  ANNOTATOR_URL: "${ANNOTATOR_URL}"
+  ANNOTATOR_URL: "{{ANNOTATOR_URL}}"
