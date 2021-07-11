@@ -35,7 +35,7 @@ type NDT7ResultParser struct {
 func NewNDT7ResultParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.NDT7.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(etl.BatchAnnotationURL)
+		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
 	}
 
 	return &NDT7ResultParser{
