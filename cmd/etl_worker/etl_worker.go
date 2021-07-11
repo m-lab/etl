@@ -69,7 +69,7 @@ var (
 	bigqueryProject = flag.String("bigquery_project", "", "Override GCLOUD_PROJECT for BigQuery operations")
 	bigqueryDataset = flag.String("bigquery_dataset", "", "Override the BigQuery dataset for output tables")
 	outputDir       = flag.String("output_dir", "", "If output type is 'local', write output to this directory")
-	annotatorURL    = flagx.URL{}
+	annotatorURL    = flagx.MustNewURL("https://annotator-dot-mlab-sandbox.appspot.com")
 )
 
 // Other global values.
