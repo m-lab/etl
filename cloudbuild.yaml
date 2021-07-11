@@ -132,7 +132,7 @@ steps:
   id: "Update annotator url environment variable in app-batch.yaml"
   args: [
     'bash', '-c',
-    "sed -i -e 's/{{ANNOTATOR_URL}}/$_ANNOTATOR_URL/' cmd/etl_worker/app-batch.yaml"
+    "sed -i -e 's|{{ANNOTATOR_URL}}|$_ANNOTATOR_URL|' cmd/etl_worker/app-batch.yaml"
   ]
 
 - name: gcr.io/google.com/cloudsdktool/cloud-sdk
