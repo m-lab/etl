@@ -127,6 +127,14 @@ steps:
     'gcloud', 'app', 'deploy', '--project=$PROJECT_ID', 'appengine/queue.yaml'
   ]
 
+# Prepare app yaml configuration.
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Update annotator url environment variable in app-batch.yaml"
+  args: [
+    'bash', '-c',
+    "sed -i -e 's|{{ANNOTATOR_URL}}|$_ANNOTATOR_URL|' cmd/etl_worker/app-batch.yaml"
+  ]
+
 - name: gcr.io/google.com/cloudsdktool/cloud-sdk
   id: "Deploy etl batch parser to AppEngine"
   args: [

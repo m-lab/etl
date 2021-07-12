@@ -18,7 +18,6 @@ import (
 
 	"github.com/google/go-jsonnet"
 	v2as "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
@@ -365,7 +364,7 @@ func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
 	if len(ann) > 0 && ann[0] != nil {
 		annotator = ann[0]
 	} else {
-		annotator = v2as.GetAnnotator(annotation.BatchURL)
+		annotator = v2as.GetAnnotator(etl.BatchAnnotatorURL)
 	}
 	return &PTParser{Base: *NewBase(ins, bufSize, annotator)}
 }

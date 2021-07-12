@@ -30,7 +30,6 @@ import (
 
 	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
@@ -154,7 +153,7 @@ func NewNDTParser(ins etl.Inserter, annotator ...v2as.Annotator) *NDTParser {
 	if len(annotator) > 0 && annotator[0] != nil {
 		ann = annotator[0]
 	} else {
-		ann = v2as.GetAnnotator(annotation.BatchURL)
+		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
 	}
 
 	return &NDTParser{Base: *NewBase(ins, bufSize, ann)}

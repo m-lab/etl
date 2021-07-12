@@ -14,7 +14,6 @@ import (
 
 	v2as "github.com/m-lab/annotation-service/api/v2"
 
-	"github.com/m-lab/etl/annotation"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -36,7 +35,7 @@ type NDT5ResultParser struct {
 func NewNDT5ResultParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.NDT5.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(annotation.BatchURL)
+		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
 	}
 
 	return &NDT5ResultParser{

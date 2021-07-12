@@ -40,10 +40,6 @@ network:
     - 9090/tcp
 
 env_variables:
-  # These should be substituted in the travis deployment script.
-  RELEASE_TAG: ${TRAVIS_TAG}
-  COMMIT_HASH: ${TRAVIS_COMMIT}
-
   PROMETHEUSX_LISTEN_ADDRESS: ':9090' # Must match one of the forwarded_ports above.
   BATCH_SERVICE: 'true'   # Allow instances to discover they are BATCH instances.
   MAX_WORKERS: 20
@@ -51,3 +47,5 @@ env_variables:
   # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
   NDT_OMIT_DELTAS: 'true'
   # TODO add custom service-account, instead of using default credentials.
+
+  ANNOTATOR_URL: "{{ANNOTATOR_URL}}"
