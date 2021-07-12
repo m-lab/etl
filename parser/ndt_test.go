@@ -205,6 +205,8 @@ func TestNDTParser(t *testing.T) {
 				},
 			},
 			"ServerX": schema.Web100ValueMap{
+				"Site":    "vie01",
+				"Machine": "mlab3",
 				"Network": schema.Web100ValueMap{
 					"ASName":   "Fake Server ISP",
 					"ASNumber": int64(456),
