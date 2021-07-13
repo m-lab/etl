@@ -6,10 +6,12 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/annotation-service/api"
+	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/tcp-info/snapshot"
+	"github.com/m-lab/uuid-annotator/annotator"
 
 	"github.com/m-lab/etl/metrics"
 )
@@ -59,6 +61,10 @@ type TCPRow struct {
 	FinalSnapshot *snapshot.Snapshot
 
 	Snapshots []*snapshot.Snapshot
+
+	// ServerX and ClientX are for the synthetic UUID annotator export process.
+	ServerX annotator.ServerAnnotations
+	ClientX annotator.ClientAnnotations
 }
 
 // CopySocketInfo creates ServerInfo and ClientInfo with IP and port.
@@ -129,6 +135,10 @@ func (row *TCPRow) AnnotateClients(annMap map[string]*api.Annotations) error {
 		metrics.AnnotationMissingCount.WithLabelValues("No annotation for IP").Inc()
 		return nil
 	}
+	c := v2as.ConvertAnnotationsToClientAnnotations(ann)
+	row.ClientX.Geo = c.Geo
+	row.ClientX.Network = c.Network
+
 	if ann.Geo == nil {
 		metrics.AnnotationMissingCount.WithLabelValues("Empty ann.Geo").Inc()
 	} else {
@@ -158,6 +168,10 @@ func (row *TCPRow) AnnotateServer(local *api.Annotations) error {
 	if local == nil {
 		return nil
 	}
+	s := v2as.ConvertAnnotationsToServerAnnotations(local)
+	row.ServerX.Geo = s.Geo
+	row.ServerX.Network = s.Network
+
 	row.Server.Geo = local.Geo
 	if local.Network == nil {
 		return nil
