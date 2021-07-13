@@ -9,11 +9,10 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/fsouza/fake-gcs-server v1.23.1
 	github.com/go-test/deep v1.0.7
-	github.com/gocarina/gocsv v0.0.0-20210326111627-0340a0229e98 // indirect
 	github.com/google/go-jsonnet v0.17.0
 	github.com/googleapis/google-cloud-go-testing v0.0.0-20200911160855-bcd43fbb19e8
 	github.com/kr/pretty v0.2.1
-	github.com/m-lab/annotation-service v0.0.0-20210707211452-d9dc04efa2ae
+	github.com/m-lab/annotation-service v0.0.0-20210713124633-fa227b3d5b2f
 	github.com/m-lab/etl-gardener v0.0.0-20210310164025-d9582f1131b5
 	github.com/m-lab/go v0.1.45
 	github.com/m-lab/ndt-server v0.20.5
@@ -24,7 +23,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/valyala/gozstd v1.9.0
-	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4
+	golang.org/x/net v0.0.0-20210331212208-0fccb6fa2b5c
 	golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	google.golang.org/api v0.43.0
