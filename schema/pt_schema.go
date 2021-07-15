@@ -7,7 +7,9 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/annotation-service/api"
+	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/go/cloud/bqx"
+	"github.com/m-lab/uuid-annotator/annotator"
 
 	"github.com/m-lab/etl/metrics"
 )
@@ -51,6 +53,10 @@ type PTTest struct {
 	Hop            []ScamperHop `json:"hop"`
 	ExpVersion     string       `json:"exp_version" bigquery:"exp_version"`
 	CachedResult   bool         `json:"cached_result,bool" bigquery:"cached_result"`
+
+	// ServerX and ClientX are for the synthetic UUID annotator export process.
+	ServerX annotator.ServerAnnotations
+	ClientX annotator.ClientAnnotations
 }
 
 // Schema returns the Bigquery schema for PTTest.
@@ -129,6 +135,10 @@ func (row *PTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
 		metrics.AnnotationMissingCount.WithLabelValues("No annotation for PT client IP").Inc()
 		return nil
 	}
+	c := v2as.ConvertAnnotationsToClientAnnotations(ann)
+	row.ClientX.Geo = c.Geo
+	row.ClientX.Network = c.Network
+
 	if ann.Geo == nil {
 		metrics.AnnotationMissingCount.WithLabelValues("Empty ann.Geo").Inc()
 	} else {
@@ -153,5 +163,9 @@ func (row *PTTest) AnnotateServer(local *api.Annotations) error {
 		return nil
 	}
 	row.Source.Network = local.Network
+
+	s := v2as.ConvertAnnotationsToServerAnnotations(local)
+	row.ServerX.Geo = s.Geo
+	row.ServerX.Network = s.Network
 	return nil
 }
