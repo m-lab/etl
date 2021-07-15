@@ -498,6 +498,9 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 		Destination: oneTest.Destination,
 		Hop:         oneTest.Hops,
 	}
+	dp, _ := etl.ValidateTestPath(pt.taskFileName)
+	ptTest.ServerX.Site = dp.Site
+	ptTest.ServerX.Machine = dp.Host
 
 	err := pt.AddRow(&ptTest)
 	if err == etl.ErrBufferFull {
