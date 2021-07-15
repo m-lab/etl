@@ -2,15 +2,15 @@ package parser_test
 
 import (
 	"io/ioutil"
-	"testing"
 	"strings"
+	"testing"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/go/rtx"
-	"github.com/m-lab/etl/schema"
 	"github.com/go-test/deep"
+	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/go/rtx"
 )
 
 func TestAnnotationParser_ParseAndInsert(t *testing.T) {
@@ -54,13 +54,13 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 				n.Flush()
 				row := ins.data[0].(*schema.AnnotationRow)
 
-				expPI := schema.ParseInfo {
+				expPI := schema.ParseInfo{
 					Version:    "https://github.com/m-lab/etl/tree/foobar",
 					Time:       row.Parser.Time,
 					ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt-njp6l_1585004303_00000000000170FA.json",
 					Filename:   "ndt-njp6l_1585004303_00000000000170FA.json",
 					Priority:   0,
-					GitCommit:	"12345678",
+					GitCommit:  "12345678",
 				}
 
 				if diff := deep.Equal(row.Parser, expPI); diff != nil {

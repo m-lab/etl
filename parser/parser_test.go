@@ -17,10 +17,10 @@ import (
 )
 
 func init() {
-	etl.Version = "foobar"	
+	etl.Version = "foobar"
 	parser.InitParserVersionForTest()
 
-	etl.GitCommit ="12345678"
+	etl.GitCommit = "12345678"
 	parser.InitParserGitCommitForTest()
 }
 

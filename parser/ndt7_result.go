@@ -81,7 +81,7 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 			Time:       time.Now(),
 			ArchiveURL: meta["filename"].(string),
 			Filename:   testName,
-			GitCommit:	GitCommit(),	
+			GitCommit:  GitCommit(),
 		},
 	}
 

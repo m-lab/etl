@@ -26,8 +26,8 @@ func init() {
 
 const uninitialized = "uninitialized"
 
-var( 
-	gParserVersion = uninitialized
+var (
+	gParserVersion   = uninitialized
 	gParserGitCommit = uninitialized
 )
 
