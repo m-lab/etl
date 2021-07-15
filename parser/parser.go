@@ -45,8 +45,8 @@ func initParserVersion() string {
 // initParserGitCommit initializes the gParserGitCommit variable for use by all parsers.
 func initParserGitCommit() string {
 	hash := etl.GitCommit
-	if hash != "nocommit" && len(hash) >= 8 {
-		gParserGitCommit = hash[0:8]
+	if hash != "nocommit" {
+		gParserGitCommit = hash
 	}
 	return gParserGitCommit
 }
