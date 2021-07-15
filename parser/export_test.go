@@ -7,3 +7,7 @@ package parser
 // InitParserVersionForTest allows tests to rerun initParserVersion after initializing
 // environment variables.
 var InitParserVersionForTest = initParserVersion
+
+// InitParserGitCommitForTest allows test to rerun initParseGitCommit after initializing
+// environement variables.
+var InitParserGitCommitForTest = initParserGitCommit

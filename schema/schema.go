@@ -18,6 +18,7 @@ type ParseInfo struct {
 	ArchiveURL string
 	Filename   string
 	Priority   int64
+	GitCommit	string
 }
 
 // FindSchemaDocsFor should be used by parser row types to associate bigquery

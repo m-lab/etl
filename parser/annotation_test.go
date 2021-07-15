@@ -3,11 +3,14 @@ package parser_test
 import (
 	"io/ioutil"
 	"testing"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/go/rtx"
+	"github.com/m-lab/etl/schema"
+	"github.com/go-test/deep"
 )
 
 func TestAnnotationParser_ParseAndInsert(t *testing.T) {
@@ -45,6 +48,24 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 
 			if err := n.ParseAndInsert(meta, tt.file, data); (err != nil) != tt.wantErr {
 				t.Errorf("AnnotationParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if n.Accepted() == 1 {
+				n.Flush()
+				row := ins.data[0].(*schema.AnnotationRow)
+
+				expPI := schema.ParseInfo {
+					Version:    "https://github.com/m-lab/etl/tree/foobar",
+					Time:       row.Parser.Time,
+					ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt-njp6l_1585004303_00000000000170FA.json",
+					Filename:   "ndt-njp6l_1585004303_00000000000170FA.json",
+					Priority:   0,
+					GitCommit:	"12345678",
+				}
+
+				if diff := deep.Equal(row.Parser, expPI); diff != nil {
+					t.Errorf("AnnotationParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
+				}
 			}
 		})
 	}
