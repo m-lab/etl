@@ -19,6 +19,9 @@ import (
 func init() {
 	etl.Version = "foobar"
 	parser.InitParserVersionForTest()
+
+	etl.GitCommit = "12345678"
+	parser.InitParserGitCommitForTest()
 }
 
 // countingInserter counts the calls to InsertRows and Flush.

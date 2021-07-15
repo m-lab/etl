@@ -21,9 +21,15 @@ import (
 
 func init() {
 	initParserVersion()
+	initParserGitCommit()
 }
 
-var gParserVersion = "uninitialized"
+const uninitialized = "uninitialized"
+
+var (
+	gParserVersion   = uninitialized
+	gParserGitCommit = uninitialized
+)
 
 // initParserVersion initializes the gParserVersion variable for use by all parsers.
 func initParserVersion() string {
@@ -31,19 +37,28 @@ func initParserVersion() string {
 	if release != "noversion" {
 		gParserVersion = "https://github.com/m-lab/etl/tree/" + release
 	} else {
-		hash := etl.GitCommit
-		if hash != "nocommit" && len(hash) >= 8 {
-			gParserVersion = "https://github.com/m-lab/etl/tree/" + hash[0:8]
-		} else {
-			gParserVersion = "local development"
-		}
+		gParserVersion = "local development"
 	}
 	return gParserVersion
+}
+
+// initParserGitCommit initializes the gParserGitCommit variable for use by all parsers.
+func initParserGitCommit() string {
+	hash := etl.GitCommit
+	if hash != "nocommit" {
+		gParserGitCommit = hash
+	}
+	return gParserGitCommit
 }
 
 // Version returns the parser version used by parsers to annotate data rows.
 func Version() string {
 	return gParserVersion
+}
+
+// GitCommit returns the git commit hash of the build.
+func GitCommit() string {
+	return gParserGitCommit
 }
 
 // NewSinkParser creates an appropriate parser for a given data type.

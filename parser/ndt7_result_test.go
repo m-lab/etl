@@ -70,6 +70,7 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 					ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
 					Filename:   "ndt7-download-20200318T000657.568382877Z.ndt-knwp4_1583603744_000000000000590E.json",
 					Priority:   0,
+					GitCommit:  "12345678",
 				}
 				if diff := deep.Equal(row.Parser, expPI); diff != nil {
 					pretty.Print(row.Parser)
@@ -108,6 +109,7 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 					ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
 					Filename:   "ndt7-upload-20200318T001352.496224022Z.ndt-knwp4_1583603744_0000000000005CF2.json",
 					Priority:   0,
+					GitCommit:  "12345678",
 				}
 				if diff := deep.Equal(row.Parser, expPI); diff != nil {
 					t.Errorf("NDT7ResultParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
