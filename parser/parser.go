@@ -65,8 +65,7 @@ func GitCommit() string {
 
 // NormalizeIP accepts an IPv4 or IPv6 address and returns a normalized version
 // of that string. This should be used to fix malformed IPv6 addresses in web100
-// datasets (e.g. 2001:::abcd:2) as well as IPv6 mapped IPv4 addresses
-// (e.g. ::ffff:1.2.3.4).
+// datasets (e.g. 2001:::abcd:2) as well as IPv4-mapped IPv6 addresses (e.g. ::ffff:1.2.3.4).
 func NormalizeIP(ip string) string {
 	r, err := web100.FixIPv6(ip)
 	if err != nil {
