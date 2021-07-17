@@ -9,8 +9,12 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/go-test/deep"
+	"github.com/m-lab/annotation-service/api"
+	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/go/pretty"
 )
 
 func TestParsePT(t *testing.T) {
@@ -252,7 +256,12 @@ func TestParseLegacyFormatData(t *testing.T) {
 }
 
 func TestParseJSONL(t *testing.T) {
-	rawData, err := ioutil.ReadFile("testdata/PT/20190927T070859Z_ndt-qtfh8_1565996043_0000000000003B64.jsonl")
+	m := map[string]*api.Annotations{}
+	ins := newInMemoryInserter()
+	pt := parser.NewPTParser(ins, newFakeAnnotator(m))
+
+	filename := "testdata/PT/20190927T070859Z_ndt-qtfh8_1565996043_0000000000003B64.jsonl"
+	rawData, err := ioutil.ReadFile(filename)
 	if err != nil {
 		t.Fatalf(err.Error())
 		return
@@ -262,9 +271,25 @@ func TestParseJSONL(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
+	url := "gs://archive-measurement-lab/ndt/traceroute/2019/09/27/20190927T000540.410989Z-traceroute-mlab2-nuq07-ndt.tgz"
+	meta := map[string]bigquery.Value{"filename": url}
+	err = pt.ParseAndInsert(meta, filename, rawData)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if pt.NumRowsForTest() != 1 {
+		fmt.Println(pt.NumRowsForTest())
+		t.Fatalf("The data is not inserted, in buffer now.")
+	}
+	pt.Flush()
+
 	if ptTest.UUID != "ndt-qtfh8_1565996043_0000000000003B64" {
 		t.Fatalf("UUID parsing error %s", ptTest.UUID)
 	}
+
+	pretty.Print(ptTest.ServerX)
+	pretty.Print(ptTest.ClientX)
 }
 
 func TestParse(t *testing.T) {
@@ -320,7 +345,8 @@ func TestParse(t *testing.T) {
 
 func TestAnnotateAndPutAsync(t *testing.T) {
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins, &fakeAnnotator{})
+	m := map[string]*api.Annotations{}
+	pt := parser.NewPTParser(ins, newFakeAnnotator(m))
 	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
@@ -347,13 +373,46 @@ func TestAnnotateAndPutAsync(t *testing.T) {
 }
 
 func TestParseAndInsert(t *testing.T) {
+
+	m := map[string]*api.Annotations{
+		"2.80.132.33": &api.Annotations{
+			Geo: &api.GeolocationIP{
+				ContinentCode: "NA",
+				CountryCode:   "US",
+				Latitude:      1.0,
+				Longitude:     2.0,
+			},
+			Network: &api.ASData{
+				ASNumber: 1234,
+				Systems: []api.System{
+					{ASNs: []uint32{1234}},
+				},
+			},
+		},
+		"91.239.96.102": &api.Annotations{
+			Geo: &api.GeolocationIP{
+				ContinentCode: "NA",
+				CountryCode:   "US",
+				Latitude:      1.0,
+				Longitude:     2.0,
+			},
+			Network: &api.ASData{
+				ASNumber: 1234,
+				Systems: []api.System{
+					{ASNs: []uint32{1234}},
+				},
+			},
+		},
+	}
+
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins, &fakeAnnotator{})
+	pt := parser.NewPTParser(ins, newFakeAnnotator(m))
 	rawData, err := ioutil.ReadFile("testdata/PT/20130524T00:04:44Z_ALL5729.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
 	}
-	meta := map[string]bigquery.Value{"filename": "gs://fake-bucket/fake-archive.tgz"}
+	url := "gs://archive-measurement-lab/paris-traceroute/2013/05/24/20130524T000000Z-mlab3-akl01-paris-traceroute-0000.tgz"
+	meta := map[string]bigquery.Value{"filename": url}
 	err = pt.ParseAndInsert(meta, "testdata/PT/20130524T00:04:44Z_ALL5729.paris", rawData)
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -369,12 +428,25 @@ func TestParseAndInsert(t *testing.T) {
 		fmt.Println(len(ins.data))
 		t.Fatalf("Number of rows in inserter is wrong.")
 	}
-	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != "gs://fake-bucket/fake-archive.tgz" {
+	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != url {
 		t.Fatalf("Task filename is wrong.")
 	}
 	// echo -n 2013-05-24T00:04:44Z-91.239.96.102-2.80.132.33 | openssl dgst -binary -md5 | base64  | tr '/+' '_-' | tr -d '='
 	if ins.data[0].(*schema.PTTest).UUID != "R9_wGx1-cSmqtSAt5aQtNg" {
 		t.Fatalf("UUID is wrong; got %q, want %q", ins.data[0].(*schema.PTTest).UUID, "R9_wGx1-cSmqtSAt5aQtNg")
+	}
+	p := ins.data[0].(*schema.PTTest)
+
+	// Verify the client and server annotations match.
+	cx := v2.ConvertAnnotationsToClientAnnotations(m["91.239.96.102"])
+	if diff := deep.Equal(&p.ClientX, cx); diff != nil {
+		t.Errorf("ClientX annotation does not match; %#v", diff)
+	}
+	sx := v2.ConvertAnnotationsToServerAnnotations(m["2.80.132.33"])
+	sx.Site = "akl01"
+	sx.Machine = "mlab3"
+	if diff := deep.Equal(&p.ServerX, sx); diff != nil {
+		t.Errorf("ServerX annotation does not match; %#v", diff)
 	}
 }
 

@@ -8,9 +8,12 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-test/deep"
 
 	v2 "github.com/m-lab/annotation-service/api/v2"
 
@@ -57,10 +60,37 @@ func fileSource(fn string) (etl.TestSource, error) {
 		RetryBaseTime: timeout, TableBase: "test", PathDate: civil.Date{Year: 2020, Month: 6, Day: 11}}, nil
 }
 
-type fakeAnnotator struct{}
-
-func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2.Response, error) {
-	return &v2.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
+var tcpInfoAnno = map[string]*api.Annotations{
+	// client ip.
+	"35.225.75.192": &api.Annotations{
+		Geo: &api.GeolocationIP{
+			ContinentCode: "NA",
+			CountryCode:   "US",
+			Latitude:      1.0,
+			Longitude:     2.0,
+		},
+		Network: &api.ASData{
+			ASNumber: 1234,
+			Systems: []api.System{
+				{ASNs: []uint32{1234}},
+			},
+		},
+	},
+	// server ip.
+	"195.89.146.242": &api.Annotations{
+		Geo: &api.GeolocationIP{
+			ContinentCode: "NA",
+			CountryCode:   "US",
+			Latitude:      1.0,
+			Longitude:     2.0,
+		},
+		Network: &api.ASData{
+			ASNumber: 1234,
+			Systems: []api.System{
+				{ASNs: []uint32{1234}},
+			},
+		},
+	},
 }
 
 type inMemorySink struct {
@@ -116,6 +146,7 @@ func TestTCPParser(t *testing.T) {
 	parserVersion := parser.InitParserVersionForTest()
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	url := "gs://fake-archive/ndt/tcpinfo/2019/05/16/" + filepath.Base(filename)
 
 	src, err := fileSource(filename)
 	if err != nil {
@@ -124,8 +155,8 @@ func TestTCPParser(t *testing.T) {
 
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
-	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
-	task := task.NewTask(filename, src, p, nullCloser{})
+	p := parser.NewTCPInfoParser(ins, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
+	task := task.NewTask(url, src, p, nullCloser{})
 
 	startDecode := time.Now()
 	n, err := task.ProcessAllTests(false)
@@ -158,7 +189,7 @@ func TestTCPParser(t *testing.T) {
 		if row.ParseInfo.ParseTime.After(time.Now()) {
 			t.Error("Should have inserted parse_time")
 		}
-		if row.ParseInfo.TaskFileName != filename {
+		if row.ParseInfo.TaskFileName != url {
 			t.Error("Should have correct filename", filename, "!=", row.ParseInfo.TaskFileName)
 		}
 
@@ -202,6 +233,9 @@ func TestTCPParser(t *testing.T) {
 	}
 	marshalTime := time.Since(startMarshal)
 
+	//pretty.Print(largestRow.ServerX)
+	//pretty.Print(largestRow.Client)
+
 	duration := largestRow.FinalSnapshot.Timestamp.Sub(largestRow.Snapshots[0].Timestamp)
 	t.Log("Largest json is", len(largestJson), "bytes in", len(largestRow.Snapshots), "snapshots, over", duration, "with", len(largestJson)/len(largestRow.Snapshots), "json bytes/snap")
 	t.Log("Total of", totalSnaps, "snapshots decoded and marshalled")
@@ -218,21 +252,34 @@ func TestTCPParser(t *testing.T) {
 	if totalSnaps != 1588 {
 		t.Error("expected 1588 (thinned) snapshots, got", totalSnaps)
 	}
+
+	// Verify the client and server annotations match.
+	cx := v2.ConvertAnnotationsToClientAnnotations(tcpInfoAnno["35.225.75.192"])
+	if diff := deep.Equal(&largestRow.ClientX, cx); diff != nil {
+		t.Errorf("ClientX annotation does not match; %#v", diff)
+	}
+	sx := v2.ConvertAnnotationsToServerAnnotations(tcpInfoAnno["195.89.146.242"])
+	sx.Site = "arn02"
+	sx.Machine = "mlab4"
+	if diff := deep.Equal(&largestRow.ServerX, sx); diff != nil {
+		t.Errorf("ServerX annotation does not match; %#v", diff)
+	}
 }
 
 // This is a subset of TestTCPParser, but simpler, so might be useful.
 func TestTCPTask(t *testing.T) {
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
-	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
+	p := parser.NewTCPInfoParser(ins, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	url := "gs://fake-archive/ndt/tcpinfo/2019/05/16/" + filepath.Base(filename)
 	src, err := fileSource(filename)
 	if err != nil {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p, &nullCloser{})
+	task := task.NewTask(url, src, p, &nullCloser{})
 
 	n, err := task.ProcessAllTests(false)
 	if err != nil {
@@ -246,15 +293,16 @@ func TestTCPTask(t *testing.T) {
 func TestBQSaver(t *testing.T) {
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
-	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
+	p := parser.NewTCPInfoParser(ins, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	url := "gs://fake-archive/ndt/tcpinfo/2019/05/16/" + filepath.Base(filename)
 	src, err := fileSource(filename)
 	if err != nil {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p, &nullCloser{})
+	task := task.NewTask(url, src, p, &nullCloser{})
 
 	_, err = task.ProcessAllTests(false)
 	if err != nil {
@@ -291,15 +339,16 @@ func TestTaskToGCS(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Inject fake inserter and annotator
-	p := parser.NewTCPInfoParser(rw, "test", "suffix", &fakeAnnotator{})
+	p := parser.NewTCPInfoParser(rw, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	url := "gs://fake-archive/ndt/tcpinfo/2019/05/16/" + filepath.Base(filename)
 	src, err := fileSource(filename)
 	if err != nil {
 		t.Fatal("Failed reading testdata from", filename)
 	}
 
-	task := task.NewTask(filename, src, p, &nullCloser{})
+	task := task.NewTask(url, src, p, &nullCloser{})
 
 	n, err := task.ProcessAllTests(false)
 	if err != nil {
@@ -318,7 +367,7 @@ func TestTaskToGCS(t *testing.T) {
 func BenchmarkTCPParser(b *testing.B) {
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
-	p := parser.NewTCPInfoParser(ins, "test", "_suffix", &fakeAnnotator{})
+	p := parser.NewTCPInfoParser(ins, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	n := 0
