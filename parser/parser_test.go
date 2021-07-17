@@ -75,6 +75,11 @@ func TestNormalizeIP(t *testing.T) {
 			want: "1:2:3::::4",
 		},
 		{
+			name: "badformat-preserved-corrupt",
+			ip:   "1-2-3-4", // this is not an IP, but b/c it can't be fixed, it's preserved.
+			want: "1-2-3-4",
+		},
+		{
 			name: "success-ipv6-mapped-ipv4",
 			ip:   "::ffff:1.2.3.4", // quad-colon format error, not normalized.
 			want: "1.2.3.4",
