@@ -294,6 +294,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			ssTest.TaskFileName = meta["filename"].(string)
 		}
 
+		// ArchiveURL must already be valid, so error is safe to ignore.
 		dp, _ := etl.ValidateTestPath(ssTest.TaskFileName)
 		ssTest.Web100_log_entry.Connection_spec.ServerX.Site = dp.Site
 		ssTest.Web100_log_entry.Connection_spec.ServerX.Machine = dp.Host

@@ -498,6 +498,7 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 		Destination: oneTest.Destination,
 		Hop:         oneTest.Hops,
 	}
+	// ArchiveURL must already be valid, so error is safe to ignore.
 	dp, _ := etl.ValidateTestPath(pt.taskFileName)
 	ptTest.ServerX.Site = dp.Site
 	ptTest.ServerX.Machine = dp.Host
@@ -586,6 +587,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if strings.HasSuffix(testName, ".jsonl") {
 		ptTest, err := ParseJSONL(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
+			// ArchiveURL must already be valid, so error is safe to ignore.
 			dp, _ := etl.ValidateTestPath(pt.taskFileName)
 			ptTest.ServerX.Site = dp.Site
 			ptTest.ServerX.Machine = dp.Host

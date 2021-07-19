@@ -192,6 +192,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 			// TODO - should populate other ServerInfo fields from siteinfo API.
 		}
 	}
+	// ArchiveURL must already be valid, so error is safe to ignore.
 	dp, _ := etl.ValidateTestPath(fileMetadata["filename"].(string))
 	row.ServerX.Site = dp.Site
 	row.ServerX.Machine = dp.Host
