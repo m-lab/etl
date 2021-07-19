@@ -233,9 +233,6 @@ func TestTCPParser(t *testing.T) {
 	}
 	marshalTime := time.Since(startMarshal)
 
-	//pretty.Print(largestRow.ServerX)
-	//pretty.Print(largestRow.Client)
-
 	duration := largestRow.FinalSnapshot.Timestamp.Sub(largestRow.Snapshots[0].Timestamp)
 	t.Log("Largest json is", len(largestJson), "bytes in", len(largestRow.Snapshots), "snapshots, over", duration, "with", len(largestJson)/len(largestRow.Snapshots), "json bytes/snap")
 	t.Log("Total of", totalSnaps, "snapshots decoded and marshalled")
