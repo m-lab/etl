@@ -568,7 +568,6 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	// Process json output from traceroute-caller
 	if strings.HasSuffix(testName, ".json") {
 		ptTest, err := ParsePT(testName, rawContent, pt.TableName(), pt.taskFileName)
-		fmt.Println("JSON PARSER!!!!!!")
 		if err == nil {
 			err := pt.AddRow(&ptTest)
 			if err == etl.ErrBufferFull {
