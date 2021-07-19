@@ -610,6 +610,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 			deltaFieldCount, test.fn, n.taskFileName)
 	}
 
+	// ArchiveURL must already be valid, so error is safe to ignore.
 	dp, _ := etl.ValidateTestPath(results["task_filename"].(string))
 	connSpec.Get("ServerX")["Site"] = dp.Site
 	connSpec.Get("ServerX")["Machine"] = dp.Host
