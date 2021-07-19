@@ -118,39 +118,3 @@ func BenchmarkValidateIPv4(b *testing.B) {
 		_ = web100.ValidateIP("1.2.3.4")
 	}
 }
-
-func TestNormalizeIP(t *testing.T) {
-	tests := []struct {
-		name string
-		ip   string
-		want string
-	}{
-		{
-			name: "success-noop-ipv4",
-			ip:   "1.2.3.4",
-			want: "1.2.3.4",
-		},
-		{
-			name: "success-noop-ipv6",
-			ip:   "1:2:3::4",
-			want: "1:2:3::4",
-		},
-		{
-			name: "success-:::-ipv6",
-			ip:   "1:2:3:::4", // triple-colon format from web100.
-			want: "1:2:3::4",
-		},
-		{
-			name: "badformat-preserved-::::-ipv6",
-			ip:   "1:2:3::::4", // quad-colon format error, not normalized.
-			want: "1:2:3::::4",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := web100.NormalizeIP(tt.ip); got != tt.want {
-				t.Errorf("NormalizeIP() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}

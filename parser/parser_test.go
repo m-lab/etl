@@ -48,6 +48,52 @@ func (ti *countingInserter) Flush() error {
 	return nil
 }
 
+func TestNormalizeIP(t *testing.T) {
+	tests := []struct {
+		name string
+		ip   string
+		want string
+	}{
+		{
+			name: "success-noop-ipv4",
+			ip:   "1.2.3.4",
+			want: "1.2.3.4",
+		},
+		{
+			name: "success-noop-ipv6",
+			ip:   "1:2:3::4",
+			want: "1:2:3::4",
+		},
+		{
+			name: "success-:::-ipv6",
+			ip:   "1:2:3:::4", // triple-colon format from web100.
+			want: "1:2:3::4",
+		},
+		{
+			name: "badformat-preserved-::::-ipv6",
+			ip:   "1:2:3::::4", // quad-colon format error, not normalized.
+			want: "1:2:3::::4",
+		},
+		{
+			name: "badformat-preserved-corrupt",
+			ip:   "1-2-3-4", // this is not an IP, but b/c it can't be fixed, it's preserved.
+			want: "1-2-3-4",
+		},
+		{
+			name: "success-ipv6-mapped-ipv4",
+			ip:   "::ffff:1.2.3.4", // quad-colon format error, not normalized.
+			want: "1.2.3.4",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parser.NormalizeIP(tt.ip); got != tt.want {
+				t.Errorf("NormalizeIP() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 //------------------------------------------------------------------------------------
 // TestParser ignores the content, returns a MapSaver containing meta data and
 // "testname":"..."

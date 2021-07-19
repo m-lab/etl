@@ -100,11 +100,11 @@ func TestParseJSONLSimple(t *testing.T) {
 	if got.UUID != wantUUID {
 		t.Fatalf("failed to parse UUID, wanted %q, got %q", wantUUID, got.UUID)
 	}
-	wantSourceIP := "::ffff:180.87.97.101"
+	wantSourceIP := "180.87.97.101"
 	if got.Source.IP != wantSourceIP {
 		t.Fatalf("failed to parse source IP, wanted %q, got %q", wantSourceIP, got.Source.IP)
 	}
-	wantDestinationIP := "::ffff:1.47.236.62"
+	wantDestinationIP := "1.47.236.62"
 	if got.Destination.IP != wantDestinationIP {
 		t.Fatalf("failed to parse destination IP, wanted %q, got %q", wantDestinationIP, got.Destination.IP)
 	}
