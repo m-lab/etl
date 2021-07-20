@@ -9,7 +9,7 @@ ParseInfo.ParserVersion:
   Description: Version of the parser that processed this row.
 
 id:
-  Description: UUID of the connection under consideration
+  Description: UUID of the connection under consideration.
 test_id:
   Description: Original filename of measurement as written to disk and in the
     GCS archive.
