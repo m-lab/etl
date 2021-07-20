@@ -6,14 +6,14 @@ import (
 	"github.com/m-lab/go/cloud/bqx"
 )
 
-// PCAPRow describes a single BQ row of pcap (packet capture) data
+// PCAPRow describes a single BQ row of pcap (packet capture) data.
 type PCAPRow struct {
 	ID     string     `bigquery:"id"`
 	Parser ParseInfo  `bigquery:"parser"`
 	Date   civil.Date `bigquery:"date"`
 }
 
-// Schema returns the Bigquery schema for Pcap
+// Schema returns the Bigquery schema for Pcap.
 func (row *PCAPRow) Schema() (bigquery.Schema, error) {
 	sch, err := bigquery.InferSchema(row)
 	if err != nil {
