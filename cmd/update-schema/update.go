@@ -233,6 +233,14 @@ func updateStandardTables(project string) int {
 	if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
 		errCount++
 	}
+
+	if err := CreateOrUpdatePCAPRow(project, "tmp_ndt", "pcap"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdatePCAPRow(project, "raw_ndt", "pcap"); err != nil {
+		errCount++
+	}
+
 	return errCount
 }
 
