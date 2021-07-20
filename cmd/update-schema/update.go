@@ -107,6 +107,13 @@ func CreateOrUpdateSwitchStats(project string, dataset string, table string) err
 	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
+func CreateOrUpdatePCAPRow(project string, dataset string, table string) error {
+	row := schema.PCAPRow{}
+	schema, err := row.Schema()
+	rtx.Must(err, "PCAPRow.Schema")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
+}
+
 // listTemplateTables finds all template tables for the given project, datatype, and base table name.
 // Because this function must enumerate all tables in the dataset to find matching names, it may be slow.
 func listTemplateTables(project, dataset, table string) ([]string, error) {
@@ -226,6 +233,14 @@ func updateStandardTables(project string) int {
 	if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
 		errCount++
 	}
+
+	if err := CreateOrUpdatePCAPRow(project, "tmp_ndt", "pcap"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdatePCAPRow(project, "raw_ndt", "pcap"); err != nil {
+		errCount++
+	}
+
 	return errCount
 }
 
@@ -364,6 +379,14 @@ func main() {
 			errCount++
 		}
 		if err := CreateOrUpdateSwitchStats(*project, "batch", "switch"); err != nil {
+			errCount++
+		}
+
+	case "pcap":
+		if err := CreateOrUpdatePCAPRow(*project, "tmp_ndt", "pcap"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdatePCAPRow(*project, "raw_ndt", "pcap"); err != nil {
 			errCount++
 		}
 

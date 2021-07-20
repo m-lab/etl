@@ -155,6 +155,7 @@ func main() {
 		&schema.NDT7ResultRow{},
 		&schema.TCPRow{},
 		&schema.PTTest{},
+		&schema.PCAPRow{},
 		// TODO(https://github.com/m-lab/etl/issues/745): Add additional types once
 		// "standard columns" are resolved.
 	}
