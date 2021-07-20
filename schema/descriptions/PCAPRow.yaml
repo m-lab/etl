@@ -1,6 +1,1 @@
-ID:
-  Description: UUID of the connection under consideration.
-Parser:
-  Description: Metadata about how the parser processed the measurement.
-Date:
-  Description: Date column is necessary for BigQuery's column-based partitioning.
+

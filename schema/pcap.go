@@ -6,6 +6,7 @@ import (
 	"github.com/m-lab/go/cloud/bqx"
 )
 
+// PCAPRow describes a single BQ row of pcap (packet capture) data
 type PCAPRow struct {
 	ID     string     `bigquery:"id"`
 	Parser ParseInfo  `bigquery:"parser"`
