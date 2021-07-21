@@ -39,4 +39,9 @@ func Test_main(t *testing.T) {
 	if err != nil {
 		t.Errorf("main() missing output file; missing schema_ndt5resultrow.md")
 	}
+
+	_, err = os.Stat(path.Join(tmpdir, "schema_pcaprow.md"))
+	if err != nil {
+		t.Errorf("main() missing output file; missing schema_pcaprow.md")
+	}
 }
