@@ -24,5 +24,5 @@ gsutil cp testfiles/20210617T003002.410133Z-ndt7-mlab1-foo01-ndt.tgz \
 # Run integration tests.
 go test -v -tags=integration -coverprofile=_integration.cov ./...
 
-# Revoke the service account credentials so to restore default credentials.
+# Revoke the service account credentials to restore default credentials.
 gcloud auth revoke $(gcloud config get-value account)
