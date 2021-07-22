@@ -14,6 +14,7 @@ echo "$SERVICE_ACCOUNT_mlab_testing" > $PWD/creds.json
 export GOOGLE_APPLICATION_CREDENTIALS=$PWD/creds.json
 
 # Prepare archives in mlab-testing project for some integration tests.
+./travis/activate_service_account.sh SERVICE_ACCOUNT_mlab_testing
 gsutil cp testfiles/20210617T003002.410133Z-ndt7-mlab1-foo01-ndt.tgz \
     gs://archive-mlab-testing/ndt/ndt7/2021/06/17/20210617T003002.410133Z-ndt7-mlab1-foo01-ndt.tgz
 
