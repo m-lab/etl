@@ -13,14 +13,16 @@ fi
 echo "$SERVICE_ACCOUNT_mlab_testing" > $PWD/creds.json
 export GOOGLE_APPLICATION_CREDENTIALS=$PWD/creds.json
 
+set -x
+
 gcloud auth list
 gcloud config configurations list
-
-set -x
+ls -lR ~/.config/gcloud/
 
 # Prepare archives in mlab-testing project for some integration tests.
 source ./travis/gcloudlib.sh
 activate_service_account SERVICE_ACCOUNT_mlab_testing
+original=$(gcloud config get-value account)
 
 gcloud auth list
 gcloud config configurations list
@@ -31,6 +33,6 @@ gsutil cp testfiles/20210617T003002.410133Z-ndt7-mlab1-foo01-ndt.tgz \
 # Run integration tests.
 go test -v -tags=integration -coverprofile=_integration.cov ./...
 
-gcloud auth list
-gcloud config configurations activate default
+
+gcloud auth revoke $(original)
 gcloud auth list
