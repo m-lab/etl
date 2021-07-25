@@ -260,6 +260,7 @@ const (
 	NDT7            = DataType("ndt7")
 	NDT_OMIT_DELTAS = DataType("ndt_nodelta") // to support larger buffer size.
 	SS              = DataType("sidestream")
+	PCAP            = DataType("pcap")
 	PT              = DataType("traceroute")
 	SW              = DataType("switch")
 	TCPINFO         = DataType("tcpinfo")
@@ -276,6 +277,7 @@ var (
 		"ndt7":             NDT7,
 		"sidestream":       SS,
 		"paris-traceroute": PT,
+		"pcap":             PCAP,
 		"switch":           SW,
 		"tcpinfo":          TCPINFO,
 		"traceroute":       PT,
@@ -287,6 +289,7 @@ var (
 		ANNOTATION: "annotation",
 		NDT:        "ndt",
 		SS:         "sidestream",
+		PCAP:       "pcap",
 		PT:         "traceroute",
 		SW:         "switch",
 		TCPINFO:    "tcpinfo",
@@ -296,13 +299,17 @@ var (
 	}
 
 	// Map from data type to number of buffer size for BQ insertion.
-	// TODO - this should be loaded from a config.
+	// This matters more for the legacy parsing that used BQ streaming inserts.
+	// For the JSONL output in Gardener 2.0 operation, the buffer size doesn’t matter much,
+	// as everything is written to gcs files, and the gcs library does it’s own buffering.
+	// TODO - this should be loaded from a config
 	dataTypeToBQBufferSize = map[DataType]int{
 		ANNOTATION:      400, // around 1k each.
 		NDT:             10,
 		NDT_OMIT_DELTAS: 50,
 		TCPINFO:         5,
 		SS:              500, // Average json size is 2.5K
+		PCAP:            200,
 		PT:              20,
 		SW:              100,
 		NDT5:            200,
