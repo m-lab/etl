@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"regexp"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,6 +17,8 @@ import (
 //=====================================================================================
 //                       PCAP Parser
 //=====================================================================================
+
+const pcapSuffix = ".pcap.gz"
 
 // PCAPParser parses the PCAP datatype from the packet-headers process.
 type PCAPParser struct {
@@ -41,18 +43,18 @@ func NewPCAPParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.
 }
 
 // IsParsable returns the canonical test type and whether to parse data.
-func (parser *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
+func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like (.*).pcap.gz .
-	if strings.HasSuffix(testName, "pcap.gz") {
+	if strings.HasSuffix(testName, pcapSuffix) {
 		return "pcap", true
 	}
 	return "", false
 }
 
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
-func (parser *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
-	metrics.WorkerState.WithLabelValues(parser.TableName(), "pcap").Inc()
-	defer metrics.WorkerState.WithLabelValues(parser.TableName(), "pcap").Dec()
+func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
+	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
+	defer metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Dec()
 
 	row := schema.PCAPRow{
 		Parser: schema.ParseInfo{
@@ -69,15 +71,15 @@ func (parser *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value,
 	// run our systems in UTC, all timestamps will be relative to UTC and as
 	// will these dates.
 	row.Date = fileMetadata["date"].(civil.Date)
-	row.ID = parser.GetUUID(testName)
+	row.ID = p.GetUUID(testName)
 
 	// Insert the row.
-	if err := parser.Put(&row); err != nil {
+	if err := p.Put(&row); err != nil {
 		return err
 	}
 
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(parser.TableName(), "pcap", "ok").Inc()
+	metrics.TestCount.WithLabelValues(p.TableName(), "pcap", "ok").Inc()
 
 	return nil
 }
@@ -85,46 +87,42 @@ func (parser *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value,
 // GetUUID extracts the UUID from the filename.
 // For example, for filename 2021/07/22/ndt-4c6fb_1625899199_00000000013A4623.pcap.gz,
 // it returns ndt-4c6fb_1625899199_00000000013A4623.
-func (parser *PCAPParser) GetUUID(filename string) string {
-	regex := regexp.MustCompile(`\d{4}/\d{2}/\d{2}/`)
-	id := regex.ReplaceAllString(filename, "")
-	if len(id) >= 8 {
-		return id[:len(id)-8]
-	}
-	return id
+func (p *PCAPParser) GetUUID(filename string) string {
+	id := filepath.Base(filename)
+	return strings.TrimSuffix(id, pcapSuffix)
 }
 
 // NB: These functions are also required to complete the etl.Parser interface
 // For PCAP, we just forward the calls to the Inserter.
 
-func (parser *PCAPParser) Flush() error {
-	return parser.Base.Flush()
+func (p *PCAPParser) Flush() error {
+	return p.Base.Flush()
 }
 
-func (parser *PCAPParser) TableName() string {
-	return parser.table
+func (p *PCAPParser) TableName() string {
+	return p.table
 }
 
-func (parser *PCAPParser) FullTableName() string {
-	return parser.table + parser.suffix
+func (p *PCAPParser) FullTableName() string {
+	return p.table + p.suffix
 }
 
 // RowsInBuffer returns the count of rows currently in the buffer.
-func (parser *PCAPParser) RowsInBuffer() int {
-	return parser.GetStats().Pending
+func (p *PCAPParser) RowsInBuffer() int {
+	return p.GetStats().Pending
 }
 
 // Committed returns the count of rows successfully committed to BQ.
-func (parser *PCAPParser) Committed() int {
-	return parser.GetStats().Committed
+func (p *PCAPParser) Committed() int {
+	return p.GetStats().Committed
 }
 
 // Accepted returns the count of all rows received through InsertRow(s).
-func (parser *PCAPParser) Accepted() int {
-	return parser.GetStats().Total()
+func (p *PCAPParser) Accepted() int {
+	return p.GetStats().Total()
 }
 
 // Failed returns the count of all rows that could not be committed.
-func (parser *PCAPParser) Failed() int {
-	return parser.GetStats().Failed
+func (p *PCAPParser) Failed() int {
+	return p.GetStats().Failed
 }

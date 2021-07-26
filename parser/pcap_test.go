@@ -2,6 +2,7 @@ package parser_test
 
 import (
 	"io/ioutil"
+	"path"
 	"strings"
 	"testing"
 
@@ -14,25 +15,25 @@ import (
 )
 
 const (
-	filename = "ndt-4c6fb_1625899199_000000000121C1A0.pcap.gz"
-	GCSPath  = "gs://archive-measurement-lab/ndt/pcap/2021/07/22/"
+	pcapFilename = "ndt-4c6fb_1625899199_000000000121C1A0.pcap.gz"
+	pcapGCSPath  = "gs://archive-measurement-lab/ndt/pcap/2021/07/22/"
 )
 
 func TestPCAPParser_ParseAndInsert(t *testing.T) {
 	ins := newInMemorySink()
 	n := parser.NewPCAPParser(ins, "test", "_suffix", &fakeAnnotator{})
 
-	data, err := ioutil.ReadFile("testdata/PCAP/" + filename)
+	data, err := ioutil.ReadFile(path.Join("testdata/PCAP/", pcapFilename))
 	rtx.Must(err, "failed to load test file")
 
 	date := civil.Date{Year: 2021, Month: 07, Day: 22}
 
 	meta := map[string]bigquery.Value{
-		"filename": GCSPath + filename,
+		"filename": path.Join(pcapGCSPath, pcapFilename),
 		"date":     date,
 	}
 
-	if err := n.ParseAndInsert(meta, filename, data); err != nil {
+	if err := n.ParseAndInsert(meta, pcapFilename, data); err != nil {
 		t.Errorf("PCAPParser.ParseAndInsert() error = %v, wantErr %v", err, true)
 	}
 
@@ -46,8 +47,8 @@ func TestPCAPParser_ParseAndInsert(t *testing.T) {
 	expectedParseInfo := schema.ParseInfo{
 		Version:    "https://github.com/m-lab/etl/tree/foobar",
 		Time:       row.Parser.Time,
-		ArchiveURL: GCSPath + filename,
-		Filename:   filename,
+		ArchiveURL: path.Join(pcapGCSPath, pcapFilename),
+		Filename:   pcapFilename,
 		Priority:   0,
 		GitCommit:  "12345678",
 	}
@@ -72,7 +73,7 @@ func TestPCAPParser_IsParsable(t *testing.T) {
 	}{
 		{
 			name:     "success-pcap",
-			testName: filename,
+			testName: pcapFilename,
 			want:     true,
 		},
 		{
@@ -84,7 +85,7 @@ func TestPCAPParser_IsParsable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, err := ioutil.ReadFile(`testdata/PCAP/` + tt.testName)
+			data, err := ioutil.ReadFile(path.Join(`testdata/PCAP/`, tt.testName))
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
@@ -116,7 +117,7 @@ func TestPCAPParser_GetUUID(t *testing.T) {
 		{
 			name:     "empty-string",
 			filename: "",
-			want:     "",
+			want:     ".",
 		},
 	}
 
