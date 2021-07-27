@@ -51,7 +51,7 @@ env_variables:
   MAX_WORKERS: 20
   BIGQUERY_PROJECT: ''  # Overrides GCLOUD_PROJECT
   # BIGQUERY_DATASET: 'base_tables' # Overrided computed dataset.
-  NDT_OMIT_DELTAS: 'true'
+  NDT_OMIT_DELTAS: 'false'
   # TODO add custom service-account, instead of using default credentials.
 
   ANNOTATOR_URL: "{{ANNOTATOR_URL}}"
