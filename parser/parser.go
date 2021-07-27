@@ -90,6 +90,8 @@ func NewSinkParser(dt etl.DataType, sink row.Sink, table string, ann api.Annotat
 		return NewNDT7ResultParser(sink, table, "", ann)
 	case etl.TCPINFO:
 		return NewTCPInfoParser(sink, table, "", ann)
+	case etl.PCAP:
+		return NewPCAPParser(sink, table, "", ann)
 	default:
 		return nil
 	}
