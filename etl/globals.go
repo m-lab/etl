@@ -323,16 +323,7 @@ var (
 	// It allows us process fewer archives when there is a very high volume of data.
 	// TODO - this should be loaded from a config.
 	dataTypeToSkipCount = map[DataType]int{
-		ANNOTATION: 0,
-		NDT:        0,
-		SS:         0,
-		PCAP:       9,
-		PT:         0,
-		SW:         0,
-		TCPINFO:    0,
-		NDT5:       0,
-		NDT7:       0,
-		INVALID:    0,
+		PCAP: 9,
 	}
 )
 
@@ -347,22 +338,9 @@ func DirToTablename(dir string) string {
 	return dataTypeToTable[dirToDataType[dir]]
 }
 
-// NameToDataType returns the DataType corresponding to the type name.
-func NameToDataType(name string) DataType {
-	dataType, ok := dirToDataType[name]
-	if !ok {
-		return INVALID
-	}
-	return dataType
-}
-
 // SkipCount returns the number of files to skip when processing each DataType.
 func (dt DataType) SkipCount() int {
-	count, ok := dataTypeToSkipCount[dt]
-	if !ok {
-		return 0
-	}
-	return count
+	return dataTypeToSkipCount[dt]
 }
 
 // BigqueryProject returns the appropriate project.

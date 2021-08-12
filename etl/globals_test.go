@@ -369,36 +369,6 @@ func TestDirToTablename(t *testing.T) {
 	}
 }
 
-func TestNameToDataType(t *testing.T) {
-	tests := []struct {
-		name string
-		want etl.DataType
-	}{
-
-		{
-			name: "ndt7",
-			want: etl.NDT7,
-		},
-		{
-			name: "invalid",
-			want: etl.INVALID,
-		},
-		{
-			name: "foo",
-			want: etl.INVALID,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := etl.NameToDataType(tt.name)
-			if got != tt.want {
-				t.Errorf("NameToDataType() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSkipCount(t *testing.T) {
 	tests := []struct {
 		name     string

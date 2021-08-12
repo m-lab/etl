@@ -177,7 +177,7 @@ func (src *GCSSource) streamToPending(ctx context.Context, job tracker.Job) {
 	}
 
 	index := 0
-	dataType := etl.NameToDataType(job.Datatype)
+	dataType := etl.DataType(job.Datatype)
 	skipCount := dataType.SkipCount()
 
 	for _, f := range files {
