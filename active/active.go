@@ -20,6 +20,8 @@ import (
 	"google.golang.org/api/iterator"
 
 	"cloud.google.com/go/storage"
+	"github.com/m-lab/etl-gardener/tracker"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/cloud/gcs"
 	"github.com/m-lab/go/logx"
@@ -103,17 +105,17 @@ type GCSSource struct {
 }
 
 // NewGCSSource creates a new source for active processing.
-func NewGCSSource(ctx context.Context, label string, fl FileLister, toRunnable func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
+func NewGCSSource(ctx context.Context, job tracker.Job, fl FileLister, toRunnable func(*storage.ObjectAttrs) Runnable) (*GCSSource, error) {
 	src := GCSSource{
 		ctx:        WithFail(ctx),
 		fileLister: fl,
 		toRunnable: toRunnable,
 
 		pendingChan: make(chan Runnable, 0),
-		label:       label,
+		label:       job.Path(),
 	}
 
-	go src.streamToPending(ctx)
+	go src.streamToPending(ctx, job)
 
 	return &src, nil
 }
@@ -162,7 +164,7 @@ func (src *GCSSource) Next(ctx context.Context) (Runnable, error) {
 // It fetches the list of files once, then converts files to Runnables until all files are
 // handled, or the context is canceled or expires.
 // The Runnables are pulled from the queue by Next().
-func (src *GCSSource) streamToPending(ctx context.Context) {
+func (src *GCSSource) streamToPending(ctx context.Context, job tracker.Job) {
 	// No matter what else happens, we eventually want to close the pendingChan.
 	defer close(src.pendingChan)
 
@@ -173,6 +175,10 @@ func (src *GCSSource) streamToPending(ctx context.Context) {
 		src.ctx.Fail(err)
 		return
 	}
+
+	index := 0
+	dataType := etl.NameToDataType(job.Datatype)
+	skipCount := dataType.SkipCount()
 
 	for _, f := range files {
 		debug.Println(f)
@@ -186,8 +192,12 @@ func (src *GCSSource) streamToPending(ctx context.Context) {
 			metrics.ActiveErrors.WithLabelValues(src.Label(), "streamToPending").Inc()
 			break
 		}
-		debug.Printf("Adding gs://%s/%s", f.Bucket, f.Name)
-		// Blocks until consumer reads channel.
-		src.pendingChan <- src.toRunnable(f)
+
+		if index%(skipCount+1) == 0 {
+			debug.Printf("Adding gs://%s/%s", f.Bucket, f.Name)
+			// Blocks until consumer reads channel.
+			src.pendingChan <- src.toRunnable(f)
+		}
+		index++
 	}
 }

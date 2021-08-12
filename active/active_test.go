@@ -15,12 +15,17 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 
+	"github.com/m-lab/etl-gardener/tracker"
 	"github.com/m-lab/etl/active"
 	"github.com/m-lab/go/cloud/gcs"
 	"github.com/m-lab/go/logx"
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/go/cloudtest/gcsfake"
+)
+
+var (
+	job = tracker.Job{}
 )
 
 func init() {
@@ -95,8 +100,28 @@ func testClient() stiface.Client {
 	return &client
 }
 
-func standardLister() active.FileLister {
-	bh, err := gcs.GetBucket(context.Background(), testClient(), "foobar")
+func testClientSkipFiles() stiface.Client {
+	client := gcsfake.GCSClient{}
+	client.AddTestBucket("foobar",
+		&gcsfake.BucketHandle{
+			ObjAttrs: []*storage.ObjectAttrs{
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj1", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj2", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj3", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj4", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj5", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj6", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj7", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj8", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj9", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj10", Updated: time.Now()},
+				{Bucket: "foobar", Name: "ndt/ndt5/2019/01/01/obj11", Updated: time.Now()},
+			}})
+	return &client
+}
+
+func standardLister(client func() stiface.Client) active.FileLister {
+	bh, err := gcs.GetBucket(context.Background(), client(), "foobar")
 	rtx.Must(err, "GetBucket failed")
 	return active.FileListerFunc(bh, "ndt/ndt5/2019/01/01/", nil)
 }
@@ -123,7 +148,7 @@ func runAll(ctx context.Context, rSrc active.RunnableSource) (*errgroup.Group, e
 func TestGCSSourceBasic(t *testing.T) {
 	p := newCounter(t)
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, job, standardLister(testClient), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +174,7 @@ func TestWithRunFailures(t *testing.T) {
 	p.addOutcome(os.ErrInvalid)
 
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, job, standardLister(testClient), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +199,7 @@ func TestWithRunFailures(t *testing.T) {
 func TestExpiredContext(t *testing.T) {
 	p := newCounter(t)
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, job, standardLister(testClient), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +224,7 @@ func TestWithStorageError(t *testing.T) {
 	p := newCounter(t)
 
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", ErroringLister, p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, job, ErroringLister, p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +239,7 @@ func TestExpiredFileListerContext(t *testing.T) {
 	p := newCounter(t)
 
 	ctx := context.Background()
-	fs, err := active.NewGCSSource(ctx, "test", standardLister(), p.toRunnable)
+	fs, err := active.NewGCSSource(ctx, job, standardLister(testClient), p.toRunnable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,5 +260,57 @@ func TestExpiredFileListerContext(t *testing.T) {
 	}
 	if err != context.Canceled {
 		t.Error("Should return os.ErrInvalid", err)
+	}
+}
+
+func TestSkipFiles(t *testing.T) {
+	tests := []struct {
+		name         string
+		successCount int
+		failureCount int
+	}{
+		{
+			name:         "pcap",
+			successCount: 2,
+			failureCount: 0,
+		},
+		{
+			name:         "ndt7",
+			successCount: 11,
+			failureCount: 0,
+		},
+		{
+			name:         "foo",
+			successCount: 11,
+			failureCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newCounter(t)
+			ctx := context.Background()
+			fs, err := active.NewGCSSource(ctx, tracker.Job{Datatype: tt.name}, standardLister(testClientSkipFiles), p.toRunnable)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			eg, err := runAll(ctx, fs)
+			if err != iterator.Done {
+				t.Fatal(err)
+			}
+			err = eg.Wait()
+			if err != nil {
+				t.Error(err)
+			}
+
+			if p.success != tt.successCount {
+				t.Errorf("for %s, %d should have succeeded, got %d", tt.name, tt.successCount, p.success)
+			}
+
+			if p.fail != tt.failureCount {
+				t.Errorf("for %s, %d should have failed, got %d", tt.name, tt.failureCount, p.fail)
+			}
+		})
 	}
 }
