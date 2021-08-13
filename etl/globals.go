@@ -318,6 +318,13 @@ var (
 	}
 	// There is also a mapping of data types to queue names in
 	// queue_pusher.go
+
+	// Map from data type to number of files to skip when processing said type.
+	// It allows us process fewer archives when there is a very high volume of data.
+	// TODO - this should be loaded from a config.
+	dataTypeToSkipCount = map[DataType]int{
+		PCAP: 9,
+	}
 )
 
 /*******************************************************************************
@@ -329,6 +336,11 @@ var (
 // DirToTablename translates gs dir to BQ tablename.
 func DirToTablename(dir string) string {
 	return dataTypeToTable[dirToDataType[dir]]
+}
+
+// SkipCount returns the number of files to skip when processing each DataType.
+func (dt DataType) SkipCount() int {
+	return dataTypeToSkipCount[dt]
 }
 
 // BigqueryProject returns the appropriate project.

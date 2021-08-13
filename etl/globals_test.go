@@ -368,3 +368,36 @@ func TestDirToTablename(t *testing.T) {
 		t.Errorf("DirToTablename() failed to translate PT dir name correctly.")
 	}
 }
+
+func TestSkipCount(t *testing.T) {
+	tests := []struct {
+		name     string
+		dataType etl.DataType
+		want     int
+	}{
+		{
+			name:     "ndt7",
+			dataType: etl.NDT7,
+			want:     0,
+		},
+		{
+			name:     "pcap",
+			dataType: etl.PCAP,
+			want:     9,
+		},
+		{
+			name:     "invalid",
+			dataType: etl.INVALID,
+			want:     0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.dataType.SkipCount()
+			if got != tt.want {
+				t.Errorf("SkipCount() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}

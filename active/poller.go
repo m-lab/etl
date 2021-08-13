@@ -154,7 +154,7 @@ func (g *GardenerAPI) JobFileSource(ctx context.Context, job tracker.Job,
 		return nil, err
 	}
 	lister := FileListerFunc(bh, prefix, filter)
-	gcsSource, err := NewGCSSource(ctx, job.Path(), lister, toRunnable)
+	gcsSource, err := NewGCSSource(ctx, job, lister, toRunnable)
 	if err != nil {
 		failMetric(job, "GCSSource")
 		return nil, err
