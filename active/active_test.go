@@ -109,7 +109,7 @@ func standardLister() active.FileLister {
 
 func skipFilesListener(dataType string) active.FileLister {
 	client := gcsfake.GCSClient{}
-	bucket := "ndt/" + dataType + "/2019/01/01/"
+	bucket := path.Join("ndt/", dataType, "/2019/01/01/")
 	client.AddTestBucket("foobar",
 		&gcsfake.BucketHandle{
 			ObjAttrs: []*storage.ObjectAttrs{
