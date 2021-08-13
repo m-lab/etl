@@ -109,26 +109,26 @@ func standardLister() active.FileLister {
 
 func skipFilesListener(dataType string) active.FileLister {
 	client := gcsfake.GCSClient{}
-	bucket := path.Join("ndt/", dataType, "/2019/01/01/")
+	prefix := path.Join("ndt/", dataType, "/2019/01/01/")
 	client.AddTestBucket("foobar",
 		&gcsfake.BucketHandle{
 			ObjAttrs: []*storage.ObjectAttrs{
-				{Bucket: "foobar", Name: path.Join(bucket, "obj1"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj2"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj3"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj4"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj5"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj6"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj7"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj8"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj9"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj10"), Updated: time.Now()},
-				{Bucket: "foobar", Name: path.Join(bucket, "obj11"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj1"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj2"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj3"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj4"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj5"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj6"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj7"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj8"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj9"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj10"), Updated: time.Now()},
+				{Bucket: "foobar", Name: path.Join(prefix, "obj11"), Updated: time.Now()},
 			}})
 
 	bh, err := gcs.GetBucket(context.Background(), &client, "foobar")
 	rtx.Must(err, "GetBucket failed")
-	return active.FileListerFunc(bh, bucket, nil)
+	return active.FileListerFunc(bh, prefix, nil)
 
 }
 
