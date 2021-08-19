@@ -17,7 +17,7 @@ RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
 
 # Install binaries needed for builds and testing.
-RUN apt-get update
+RUN apt-get --allow-releaseinfo-change update
 RUN apt-get install -y jq gcc netcat
 RUN go get -v github.com/m-lab/gcp-config/cmd/cbif
 
