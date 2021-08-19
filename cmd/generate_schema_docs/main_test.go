@@ -44,4 +44,9 @@ func Test_main(t *testing.T) {
 	if err != nil {
 		t.Errorf("main() missing output file; missing schema_pcaprow.md")
 	}
+
+	_, err = os.Stat(path.Join(tmpdir, "schema_hopannotation1row.md"))
+	if err != nil {
+		t.Errorf("main() missing output file; missing schema_hopannotation1row.md")
+	}
 }

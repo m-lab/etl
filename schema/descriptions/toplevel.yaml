@@ -19,6 +19,8 @@ log_time:
 date:
   Description: Date is used by BigQuery to partition data to improve query
     performance.
+raw:
+  Description: Fields from the raw data.
 
 # Lower case parser for 'Standard Column' supporting schemas.
 parser:
