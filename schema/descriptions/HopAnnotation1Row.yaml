@@ -1,5 +1,7 @@
 ID:
   Description: Annotation ID is a daily unique identifier for Hop Annotations to join with traceroute datasets.
+id:
+  Description: Annotation ID is a daily unique identifier for Hop Annotations to join with traceroute datasets.
 raw.Timestamp:
   Description: Scamper cycle start time.
 raw.Annotations.Geo:
