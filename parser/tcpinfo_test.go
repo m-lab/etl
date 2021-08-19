@@ -145,12 +145,12 @@ func (nc nullCloser) Close() error { return nil }
 func TestTCPParser(t *testing.T) {
 	parserVersion := parser.InitParserVersionForTest()
 
-	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
-	url := "gs://fake-archive/ndt/tcpinfo/2019/05/16/" + filepath.Base(filename)
+	taskfilename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
+	url := "gs://fake-archive/ndt/tcpinfo/2019/05/16/" + filepath.Base(taskfilename)
 
-	src, err := fileSource(filename)
+	src, err := fileSource(taskfilename)
 	if err != nil {
-		t.Fatal("Failed reading testdata from", filename)
+		t.Fatal("Failed reading testdata from", taskfilename)
 	}
 
 	// Inject fake inserter and annotator
@@ -190,7 +190,11 @@ func TestTCPParser(t *testing.T) {
 			t.Error("Should have inserted parse_time")
 		}
 		if row.ParseInfo.TaskFileName != url {
-			t.Error("Should have correct filename", filename, "!=", row.ParseInfo.TaskFileName)
+			t.Error("Should have correct taskfilename", taskfilename, "!=", row.ParseInfo.TaskFileName)
+		}
+
+		if !strings.Contains(row.ParseInfo.Filename, row.UUID) {
+			t.Errorf("Should have non empty filename containing UUID: %s not found in :%s:\n", row.UUID, row.ParseInfo.Filename)
 		}
 
 		if row.ParseInfo.ParserVersion != parserVersion {

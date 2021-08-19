@@ -183,6 +183,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 	row.TestTime = testMetadata.StartTime
 
 	row.ParseInfo = &schema.ParseInfoV0{ParseTime: time.Now(), ParserVersion: Version()}
+	row.ParseInfo.Filename = testName
 
 	if fileMetadata["filename"] != nil {
 		fn, ok := fileMetadata["filename"].(string)
