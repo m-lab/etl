@@ -11,7 +11,7 @@ import (
 )
 
 // Schema stub for HopAnnotation1.
-// Eventually this will be returned by traceroute-caller.
+// TODO(cristinaleon): Remove this definition when traceroute-caller is available.
 type HopAnnotation1 struct {
 	ID          string
 	Timestamp   time.Time

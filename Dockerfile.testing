@@ -1,5 +1,6 @@
 FROM gcr.io/google.com/cloudsdktool/cloud-sdk:331.0.0
 
+
 # Fetch recent go version.
 ENV GOLANG_VERSION 1.15.8
 ENV GOLANG_DOWNLOAD_URL https://golang.org/dl/go$GOLANG_VERSION.linux-amd64.tar.gz
@@ -16,7 +17,7 @@ RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR $GOPATH
 
 # Install binaries needed for builds and testing.
-RUN apt-get --allow-releaseinfo-change update
+RUN apt-get update
 RUN apt-get install -y jq gcc netcat
 RUN go get -v github.com/m-lab/gcp-config/cmd/cbif
 
