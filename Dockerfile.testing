@@ -1,5 +1,5 @@
 FROM gcr.io/google.com/cloudsdktool/cloud-sdk:331.0.0
-
+RUN apt-get update –allow-releaseinfo-chang
 
 # Fetch recent go version.
 ENV GOLANG_VERSION 1.15.8
