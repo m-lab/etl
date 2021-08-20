@@ -255,6 +255,7 @@ func (dt DataType) BQBufferSize() int {
 // TODO - use camelcase.
 const (
 	ANNOTATION      = DataType("annotation")
+	HOPANNOTATION1  = DataType("hopannotation1")
 	NDT             = DataType("ndt")
 	NDT5            = DataType("ndt5")
 	NDT7            = DataType("ndt7")
@@ -272,6 +273,7 @@ var (
 	// TODO - this should be loaded from a config.
 	dirToDataType = map[string]DataType{
 		"annotation":       ANNOTATION,
+		"hopannotation1":   HOPANNOTATION1,
 		"ndt":              NDT,
 		"ndt5":             NDT5,
 		"ndt7":             NDT7,
@@ -286,16 +288,17 @@ var (
 	// DataTypeToTable maps from data type to BigQuery table name.
 	// TODO - this should be loaded from a config.
 	dataTypeToTable = map[DataType]string{
-		ANNOTATION: "annotation",
-		NDT:        "ndt",
-		SS:         "sidestream",
-		PCAP:       "pcap",
-		PT:         "traceroute",
-		SW:         "switch",
-		TCPINFO:    "tcpinfo",
-		NDT5:       "ndt5",
-		NDT7:       "ndt7",
-		INVALID:    "invalid",
+		ANNOTATION:     "annotation",
+		HOPANNOTATION1: "hopannotation1",
+		NDT:            "ndt",
+		SS:             "sidestream",
+		PCAP:           "pcap",
+		PT:             "traceroute",
+		SW:             "switch",
+		TCPINFO:        "tcpinfo",
+		NDT5:           "ndt5",
+		NDT7:           "ndt7",
+		INVALID:        "invalid",
 	}
 
 	// Map from data type to number of buffer size for BQ insertion.
@@ -305,6 +308,7 @@ var (
 	// TODO - this should be loaded from a config
 	dataTypeToBQBufferSize = map[DataType]int{
 		ANNOTATION:      400, // around 1k each.
+		HOPANNOTATION1:  200,
 		NDT:             10,
 		NDT_OMIT_DELTAS: 50,
 		TCPINFO:         5,

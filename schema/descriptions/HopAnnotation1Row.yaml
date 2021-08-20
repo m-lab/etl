@@ -1,0 +1,8 @@
+ID:
+  Description: Annotation ID is a daily unique identifier for Hop Annotations to join with traceroute datasets.
+id:
+  Description: Annotation ID is a daily unique identifier for Hop Annotations to join with traceroute datasets.
+raw.Timestamp:
+  Description: Scamper cycle start time.
+raw.Annotations.Geo:
+  Description: Geolocation information annotated using MaxMind, which is known to be less accurate for infrastructure IPs in traceroute hops.
