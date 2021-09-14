@@ -34,19 +34,18 @@ func Test_main(t *testing.T) {
 
 	main() // no crash == working
 
-	// Check for expected files in tmpdir
-	_, err = os.Stat(path.Join(tmpdir, "schema_ndt5resultrow.md"))
-	if err != nil {
-		t.Errorf("main() missing output file; missing schema_ndt5resultrow.md")
+	files := [4]string{
+		"schema_ndt5resultrow.md",
+		"schema_pcaprow.md",
+		"schema_hopannotation1row.md",
+		"schema_scamper1row.md",
 	}
 
-	_, err = os.Stat(path.Join(tmpdir, "schema_pcaprow.md"))
-	if err != nil {
-		t.Errorf("main() missing output file; missing schema_pcaprow.md")
-	}
-
-	_, err = os.Stat(path.Join(tmpdir, "schema_hopannotation1row.md"))
-	if err != nil {
-		t.Errorf("main() missing output file; missing schema_hopannotation1row.md")
+	for _, file := range files {
+		// Check for expected files in tmpdir
+		_, err = os.Stat(path.Join(tmpdir, file))
+		if err != nil {
+			t.Errorf("main() missing output file; missing %s", file)
+		}
 	}
 }
