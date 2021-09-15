@@ -42,7 +42,7 @@ type BQTracelbLine struct {
 	Attempts    float64         `bigquery:"attempts"`
 	Confidence  float64         `bigquery:"confidence"`
 	Tos         float64         `bigquery:"tos"`
-	Gaplimit     float64         `bigquery:"gaplint"`
+	Gaplimit    float64         `bigquery:"gaplimit"`
 	WaitTimeout float64         `bigquery:"wait_timeout"`
 	WaitProbe   float64         `bigquery:"wait_probe"`
 	Probec      float64         `bigquery:"probec"`
