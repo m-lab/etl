@@ -61,7 +61,7 @@ func parseTracelb(bqScamperOutput *schema.BQScamperOutput, tracelb parser.Tracel
 		Attempts:    tracelb.Attempts,
 		Confidence:  tracelb.Confidence,
 		Tos:         tracelb.Tos,
-		Gaplint:     tracelb.Gaplint,
+		Gaplimit:    tracelb.Gaplint,
 		WaitTimeout: tracelb.WaitTimeout,
 		WaitProbe:   tracelb.WaitProbe,
 		Probec:      tracelb.Probec,
@@ -86,7 +86,7 @@ func parseTracelb(bqScamperOutput *schema.BQScamperOutput, tracelb parser.Tracel
 		}
 
 		bqScamperNode := schema.BQScamperNode{
-			UUID:    fmt.Sprintf("%s_%s_%s", date, hostname, node.Addr),
+			UUID:  fmt.Sprintf("%s_%s_%s", date, hostname, node.Addr),
 			Addr:  node.Addr,
 			Name:  node.Name,
 			QTTL:  node.QTTL,
@@ -140,10 +140,10 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	}
 
 	row := schema.Scamper1Row{
-		ID:            bqScamperOutput.Metadata.UUID,
-		Parser:        parseInfo,
-		Date:          fileMetadata["date"].(civil.Date),
-		Raw: bqScamperOutput,
+		ID:     bqScamperOutput.Metadata.UUID,
+		Parser: parseInfo,
+		Date:   fileMetadata["date"].(civil.Date),
+		Raw:    bqScamperOutput,
 	}
 
 	// Insert the row.

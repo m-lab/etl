@@ -1,0 +1,222 @@
+{
+  "UUID": "0000000000",
+  "TracerouteCallerVersion": "0000000",
+  "CachedResult": false,
+  "CachedUUID": ""
+}
+{
+  "type": "cycle-start",
+  "list_name": "/tmp/scamperctrl:51803",
+  "id": 1,
+  "hostname": "ndt-plh7v",
+  "start_time": 1566691268
+}
+{
+  "type": "tracelb",
+  "version": "0.1",
+  "userid": 0,
+  "method": "icmp-echo",
+  "src": "2001:550:1b01:1:e41d:2d00:151:f6c0",
+  "dst": "2600:1009:b013:1a59:c369:b528:98fd:ab43",
+  "start": {
+    "sec": 1567900908,
+    "usec": 729543,
+    "ftime": "2019-09-08 00:01:48"
+  },
+  "probe_size": 60,
+  "firsthop": 1,
+  "attempts": 3,
+  "confidence": 95,
+  "tos": 0,
+  "gaplimit": 3,
+  "wait_timeout": 5,
+  "wait_probe": 250,
+  "probec": 85,
+  "probec_max": 3000,
+  "nodec": 6,
+  "linkc": 6,
+  "nodes": [
+    {
+      "addr": "2001:550:1b01:1::1",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr": "2001:550:3::1ca",
+            "probes": [
+              {
+                "tx": {
+                  "sec": 1567900908,
+                  "usec": 979595
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 1,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1567900909,
+                      "usec": 16398
+                    },
+                    "ttl": 63,
+                    "rtt": 36.803,
+                    "icmp_type": 3,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1567900909,
+                  "usec": 229642
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 2,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1567900909,
+                      "usec": 229974
+                    },
+                    "ttl": 63,
+                    "rtt": 0.332,
+                    "icmp_type": 3,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1567900909,
+                  "usec": 480242
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 3,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1567900909,
+                      "usec": 480571
+                    },
+                    "ttl": 63,
+                    "rtt": 0.329,
+                    "icmp_type": 3,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1567900909,
+                  "usec": 730987
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 4,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1567900909,
+                      "usec": 731554
+                    },
+                    "ttl": 63,
+                    "rtt": 0.567,
+                    "icmp_type": 3,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1567900909,
+                  "usec": 982029
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 5,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1567900909,
+                      "usec": 982358
+                    },
+                    "ttl": 63,
+                    "rtt": 0.329,
+                    "icmp_type": 3,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1567900910,
+                  "usec": 232994
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 6,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1567900910,
+                      "usec": 234231
+                    },
+                    "ttl": 63,
+                    "rtt": 1.237,
+                    "icmp_type": 3,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "addr": "2001:4888:3f:6092:3a2:26:0:1",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr":  "*"
+          }
+        ],
+        [
+          {
+            "addr": "*"
+          }
+        ]
+      ]
+    }
+  ]
+}
+{
+  "type": "cycle-stop",
+  "list_name": "/tmp/scamperctrl:51803",
+  "id": 1,
+  "hostname": "ndt-plh7v",
+  "stop_time": 1566691541
+}
