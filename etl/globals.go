@@ -263,7 +263,6 @@ const (
 	SS              = DataType("sidestream")
 	PCAP            = DataType("pcap")
 	PT              = DataType("traceroute")
-	SCAMPER1        = DataType("scamper1")
 	SW              = DataType("switch")
 	TCPINFO         = DataType("tcpinfo")
 	INVALID         = DataType("invalid")
@@ -281,7 +280,6 @@ var (
 		"sidestream":       SS,
 		"paris-traceroute": PT,
 		"pcap":             PCAP,
-		"scamper1":         SCAMPER1,
 		"switch":           SW,
 		"tcpinfo":          TCPINFO,
 		"traceroute":       PT,
@@ -296,7 +294,6 @@ var (
 		SS:             "sidestream",
 		PCAP:           "pcap",
 		PT:             "traceroute",
-		SCAMPER1:       "scamper1",
 		SW:             "switch",
 		TCPINFO:        "tcpinfo",
 		NDT5:           "ndt5",
@@ -318,7 +315,6 @@ var (
 		SS:              500, // Average json size is 2.5K
 		PCAP:            200,
 		PT:              20,
-		SCAMPER1:        200,
 		SW:              100,
 		NDT5:            200,
 		NDT7:            200,

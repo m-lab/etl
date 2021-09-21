@@ -94,8 +94,6 @@ func NewSinkParser(dt etl.DataType, sink row.Sink, table string, ann api.Annotat
 		return NewTCPInfoParser(sink, table, "", ann)
 	case etl.PCAP:
 		return NewPCAPParser(sink, table, "", ann)
-	case etl.SCAMPER1:
-		return NewScamper1Parser(sink, table, "", ann)
 	default:
 		return nil
 	}
