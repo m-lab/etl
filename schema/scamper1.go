@@ -1,5 +1,12 @@
 package schema
 
+// The below BQ.* structs are the BQ-supported versions of the
+// corresponding traceroute-caller structs.
+// The reasons using mixed structs from TRC and BQ in the schema are:
+// 1. To add HopIDs the Tracelb.Nodes field.
+// 2. To replace the Tracelb.Nodes.Links nested array field from TRC,
+// since nested arrays are not supported in BQ.
+
 import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
@@ -12,8 +19,6 @@ import (
 // BQScamperLinkArray defines an array of ScamperLinks.
 // BigQuery does not support arrays of arrays, so this struct breaks down
 // traceroute-caller's ScamperNode.Links ([][]SamperLink) field into two.
-// The following BQ.* structs are the BQ-supported versions of the
-// corresponding traceroute-caller structs.
 type BQScamperLinkArray struct {
 	Links []parser.ScamperLink
 }
