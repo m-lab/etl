@@ -25,7 +25,7 @@ type BQScamperLinkArray struct {
 
 // BQScamperNode describes a layer of links.
 type BQScamperNode struct {
-	HopID string               `bigquery:"hop_id"`
+	HopID string               `json:"hop_id" bigquery:"hop_id"`
 	Addr  string               `bigquery:"addr"`
 	Name  string               `bigquery:"name"`
 	QTTL  int                  `json:"q_ttl" bigquery:"q_ttl"`
