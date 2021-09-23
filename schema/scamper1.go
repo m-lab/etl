@@ -25,10 +25,10 @@ type BQScamperLinkArray struct {
 
 // BQScamperNode describes a layer of links.
 type BQScamperNode struct {
-	UUID  string               `bigquery:"uuid"`
+	HopID string               `bigquery:"uuid"`
 	Addr  string               `bigquery:"addr"`
 	Name  string               `bigquery:"name"`
-	QTTL  int                  `bigquery:"q_ttl"`
+	QTTL  int                  `json:"q_ttl" bigquery:"q_ttl"`
 	Linkc int64                `bigquery:"linkc"`
 	Links []BQScamperLinkArray `bigquery:"links"`
 }
@@ -42,16 +42,16 @@ type BQTracelbLine struct {
 	Src         string          `bigquery:"src"`
 	Dst         string          `bigquery:"dst"`
 	Start       parser.TS       `bigquery:"start"`
-	ProbeSize   float64         `bigquery:"probe_size"`
+	ProbeSize   float64         `json:"probe_size" bigquery:"probe_size"`
 	Firsthop    float64         `bigquery:"firsthop"`
 	Attempts    float64         `bigquery:"attempts"`
 	Confidence  float64         `bigquery:"confidence"`
 	Tos         float64         `bigquery:"tos"`
 	Gaplimit    float64         `bigquery:"gaplimit"`
-	WaitTimeout float64         `bigquery:"wait_timeout"`
-	WaitProbe   float64         `bigquery:"wait_probe"`
+	WaitTimeout float64         `json:"wait_timeout" bigquery:"wait_timeout"`
+	WaitProbe   float64         `json:"wait_probe" bigquery:"wait_probe"`
 	Probec      float64         `bigquery:"probec"`
-	ProbecMax   float64         `bigquery:"probec_max"`
+	ProbecMax   float64         `json:"probec_max" bigquery:"probec_max"`
 	Nodec       float64         `bigquery:"nodec"`
 	Linkc       float64         `bigquery:"linkc"`
 	Nodes       []BQScamperNode `bigquery:"nodes"`

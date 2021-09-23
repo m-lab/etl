@@ -321,6 +321,8 @@ github.com/m-lab/traceroute-caller v0.9.1 h1:6jkheWa++HPMbYMUrQqSexid3QMpJZ2qJN3
 github.com/m-lab/traceroute-caller v0.9.1/go.mod h1:C7sFQ1qOfX2l6t80QvX0+NRkSYi04nVZZ9NwA0LyvKo=
 github.com/m-lab/traceroute-caller v0.9.2-0.20210921013111-006e908facdf h1:sGnECopsGj6tcQnz8xS04y7R1OboZYMnZnsJne6rkNs=
 github.com/m-lab/traceroute-caller v0.9.2-0.20210921013111-006e908facdf/go.mod h1:C7sFQ1qOfX2l6t80QvX0+NRkSYi04nVZZ9NwA0LyvKo=
+github.com/m-lab/traceroute-caller v0.9.2-0.20210921210304-69fc51173486 h1:7BEiGg7kZZUpWAjgtU9t8mLzPmxHWKa7Fm/5B4DLcLY=
+github.com/m-lab/traceroute-caller v0.9.2-0.20210921210304-69fc51173486/go.mod h1:C7sFQ1qOfX2l6t80QvX0+NRkSYi04nVZZ9NwA0LyvKo=
 github.com/m-lab/uuid v0.0.0-20191115203855-549727171666 h1:sG9hIJEQJTrIUN3H599qOKfhwvWi2+/6f4AR9pRrmOI=
 github.com/m-lab/uuid v0.0.0-20191115203855-549727171666/go.mod h1:pOwFpWLKhWzvBYvSJbs+MK6UbPK4gqhLpRgFumneLzM=
 github.com/m-lab/uuid-annotator v0.4.1/go.mod h1:f/zvgcc5A3HQ1Y63HWpbBVXNcsJwQ4uRIOqsF/nyto8=

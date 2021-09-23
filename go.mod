@@ -18,7 +18,7 @@ require (
 	github.com/m-lab/go v0.1.45
 	github.com/m-lab/ndt-server v0.20.5
 	github.com/m-lab/tcp-info v1.5.3
-	github.com/m-lab/traceroute-caller v0.9.2-0.20210921013111-006e908facdf // indirect
+	github.com/m-lab/traceroute-caller v0.9.2-0.20210921210304-69fc51173486 // indirect
 	github.com/m-lab/uuid v0.0.0-20191115203855-549727171666 // indirect
 	github.com/m-lab/uuid-annotator v0.4.5
 	github.com/prometheus/client_golang v1.11.0
