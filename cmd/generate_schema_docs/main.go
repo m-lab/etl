@@ -157,6 +157,7 @@ func main() {
 		&schema.TCPRow{},
 		&schema.PTTest{},
 		&schema.PCAPRow{},
+		&schema.Scamper1Row{},
 		// TODO(https://github.com/m-lab/etl/issues/745): Add additional types once
 		// "standard columns" are resolved.
 	}

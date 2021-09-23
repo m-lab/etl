@@ -121,6 +121,13 @@ func CreateOrUpdateHopAnnotation1Row(project string, dataset string, table strin
 	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
+func CreateOrUpdateScamper1Row(project string, dataset string, table string) error {
+	row := schema.Scamper1Row{}
+	schema, err := row.Schema()
+	rtx.Must(err, "Scamper1Row.Schema")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
+}
+
 // listTemplateTables finds all template tables for the given project, datatype, and base table name.
 // Because this function must enumerate all tables in the dataset to find matching names, it may be slow.
 func listTemplateTables(project, dataset, table string) ([]string, error) {
@@ -252,6 +259,13 @@ func updateStandardTables(project string) int {
 		errCount++
 	}
 	if err := CreateOrUpdateHopAnnotation1Row(project, "raw_ndt", "hopannotation1"); err != nil {
+		errCount++
+	}
+
+	if err := CreateOrUpdateScamper1Row(project, "tmp_ndt", "scamper1"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateScamper1Row(project, "raw_ndt", "scamper1"); err != nil {
 		errCount++
 	}
 
@@ -409,6 +423,14 @@ func main() {
 			errCount++
 		}
 		if err := CreateOrUpdateHopAnnotation1Row(*project, "raw_ndt", "hopannotation1"); err != nil {
+			errCount++
+		}
+
+	case "scamper1":
+		if err := CreateOrUpdateScamper1Row(*project, "tmp_ndt", "scamper1"); err != nil {
+			errCount++
+		}
+		if err := CreateOrUpdateScamper1Row(*project, "raw_ndt", "scamper1"); err != nil {
 			errCount++
 		}
 

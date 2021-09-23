@@ -1,0 +1,2 @@
+raw.Tracelb.Nodes.HopID:
+  Description: Daily unique identifier to join traceroute datasets with Hop Annotations.
