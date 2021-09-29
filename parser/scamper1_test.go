@@ -32,11 +32,11 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 
 	err = n.ParseAndInsert(meta, file, data)
 	if err != nil {
-		t.Errorf("Scamper1Parser.ParseAndInsert() error = %v, wantErr %v", err, false)
+		t.Errorf("Scamper1Parser.ParseAndInsert() error = %v, wantErr false", err)
 	}
 
 	if n.Accepted() != 1 {
-		t.Error("Scamper1Parser.ParseAndInsert(): Failed to insert snaplog data")
+		t.Error("Scamper1Parser.ParseAndInsert(): failed to insert snaplog data")
 	}
 	n.Flush()
 
@@ -45,7 +45,7 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 	expectedRow := expectedScamper1Row()
 	expectedRow.Parser.Time = row.Parser.Time
 	if diff := deep.Equal(row, &expectedRow); diff != nil {
-		t.Errorf("Scamper1Parser.ParseAndInser() different rows: %s", strings.Join(diff, "\n"))
+		t.Errorf("Scamper1Parser.ParseAndInsert(): different rows - %s", strings.Join(diff, "\n"))
 	}
 }
 
