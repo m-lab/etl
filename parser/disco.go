@@ -1,5 +1,5 @@
 // Package parser defines the Parser interface and implementations for the different
-// test types, NDT, Paris Traceroute, and SideStream.
+// data types.
 package parser
 
 // This file defines the Parser subtype that handles DISCO data.

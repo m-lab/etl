@@ -1,6 +1,7 @@
 package parser_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path"
 	"strings"
@@ -32,11 +33,11 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 
 	err = n.ParseAndInsert(meta, file, data)
 	if err != nil {
-		t.Errorf("Scamper1Parser.ParseAndInsert() error = %v, wantErr false", err)
+		t.Errorf("failed to parse scamper1 file: %v", err)
 	}
 
 	if n.Accepted() != 1 {
-		t.Error("Scamper1Parser.ParseAndInsert(): failed to insert snaplog data")
+		t.Error("failed to insert snaplog data")
 	}
 	n.Flush()
 
@@ -45,7 +46,7 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 	expectedRow := expectedScamper1Row()
 	expectedRow.Parser.Time = row.Parser.Time
 	if diff := deep.Equal(row, &expectedRow); diff != nil {
-		t.Errorf("Scamper1Parser.ParseAndInsert(): different rows - %s", strings.Join(diff, "\n"))
+		t.Errorf("failed to extract correct row from file: different rows - %s", strings.Join(diff, "\n"))
 	}
 }
 
@@ -77,7 +78,7 @@ func TestScamper1_IsParsable(t *testing.T) {
 			p := &parser.Scamper1Parser{}
 			_, got := p.IsParsable(tt.file, data)
 			if got != tt.want {
-				t.Errorf("Scamper1Parser.IsParsable() got = %v, want %v", got, tt.want)
+				t.Errorf("failed to detect if file is parsable: got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -215,8 +216,10 @@ func expectedScamper1Row() schema.Scamper1Row {
 		},
 	}
 
+	cycleStartTime := float64(1566691268)
+	cycleStartDate := parser.GetTraceStartDate(float64(cycleStartTime))
 	bqScamperNode1 := schema.BQScamperNode{
-		HopID: "20190825_ndt-plh7v_2001:550:1b01:1::1",
+		HopID: fmt.Sprintf("%s_ndt-plh7v_2001:550:1b01:1::1", cycleStartDate),
 		Addr:  "2001:550:1b01:1::1",
 		Name:  "",
 		QTTL:  1,
@@ -224,7 +227,7 @@ func expectedScamper1Row() schema.Scamper1Row {
 		Links: bqScamperLinkArray1,
 	}
 	bqScamperNode2 := schema.BQScamperNode{
-		HopID: "20190825_ndt-plh7v_2001:4888:3f:6092:3a2:26:0:1",
+		HopID: fmt.Sprintf("%s_ndt-plh7v_2001:4888:3f:6092:3a2:26:0:1", cycleStartDate),
 		Addr:  "2001:4888:3f:6092:3a2:26:0:1",
 		Name:  "",
 		QTTL:  1,
@@ -271,7 +274,7 @@ func expectedScamper1Row() schema.Scamper1Row {
 			ListName:  "/tmp/scamperctrl:51803",
 			ID:        1,
 			Hostname:  "ndt-plh7v",
-			StartTime: 1566691268,
+			StartTime: cycleStartTime,
 		},
 		Tracelb: bqTracelbLine,
 		CycleStop: parserTRC.CyclestopLine{

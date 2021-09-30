@@ -16,7 +16,7 @@ import (
 )
 
 //=====================================================================================
-//                       Scamper1 Parser
+//                       scamper1 Parser
 //=====================================================================================
 
 const (
@@ -42,6 +42,13 @@ func NewScamper1Parser(sink row.Sink, table, suffix string, ann v2as.Annotator) 
 		table:  table,
 		suffix: suffix,
 	}
+}
+
+// GetTraceStartDate extracts the date portion of the cycle-start timestamp in YYYYMMDD format.
+func GetTraceStartDate(cycleStartTime float64) string {
+	traceStartTime := time.Unix(int64(cycleStartTime), 0).UTC()
+	date := traceStartTime.Format("20060102")
+	return date
 }
 
 // parseTracelb parses the TracelbLine struct defined in traceroute-caller and populates the BQTracelbLine.
@@ -70,8 +77,7 @@ func parseTracelb(bqScamperOutput *schema.BQScamperOutput, tracelb parser.Tracel
 
 	nodes := tracelb.Nodes
 	bqScamperOutput.Tracelb.Nodes = make([]schema.BQScamperNode, 0, len(nodes))
-	traceStartTime := time.Unix(int64(bqScamperOutput.CycleStart.StartTime), 0)
-	date := traceStartTime.Format("20060102")
+	date := GetTraceStartDate(bqScamperOutput.CycleStart.StartTime)
 	hostname := bqScamperOutput.CycleStart.Hostname
 
 	for _, node := range nodes {
@@ -103,14 +109,14 @@ func (p *Scamper1Parser) IsParsable(testName string, data []byte) (string, bool)
 	return "", false
 }
 
-// ParseAndInsert decodes the Scamper1 data and inserts it into BQ.
+// ParseAndInsert decodes the scamper1 data and inserts it into BQ.
 func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Dec()
 
 	scamperOutput, err := parser.ParseTraceroute(rawContent)
 	if err != nil {
-		return fmt.Errorf("corrupted scamper1 file: %s", err)
+		return fmt.Errorf("failed to parse scamper1 file: %v", err)
 	}
 
 	bqScamperOutput := schema.BQScamperOutput{
@@ -147,16 +153,21 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 }
 
 // NB: These functions are also required to complete the etl.Parser interface
-// For Scamper1, we just forward the calls to the Inserter.
+// For scamper1, we just forward the calls to the Inserter.
 
+// Flush flushes any pending rows.
 func (p *Scamper1Parser) Flush() error {
 	return p.Base.Flush()
 }
 
+// TableName of the table that this Parser inserts into.
+// Used for metrics and logging.
 func (p *Scamper1Parser) TableName() string {
 	return p.table
 }
 
+// FullTableName of the BQ table that the uploader pushes to,
+// including $YYYYMMNN, or _YYYYMMNN.
 func (p *Scamper1Parser) FullTableName() string {
 	return p.table + p.suffix
 }
