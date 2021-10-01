@@ -8,7 +8,6 @@ require (
 	cloud.google.com/go/storage v1.14.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/fsouza/fake-gcs-server v1.23.1
-	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-test/deep v1.0.7
 	github.com/google/go-jsonnet v0.17.0
 	github.com/googleapis/google-cloud-go-testing v0.0.0-20200911160855-bcd43fbb19e8
