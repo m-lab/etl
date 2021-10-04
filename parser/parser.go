@@ -1,5 +1,5 @@
 // Package parser defines the Parser interface and implementations for the different
-// test types, NDT, Paris Traceroute, and SideStream.
+// data types.
 package parser
 
 import (
@@ -94,6 +94,8 @@ func NewSinkParser(dt etl.DataType, sink row.Sink, table string, ann api.Annotat
 		return NewTCPInfoParser(sink, table, "", ann)
 	case etl.PCAP:
 		return NewPCAPParser(sink, table, "", ann)
+	case etl.SCAMPER1:
+		return NewScamper1Parser(sink, table, "", ann)
 	default:
 		return nil
 	}
