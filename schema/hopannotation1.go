@@ -1,29 +1,19 @@
 package schema
 
 import (
-	"time"
-
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
-	"github.com/m-lab/uuid-annotator/annotator"
+	"github.com/m-lab/traceroute-caller/hopannotation"
 )
-
-// Schema stub for HopAnnotation1.
-// TODO(cristinaleon): Remove this definition when traceroute-caller is available.
-type HopAnnotation1 struct {
-	ID          string
-	Timestamp   time.Time
-	Annotations *annotator.ClientAnnotations
-}
 
 // HopAnnotation1Row describes a single BQ row of HopAnnotation1 data.
 type HopAnnotation1Row struct {
-	ID     string          `bigquery:"id"`
-	Parser ParseInfo       `bigquery:"parser"`
-	Date   civil.Date      `bigquery:"date"`
-	Raw    *HopAnnotation1 `json:",omitempty" bigquery:"raw"`
+	ID     string                        `bigquery:"id"`
+	Parser ParseInfo                     `bigquery:"parser"`
+	Date   civil.Date                    `bigquery:"date"`
+	Raw    *hopannotation.HopAnnotation1 `json:",omitempty" bigquery:"raw"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
 	row.NullAnnotator `bigquery:"-"`
