@@ -13,6 +13,7 @@ import (
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/rtx"
+	"github.com/m-lab/traceroute-caller/hopannotation"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
@@ -82,7 +83,7 @@ func TestHopAnnotation1Parser_ParseAndInsert(t *testing.T) {
 		Network: &expectedNetwork,
 	}
 
-	expectedRaw := schema.HopAnnotation1{
+	expectedRaw := hopannotation.HopAnnotation1{
 		ID:          "20210818_1e0b318cf3c2_91.189.88.152",
 		Timestamp:   time.Date(2021, 8, 18, 17, 44, 32, 0, time.UTC),
 		Annotations: &expectedAnnotations,

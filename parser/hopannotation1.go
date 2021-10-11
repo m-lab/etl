@@ -12,6 +12,7 @@ import (
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/traceroute-caller/hopannotation"
 )
 
 //=====================================================================================
@@ -62,7 +63,7 @@ func (p *HopAnnotation1Parser) ParseAndInsert(fileMetadata map[string]bigquery.V
 		},
 	}
 
-	raw := schema.HopAnnotation1{}
+	raw := hopannotation.HopAnnotation1{}
 	err := json.Unmarshal(rawContent, &raw)
 	if err != nil {
 		metrics.TestCount.WithLabelValues(p.TableName(), "hopannotation1", "decode-location-error").Inc()
