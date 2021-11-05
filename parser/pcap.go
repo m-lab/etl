@@ -7,6 +7,9 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcapgo"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -56,6 +59,38 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Dec()
 
+	pcap, err := pcapgo.NewReader(strings.NewReader(string(rawContent)))
+	if err != nil {
+		return err
+	}
+
+	var count int64 = 0
+	var sacks int64 = 0
+	optionCounts := make([]int64, 16)
+	optionNames := make([]string, 16)
+	for i := 0; i < 16; i++ {
+		optionNames[i] = layers.TCPOptionKind(i).String()
+	}
+
+	data, _, err := pcap.ReadPacketData()
+	for err == nil {
+		// Decode a packet
+		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
+		// Get the TCP layer from this packet
+		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+			//var sack string
+			tcp, _ := tcpLayer.(*layers.TCP)
+			for i := 0; i < len(tcp.Options); i++ {
+				optionCounts[i]++
+				if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
+					sacks += int64(len(tcp.Options[i].OptionData) / 8)
+				}
+			}
+		}
+		count++
+		data, _, err = pcap.ReadPacketData()
+	}
+
 	row := schema.PCAPRow{
 		Parser: schema.ParseInfo{
 			Version:    Version(),
@@ -64,6 +99,15 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			Filename:   testName,
 			GitCommit:  GitCommit(),
 		},
+		Alpha: schema.AlphaFields{
+			OptionCounts: optionCounts,
+			Packets:      count,
+			Sacks:        sacks,
+		},
+	}
+
+	if err := p.Put(&row); err != nil {
+		return err
 	}
 
 	// NOTE: Civil is not TZ adjusted. It takes the year, month, and date from
@@ -73,11 +117,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	row.Date = fileMetadata["date"].(civil.Date)
 	row.ID = p.GetUUID(testName)
 
-	// Insert the row.
-	if err := p.Put(&row); err != nil {
-		return err
-	}
-
+	//	log.Println(count, "packets", sacks, "sacks", optionCounts, optionNames)
 	// Count successful inserts.
 	metrics.TestCount.WithLabelValues(p.TableName(), "pcap", "ok").Inc()
 
