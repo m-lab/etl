@@ -31,7 +31,7 @@ func NewLocalWriter(dir string, path string) (row.Sink, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
