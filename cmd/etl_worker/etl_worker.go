@@ -1,4 +1,6 @@
-// Sample
+// For local execution, may need to run
+// gcloud auth application-default login
+
 package main
 
 import (
@@ -187,6 +189,7 @@ func handleLocalRequest(rw http.ResponseWriter, req *http.Request) {
 	ctx := context.Background()
 	obj, err := c.Bucket(dp.Bucket).Object(dp.Path).Attrs(ctx)
 	if err != nil {
+		log.Println(err)
 		rw.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(rw, "failed to get object attrs for %s / %s", dp.Bucket, dp.Path)
 		return
