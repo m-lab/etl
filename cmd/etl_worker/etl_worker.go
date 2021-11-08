@@ -1,4 +1,3 @@
-// Sample
 package main
 
 import (
@@ -187,6 +186,7 @@ func handleLocalRequest(rw http.ResponseWriter, req *http.Request) {
 	ctx := context.Background()
 	obj, err := c.Bucket(dp.Bucket).Object(dp.Path).Attrs(ctx)
 	if err != nil {
+		log.Println(err)
 		rw.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(rw, "failed to get object attrs for %s / %s", dp.Bucket, dp.Path)
 		return
@@ -407,6 +407,9 @@ func main() {
 
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from env")
+	if outputType.Value == "local" {
+		log.Println("To resolve oauth problems, run 'gcloud auth application-default login'")
+	}
 
 	go site.MustReload(mainCtx)
 

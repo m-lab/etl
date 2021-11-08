@@ -14,6 +14,7 @@ pipeline. The ETL worker is responsible for parsing data archives produced by
 
 ```sh
 go get ./cmd/etl_worker
+gcloud auth application-default login
 ~/bin/etl_worker -service_port :8080 -output_dir ./output -output local
 ```
 
