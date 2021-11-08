@@ -62,13 +62,23 @@ type wrappingCounter struct {
 	value       uint64
 }
 
-func (w *wrappingCounter) Update(clock uint32) {
+// Returns true if seq is earlier than the max observed seq.
+func (w *wrappingCounter) Update(clock uint32) bool {
 	if !w.initialized {
 		w.clock = clock
 		w.initialized = true
 	}
-	w.value = (w.value + uint64(clock-w.clock)) % uint64(1<<32)
-	w.clock = clock
+	delta := int64(clock) - int64(w.clock)
+	if delta < 0 {
+		delta += 1 << 32
+	}
+	if delta > 1<<31 {
+		return true
+	} else {
+		w.value = (w.value + uint64(clock-w.clock)) % uint64(1<<32)
+		w.clock = clock
+	}
+	return false
 }
 
 func (w *wrappingCounter) Value() uint64 {
@@ -78,20 +88,29 @@ func (w *wrappingCounter) Value() uint64 {
 // state keep track of the TCP state of one side of a connection.
 // TODO - add histograms for Ack inter-arrival time.
 type state struct {
-	Port           layers.TCPPort // When this port is SrcPort, we update this stat struct.
-	Sent           uint64         // Number of bytes sent in tcp payloads.
-	Seq            wrappingCounter
-	Ack            wrappingCounter
-	LastPacketTime uint64
-	Window         uint16
+	maxSeq uint32
+
+	Port               layers.TCPPort // When this port is SrcPort, we update this stat struct.
+	Sent               uint64         // Number of bytes sent in tcp payloads.
+	Seq                wrappingCounter
+	Ack                wrappingCounter
+	LastPacketTimeUsec uint64
+	Window             uint16
+	Retransmits        uint64
+	ECECount           uint64
 }
 
 func (s *state) Update(tcp *layers.TCP, ci gopacket.CaptureInfo) {
 	if tcp.SrcPort == s.Port {
 		s.Sent += uint64(ci.Length - int(tcp.DataOffset*4))
-		s.Seq.Update(tcp.Seq)
-		s.LastPacketTime = uint64(ci.Timestamp.Nanosecond())
+		if s.Seq.Update(tcp.Seq) {
+			s.Retransmits++
+		}
+		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
 		s.Window = tcp.Window
+		if tcp.ECE {
+			s.ECECount++
+		}
 	} else {
 		if tcp.ACK {
 			s.Ack.Update(tcp.Ack)
@@ -100,7 +119,7 @@ func (s *state) Update(tcp *layers.TCP, ci gopacket.CaptureInfo) {
 }
 
 func (s state) String() string {
-	return fmt.Sprintf("[%5d %12d/%10d/%10d %9d %5d]", s.Port, s.Sent, s.Seq.Value(), s.Ack.Value(), s.LastPacketTime, s.Window)
+	return fmt.Sprintf("[%5d %12d/%10d/%10d %8d %5d {%4d} (%4d)]", s.Port, s.Sent, s.Seq.Value(), s.Ack.Value(), s.LastPacketTimeUsec%10000000, s.Window, s.Retransmits, s.ECECount)
 }
 
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
@@ -134,15 +153,22 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	for err == nil {
 		// Decode a packet
 		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
+		if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+			//ip, _ := ipLayer.(*layers.IPv4)
+
+		} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
+			//ip, _ := ipLayer.(*layers.IPv6)
+
+		}
 		// Get the TCP layer from this packet
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-			//var sack string
 			tcp, _ := tcpLayer.(*layers.TCP)
-			if !(tcp.SrcPort == 443 || tcp.DstPort == 443) {
-				//break // only process ndt7 tests
-			}
+			// Special case handling for first two packets.
 			switch count {
 			case 0:
+				if tcp.SrcPort == 443 || tcp.DstPort == 443 {
+					log.Println(p.GetUUID(testName))
+				}
 				first.Port = tcp.SrcPort
 				second.Port = tcp.DstPort
 			case 1:
@@ -151,6 +177,8 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 				}
 			default:
 			}
+
+			// Update both state structs.
 			first.Update(tcp, ci)
 			second.Update(tcp, ci)
 
@@ -163,14 +191,16 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 					syn = count
 				}
 			}
+
+			// Handle options
 			for i := 0; i < len(tcp.Options); i++ {
 				optionCounts[i]++
 				if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
 					sacks += int64(len(tcp.Options[i].OptionData) / 8)
 				}
 			}
-			if count < 100 {
-				//	log.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
+			if count < 100 && (tcp.SrcPort == 443 || tcp.DstPort == 443) {
+				//log.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
 			}
 		}
 		count++
@@ -193,6 +223,10 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			SynAckPacket:       synAck,
 			SynAckTime:         synAckTime,
 			OptionCounts:       optionCounts,
+			FirstECECount:      first.ECECount,
+			SecondECECount:     second.ECECount,
+			FirstRetransmits:   first.Retransmits,
+			SecondRetransmits:  second.Retransmits,
 			Packets:            count,
 			Sacks:              sacks,
 			TotalSrcSeq:        int64(first.Seq.Value()),
@@ -200,6 +234,9 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 		},
 	}
 
+	if row.Alpha.FirstECECount > 0 || row.Alpha.SecondECECount > 0 || row.Alpha.FirstRetransmits > 0 || row.Alpha.SecondRetransmits > 0 {
+		log.Println(row.Alpha)
+	}
 	if synAckTime.Sub(synTime) > 100*time.Microsecond {
 		log.Println("long synAck interval", synAckTime.Sub(synTime))
 	}
