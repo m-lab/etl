@@ -123,8 +123,8 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 
 	data, ci, err := pcap.ReadPacketData()
 
-	var syn int64 = -1
-	var synAck int64 = -1
+	var syn int64 = 0
+	var synAck int64 = 0
 	var synTime time.Time
 	var synAckTime time.Time
 
@@ -139,7 +139,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			//var sack string
 			tcp, _ := tcpLayer.(*layers.TCP)
 			if !(tcp.SrcPort == 443 || tcp.DstPort == 443) {
-				break // only process ndt7 tests
+				//break // only process ndt7 tests
 			}
 			switch count {
 			case 0:
@@ -170,7 +170,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 				}
 			}
 			if count < 100 {
-				log.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
+				//	log.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
 			}
 		}
 		count++
