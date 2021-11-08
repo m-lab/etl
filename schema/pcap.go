@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"time"
+
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	"github.com/google/gopacket/layers"
@@ -15,9 +17,16 @@ type Packet struct {
 }
 
 type AlphaFields struct {
-	Packets      int64   `bigquery:"packets" json:"packets"`
-	OptionCounts []int64 `bigquery:"option_counts" json:"option_counts"`
-	Sacks        int64   `bigquery:"sacks" json:"sacks"`
+	SynAckIntervalNsec int64     `bigquery:"syn_ack_interval_nsec"`
+	SynPacket          int64     `bigquery:"syn_packet" json:"syn_packet"`
+	SynTime            time.Time `bigquery:"syn_time" json:"syn_time"`
+	SynAckPacket       int64     `bigquery:"syn_ack_packet" json:"syn_ack_packet"`
+	SynAckTime         time.Time `bigquery:"syn_ack_time" json:"syn_ack_time"`
+	Packets            int64     `bigquery:"packets" json:"packets"`
+	OptionCounts       []int64   `bigquery:"option_counts" json:"option_counts"`
+	Sacks              int64     `bigquery:"sacks" json:"sacks"`
+	TotalSrcSeq        int64     `bigquery:"total_src_seq" json:"total_src_seq"`
+	TotalDstSeq        int64     `bigquery:"total_dst_seq" json:"total_dst_seq"`
 }
 
 // PCAPRow describes a single BQ row of pcap (packet capture) data.

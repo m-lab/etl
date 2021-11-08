@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"log"
 	"path/filepath"
 	"strings"
 	"time"
@@ -54,6 +55,16 @@ func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
 	return "", false
 }
 
+type state struct {
+	init           bool
+	lastPacketTime time.Time
+	Port           layers.TCPPort // When this port is SrcPort, we update this stat struct.
+	LastSeq        uint32
+	LastAck        uint32 // From the other direction.
+	TotalSeq       uint64
+	TotalAck       uint64
+}
+
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
 func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
@@ -72,7 +83,17 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 		optionNames[i] = layers.TCPOptionKind(i).String()
 	}
 
-	data, _, err := pcap.ReadPacketData()
+	data, ci, err := pcap.ReadPacketData()
+	//startTime := ci.Timestamp
+
+	var syn int64 = -1
+	var synAck int64 = -1
+	var synTime time.Time
+	var synAckTime time.Time
+
+	var first state
+	var second state
+
 	for err == nil {
 		// Decode a packet
 		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
@@ -80,15 +101,66 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			//var sack string
 			tcp, _ := tcpLayer.(*layers.TCP)
+
+			if !first.init {
+				first.init = true
+				first.Port = tcp.SrcPort
+				first.LastSeq = tcp.Seq
+				second.Port = tcp.DstPort
+			} else if !second.init {
+				second.init = true
+				if second.Port != tcp.SrcPort {
+					log.Fatal("oops", second, first, tcp.DstPort)
+				}
+				second.LastSeq = tcp.Seq
+				if tcp.ACK {
+					first.LastAck = tcp.Ack
+				}
+			}
+
+			if tcp.SrcPort == first.Port {
+				first.TotalSeq += uint64(tcp.Seq - first.LastSeq)
+				if tcp.Seq < first.LastSeq {
+					first.TotalSeq += 1 << 32
+				}
+				first.LastSeq = tcp.Seq
+				if tcp.ACK {
+					second.LastAck = tcp.Ack
+				}
+				first.lastPacketTime = ci.Timestamp
+			} else if tcp.SrcPort == second.Port {
+				second.TotalSeq += uint64(tcp.Seq - second.LastSeq)
+				if tcp.Seq < second.LastSeq {
+					second.TotalSeq += 1 << 32
+				}
+				second.LastSeq = tcp.Seq
+				if tcp.ACK {
+					first.LastAck = tcp.Ack
+				}
+				second.lastPacketTime = ci.Timestamp
+			}
+
+			if tcp.SYN {
+				if tcp.ACK {
+					synAckTime = ci.Timestamp
+					synAck = count
+				} else {
+					synTime = ci.Timestamp
+					syn = count
+				}
+			}
 			for i := 0; i < len(tcp.Options); i++ {
 				optionCounts[i]++
 				if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
 					sacks += int64(len(tcp.Options[i].OptionData) / 8)
 				}
 			}
+			if count < 20 {
+				log.Printf("%2d, %010d, %010d, %v, %v", count, tcp.Seq, tcp.Ack, first, second)
+			}
 		}
 		count++
-		data, _, err = pcap.ReadPacketData()
+		data, ci, err = pcap.ReadPacketData()
 	}
 
 	row := schema.PCAPRow{
@@ -99,11 +171,23 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			Filename:   testName,
 			GitCommit:  GitCommit(),
 		},
+
 		Alpha: schema.AlphaFields{
-			OptionCounts: optionCounts,
-			Packets:      count,
-			Sacks:        sacks,
+			SynAckIntervalNsec: synAckTime.Sub(synTime).Nanoseconds(),
+			SynPacket:          syn,
+			SynTime:            synTime,
+			SynAckPacket:       synAck,
+			SynAckTime:         synAckTime,
+			OptionCounts:       optionCounts,
+			Packets:            count,
+			Sacks:              sacks,
+			TotalSrcSeq:        int64(first.TotalSeq),
+			TotalDstSeq:        int64(second.TotalSeq),
 		},
+	}
+
+	if synAckTime.Sub(synTime) > 100*time.Microsecond {
+		log.Println("long synAck interval", synAckTime.Sub(synTime))
 	}
 
 	if err := p.Put(&row); err != nil {
