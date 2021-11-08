@@ -5,16 +5,9 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	"github.com/google/gopacket/layers"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
 )
-
-type Packet struct {
-	Seq     uint32
-	Ack     uint32
-	Options []layers.TCPOption
-}
 
 type AlphaFields struct {
 	SynAckIntervalNsec int64     `bigquery:"syn_ack_interval_nsec"`

@@ -55,14 +55,32 @@ func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
 	return "", false
 }
 
+type wrappingCounter struct {
+	initialized bool
+	clock       uint32
+	value       uint64
+}
+
+func (w *wrappingCounter) Update(clock uint32) {
+	if !w.initialized {
+		w.clock = clock
+		w.initialized = true
+	}
+	w.value = (w.value + uint64(clock-w.clock)) % uint64(1<<32)
+	w.clock = clock
+}
+
+func (w *wrappingCounter) Value() uint64 {
+	return w.value
+}
+
 type state struct {
-	init           bool
-	lastPacketTime time.Time
+	LastPacketTime uint64
 	Port           layers.TCPPort // When this port is SrcPort, we update this stat struct.
-	LastSeq        uint32
-	LastAck        uint32 // From the other direction.
-	TotalSeq       uint64
-	TotalAck       uint64
+	Sent           uint64         // Number of bytes sent in tcp payloads.
+	Seq            wrappingCounter
+	Ack            wrappingCounter
+	Window         uint16
 }
 
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
@@ -84,7 +102,6 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	}
 
 	data, ci, err := pcap.ReadPacketData()
-	//startTime := ci.Timestamp
 
 	var syn int64 = -1
 	var synAck int64 = -1
@@ -101,43 +118,35 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			//var sack string
 			tcp, _ := tcpLayer.(*layers.TCP)
-
-			if !first.init {
-				first.init = true
-				first.Port = tcp.SrcPort
-				first.LastSeq = tcp.Seq
-				second.Port = tcp.DstPort
-			} else if !second.init {
-				second.init = true
-				if second.Port != tcp.SrcPort {
-					log.Fatal("oops", second, first, tcp.DstPort)
-				}
-				second.LastSeq = tcp.Seq
-				if tcp.ACK {
-					first.LastAck = tcp.Ack
-				}
+			if !(tcp.SrcPort == 443 || tcp.DstPort == 443) {
+				break // only process ndt7 tests
 			}
-
+			switch count {
+			case 0:
+				first.Port = tcp.SrcPort
+				second.Port = tcp.DstPort
+			case 1:
+				if second.Port != tcp.SrcPort || !tcp.ACK {
+					log.Fatal("oops", second, first, tcp.DstPort, tcp.ACK)
+				}
+			default:
+			}
 			if tcp.SrcPort == first.Port {
-				first.TotalSeq += uint64(tcp.Seq - first.LastSeq)
-				if tcp.Seq < first.LastSeq {
-					first.TotalSeq += 1 << 32
-				}
-				first.LastSeq = tcp.Seq
+				first.Sent += uint64(ci.Length - int(tcp.DataOffset*4))
+				first.Seq.Update(tcp.Seq)
 				if tcp.ACK {
-					second.LastAck = tcp.Ack
+					second.Ack.Update(tcp.Ack)
 				}
-				first.lastPacketTime = ci.Timestamp
+				first.LastPacketTime = uint64(ci.Timestamp.Nanosecond())
+				first.Window = tcp.Window
 			} else if tcp.SrcPort == second.Port {
-				second.TotalSeq += uint64(tcp.Seq - second.LastSeq)
-				if tcp.Seq < second.LastSeq {
-					second.TotalSeq += 1 << 32
-				}
-				second.LastSeq = tcp.Seq
+				second.Sent += uint64(ci.Length - int(tcp.DataOffset*4))
+				second.Seq.Update(tcp.Seq)
 				if tcp.ACK {
-					first.LastAck = tcp.Ack
+					first.Ack.Update(tcp.Ack)
 				}
-				second.lastPacketTime = ci.Timestamp
+				second.LastPacketTime = uint64(ci.Timestamp.Nanosecond())
+				second.Window = tcp.Window
 			}
 
 			if tcp.SYN {
@@ -155,7 +164,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 					sacks += int64(len(tcp.Options[i].OptionData) / 8)
 				}
 			}
-			if count < 20 {
+			if count < 100 {
 				log.Printf("%2d, %010d, %010d, %v, %v", count, tcp.Seq, tcp.Ack, first, second)
 			}
 		}
@@ -181,8 +190,8 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			OptionCounts:       optionCounts,
 			Packets:            count,
 			Sacks:              sacks,
-			TotalSrcSeq:        int64(first.TotalSeq),
-			TotalDstSeq:        int64(second.TotalSeq),
+			TotalSrcSeq:        int64(first.Seq.Value()),
+			TotalDstSeq:        int64(second.Seq.Value()),
 		},
 	}
 
