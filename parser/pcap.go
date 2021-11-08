@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"log"
 	"path/filepath"
 	"strings"
@@ -74,13 +75,32 @@ func (w *wrappingCounter) Value() uint64 {
 	return w.value
 }
 
+// state keep track of the TCP state of one side of a connection.
+// TODO - add histograms for Ack inter-arrival time.
 type state struct {
-	LastPacketTime uint64
 	Port           layers.TCPPort // When this port is SrcPort, we update this stat struct.
 	Sent           uint64         // Number of bytes sent in tcp payloads.
 	Seq            wrappingCounter
 	Ack            wrappingCounter
+	LastPacketTime uint64
 	Window         uint16
+}
+
+func (s *state) Update(tcp *layers.TCP, ci gopacket.CaptureInfo) {
+	if tcp.SrcPort == s.Port {
+		s.Sent += uint64(ci.Length - int(tcp.DataOffset*4))
+		s.Seq.Update(tcp.Seq)
+		s.LastPacketTime = uint64(ci.Timestamp.Nanosecond())
+		s.Window = tcp.Window
+	} else {
+		if tcp.ACK {
+			s.Ack.Update(tcp.Ack)
+		}
+	}
+}
+
+func (s state) String() string {
+	return fmt.Sprintf("[%5d %12d/%10d/%10d %9d %5d]", s.Port, s.Sent, s.Seq.Value(), s.Ack.Value(), s.LastPacketTime, s.Window)
 }
 
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
@@ -131,23 +151,8 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 				}
 			default:
 			}
-			if tcp.SrcPort == first.Port {
-				first.Sent += uint64(ci.Length - int(tcp.DataOffset*4))
-				first.Seq.Update(tcp.Seq)
-				if tcp.ACK {
-					second.Ack.Update(tcp.Ack)
-				}
-				first.LastPacketTime = uint64(ci.Timestamp.Nanosecond())
-				first.Window = tcp.Window
-			} else if tcp.SrcPort == second.Port {
-				second.Sent += uint64(ci.Length - int(tcp.DataOffset*4))
-				second.Seq.Update(tcp.Seq)
-				if tcp.ACK {
-					first.Ack.Update(tcp.Ack)
-				}
-				second.LastPacketTime = uint64(ci.Timestamp.Nanosecond())
-				second.Window = tcp.Window
-			}
+			first.Update(tcp, ci)
+			second.Update(tcp, ci)
 
 			if tcp.SYN {
 				if tcp.ACK {
@@ -165,7 +170,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 				}
 			}
 			if count < 100 {
-				log.Printf("%2d, %010d, %010d, %v, %v", count, tcp.Seq, tcp.Ack, first, second)
+				log.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
 			}
 		}
 		count++
