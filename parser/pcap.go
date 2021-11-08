@@ -62,20 +62,29 @@ type wrappingCounter struct {
 	value       uint64
 }
 
+func (w *wrappingCounter) delta(clock uint32) int64 {
+	delta := int64(clock) - int64(w.clock)
+	if delta < -1<<31 {
+		delta += 1 << 30
+	}
+	if delta > 1<<30 || delta < -1<<30 {
+		log.Fatal("invalid counter delta")
+	}
+	return delta
+}
+
 // Returns true if seq is earlier than the max observed seq.
 func (w *wrappingCounter) Update(clock uint32) bool {
 	if !w.initialized {
 		w.clock = clock
 		w.initialized = true
 	}
-	delta := int64(clock) - int64(w.clock)
+	delta := w.delta(clock)
 	if delta < 0 {
-		delta += 1 << 32
-	}
-	if delta > 1<<31 {
+		log.Printf("Retransmit?: %d < %d, (%d)", clock, w.clock, w.value)
 		return true
 	} else {
-		w.value = (w.value + uint64(clock-w.clock)) % uint64(1<<32)
+		w.value += uint64(delta)
 		w.clock = clock
 	}
 	return false
@@ -235,7 +244,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	}
 
 	if row.Alpha.FirstECECount > 0 || row.Alpha.SecondECECount > 0 || row.Alpha.FirstRetransmits > 0 || row.Alpha.SecondRetransmits > 0 {
-		log.Println(row.Alpha)
+		log.Println(first, second) //, row.Alpha)
 	}
 	if synAckTime.Sub(synTime) > 100*time.Microsecond {
 		log.Println("long synAck interval", synAckTime.Sub(synTime))
