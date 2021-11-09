@@ -10,20 +10,22 @@ import (
 )
 
 type AlphaFields struct {
-	SynAckIntervalNsec int64     `bigquery:"syn_ack_interval_nsec"`
-	SynPacket          int64     `bigquery:"syn_packet" json:"syn_packet"`
-	SynTime            time.Time `bigquery:"syn_time" json:"syn_time"`
-	SynAckPacket       int64     `bigquery:"syn_ack_packet" json:"syn_ack_packet"`
-	SynAckTime         time.Time `bigquery:"syn_ack_time" json:"syn_ack_time"`
-	Packets            int64     `bigquery:"packets" json:"packets"`
-	OptionCounts       []int64   `bigquery:"option_counts" json:"option_counts"`
-	FirstECECount      uint64    `bigquery:"first_ece_count" json:"first_ece_count"`
-	SecondECECount     uint64    `bigquery:"second_ece_count" json:"second_ece_count"`
-	FirstRetransmits   uint64    `bigquery:"first_retransmits" json:"first_retransmits"`
-	SecondRetransmits  uint64    `bigquery:"second_retransmits" json:"second_retransmits"`
-	Sacks              int64     `bigquery:"sacks" json:"sacks"`
-	TotalSrcSeq        int64     `bigquery:"total_src_seq" json:"total_src_seq"`
-	TotalDstSeq        int64     `bigquery:"total_dst_seq" json:"total_dst_seq"`
+	TruncatedPackets  int64     `bigquery:"truncated_packets"`
+	SynPacket         int64     `bigquery:"syn_packet" json:"syn_packet"`
+	SynTime           time.Time `bigquery:"syn_time" json:"syn_time"`
+	SynAckPacket      int64     `bigquery:"syn_ack_packet" json:"syn_ack_packet"`
+	SynAckTime        time.Time `bigquery:"syn_ack_time" json:"syn_ack_time"`
+	Packets           int64     `bigquery:"packets" json:"packets"`
+	OptionCounts      []int64   `bigquery:"option_counts" json:"option_counts"`
+	FirstECECount     uint64    `bigquery:"first_ece_count" json:"first_ece_count"`
+	SecondECECount    uint64    `bigquery:"second_ece_count" json:"second_ece_count"`
+	FirstRetransmits  uint64    `bigquery:"first_retransmits" json:"first_retransmits"`
+	SecondRetransmits uint64    `bigquery:"second_retransmits" json:"second_retransmits"`
+	Sacks             int64     `bigquery:"sacks" json:"sacks"`
+	TotalSrcSeq       int64     `bigquery:"total_src_seq" json:"total_src_seq"`
+	TotalDstSeq       int64     `bigquery:"total_dst_seq" json:"total_dst_seq"`
+	TTLChanges        int64     `bigquery:"ttl_changes" json:"ttl_changes"`
+	IPChanges         int64     `bigquery:"ip_changes" json:"ip_changes"`
 }
 
 // PCAPRow describes a single BQ row of pcap (packet capture) data.

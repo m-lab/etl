@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"log"
+	"net"
 	"path/filepath"
 	"strings"
 	"time"
@@ -81,7 +82,7 @@ func (w *wrappingCounter) Update(clock uint32) bool {
 	}
 	delta := w.delta(clock)
 	if delta < 0 {
-		log.Printf("Retransmit?: %d < %d, (%d)", clock, w.clock, w.value)
+		//log.Printf("Retransmit?: %d < %d, (%d)", clock, w.clock, w.value)
 		return true
 	} else {
 		w.value += uint64(delta)
@@ -99,21 +100,28 @@ func (w *wrappingCounter) Value() uint64 {
 type state struct {
 	maxSeq uint32
 
-	Port               layers.TCPPort // When this port is SrcPort, we update this stat struct.
-	Sent               uint64         // Number of bytes sent in tcp payloads.
-	Seq                wrappingCounter
+	SrcIP net.IP
+	TTL   uint8
+
+	SrcPort            layers.TCPPort  // When this port is SrcPort, we update this stat struct.
+	Sent               uint64          // Number of bytes sent in tcp payloads.
+	Seq                wrappingCounter // This should match the previous value of Sent.
 	Ack                wrappingCounter
+	Sacks              uint64
 	LastPacketTimeUsec uint64
 	Window             uint16
 	Retransmits        uint64
 	ECECount           uint64
+	TTLChanges         uint64 // Observed number of TTL values that don't match first IP header.
 }
 
-func (s *state) Update(tcp *layers.TCP, ci gopacket.CaptureInfo) {
-	if tcp.SrcPort == s.Port {
-		s.Sent += uint64(ci.Length - int(tcp.DataOffset*4))
+func (s *state) Update(tcp *layers.TCP, ci gopacket.CaptureInfo, sacks int) {
+	if tcp.SrcPort == s.SrcPort {
 		if s.Seq.Update(tcp.Seq) {
 			s.Retransmits++
+		} else {
+			// If this is NOT a retransmit, update the Sent value.
+			s.Sent += uint64(ci.Length - int(tcp.DataOffset*4))
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
 		s.Window = tcp.Window
@@ -124,11 +132,12 @@ func (s *state) Update(tcp *layers.TCP, ci gopacket.CaptureInfo) {
 		if tcp.ACK {
 			s.Ack.Update(tcp.Ack)
 		}
+		s.Sacks += uint64(sacks)
 	}
 }
 
 func (s state) String() string {
-	return fmt.Sprintf("[%5d %12d/%10d/%10d %8d %5d {%4d} (%4d)]", s.Port, s.Sent, s.Seq.Value(), s.Ack.Value(), s.LastPacketTimeUsec%10000000, s.Window, s.Retransmits, s.ECECount)
+	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.Sent, s.Seq.Value(), s.Ack.Value(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.Retransmits, s.ECECount)
 }
 
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
@@ -141,9 +150,11 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 		return err
 	}
 
-	var count int64 = 0
-	var sacks int64 = 0
-	optionCounts := make([]int64, 16)
+	// This is used to keep track of some of the TCP state.
+	alpha := schema.AlphaFields{
+		OptionCounts: make([]int64, 16),
+	}
+
 	optionNames := make([]string, 16)
 	for i := 0; i < 16; i++ {
 		optionNames[i] = layers.TCPOptionKind(i).String()
@@ -151,70 +162,131 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 
 	data, ci, err := pcap.ReadPacketData()
 
-	var syn int64 = 0
-	var synAck int64 = 0
-	var synTime time.Time
-	var synAckTime time.Time
-
 	var first state
 	var second state
 
 	for err == nil {
 		// Decode a packet
 		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
+		if packet.ErrorLayer() != nil {
+			log.Printf("Error decoding packet: %v", packet.ErrorLayer().Error())
+			continue
+		}
+		if packet.Metadata().Truncated {
+			if alpha.Packets < 20 {
+				log.Printf("Packet %d truncated to %d of %d bytes, from data of length %d",
+					alpha.Packets, packet.Metadata().CaptureInfo.CaptureLength,
+					packet.Metadata().CaptureInfo.Length, len(data))
+			}
+			alpha.TruncatedPackets++
+		}
 		if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-			//ip, _ := ipLayer.(*layers.IPv4)
-
+			ip, _ := ipLayer.(*layers.IPv4)
+			switch alpha.Packets {
+			case 0:
+				first.SrcIP = ip.SrcIP
+				first.TTL = ip.TTL
+			case 1:
+				second.SrcIP = ip.SrcIP
+				second.TTL = ip.TTL
+			default:
+				if first.SrcIP.Equal(ip.SrcIP) {
+					if first.TTL != ip.TTL {
+						alpha.TTLChanges++
+						first.TTLChanges++
+					}
+				} else if second.SrcIP.Equal(ip.SrcIP) {
+					if second.TTL != ip.TTL {
+						alpha.TTLChanges++
+						second.TTLChanges++
+					}
+				} else {
+					alpha.IPChanges++
+				}
+			}
 		} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-			//ip, _ := ipLayer.(*layers.IPv6)
-
+			ip, _ := ipLayer.(*layers.IPv6)
+			switch alpha.Packets {
+			case 0:
+				first.SrcIP = ip.SrcIP
+				first.TTL = ip.HopLimit
+			case 1:
+				second.SrcIP = ip.SrcIP
+				second.TTL = ip.HopLimit
+			default:
+				if first.SrcIP.Equal(ip.SrcIP) {
+					if first.TTL != ip.HopLimit {
+						alpha.TTLChanges++
+						second.TTLChanges++
+					}
+				} else if second.SrcIP.Equal(ip.SrcIP) {
+					if second.TTL != ip.HopLimit {
+						alpha.TTLChanges++
+						second.TTLChanges++
+					}
+				} else {
+					alpha.IPChanges++
+				}
+			}
 		}
 		// Get the TCP layer from this packet
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
+
 			// Special case handling for first two packets.
-			switch count {
+			switch alpha.Packets {
 			case 0:
 				if tcp.SrcPort == 443 || tcp.DstPort == 443 {
 					log.Println(p.GetUUID(testName))
 				}
-				first.Port = tcp.SrcPort
-				second.Port = tcp.DstPort
+				first.SrcPort = tcp.SrcPort
+				second.SrcPort = tcp.DstPort
 			case 1:
-				if second.Port != tcp.SrcPort || !tcp.ACK {
+				if second.SrcPort != tcp.SrcPort || !tcp.ACK {
 					log.Fatal("oops", second, first, tcp.DstPort, tcp.ACK)
 				}
 			default:
 			}
 
+			var sack int
+			// Handle options
+			for i := 0; i < len(tcp.Options); i++ {
+				alpha.OptionCounts[i]++
+				if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
+					// TODO This is overcounting.  We want to count the distinct packets that are skipped in the SACKs.
+					sack = int(len(tcp.Options[i].OptionData) / 8)
+					alpha.Sacks += int64(sack)
+				}
+			}
+
 			// Update both state structs.
-			first.Update(tcp, ci)
-			second.Update(tcp, ci)
+			first.Update(tcp, ci, sack)
+			second.Update(tcp, ci, sack)
 
 			if tcp.SYN {
 				if tcp.ACK {
-					synAckTime = ci.Timestamp
-					synAck = count
+					alpha.SynAckTime = ci.Timestamp
+					alpha.SynAckPacket = alpha.Packets
 				} else {
-					synTime = ci.Timestamp
-					syn = count
+					alpha.SynTime = ci.Timestamp
+					alpha.SynPacket = alpha.Packets
 				}
 			}
 
-			// Handle options
-			for i := 0; i < len(tcp.Options); i++ {
-				optionCounts[i]++
-				if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
-					sacks += int64(len(tcp.Options[i].OptionData) / 8)
-				}
-			}
-			if count < 100 && (tcp.SrcPort == 443 || tcp.DstPort == 443) {
+			if alpha.Packets < 100 && (tcp.SrcPort == 443 || tcp.DstPort == 443) {
 				//log.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
 			}
 		}
-		count++
+		alpha.Packets++
 		data, ci, err = pcap.ReadPacketData()
 	}
+
+	alpha.FirstECECount = first.ECECount
+	alpha.SecondECECount = second.ECECount
+	alpha.FirstRetransmits = first.Retransmits
+	alpha.SecondRetransmits = second.Retransmits
+	alpha.TotalSrcSeq = int64(first.Seq.Value())
+	alpha.TotalDstSeq = int64(second.Seq.Value())
 
 	row := schema.PCAPRow{
 		Parser: schema.ParseInfo{
@@ -225,31 +297,12 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			GitCommit:  GitCommit(),
 		},
 
-		Alpha: schema.AlphaFields{
-			SynAckIntervalNsec: synAckTime.Sub(synTime).Nanoseconds(),
-			SynPacket:          syn,
-			SynTime:            synTime,
-			SynAckPacket:       synAck,
-			SynAckTime:         synAckTime,
-			OptionCounts:       optionCounts,
-			FirstECECount:      first.ECECount,
-			SecondECECount:     second.ECECount,
-			FirstRetransmits:   first.Retransmits,
-			SecondRetransmits:  second.Retransmits,
-			Packets:            count,
-			Sacks:              sacks,
-			TotalSrcSeq:        int64(first.Seq.Value()),
-			TotalDstSeq:        int64(second.Seq.Value()),
-		},
+		Alpha: alpha,
 	}
 
 	if row.Alpha.FirstECECount > 0 || row.Alpha.SecondECECount > 0 || row.Alpha.FirstRetransmits > 0 || row.Alpha.SecondRetransmits > 0 {
-		log.Println(first, second) //, row.Alpha)
+		log.Printf("%d/%d truncated, %v <--> %v", alpha.TruncatedPackets, alpha.Packets, first, second) //, row.Alpha)
 	}
-	if synAckTime.Sub(synTime) > 100*time.Microsecond {
-		log.Println("long synAck interval", synAckTime.Sub(synTime))
-	}
-
 	if err := p.Put(&row); err != nil {
 		return err
 	}
