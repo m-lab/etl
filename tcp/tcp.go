@@ -64,7 +64,7 @@ func (w *Tracker) delta(clock uint32) int64 {
 		delta += 1 << 30
 	}
 	if delta > 1<<30 || delta < -1<<30 {
-		log.Fatal("invalid counter delta")
+		fmt.Print("invalid counter delta")
 	}
 	return delta
 }
@@ -116,24 +116,24 @@ func (w *Tracker) Acked() uint64 {
 
 func (w *Tracker) Ack(clock uint32) {
 	if !w.initialized {
-		log.Fatal("Ack called before Seq")
+		fmt.Print("Ack called before Seq")
 	}
 }
 
 // Sack updates the counter with sack information (from other direction)
 func (w *Tracker) Sack(block sackBlock) {
 	if !w.initialized {
-		log.Fatal("Sack called before Seq")
+		fmt.Print("Sack called before Seq")
 	}
 	// Auto gen code
 	if block.Left > block.Right {
-		log.Fatal("Sack block has left > right")
+		fmt.Print("Sack block has left > right")
 	}
 	if block.Left < w.ack {
-		log.Fatal("Sack block has left < ack")
+		fmt.Print("Sack block has left < ack")
 	}
 	if block.Right > w.NextSeq() {
-		log.Fatal("Sack block has right > next seq")
+		fmt.Print("Sack block has right > next seq")
 	}
 	w.sacks = append(w.sacks, block)
 	w.sackBytes += uint64(block.Right - block.Left)
@@ -233,7 +233,7 @@ type Parser struct {
 func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Print(err)
 		return nil, err
 	}
 
@@ -332,7 +332,8 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 				p.RightState.SrcPort = tcp.DstPort
 			case 1:
 				if p.RightState.SrcPort != tcp.SrcPort || !tcp.ACK {
-					log.Fatal("oops", p.RightState, p.LeftState, tcp.DstPort, tcp.ACK)
+					// Use fmt for advisory/info logging.
+					fmt.Println("Bad sack block", p.RightState, p.LeftState, tcp.DstPort, tcp.ACK)
 				}
 			default:
 			}

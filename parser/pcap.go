@@ -58,6 +58,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Dec()
 
+	// Currently, this decodes all the pcap packets, but doesn't produce any output.
 	log.Println(testName)
 	tcp := tcp.Parser{}
 	_, err := tcp.Parse(rawContent)
