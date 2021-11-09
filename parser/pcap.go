@@ -18,6 +18,7 @@ import (
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/etl/tcp"
 )
 
 //=====================================================================================
@@ -145,6 +146,10 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Dec()
 
+	log.Println(testName)
+	tcp := tcp.Parser{}
+	return tcp.Parse(rawContent)
+
 	pcap, err := pcapgo.NewReader(strings.NewReader(string(rawContent)))
 	if err != nil {
 		return err
@@ -172,14 +177,16 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			log.Printf("Error decoding packet: %v", packet.ErrorLayer().Error())
 			continue
 		}
-		if packet.Metadata().Truncated {
-			if alpha.Packets < 20 {
-				log.Printf("Packet %d truncated to %d of %d bytes, from data of length %d",
-					alpha.Packets, packet.Metadata().CaptureInfo.CaptureLength,
-					packet.Metadata().CaptureInfo.Length, len(data))
-			}
-			alpha.TruncatedPackets++
-		}
+		/*
+			if packet.Metadata().Truncated {
+				if alpha.Packets < 5 {
+					log.Printf("Packet %d truncated to %d of %d bytes, from data of length %d",
+						alpha.Packets, packet.Metadata().CaptureInfo.CaptureLength,
+						packet.Metadata().CaptureInfo.Length, len(data))
+				}
+				alpha.TruncatedPackets++
+			}*/
+
 		if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 			ip, _ := ipLayer.(*layers.IPv4)
 			switch alpha.Packets {
