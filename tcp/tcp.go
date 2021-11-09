@@ -105,6 +105,7 @@ func (w *Tracker) Seq(clock uint32, length uint16, synFin bool) bool {
 	return false
 }
 
+// Total bytes transmitted, not including retransmits.
 func (w *Tracker) Value() uint64 {
 	return w.sent - w.retransmits
 }
@@ -229,11 +230,11 @@ type Parser struct {
 }
 
 // Parse parses an entire pcap file.
-func (p *Parser) Parse(data []byte) error {
+func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
 	if err != nil {
 		log.Fatal(err)
-		return err
+		return nil, err
 	}
 
 	// This is used to keep track of some of the TCP state.
@@ -376,5 +377,8 @@ func (p *Parser) Parse(data []byte) error {
 	alpha.TotalSrcSeq = int64(p.LeftState.SeqTracker.Value())
 	alpha.TotalDstSeq = int64(p.RightState.SeqTracker.Value())
 
-	return nil
+	if alpha.FirstECECount > 0 || alpha.SecondECECount > 0 || alpha.FirstRetransmits > 0 || alpha.SecondRetransmits > 0 {
+		log.Printf("%d/%d truncated, %v <--> %v", alpha.TruncatedPackets, alpha.Packets, p.LeftState, p.RightState) //, alpha)
+	}
+	return &alpha, nil
 }

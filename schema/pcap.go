@@ -34,7 +34,7 @@ type PCAPRow struct {
 	Parser ParseInfo  `bigquery:"parser" json:"parser"`
 	Date   civil.Date `bigquery:"date" json:"date"`
 
-	Alpha AlphaFields `bigquery:"alpha" json:"alpha"`
+	Alpha *AlphaFields `bigquery:"alpha" json:"alpha"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
 	row.NullAnnotator `bigquery:"-"`

@@ -58,17 +58,16 @@ func TestPCAPParser_ParseAndInsert(t *testing.T) {
 		ID:     "ndt-4c6fb_1625899199_000000000121C1A0",
 		Parser: expectedParseInfo,
 		Date:   date,
-		Alpha: schema.AlphaFields{
-			SynAckIntervalNsec: 13000,
-			SynPacket:          0,
-			SynTime:            time.Date(2021, 07, 21, 00, 00, 01, 181050000, time.UTC),
-			SynAckPacket:       1,
-			SynAckTime:         time.Date(2021, 07, 21, 00, 00, 01, 181063000, time.UTC),
-			Packets:            18240,
-			OptionCounts:       []int64{18240, 18240, 18240, 757, 757, 755, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-			Sacks:              2077,
-			TotalSrcSeq:        238,
-			TotalDstSeq:        22121164,
+		Alpha: &schema.AlphaFields{
+			SynPacket:    0,
+			SynTime:      time.Date(2021, 07, 21, 00, 00, 01, 181050000, time.UTC),
+			SynAckPacket: 1,
+			SynAckTime:   time.Date(2021, 07, 21, 00, 00, 01, 181063000, time.UTC),
+			Packets:      18240,
+			OptionCounts: []int64{18240, 18240, 18240, 757, 757, 755, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			Sacks:        2077,
+			TotalSrcSeq:  238,
+			TotalDstSeq:  22121164,
 		},
 	}
 
