@@ -341,7 +341,8 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 			var sack int
 			// Handle options
 			for i := 0; i < len(tcp.Options); i++ {
-				alpha.OptionCounts[i]++
+				// TODO test case for wrong index.
+				alpha.OptionCounts[tcp.Options[i].OptionType]++
 				if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
 					// TODO This is overcounting.  We want to count the distinct packets that are skipped in the SACKs.
 					sack = int(len(tcp.Options[i].OptionData) / 8)
