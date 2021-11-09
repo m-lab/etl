@@ -137,6 +137,16 @@ func TestValidateTestPath(t *testing.T) {
 				"archive-measurement-lab", "ndt", "scamper1", "2021/09/08", "20210908", "215656.886052", "scamper1", "mlab3", "bog03", "ndt", "", "", ".tgz",
 			},
 		},
+		{
+			name:     "thirdparty-annotation",
+			path:     `gs://archive-mlab-sandbox/ndt/annotation/2019/08/14/20211107T143735.458956Z-annotation-third-party-ndt.tgz`,
+			wantType: etl.ANNOTATION,
+			want: etl.DataPath{
+				`gs://archive-mlab-sandbox/ndt/annotation/2019/08/14/20211107T143735.458956Z-annotation-third-party-ndt.tgz`,
+				`ndt/annotation/2019/08/14/20211107T143735.458956Z-annotation-third-party-ndt.tgz`,
+				`archive-mlab-sandbox`, "ndt", "annotation", "2019/08/14", "20211107", "143735.458956", "annotation", "third", "party", "ndt", "", "", ".tgz",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

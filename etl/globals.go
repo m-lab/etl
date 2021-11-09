@@ -68,7 +68,7 @@ const DatePathPattern = `(\d{4}/[01]\d/[0123]\d)/`
 const dateTime = `(\d{4}[01]\d[0123]\d)T(\d{6}(\.\d{0,6})?)Z`
 
 const type2 = `(?:-([a-z0-9-]+))?` // optional datatype string
-const mlabNSiteNN = `-(mlab\d)-([a-z]{3}\d[0-9t])-`
+const mlabNSiteNN = `-(mlab\d|third)-([a-z]{3}\d[0-9t]|party)-`
 
 // This parses the experiment name, optional -NNNN sequence number, and optional -e (for old embargoed files)
 const expNNNNE = `([a-z-]+)(?:-(\d{4}))?(-e)?`
