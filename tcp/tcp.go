@@ -64,7 +64,7 @@ func (w *Tracker) delta(clock uint32) int64 {
 		delta += 1 << 30
 	}
 	if delta > 1<<30 || delta < -1<<30 {
-		fmt.Print("invalid counter delta")
+		fmt.Printf("invalid sequence delta %d: %d->%d (%d)", w.packets, w.seq, clock, delta)
 	}
 	return delta
 }
