@@ -199,7 +199,6 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 		if tcp.ACK {
 			s.SeqTracker.Ack(tcp.Ack) // TODO
 		}
-		// TODO Handle Sacks
 		// Handle options
 		for i := 0; i < len(tcp.Options); i++ {
 			if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
@@ -211,7 +210,6 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 				}
 			}
 		}
-
 	}
 }
 
@@ -240,11 +238,6 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	// This is used to keep track of some of the TCP state.
 	alpha := schema.AlphaFields{
 		OptionCounts: make([]int64, 16),
-	}
-
-	optionNames := make([]string, 16)
-	for i := 0; i < 16; i++ {
-		optionNames[i] = layers.TCPOptionKind(i).String()
 	}
 
 	data, ci, err := pcap.ReadPacketData()
@@ -342,6 +335,10 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 			// Handle options
 			for i := 0; i < len(tcp.Options); i++ {
 				// TODO test case for wrong index.
+				if tcp.Options[i].OptionType > 15 {
+					fmt.Printf("TCP Option %d has illegal option type %d", i, tcp.Options[i].OptionType)
+					continue
+				}
 				alpha.OptionCounts[tcp.Options[i].OptionType]++
 				if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
 					// TODO This is overcounting.  We want to count the distinct packets that are skipped in the SACKs.
