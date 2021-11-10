@@ -27,8 +27,8 @@ models for:
 
 */
 
-var info = log.New(os.Stdout, "info: ", 0)
-var sparseLogger = log.New(os.Stdout, "sparse: ", 0)
+var info = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
+var sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
 var sparse = logx.NewLogEvery(sparseLogger, time.Millisecond)
 var sparse2 = logx.NewLogEvery(sparseLogger, time.Millisecond)
 
@@ -52,7 +52,7 @@ type Tracker struct {
 	sent        uint64 // actual bytes sent, including retransmits, but not SYN or FIN
 	retransmits uint64 // bytes retransmitted
 
-	ack      uint32 // last observed ack
+	sendUNA  uint32 // greatest observed ack
 	acks     uint32 // number of acks (from other side)
 	onlyAcks uint32 // Number of packets that only have ACKs, no data.
 	acked    uint64 // bytes acked
@@ -75,8 +75,8 @@ func (t *Tracker) Errors() uint32 {
 	return t.errors
 }
 
-// NextSeq returns the uint32 value of the expected next sequence number.
-func (t *Tracker) NextSeq() uint32 {
+// SendNext returns the uint32 value of the expected next sequence number.
+func (t *Tracker) SendNext() uint32 {
 	return t.seq + uint32(t.lastDataLength) // wraps at 2^32
 }
 
@@ -102,11 +102,12 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 
 	if !t.initialized {
 		t.seq = clock
-		t.ack = clock // nothing acked so far
+		t.sendUNA = clock // nothing acked so far
 		t.initialized = true
 	}
 	// Use this unless we are sending new data.
-	inflight, _ := diff(t.NextSeq(), t.ack)
+	// TODO - correct this for sum of sizes of sack block scoreboard.
+	inflight, _ := diff(t.SendNext(), t.sendUNA)
 
 	// TODO handle errors
 	delta, err := diff(clock, t.seq)
@@ -138,13 +139,13 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	t.sent += uint64(length)
 	t.seq = clock
 
-	gap, err := diff(t.seq, t.ack)
+	gap, err := diff(t.seq, t.sendUNA)
 	if gap > t.maxGap {
 		t.maxGap = gap
 		//info.Printf("%8p - %5d: MaxGap = %d\n", t, t.packets, gap)
 	}
 
-	inflight, _ = diff(t.NextSeq(), t.ack)
+	inflight, _ = diff(t.SendNext(), t.sendUNA)
 
 	return inflight, false
 }
@@ -164,18 +165,24 @@ func (t *Tracker) Ack(clock uint32, withData bool) {
 		t.errors++
 		info.Print("Ack called before Seq")
 	}
-	delta, err := diff(clock, t.ack)
+	delta, err := diff(clock, t.sendUNA)
 	if err != nil {
 		t.errors++
-		info.Printf("Bad ack %4X %4X\n", t.ack, clock)
+		info.Printf("Bad ack %4X %4X\n", t.sendUNA, clock)
 		return
 	}
-	t.acked += uint64(delta)
-	t.acks++
+	if delta > 0 {
+		t.acked += uint64(delta)
+		t.acks++
+	}
 	if !withData {
 		t.onlyAcks++
 	}
-	t.ack = clock
+	t.sendUNA = clock
+}
+
+func (t *Tracker) SendUNA() uint32 {
+	return t.sendUNA
 }
 
 // Check checks that a sack block is consistent with the current window.
@@ -186,12 +193,12 @@ func (t *Tracker) checkSack(sb sackBlock) error {
 		return ErrInvalidSackBlock
 	}
 	// block Right should ALWAYS be to the left of NextSeq()
-	if overlap, err := diff(t.NextSeq(), sb.Right); err != nil || overlap < 0 {
+	if overlap, err := diff(t.SendNext(), sb.Right); err != nil || overlap < 0 {
 		info.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// Left should be to the right of ack
-	if overlap, err := diff(sb.Left, t.ack); err != nil || overlap < 0 {
+	if overlap, err := diff(sb.Left, t.sendUNA); err != nil || overlap < 0 {
 		// These often correspond to packets that show up as spurious retransmits in WireShark.
 		sparse.Println(ErrLateSackBlock, err, overlap, t.Acked())
 		return ErrLateSackBlock
@@ -208,7 +215,7 @@ func (t *Tracker) Sack(sb sackBlock) {
 	// Auto gen code
 	if err := t.checkSack(sb); err != nil {
 		t.errors++
-		info.Println(ErrInvalidSackBlock, t.ack, sb, t.NextSeq())
+		info.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
 	}
 	//t.sacks = append(t.sacks, block)
 	t.sackBytes += uint64(sb.Right - sb.Left)
@@ -236,6 +243,7 @@ type state struct {
 	WindowScale uint8
 	Window      uint16
 	Limit       uint32 // The limit on data that can be sent, based on receiver window and ack data.
+	MSS         uint16
 
 	lastHeader *layers.TCP
 
@@ -253,6 +261,12 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 		for _, block := range sacks {
 			s.SeqTracker.Sack(block)
 		}
+	case layers.TCPOptionKindMSS:
+		if len(opt.OptionData) != 2 {
+			info.Println("Invalid MSS option length", len(opt.OptionData))
+		} else {
+			s.MSS = binary.BigEndian.Uint16(opt.OptionData)
+		}
 	case layers.TCPOptionKindTimestamps:
 	case layers.TCPOptionKindWindowScale:
 		// TODO should this change after initialization?
@@ -266,18 +280,15 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 	dataLength := tcpLength - uint16(4*tcp.DataOffset)
 	if tcp.SrcPort == s.SrcPort {
 		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
-		if inflight, retrans := s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN); retrans {
+		if _, retrans := s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN); retrans {
 			// TODO
-		} else if s.Window > 0 {
-			window := int64(s.Window) << s.WindowScale
-			fraction := float64(inflight) / float64(window)
-			if fraction >= 1.0 {
-				sparse.Printf("Window limited? %d / %d\n", inflight, window)
-			}
 		}
 		if !tcp.SYN {
-			if remaining, _ := diff(s.Limit, s.SeqTracker.NextSeq()); remaining < 0 {
+			if remaining, _ := diff(s.Limit, s.SeqTracker.SendNext()); remaining < 0 {
+				// TODO: This is currently triggering more often than expected.
 				log.Println("Protocol violation", s.SrcPort, s.SeqTracker.packets)
+			} else if remaining < int32(s.MSS) {
+				sparse.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", int64(s.Window)<<s.WindowScale, remaining, s.MSS)
 			}
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
@@ -298,13 +309,13 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 		}
 		if tcp.ACK {
 			s.SeqTracker.Ack(tcp.Ack, dataLength > 0) // TODO
-			s.Limit = s.SeqTracker.ack + uint32(s.Window)<<s.WindowScale
+			s.Limit = s.SeqTracker.sendUNA + uint32(s.Window)<<s.WindowScale
 		}
 	}
 }
 
 func (s state) String() string {
-	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.SeqTracker.NextSeq(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.SeqTracker.retransmits, s.ECECount)
+	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.SeqTracker.retransmits, s.ECECount)
 }
 
 type Parser struct {

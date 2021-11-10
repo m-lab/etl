@@ -6,29 +6,29 @@ import (
 	"github.com/m-lab/etl/tcp"
 )
 
-func TestTracker_NextSeq(t *testing.T) {
+func TestTracker_SendNext(t *testing.T) {
 	tr := tcp.Tracker{}
 	tr.Seq(1234, 0, true) // SYN, no data
 	tr.Seq(1235, 20, false)
 	tr.Seq(1255, 10, false)
-	if tr.NextSeq() != 1265 {
-		t.Errorf("NextSeq() = %v, want %v", tr.NextSeq(), 1265)
+	if tr.SendNext() != 1265 {
+		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1265)
 	}
 
 	// Retransmit
 	if _, b := tr.Seq(1240, 12, false); !b {
 		t.Errorf("Seq() = %v, want %v", b, true)
 	}
-	// NextSeq should be unchanged.
-	if tr.NextSeq() != 1265 {
-		t.Errorf("NextSeq() = %v, want %v", tr.NextSeq(), 1265)
+	// SendNext should be unchanged.
+	if tr.SendNext() != 1265 {
+		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1265)
 	}
 
-	if _, b := tr.Seq(tr.NextSeq(), 10, false); b {
+	if _, b := tr.Seq(tr.SendNext(), 10, false); b {
 		t.Errorf("Seq() = %v, want %v", b, false)
 	}
-	if tr.NextSeq() != 1275 {
-		t.Errorf("NextSeq() = %v, want %v", tr.NextSeq(), 1275)
+	if tr.SendNext() != 1275 {
+		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1275)
 	}
 	if tr.Sent() != 40 {
 		t.Errorf("Sent() = %v, want %v", tr.Sent(), 40)
@@ -43,8 +43,8 @@ func TestTracker_NextSeq(t *testing.T) {
 	}
 
 	tr.Seq(5<<28, 0, false)
-	if tr.NextSeq() != 1275 {
-		t.Errorf("NextSeq() = %v, want %v", tr.NextSeq(), 1275)
+	if tr.SendNext() != 1275 {
+		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1275)
 	}
 	if tr.Errors() != 1 {
 		t.Errorf("Errors() = %v, want %v", tr.Errors(), 1)
@@ -53,8 +53,8 @@ func TestTracker_NextSeq(t *testing.T) {
 	// Seq that doesn't match previous data length.
 	tr.Seq(1300, 0, false)
 	// Seq should advance, but we should also observe an error.
-	if tr.NextSeq() != 1300 {
-		t.Errorf("NextSeq() = %v, want %v", tr.NextSeq(), 1300)
+	if tr.SendNext() != 1300 {
+		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1300)
 	}
 	if tr.Errors() != 2 {
 		t.Errorf("Errors() = %v, want %v", tr.Errors(), 2)
@@ -83,8 +83,8 @@ func TestTracker_NextSeq(t *testing.T) {
 					sackBytes:      tt.fields.sackBytes,
 					lastDataLength: tt.fields.lastDataLength,
 				}
-				if got := w.NextSeq(); got != tt.want {
-					t.Errorf("Tracker.NextSeq() = %v, want %v", got, tt.want)
+				if got := w.SendNext(); got != tt.want {
+					t.Errorf("Tracker.SendNext() = %v, want %v", got, tt.want)
 				}
 			})
 		}*/
