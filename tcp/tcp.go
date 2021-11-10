@@ -259,10 +259,11 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 		//log.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
 		if inflight, retrans := s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN); retrans {
 			// TODO
-		} else {
-			fraction := float64(inflight) / float64(int64(s.Window)<<s.WindowScale)
+		} else if s.Window > 0 {
+			window := int64(s.Window) << s.WindowScale
+			fraction := float64(inflight) / float64(window)
 			if fraction > 0.95 {
-				fmt.Println("Window limited? ", inflight)
+				fmt.Printf("Window limited? %d / %d\n", inflight, window)
 			}
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
