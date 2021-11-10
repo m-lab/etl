@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 
@@ -24,6 +23,8 @@ models for:
 
 */
 
+var ErrInvalidDelta = fmt.Errorf("invalid delta")
+
 // TODO - build a sackblock model, that consolidates new sack blocks into existing state.
 type sackBlock struct {
 	Left  uint32
@@ -32,10 +33,11 @@ type sackBlock struct {
 
 type Tracker struct {
 	initialized bool
+	errors      uint32 // Number of errors encountered while parsing
 	packets     uint32 // Number of calls to Seq function
-	seq         uint32
-	syn         uint32 // one or zero, depending on whether SYN was sent.
-	sent        uint64 // actual bytes sent, including retransmits
+	seq         uint32 // The last sequence number observed, not counting retransmits
+	synFin      uint32 // zero, one or two, depending on whether SYN and FIN were sent
+	sent        uint64 // actual bytes sent, including retransmits, but not SYN or FIN
 	retransmits uint64 // bytes retransmitted
 
 	ack   uint32 // last observed ack
@@ -48,6 +50,11 @@ type Tracker struct {
 	lastDataLength uint16 // Used to compute NextSeq()
 }
 
+// Errors returns the number of errors encountered while parsing.
+func (t *Tracker) Errors() uint32 {
+	return t.errors
+}
+
 // NextSeq returns the uint32 value of the expected next sequence number.
 func (w *Tracker) NextSeq() uint32 {
 	return w.seq + uint32(w.lastDataLength) // wraps at 2^32
@@ -55,18 +62,16 @@ func (w *Tracker) NextSeq() uint32 {
 
 // ByteCount returns the number of bytes sent so far, not including retransmits
 func (w *Tracker) ByteCount() uint64 {
-	return w.sent + uint64(w.lastDataLength)
+	return w.sent
 }
 
-func (w *Tracker) delta(clock uint32) int64 {
-	delta := int64(clock) - int64(w.seq)
-	if delta < -1<<31 {
-		delta += 1 << 30
+func delta(clock uint32, previous uint32) (int32, error) {
+	delta := int32(clock - previous)
+	if !(-1<<30 < delta && delta < 1<<30) {
+		fmt.Printf("invalid sequence delta %d->%d (%d)", previous, clock, delta)
+		return delta, ErrInvalidDelta
 	}
-	if delta > 1<<30 || delta < -1<<30 {
-		fmt.Printf("invalid sequence delta %d: %d->%d (%d)", w.packets, w.seq, clock, delta)
-	}
-	return delta
+	return delta, nil
 }
 
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
@@ -80,7 +85,12 @@ func (w *Tracker) Seq(clock uint32, length uint16, synFin bool) bool {
 		w.ack = clock // nothing acked so far
 		w.initialized = true
 	}
-	delta := w.delta(clock)
+	// TODO handle errors
+	delta, err := delta(clock, w.seq)
+	if err != nil {
+		w.errors++
+		return false
+	}
 	if delta < 0 {
 		// DO NOT update w.seq or w.lastDataLength, as this is a retransmit
 		w.sent += uint64(length)
@@ -88,25 +98,27 @@ func (w *Tracker) Seq(clock uint32, length uint16, synFin bool) bool {
 		return true
 	}
 	// delta is non-negative (not a retransmit)
-	if delta != int64(w.lastDataLength) {
-		log.Printf("%d: delta (%d) does not match last data size (%d)", w.packets, delta, w.lastDataLength)
+	if delta != int32(w.lastDataLength) {
+		w.errors++
+		fmt.Printf("%d: delta (%d) does not match last data size (%d)\n", w.packets, delta, w.lastDataLength) // VERBOSE
 	}
 
 	if synFin {
+		w.synFin++ // Should we check if this is greater than 2?
 		// Should this include length?
 		w.lastDataLength = 1 + length
 	} else {
 		w.lastDataLength = length
 	}
-	//log.Println(w.sent, delta, w.lastDataLength)
 
-	w.sent += uint64(delta)
+	w.sent += uint64(length)
 	w.seq = clock
 	return false
 }
 
 // Total bytes transmitted, not including retransmits.
-func (w *Tracker) Value() uint64 {
+// TODO should this include the 1 byte SYN?
+func (w *Tracker) Sent() uint64 {
 	return w.sent - w.retransmits
 }
 
@@ -116,23 +128,31 @@ func (w *Tracker) Acked() uint64 {
 
 func (w *Tracker) Ack(clock uint32) {
 	if !w.initialized {
+		w.errors++
 		fmt.Print("Ack called before Seq")
 	}
+	delta, _ := delta(clock, w.ack)
+	w.acked += uint64(delta)
+	w.ack = clock
 }
 
 // Sack updates the counter with sack information (from other direction)
 func (w *Tracker) Sack(block sackBlock) {
 	if !w.initialized {
+		w.errors++
 		fmt.Print("Sack called before Seq")
 	}
 	// Auto gen code
 	if block.Left > block.Right {
+		w.errors++
 		fmt.Print("Sack block has left > right")
 	}
 	if block.Left < w.ack {
+		w.errors++
 		fmt.Print("Sack block has left < ack")
 	}
 	if block.Right > w.NextSeq() {
+		w.errors++
 		fmt.Print("Sack block has right > next seq")
 	}
 	w.sacks = append(w.sacks, block)
@@ -145,21 +165,8 @@ type endpoint struct {
 
 	SrcPort layers.TCPPort // When this port is SrcPort, we update this stat struct.
 
-	// The following fields are updated when we see a packet with SrcPort == SrcPort.
-	// Sent is the total bytes sent, including retransmits.
-	Sent                 uint64 // Total bytes sent
-	PacketsSent          uint64 // Total packets sent
-	Retransmits          uint64 // Total bytes retransmitted
-	PacketsRetransmitted uint64 // Total packets retransmitted
-
-	// Seq keeps track of the outgoing Sequence Number.
-	// It NOT updated for retransmits.
-	Seq     Tracker
-	NextSeq uint64 // The next expected sequence number, based on Seq, and the number of bytes sent.
-
-	// The following fields are updated when we see a packet with SrcPort != SrcPort.
-	UnAcked uint64 // Total bytes unacked
-	Sacked  uint64 // Total bytes sacked
+	// Seq keeps track of the outgoing Sequence Number, acknowledgements, Sacks.
+	Seq Tracker
 }
 
 type stats struct {
@@ -214,7 +221,7 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 }
 
 func (s state) String() string {
-	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.Sent, s.SeqTracker.Value(), s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.Retransmits, s.ECECount)
+	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.SeqTracker.NextSeq(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.SeqTracker.retransmits, s.ECECount)
 }
 
 type Parser struct {
@@ -246,19 +253,11 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		// Decode a packet
 		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
 		if packet.ErrorLayer() != nil {
-			log.Printf("Error decoding packet: %v", packet.ErrorLayer().Error())
+			fmt.Printf("Error decoding packet: %v", packet.ErrorLayer().Error()) // Somewhat VERBOSE
 			continue
 		}
-		/*
-			if packet.Metadata().Truncated {
-				if alpha.Packets < 5 {
-					log.Printf("Packet %d truncated to %d of %d bytes, from data of length %d",
-						alpha.Packets, packet.Metadata().CaptureInfo.CaptureLength,
-						packet.Metadata().CaptureInfo.Length, len(data))
-				}
-				alpha.TruncatedPackets++
-			}*/
 
+		// TODO This really needs to be refactored and simplified.
 		var tcpLength uint16
 		if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 			ip, _ := ipLayer.(*layers.IPv4)
@@ -371,13 +370,11 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 
 	alpha.FirstECECount = p.LeftState.ECECount
 	alpha.SecondECECount = p.RightState.ECECount
-	alpha.FirstRetransmits = p.LeftState.Retransmits
-	alpha.SecondRetransmits = p.RightState.Retransmits
-	alpha.TotalSrcSeq = int64(p.LeftState.SeqTracker.Value())
-	alpha.TotalDstSeq = int64(p.RightState.SeqTracker.Value())
+	alpha.FirstRetransmits = p.LeftState.SeqTracker.retransmits
+	alpha.SecondRetransmits = p.RightState.SeqTracker.retransmits
+	// TODO update these names
+	alpha.TotalSrcSeq = int64(p.LeftState.SeqTracker.ByteCount())
+	alpha.TotalDstSeq = int64(p.RightState.SeqTracker.ByteCount())
 
-	if alpha.FirstECECount > 0 || alpha.SecondECECount > 0 || alpha.FirstRetransmits > 0 || alpha.SecondRetransmits > 0 {
-		log.Printf("%d/%d truncated, %v <--> %v", alpha.TruncatedPackets, alpha.Packets, p.LeftState, p.RightState) //, alpha)
-	}
 	return &alpha, nil
 }
