@@ -262,7 +262,7 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 		} else if s.Window > 0 {
 			window := int64(s.Window) << s.WindowScale
 			fraction := float64(inflight) / float64(window)
-			if fraction > 0.95 {
+			if fraction >= 1.0 {
 				fmt.Printf("Window limited? %d / %d\n", inflight, window)
 			}
 		}
@@ -281,7 +281,8 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 			s.Option(tcp.SrcPort, tcp.Options[i])
 		}
 		if s.Window != tcp.Window {
-			fmt.Printf("Remote %v window changed from %d to %d\n", tcp.SrcPort, uint32(s.Window)<<s.WindowScale, uint32(tcp.Window)<<s.WindowScale)
+			// VERY VERBOSE
+			//fmt.Printf("Remote %v window changed from %d to %d\n", tcp.SrcPort, uint32(s.Window)<<s.WindowScale, uint32(tcp.Window)<<s.WindowScale)
 			s.Window = tcp.Window
 		}
 	}
