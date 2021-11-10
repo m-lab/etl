@@ -40,8 +40,9 @@ type Tracker struct {
 	sent        uint64 // actual bytes sent, including retransmits, but not SYN or FIN
 	retransmits uint64 // bytes retransmitted
 
-	ack   uint32 // last observed ack
-	acked uint64 // bytes acked
+	ack    uint32 // last observed ack
+	acked  uint64 // bytes acked
+	maxGap uint64 // Max observed gap between acked and NextSeq()
 
 	// sacks keeps track of outstanding SACK blocks
 	sacks     []sackBlock
@@ -111,6 +112,11 @@ func (w *Tracker) Seq(clock uint32, length uint16, synFin bool) bool {
 		w.lastDataLength = length
 	}
 
+	gap := w.sent - w.retransmits - w.acked
+	if gap > w.maxGap {
+		w.maxGap = gap
+		fmt.Println("MaxGap = ", gap)
+	}
 	w.sent += uint64(length)
 	w.seq = clock
 	return false
@@ -164,9 +170,6 @@ type endpoint struct {
 	TTL   uint8
 
 	SrcPort layers.TCPPort // When this port is SrcPort, we update this stat struct.
-
-	// Seq keeps track of the outgoing Sequence Number, acknowledgements, Sacks.
-	Seq Tracker
 }
 
 type stats struct {
@@ -206,7 +209,7 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 		if tcp.ACK {
 			s.SeqTracker.Ack(tcp.Ack) // TODO
 		}
-		// Handle options
+		// Handle SACKs from other direction
 		for i := 0; i < len(tcp.Options); i++ {
 			if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
 				data := tcp.Options[i].OptionData
