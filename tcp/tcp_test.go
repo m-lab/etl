@@ -16,7 +16,7 @@ func TestTracker_NextSeq(t *testing.T) {
 	}
 
 	// Retransmit
-	if b := tr.Seq(1240, 12, false); !b {
+	if _, b := tr.Seq(1240, 12, false); !b {
 		t.Errorf("Seq() = %v, want %v", b, true)
 	}
 	// NextSeq should be unchanged.
@@ -24,7 +24,7 @@ func TestTracker_NextSeq(t *testing.T) {
 		t.Errorf("NextSeq() = %v, want %v", tr.NextSeq(), 1265)
 	}
 
-	if b := tr.Seq(tr.NextSeq(), 10, false); b {
+	if _, b := tr.Seq(tr.NextSeq(), 10, false); b {
 		t.Errorf("Seq() = %v, want %v", b, false)
 	}
 	if tr.NextSeq() != 1275 {
@@ -33,11 +33,11 @@ func TestTracker_NextSeq(t *testing.T) {
 	if tr.Sent() != 40 {
 		t.Errorf("Sent() = %v, want %v", tr.Sent(), 40)
 	}
-	tr.Ack(1234)
+	tr.Ack(1234, false)
 	if tr.Acked() != 0 {
 		t.Errorf("Acked() = %v, want %v", tr.Acked(), 0)
 	}
-	tr.Ack(1244)
+	tr.Ack(1244, false)
 	if tr.Acked() != 10 {
 		t.Errorf("Acked() = %v, want %v", tr.Acked(), 10)
 	}
