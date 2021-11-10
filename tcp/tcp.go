@@ -234,6 +234,7 @@ type state struct {
 	// TODO move these to SeqTracker, so that we can observe whether we are window limited.
 	WindowScale uint8
 	Window      uint16
+	Limit       uint32 // The limit on data that can be sent, based on receiver window and ack data.
 
 	lastHeader *layers.TCP
 
@@ -273,15 +274,17 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 				sparse.Printf("Window limited? %d / %d\n", inflight, window)
 			}
 		}
+		if !tcp.SYN {
+			if remaining, _ := diff(s.Limit, s.SeqTracker.NextSeq()); remaining < 0 {
+				log.Println("Protocol violation", s.SrcPort, s.SeqTracker.packets)
+			}
+		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
 		if tcp.ECE {
 			s.ECECount++
 		}
 	} else {
 		// Process ACKs and SACKs from the other direction
-		if tcp.ACK {
-			s.SeqTracker.Ack(tcp.Ack, dataLength > 0) // TODO
-		}
 		// Handle all options, including SACKs from other direction
 		// TODO - should some of these be associated with the other direction?
 		for i := 0; i < len(tcp.Options); i++ {
@@ -291,6 +294,10 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 			// VERY VERBOSE
 			sparse2.Printf("Remote %v window changed from %d to %d\n", tcp.SrcPort, uint32(s.Window)<<s.WindowScale, uint32(tcp.Window)<<s.WindowScale)
 			s.Window = tcp.Window
+		}
+		if tcp.ACK {
+			s.SeqTracker.Ack(tcp.Ack, dataLength > 0) // TODO
+			s.Limit = s.SeqTracker.ack + uint32(s.Window)<<s.WindowScale
 		}
 	}
 }
