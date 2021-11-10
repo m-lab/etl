@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 
@@ -23,7 +24,10 @@ models for:
 
 */
 
+var ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
 var ErrInvalidDelta = fmt.Errorf("invalid delta")
+var ErrInvalidSackBlock = fmt.Errorf("invalid sack block")
+var ErrLateSackBlock = fmt.Errorf("sack block to left of ack")
 
 // TODO - build a sackblock model, that consolidates new sack blocks into existing state.
 type sackBlock struct {
@@ -40,9 +44,11 @@ type Tracker struct {
 	sent        uint64 // actual bytes sent, including retransmits, but not SYN or FIN
 	retransmits uint64 // bytes retransmitted
 
-	ack    uint32 // last observed ack
-	acked  uint64 // bytes acked
-	maxGap uint64 // Max observed gap between acked and NextSeq()
+	ack      uint32 // last observed ack
+	acks     uint32 // number of acks (from other side)
+	onlyAcks uint32 // Number of packets that only have ACKs, no data.
+	acked    uint64 // bytes acked
+	maxGap   int32  // Max observed gap between acked and NextSeq()
 
 	// sacks keeps track of outstanding SACK blocks
 	sacks     []sackBlock
@@ -51,22 +57,27 @@ type Tracker struct {
 	lastDataLength uint16 // Used to compute NextSeq()
 }
 
+func (t *Tracker) Summary() string {
+	return fmt.Sprintf("%8d bytes sent, %5d packets, %5d/%5d acks w/data, %5d max gap\n",
+		t.Sent(), t.packets, t.acks-t.onlyAcks, t.acks, t.maxGap)
+}
+
 // Errors returns the number of errors encountered while parsing.
 func (t *Tracker) Errors() uint32 {
 	return t.errors
 }
 
 // NextSeq returns the uint32 value of the expected next sequence number.
-func (w *Tracker) NextSeq() uint32 {
-	return w.seq + uint32(w.lastDataLength) // wraps at 2^32
+func (t *Tracker) NextSeq() uint32 {
+	return t.seq + uint32(t.lastDataLength) // wraps at 2^32
 }
 
 // ByteCount returns the number of bytes sent so far, not including retransmits
-func (w *Tracker) ByteCount() uint64 {
-	return w.sent
+func (t *Tracker) ByteCount() uint64 {
+	return t.sent
 }
 
-func delta(clock uint32, previous uint32) (int32, error) {
+func diff(clock uint32, previous uint32) (int32, error) {
 	delta := int32(clock - previous)
 	if !(-1<<30 < delta && delta < 1<<30) {
 		fmt.Printf("invalid sequence delta %d->%d (%d)", previous, clock, delta)
@@ -78,91 +89,115 @@ func delta(clock uint32, previous uint32) (int32, error) {
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
 // Initializes the tracker if it hasn't been initialized yet.
 // Returns true if this is a retransmit
-func (w *Tracker) Seq(clock uint32, length uint16, synFin bool) bool {
-	w.packets++ // Some of these may be retransmits.
+func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) bool {
+	t.packets++ // Some of these may be retransmits.
 
-	if !w.initialized {
-		w.seq = clock
-		w.ack = clock // nothing acked so far
-		w.initialized = true
+	if !t.initialized {
+		t.seq = clock
+		t.ack = clock // nothing acked so far
+		t.initialized = true
 	}
 	// TODO handle errors
-	delta, err := delta(clock, w.seq)
+	delta, err := diff(clock, t.seq)
 	if err != nil {
-		w.errors++
+		t.errors++
+		fmt.Printf("Bad seq %4X %4X\n", t.seq, clock)
 		return false
 	}
 	if delta < 0 {
 		// DO NOT update w.seq or w.lastDataLength, as this is a retransmit
-		w.sent += uint64(length)
-		w.retransmits += uint64(length)
+		t.sent += uint64(length)
+		t.retransmits += uint64(length)
 		return true
 	}
 	// delta is non-negative (not a retransmit)
-	if delta != int32(w.lastDataLength) {
-		w.errors++
-		fmt.Printf("%d: delta (%d) does not match last data size (%d)\n", w.packets, delta, w.lastDataLength) // VERBOSE
+	if delta != int32(t.lastDataLength) {
+		t.errors++
+		fmt.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
 	}
 
 	if synFin {
-		w.synFin++ // Should we check if this is greater than 2?
+		t.synFin++ // Should we check if this is greater than 2?
 		// Should this include length?
-		w.lastDataLength = 1 + length
+		t.lastDataLength = 1 + length
 	} else {
-		w.lastDataLength = length
+		t.lastDataLength = length
 	}
 
-	gap := w.sent - w.retransmits - w.acked
-	if gap > w.maxGap {
-		w.maxGap = gap
-		fmt.Println("MaxGap = ", gap)
+	t.sent += uint64(length)
+	t.seq = clock
+
+	gap, err := diff(t.seq, t.ack)
+	if gap > t.maxGap {
+		t.maxGap = gap
+		//fmt.Printf("%8p - %5d: MaxGap = %d\n", t, t.packets, gap)
 	}
-	w.sent += uint64(length)
-	w.seq = clock
 	return false
 }
 
 // Total bytes transmitted, not including retransmits.
 // TODO should this include the 1 byte SYN?
-func (w *Tracker) Sent() uint64 {
-	return w.sent - w.retransmits
+func (t *Tracker) Sent() uint64 {
+	return t.sent - t.retransmits
 }
 
-func (w *Tracker) Acked() uint64 {
-	return w.acked
+func (t *Tracker) Acked() uint64 {
+	return t.acked
 }
 
-func (w *Tracker) Ack(clock uint32) {
-	if !w.initialized {
-		w.errors++
+func (t *Tracker) Ack(clock uint32, withData bool) {
+	if !t.initialized {
+		t.errors++
 		fmt.Print("Ack called before Seq")
 	}
-	delta, _ := delta(clock, w.ack)
-	w.acked += uint64(delta)
-	w.ack = clock
+	delta, err := diff(clock, t.ack)
+	if err != nil {
+		t.errors++
+		fmt.Printf("Bad ack %4X %4X\n", t.ack, clock)
+		return
+	}
+	t.acked += uint64(delta)
+	t.acks++
+	if !withData {
+		t.onlyAcks++
+	}
+	t.ack = clock
+}
+
+// Check checks that a sack block is consistent with the current window.
+func (t *Tracker) checkSack(sb sackBlock) error {
+	// block should ALWAYS have positive width
+	if width, err := diff(sb.Right, sb.Left); err != nil || width <= 0 {
+		log.Println(ErrInvalidSackBlock, err, width, t.Acked())
+		return ErrInvalidSackBlock
+	}
+	// block Right should ALWAYS be to the left of NextSeq()
+	if overlap, err := diff(t.NextSeq(), sb.Right); err != nil || overlap < 0 {
+		log.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
+		return ErrInvalidSackBlock
+	}
+	// Left should be to the right of ack
+	if overlap, err := diff(sb.Left, t.ack); err != nil || overlap < 0 {
+		// These often correspond to packets that show up as spurious retransmits in WireShark.
+		log.Println(ErrLateSackBlock, err, overlap, t.Acked())
+		return ErrLateSackBlock
+	}
+	return nil
 }
 
 // Sack updates the counter with sack information (from other direction)
-func (w *Tracker) Sack(block sackBlock) {
-	if !w.initialized {
-		w.errors++
-		fmt.Print("Sack called before Seq")
+func (t *Tracker) Sack(sb sackBlock) {
+	if !t.initialized {
+		t.errors++
+		fmt.Println(ErrTrackerNotInitialized)
 	}
 	// Auto gen code
-	if block.Left > block.Right {
-		w.errors++
-		fmt.Print("Sack block has left > right")
+	if err := t.checkSack(sb); err != nil {
+		t.errors++
+		fmt.Println(ErrInvalidSackBlock, t.ack, sb, t.NextSeq())
 	}
-	if block.Left < w.ack {
-		w.errors++
-		fmt.Print("Sack block has left < ack")
-	}
-	if block.Right > w.NextSeq() {
-		w.errors++
-		fmt.Print("Sack block has right > next seq")
-	}
-	w.sacks = append(w.sacks, block)
-	w.sackBytes += uint64(block.Right - block.Left)
+	//t.sacks = append(t.sacks, block)
+	t.sackBytes += uint64(sb.Right - sb.Left)
 }
 
 type endpoint struct {
@@ -173,7 +208,6 @@ type endpoint struct {
 }
 
 type stats struct {
-	Window     uint16
 	ECECount   uint64
 	TTLChanges uint64 // Observed number of TTL values that don't match first IP header.
 }
@@ -184,7 +218,9 @@ type state struct {
 	endpoint // TODO
 	stats    // TODO
 
-	maxSeq uint32
+	// TODO move these to SeqTracker, so that we can observe whether we are window limited.
+	WindowScale uint8
+	Window      uint16
 
 	lastHeader *layers.TCP
 
@@ -193,32 +229,47 @@ type state struct {
 	LastPacketTimeUsec uint64
 }
 
+func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
+	switch opt.OptionType {
+	case layers.TCPOptionKindSACK:
+		data := opt.OptionData
+		sacks := make([]sackBlock, len(data)/8)
+		binary.Read(bytes.NewReader(data), binary.BigEndian, &sacks)
+		for _, block := range sacks {
+			s.SeqTracker.Sack(block)
+		}
+	case layers.TCPOptionKindTimestamps:
+	case layers.TCPOptionKindWindowScale:
+		// TODO should this change after initialization?
+		fmt.Printf("%v WindowScale change %d -> %d\n", port, s.WindowScale, opt.OptionData[0])
+		s.WindowScale = opt.OptionData[0]
+	default:
+	}
+}
+
 func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInfo) {
+	dataLength := tcpLength - uint16(4*tcp.DataOffset)
 	if tcp.SrcPort == s.SrcPort {
 		//log.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
-		dataLength := tcpLength - uint16(4*tcp.DataOffset)
 		if s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN) { // TODO
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
-		s.Window = tcp.Window
 		if tcp.ECE {
 			s.ECECount++
 		}
 	} else {
 		// Process ACKs and SACKs from the other direction
 		if tcp.ACK {
-			s.SeqTracker.Ack(tcp.Ack) // TODO
+			s.SeqTracker.Ack(tcp.Ack, dataLength > 0) // TODO
 		}
-		// Handle SACKs from other direction
+		// Handle all options, including SACKs from other direction
+		// TODO - should some of these be associated with the other direction?
 		for i := 0; i < len(tcp.Options); i++ {
-			if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
-				data := tcp.Options[i].OptionData
-				sacks := make([]sackBlock, len(data)/8)
-				binary.Read(bytes.NewReader(data), binary.BigEndian, &sacks)
-				for _, block := range sacks {
-					s.SeqTracker.Sack(block)
-				}
-			}
+			s.Option(tcp.SrcPort, tcp.Options[i])
+		}
+		if s.Window != tcp.Window {
+			fmt.Printf("Remote %v window changed from %d to %d\n", tcp.SrcPort, uint32(s.Window)<<s.WindowScale, uint32(tcp.Window)<<s.WindowScale)
+			s.Window = tcp.Window
 		}
 	}
 }
@@ -370,6 +421,9 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		alpha.Packets++
 		data, ci, err = pcap.ReadPacketData()
 	}
+
+	fmt.Printf("%20s: %v\n", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
+	fmt.Printf("%20s: %v\n", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())
 
 	alpha.FirstECECount = p.LeftState.ECECount
 	alpha.SecondECECount = p.RightState.ECECount
