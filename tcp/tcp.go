@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/go/logx"
 )
 
 /*
@@ -23,6 +26,10 @@ models for:
  * connection characteristics, such as MSS, wscale
 
 */
+
+var info = log.New(os.Stdout, "info: ", 0)
+var sparse = logx.NewLogEvery(info, time.Millisecond)
+var sparse2 = logx.NewLogEvery(info, time.Millisecond)
 
 var ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
 var ErrInvalidDelta = fmt.Errorf("invalid delta")
@@ -80,7 +87,7 @@ func (t *Tracker) ByteCount() uint64 {
 func diff(clock uint32, previous uint32) (int32, error) {
 	delta := int32(clock - previous)
 	if !(-1<<30 < delta && delta < 1<<30) {
-		fmt.Printf("invalid sequence delta %d->%d (%d)", previous, clock, delta)
+		info.Printf("invalid sequence delta %d->%d (%d)", previous, clock, delta)
 		return delta, ErrInvalidDelta
 	}
 	return delta, nil
@@ -104,7 +111,7 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	delta, err := diff(clock, t.seq)
 	if err != nil {
 		t.errors++
-		fmt.Printf("Bad seq %4X %4X\n", t.seq, clock)
+		info.Printf("Bad seq %4X %4X\n", t.seq, clock)
 		return inflight, false
 	}
 	if delta < 0 {
@@ -116,7 +123,7 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	// delta is non-negative (not a retransmit)
 	if delta != int32(t.lastDataLength) {
 		t.errors++
-		fmt.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
+		sparse.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
 	}
 
 	if synFin {
@@ -133,7 +140,7 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	gap, err := diff(t.seq, t.ack)
 	if gap > t.maxGap {
 		t.maxGap = gap
-		//fmt.Printf("%8p - %5d: MaxGap = %d\n", t, t.packets, gap)
+		//info.Printf("%8p - %5d: MaxGap = %d\n", t, t.packets, gap)
 	}
 
 	inflight, _ = diff(t.NextSeq(), t.ack)
@@ -154,12 +161,12 @@ func (t *Tracker) Acked() uint64 {
 func (t *Tracker) Ack(clock uint32, withData bool) {
 	if !t.initialized {
 		t.errors++
-		fmt.Print("Ack called before Seq")
+		info.Print("Ack called before Seq")
 	}
 	delta, err := diff(clock, t.ack)
 	if err != nil {
 		t.errors++
-		fmt.Printf("Bad ack %4X %4X\n", t.ack, clock)
+		info.Printf("Bad ack %4X %4X\n", t.ack, clock)
 		return
 	}
 	t.acked += uint64(delta)
@@ -174,18 +181,18 @@ func (t *Tracker) Ack(clock uint32, withData bool) {
 func (t *Tracker) checkSack(sb sackBlock) error {
 	// block should ALWAYS have positive width
 	if width, err := diff(sb.Right, sb.Left); err != nil || width <= 0 {
-		log.Println(ErrInvalidSackBlock, err, width, t.Acked())
+		info.Println(ErrInvalidSackBlock, err, width, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// block Right should ALWAYS be to the left of NextSeq()
 	if overlap, err := diff(t.NextSeq(), sb.Right); err != nil || overlap < 0 {
-		log.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
+		info.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// Left should be to the right of ack
 	if overlap, err := diff(sb.Left, t.ack); err != nil || overlap < 0 {
 		// These often correspond to packets that show up as spurious retransmits in WireShark.
-		log.Println(ErrLateSackBlock, err, overlap, t.Acked())
+		sparse.Println(ErrLateSackBlock, err, overlap, t.Acked())
 		return ErrLateSackBlock
 	}
 	return nil
@@ -195,12 +202,12 @@ func (t *Tracker) checkSack(sb sackBlock) error {
 func (t *Tracker) Sack(sb sackBlock) {
 	if !t.initialized {
 		t.errors++
-		fmt.Println(ErrTrackerNotInitialized)
+		info.Println(ErrTrackerNotInitialized)
 	}
 	// Auto gen code
 	if err := t.checkSack(sb); err != nil {
 		t.errors++
-		fmt.Println(ErrInvalidSackBlock, t.ack, sb, t.NextSeq())
+		info.Println(ErrInvalidSackBlock, t.ack, sb, t.NextSeq())
 	}
 	//t.sacks = append(t.sacks, block)
 	t.sackBytes += uint64(sb.Right - sb.Left)
@@ -247,7 +254,7 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 	case layers.TCPOptionKindTimestamps:
 	case layers.TCPOptionKindWindowScale:
 		// TODO should this change after initialization?
-		fmt.Printf("%v WindowScale change %d -> %d\n", port, s.WindowScale, opt.OptionData[0])
+		sparse.Printf("%v WindowScale change %d -> %d\n", port, s.WindowScale, opt.OptionData[0])
 		s.WindowScale = opt.OptionData[0]
 	default:
 	}
@@ -256,14 +263,14 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInfo) {
 	dataLength := tcpLength - uint16(4*tcp.DataOffset)
 	if tcp.SrcPort == s.SrcPort {
-		//log.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
+		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
 		if inflight, retrans := s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN); retrans {
 			// TODO
 		} else if s.Window > 0 {
 			window := int64(s.Window) << s.WindowScale
 			fraction := float64(inflight) / float64(window)
 			if fraction >= 1.0 {
-				fmt.Printf("Window limited? %d / %d\n", inflight, window)
+				sparse.Printf("Window limited? %d / %d\n", inflight, window)
 			}
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
@@ -282,7 +289,7 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 		}
 		if s.Window != tcp.Window {
 			// VERY VERBOSE
-			//fmt.Printf("Remote %v window changed from %d to %d\n", tcp.SrcPort, uint32(s.Window)<<s.WindowScale, uint32(tcp.Window)<<s.WindowScale)
+			sparse2.Printf("Remote %v window changed from %d to %d\n", tcp.SrcPort, uint32(s.Window)<<s.WindowScale, uint32(tcp.Window)<<s.WindowScale)
 			s.Window = tcp.Window
 		}
 	}
@@ -306,7 +313,7 @@ type Parser struct {
 func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
 	if err != nil {
-		fmt.Print(err)
+		info.Print(err)
 		return nil, err
 	}
 
@@ -321,7 +328,7 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		// Decode a packet
 		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
 		if packet.ErrorLayer() != nil {
-			fmt.Printf("Error decoding packet: %v", packet.ErrorLayer().Error()) // Somewhat VERBOSE
+			sparse.Printf("Error decoding packet: %v", packet.ErrorLayer().Error()) // Somewhat VERBOSE
 			continue
 		}
 
@@ -386,14 +393,14 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 			switch alpha.Packets {
 			case 0:
 				if tcp.SrcPort == 443 || tcp.DstPort == 443 {
-					// log.Println(p.GetUUID(testName))
+					// info.Println(p.GetUUID(testName))
 				}
 				p.LeftState.SrcPort = tcp.SrcPort
 				p.RightState.SrcPort = tcp.DstPort
 			case 1:
 				if p.RightState.SrcPort != tcp.SrcPort || !tcp.ACK {
-					// Use fmt for advisory/info logging.
-					fmt.Println("Bad sack block", p.RightState, p.LeftState, tcp.DstPort, tcp.ACK)
+					// Use log for advisory/info logging.
+					info.Println("Bad sack block", p.RightState, p.LeftState, tcp.DstPort, tcp.ACK)
 				}
 			default:
 			}
@@ -403,7 +410,7 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 			for i := 0; i < len(tcp.Options); i++ {
 				// TODO test case for wrong index.
 				if tcp.Options[i].OptionType > 15 {
-					fmt.Printf("TCP Option %d has illegal option type %d", i, tcp.Options[i].OptionType)
+					info.Printf("TCP Option %d has illegal option type %d", i, tcp.Options[i].OptionType)
 					continue
 				}
 				alpha.OptionCounts[tcp.Options[i].OptionType]++
@@ -429,15 +436,15 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 			}
 
 			if alpha.Packets < 100 && (tcp.SrcPort == 443 || tcp.DstPort == 443) {
-				//log.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
+				//info.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
 			}
 		}
 		alpha.Packets++
 		data, ci, err = pcap.ReadPacketData()
 	}
 
-	fmt.Printf("%20s: %v\n", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
-	fmt.Printf("%20s: %v\n", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())
+	info.Printf("%20s: %v\n", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
+	info.Printf("%20s: %v\n", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())
 
 	alpha.FirstECECount = p.LeftState.ECECount
 	alpha.SecondECECount = p.RightState.ECECount
