@@ -28,8 +28,9 @@ models for:
 */
 
 var info = log.New(os.Stdout, "info: ", 0)
-var sparse = logx.NewLogEvery(info, time.Millisecond)
-var sparse2 = logx.NewLogEvery(info, time.Millisecond)
+var sparseLogger = log.New(os.Stdout, "sparse: ", 0)
+var sparse = logx.NewLogEvery(sparseLogger, time.Millisecond)
+var sparse2 = logx.NewLogEvery(sparseLogger, time.Millisecond)
 
 var ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
 var ErrInvalidDelta = fmt.Errorf("invalid delta")
