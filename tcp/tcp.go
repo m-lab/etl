@@ -88,8 +88,8 @@ func diff(clock uint32, previous uint32) (int32, error) {
 
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
 // Initializes the tracker if it hasn't been initialized yet.
-// Returns true if this is a retransmit
-func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) bool {
+// Returns the bytes in flight (not including retransmits) and boolean indicator if this is a retransmit
+func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	t.packets++ // Some of these may be retransmits.
 
 	if !t.initialized {
@@ -97,18 +97,21 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) bool {
 		t.ack = clock // nothing acked so far
 		t.initialized = true
 	}
+	// Use this unless we are sending new data.
+	inflight, _ := diff(t.NextSeq(), t.ack)
+
 	// TODO handle errors
 	delta, err := diff(clock, t.seq)
 	if err != nil {
 		t.errors++
 		fmt.Printf("Bad seq %4X %4X\n", t.seq, clock)
-		return false
+		return inflight, false
 	}
 	if delta < 0 {
 		// DO NOT update w.seq or w.lastDataLength, as this is a retransmit
 		t.sent += uint64(length)
 		t.retransmits += uint64(length)
-		return true
+		return inflight, true
 	}
 	// delta is non-negative (not a retransmit)
 	if delta != int32(t.lastDataLength) {
@@ -132,7 +135,10 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) bool {
 		t.maxGap = gap
 		//fmt.Printf("%8p - %5d: MaxGap = %d\n", t, t.packets, gap)
 	}
-	return false
+
+	inflight, _ = diff(t.NextSeq(), t.ack)
+
+	return inflight, false
 }
 
 // Total bytes transmitted, not including retransmits.
@@ -251,7 +257,13 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 	dataLength := tcpLength - uint16(4*tcp.DataOffset)
 	if tcp.SrcPort == s.SrcPort {
 		//log.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
-		if s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN) { // TODO
+		if inflight, retrans := s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN); retrans {
+			// TODO
+		} else {
+			fraction := float64(inflight) / float64(int64(s.Window)<<s.WindowScale)
+			if fraction > 0.95 {
+				fmt.Println("Window limited? ", inflight)
+			}
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
 		if tcp.ECE {
