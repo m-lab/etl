@@ -1,6 +1,8 @@
 package tcp_test
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/m-lab/etl/tcp"
@@ -88,4 +90,34 @@ func TestTracker_SendNext(t *testing.T) {
 				}
 			})
 		}*/
+}
+
+// TestParse exercises a lot of code, on the ipv4 path.  It only checks
+// some basic stats, which are assumed to be correct, but not inspected.
+func TestParse(t *testing.T) {
+	f, err := os.Open("testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tcp := tcp.Parser{}
+	summary, err := tcp.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Packets != 336 {
+		t.Errorf("Packets = %v, want %v", summary.Packets, 336)
+	}
+	if summary.FirstRetransmits != 11 {
+		t.Errorf("FirstRetransmits = %v, want %v", summary.FirstRetransmits, 11)
+	}
+	if summary.SecondRetransmits != 8 {
+		t.Errorf("SecondRetransmits = %v, want %v", summary.SecondRetransmits, 8)
+	}
+	if summary.TruncatedPackets != 0 {
+		t.Errorf("TruncatedPackets = %v, want %v", summary.TruncatedPackets, 0)
+	}
 }

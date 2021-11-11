@@ -44,13 +44,14 @@ type sackBlock struct {
 }
 
 type Tracker struct {
-	initialized bool
-	errors      uint32 // Number of errors encountered while parsing
-	packets     uint32 // Number of calls to Seq function
-	seq         uint32 // The last sequence number observed, not counting retransmits
-	synFin      uint32 // zero, one or two, depending on whether SYN and FIN were sent
-	sent        uint64 // actual bytes sent, including retransmits, but not SYN or FIN
-	retransmits uint64 // bytes retransmitted
+	initialized    bool
+	errors         uint32 // Number of errors encountered while parsing
+	packets        uint32 // Number of calls to Seq function
+	seq            uint32 // The last sequence number observed, not counting retransmits
+	synFin         uint32 // zero, one or two, depending on whether SYN and FIN were sent
+	sent           uint64 // actual bytes sent, including retransmits, but not SYN or FIN
+	retransmits    uint64 // bytes retransmitted
+	retransPackets uint32 // number of retransmitted packets
 
 	sendUNA  uint32 // greatest observed ack
 	acks     uint32 // number of acks (from other side)
@@ -119,6 +120,7 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	if delta < 0 {
 		// DO NOT update w.seq or w.lastDataLength, as this is a retransmit
 		t.sent += uint64(length)
+		t.retransPackets++
 		t.retransmits += uint64(length)
 		return inflight, true
 	}
@@ -269,9 +271,13 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 		}
 	case layers.TCPOptionKindTimestamps:
 	case layers.TCPOptionKindWindowScale:
-		// TODO should this change after initialization?
-		sparse.Printf("%v WindowScale change %d -> %d\n", port, s.WindowScale, opt.OptionData[0])
-		s.WindowScale = opt.OptionData[0]
+		if len(opt.OptionData) != 1 {
+			info.Println("Invalid WindowScale option length", len(opt.OptionData))
+		} else {
+			// TODO should this change after initialization?
+			sparse.Printf("%v WindowScale change %d -> %d\n", port, s.WindowScale, opt.OptionData[0])
+			s.WindowScale = opt.OptionData[0]
+		}
 	default:
 	}
 }
@@ -465,10 +471,10 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	info.Printf("%20s: %v\n", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
 	info.Printf("%20s: %v\n", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())
 
-	alpha.FirstECECount = p.LeftState.ECECount
-	alpha.SecondECECount = p.RightState.ECECount
-	alpha.FirstRetransmits = p.LeftState.SeqTracker.retransmits
-	alpha.SecondRetransmits = p.RightState.SeqTracker.retransmits
+	alpha.FirstECECount = int64(p.LeftState.ECECount)
+	alpha.SecondECECount = int64(p.RightState.ECECount)
+	alpha.FirstRetransmits = int64(p.LeftState.SeqTracker.retransPackets)
+	alpha.SecondRetransmits = int64(p.RightState.SeqTracker.retransPackets)
 	// TODO update these names
 	alpha.TotalSrcSeq = int64(p.LeftState.SeqTracker.ByteCount())
 	alpha.TotalDstSeq = int64(p.RightState.SeqTracker.ByteCount())

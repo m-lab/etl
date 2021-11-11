@@ -17,10 +17,10 @@ type AlphaFields struct {
 	SynAckTime        time.Time `bigquery:"syn_ack_time" json:"syn_ack_time"`
 	Packets           int64     `bigquery:"packets" json:"packets"`
 	OptionCounts      []int64   `bigquery:"option_counts" json:"option_counts"`
-	FirstECECount     uint64    `bigquery:"first_ece_count" json:"first_ece_count"`
-	SecondECECount    uint64    `bigquery:"second_ece_count" json:"second_ece_count"`
-	FirstRetransmits  uint64    `bigquery:"first_retransmits" json:"first_retransmits"`
-	SecondRetransmits uint64    `bigquery:"second_retransmits" json:"second_retransmits"`
+	FirstECECount     int64     `bigquery:"first_ece_count" json:"first_ece_count"`
+	SecondECECount    int64     `bigquery:"second_ece_count" json:"second_ece_count"`
+	FirstRetransmits  int64     `bigquery:"first_retransmits" json:"first_retransmits"`
+	SecondRetransmits int64     `bigquery:"second_retransmits" json:"second_retransmits"`
 	Sacks             int64     `bigquery:"sacks" json:"sacks"`
 	TotalSrcSeq       int64     `bigquery:"total_src_seq" json:"total_src_seq"`
 	TotalDstSeq       int64     `bigquery:"total_dst_seq" json:"total_dst_seq"`
