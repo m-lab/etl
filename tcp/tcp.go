@@ -29,8 +29,8 @@ models for:
 
 var info = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
 var sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
-var sparse = logx.NewLogEvery(sparseLogger, time.Millisecond)
-var sparse2 = logx.NewLogEvery(sparseLogger, time.Millisecond)
+var sparse = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
+var sparse2 = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
 
 var ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
 var ErrInvalidDelta = fmt.Errorf("invalid delta")
@@ -191,12 +191,13 @@ func (t *Tracker) SendUNA() uint32 {
 func (t *Tracker) checkSack(sb sackBlock) error {
 	// block should ALWAYS have positive width
 	if width, err := diff(sb.Right, sb.Left); err != nil || width <= 0 {
-		info.Println(ErrInvalidSackBlock, err, width, t.Acked())
+		sparse.Println(ErrInvalidSackBlock, err, width, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// block Right should ALWAYS be to the left of NextSeq()
+	// If not, we may have missed recording a packet!
 	if overlap, err := diff(t.SendNext(), sb.Right); err != nil || overlap < 0 {
-		info.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
+		sparse.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// Left should be to the right of ack
@@ -217,7 +218,7 @@ func (t *Tracker) Sack(sb sackBlock) {
 	// Auto gen code
 	if err := t.checkSack(sb); err != nil {
 		t.errors++
-		info.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
+		sparse.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
 	}
 	//t.sacks = append(t.sacks, block)
 	t.sackBytes += uint64(sb.Right - sb.Left)
