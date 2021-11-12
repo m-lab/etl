@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
 	job "github.com/m-lab/etl-gardener/client"
@@ -95,13 +96,19 @@ func postAndIgnoreResponse(ctx context.Context, url url.URL) error {
 // or the context is canceled.
 func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job) (*errgroup.Group, error) {
 	eg := &errgroup.Group{}
+	count := 0
 	for {
 		run, err := rSrc.Next(ctx)
 		if err != nil {
-			metrics.BackendFailureCount.WithLabelValues(
-				job.Datatype, "rSrc.Next").Inc()
-			log.Println(err)
-			return eg, err
+			if err == iterator.Done {
+				log.Printf("Dispatched total of %d archives for %s\n", count, job.String())
+				return eg, nil
+			} else {
+				metrics.BackendFailureCount.WithLabelValues(
+					job.Datatype, "rSrc.Next").Inc()
+				log.Println(err)
+				return eg, err
+			}
 		}
 
 		heartbeat := tracker.HeartbeatURL(g.trackerBase, job)
@@ -125,6 +132,7 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 			return err
 		}
 
+		count++
 		eg.Go(f)
 	}
 }
@@ -171,14 +179,14 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 	toRunnable func(o *storage.ObjectAttrs) Runnable, tokens TokenSource) error {
 	job, err := g.NextJob(ctx)
 	if err != nil {
-		log.Println(err)
+		log.Println(err, "on Gardener client.NextJob()")
 		return err
 	}
 
 	log.Println(job, "filter:", job.Filter)
 	gcsSource, err := g.JobFileSource(ctx, job.Job, toRunnable)
 	if err != nil {
-		log.Println(err)
+		log.Println(err, "on JobFileSource")
 		return err
 	}
 	src := Throttle(gcsSource, tokens)
