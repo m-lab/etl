@@ -171,12 +171,14 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 	toRunnable func(o *storage.ObjectAttrs) Runnable, tokens TokenSource) error {
 	job, err := g.NextJob(ctx)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 
 	log.Println(job, "filter:", job.Filter)
 	gcsSource, err := g.JobFileSource(ctx, job.Job, toRunnable)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	src := Throttle(gcsSource, tokens)
@@ -189,12 +191,18 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 	}
 
 	eg, err := g.RunAll(ctx, src, job.Job)
+	if err != nil {
+		log.Println(err)
+	}
 
 	// Once all are dispatched, we want to wait until all have completed
 	// before posting the state change.
 	go func() {
 		log.Println("all tasks dispatched for", job.Path())
-		eg.Wait()
+		err := eg.Wait()
+		if err != nil {
+			log.Println(err, "on wait for", job.Path())
+		}
 		log.Println("finished", job.Path())
 		update := tracker.UpdateURL(g.trackerBase, job.Job, tracker.ParseComplete, "")
 		// TODO - should this have a retry?
