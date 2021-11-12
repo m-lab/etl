@@ -352,7 +352,7 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 
 	for err == nil {
 		// Decode a packet
-		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
+		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.NoCopy)
 		if packet.ErrorLayer() != nil {
 			sparse.Printf("Error decoding packet: %v", packet.ErrorLayer().Error()) // Somewhat VERBOSE
 			continue

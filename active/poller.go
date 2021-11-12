@@ -106,7 +106,7 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 			} else {
 				metrics.BackendFailureCount.WithLabelValues(
 					job.Datatype, "rSrc.Next").Inc()
-				log.Println(err)
+				log.Println(err, "processing", job.String())
 				return eg, err
 			}
 		}
