@@ -33,6 +33,7 @@ func init() {
 	// Always prepend the filename and line number.
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	logx.LogxDebug.Set("true")
+	logx.Debug.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
 type counter struct {
