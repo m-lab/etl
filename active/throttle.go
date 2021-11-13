@@ -73,6 +73,7 @@ func (ts *throttledSource) Next(ctx context.Context) (Runnable, error) {
 	// We want Next to block here until a throttle token is available.
 	err := ts.throttle.Acquire(ctx)
 	if err != nil {
+		log.Println("Throttle.Acquire error", err)
 		return nil, err
 	}
 	next, err := ts.RunnableSource.Next(ctx)
