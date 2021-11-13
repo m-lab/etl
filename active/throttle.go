@@ -2,6 +2,8 @@ package active
 
 import (
 	"context"
+	"log"
+	"sync/atomic"
 
 	"golang.org/x/sync/semaphore"
 )
@@ -14,22 +16,37 @@ type TokenSource interface {
 
 // wsTokenSource is a simple token source for initial testing.
 type wsTokenSource struct {
-	sem *semaphore.Weighted
+	acquired int64
+	released int64
+	sem      *semaphore.Weighted
 }
 
 // Acquire acquires an admission token.
 func (ts *wsTokenSource) Acquire(ctx context.Context) error {
-	return ts.sem.Acquire(ctx, 1)
+	err := ts.sem.Acquire(ctx, 1)
+	if err == nil {
+		a := atomic.AddInt64(&ts.acquired, 1)
+		if a%100 == 0 {
+			r := atomic.LoadInt64(&ts.released)
+			log.Printf("TokenBucket Acquired: %d Released: %d", a, r)
+		}
+
+	}
+	return err
 }
 
 // Release releases an admission token.
 func (ts *wsTokenSource) Release() {
+	r := atomic.AddInt64(&ts.released, 1)
+	if r%1000 == 0 {
+		log.Printf("Released total of %d tokens.", r)
+	}
 	ts.sem.Release(1)
 }
 
 // NewWSTokenSource returns a TokenSource based on semaphore.Weighted.
 func NewWSTokenSource(n int) TokenSource {
-	return &wsTokenSource{semaphore.NewWeighted(int64(n))}
+	return &wsTokenSource{sem: semaphore.NewWeighted(int64(n))}
 }
 
 // throttedSource encapsulates a Source and a throttling mechanism.
