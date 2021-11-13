@@ -79,10 +79,10 @@ spec:
 
         resources:
           requests:
-            memory: "15Gi"
+            memory: "35Gi"
             cpu: "15"
           limits:
-            memory: "20Gi"
+            memory: "50Gi"
             cpu: "15"
 
       nodeSelector:
