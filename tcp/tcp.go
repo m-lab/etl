@@ -50,7 +50,6 @@ type Tracker struct {
 	seq            uint32 // The last sequence number observed, not counting retransmits
 	synFin         uint32 // zero, one or two, depending on whether SYN and FIN were sent
 	sent           uint64 // actual bytes sent, including retransmits, but not SYN or FIN
-	retransmits    uint64 // bytes retransmitted
 	retransPackets uint32 // number of retransmitted packets
 
 	sendUNA  uint32 // greatest observed ack
@@ -127,7 +126,7 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 		// DO NOT update w.seq or w.lastDataLength, as this is a retransmit
 		t.sent += uint64(length)
 		t.retransPackets++
-		t.retransmits += uint64(length)
+		t.Retransmits += int64(length)
 		return inflight, true
 	}
 	// delta is non-negative (not a retransmit)
@@ -161,7 +160,7 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 // Total bytes transmitted, not including retransmits.
 // TODO should this include the 1 byte SYN?
 func (t *Tracker) Sent() uint64 {
-	return t.sent - t.retransmits
+	return t.sent - uint64(t.Retransmits)
 }
 
 func (t *Tracker) Acked() uint64 {
@@ -262,7 +261,15 @@ type state struct {
 }
 
 func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
-	switch opt.OptionType {
+	// TODO test case for wrong index.
+	optionType := opt.OptionType
+	if optionType > 15 {
+		info.Printf("TCP Option has illegal option type %d", opt.OptionType)
+		return
+	}
+	// HACK s.OptionCounts[optionType]++
+
+	switch optionType {
 	case layers.TCPOptionKindSACK:
 		data := opt.OptionData
 		sacks := make([]sackBlock, len(data)/8)
@@ -299,6 +306,10 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 		if !tcp.SYN {
 			if remaining, _ := diff(s.Limit, s.SeqTracker.SendNext()); remaining < 0 {
 				// TODO: This is currently triggering more often than expected.
+				// The stack should not send data beyond the window limit, which would have been
+				// specified in the last ack.  But if pcaps did not capture the last ack, and
+				// that ack increased the window, then this might be a valid send, and an
+				// indication that we missed a packet in the capture.
 				log.Println("Protocol violation", s.SrcPort, s.SeqTracker.packets)
 			} else if remaining < int32(s.MSS) {
 				sparse.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", int64(s.Window)<<s.WindowScale, remaining, s.MSS)
@@ -325,10 +336,15 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 			s.Limit = s.SeqTracker.sendUNA + uint32(s.Window)<<s.WindowScale
 		}
 	}
+	// Handle options
+	for _, opt := range tcp.Options {
+		s.Option(tcp.SrcPort, opt)
+	}
+
 }
 
 func (s state) String() string {
-	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.SeqTracker.retransmits, s.ECECount)
+	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.SeqTracker.Retransmits, s.ECECount)
 }
 
 type Parser struct {
@@ -482,13 +498,13 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	info.Printf("%20s: %v", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
 	info.Printf("%20s: %v", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())
 
-	alpha.FirstECECount = int64(p.LeftState.ECECount)
-	alpha.SecondECECount = int64(p.RightState.ECECount)
+	//alpha.FirstECECount = int64(p.LeftState.ECECount)
+	//alpha.SecondECECount = int64(p.RightState.ECECount)
 	alpha.FirstRetransmits = int64(p.LeftState.SeqTracker.retransPackets)
 	alpha.SecondRetransmits = int64(p.RightState.SeqTracker.retransPackets)
 	// TODO update these names
-	alpha.TotalSrcSeq = int64(p.LeftState.SeqTracker.ByteCount())
-	alpha.TotalDstSeq = int64(p.RightState.SeqTracker.ByteCount())
+	//alpha.TotalSrcSeq = int64(p.LeftState.SeqTracker.ByteCount())
+	//alpha.TotalDstSeq = int64(p.RightState.SeqTracker.ByteCount())
 
 	return &alpha, nil
 }
