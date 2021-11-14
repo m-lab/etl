@@ -416,6 +416,10 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 				}
 			}
 		}
+
+		// Looks like TCP is generating huge number of errors.  So we'll try bypassing it and see
+		// how that changes the behavior.
+		continue
 		// Get the TCP layer from this packet
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
