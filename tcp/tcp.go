@@ -360,118 +360,119 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		})
 		if packet.ErrorLayer() != nil {
 			sparse.Printf("Error decoding packet: %v", packet.ErrorLayer().Error()) // Somewhat VERBOSE
-			continue
-		}
+		} else {
 
-		// TODO This really needs to be refactored and simplified.
-		var tcpLength uint16
-		if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-			ip, _ := ipLayer.(*layers.IPv4)
-			tcpLength = ip.Length - uint16(4*ip.IHL)
-			switch alpha.Packets {
-			case 0:
-				p.LeftState.SrcIP = ip.SrcIP
-				p.LeftState.TTL = ip.TTL
-			case 1:
-				p.RightState.SrcIP = ip.SrcIP
-				p.RightState.TTL = ip.TTL
-			default:
-				if p.LeftState.SrcIP.Equal(ip.SrcIP) {
-					if p.LeftState.TTL != ip.TTL {
-						alpha.TTLChanges++
-						p.LeftState.TTLChanges++
+			// TODO This really needs to be refactored and simplified.
+			var tcpLength uint16
+			if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+				ip, _ := ipLayer.(*layers.IPv4)
+				tcpLength = ip.Length - uint16(4*ip.IHL)
+				switch alpha.Packets {
+				case 0:
+					p.LeftState.SrcIP = ip.SrcIP
+					p.LeftState.TTL = ip.TTL
+				case 1:
+					p.RightState.SrcIP = ip.SrcIP
+					p.RightState.TTL = ip.TTL
+				default:
+					if p.LeftState.SrcIP.Equal(ip.SrcIP) {
+						if p.LeftState.TTL != ip.TTL {
+							alpha.TTLChanges++
+							p.LeftState.TTLChanges++
+						}
+					} else if p.RightState.SrcIP.Equal(ip.SrcIP) {
+						if p.RightState.TTL != ip.TTL {
+							alpha.TTLChanges++
+							p.RightState.TTLChanges++
+						}
+					} else {
+						alpha.IPChanges++
 					}
-				} else if p.RightState.SrcIP.Equal(ip.SrcIP) {
-					if p.RightState.TTL != ip.TTL {
-						alpha.TTLChanges++
-						p.RightState.TTLChanges++
+				}
+			} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
+				ip, _ := ipLayer.(*layers.IPv6)
+				tcpLength = ip.Length // In IPv6, the Length field is the payload length.
+				switch alpha.Packets {
+				case 0:
+					p.LeftState.SrcIP = ip.SrcIP
+					p.LeftState.TTL = ip.HopLimit
+				case 1:
+					p.RightState.SrcIP = ip.SrcIP
+					p.RightState.TTL = ip.HopLimit
+				default:
+					if p.LeftState.SrcIP.Equal(ip.SrcIP) {
+						if p.LeftState.TTL != ip.HopLimit {
+							alpha.TTLChanges++
+							p.RightState.TTLChanges++
+						}
+					} else if p.RightState.SrcIP.Equal(ip.SrcIP) {
+						if p.RightState.TTL != ip.HopLimit {
+							alpha.TTLChanges++
+							p.RightState.TTLChanges++
+						}
+					} else {
+						alpha.IPChanges++
 					}
-				} else {
-					alpha.IPChanges++
 				}
 			}
-		} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-			ip, _ := ipLayer.(*layers.IPv6)
-			tcpLength = ip.Length // In IPv6, the Length field is the payload length.
-			switch alpha.Packets {
-			case 0:
-				p.LeftState.SrcIP = ip.SrcIP
-				p.LeftState.TTL = ip.HopLimit
-			case 1:
-				p.RightState.SrcIP = ip.SrcIP
-				p.RightState.TTL = ip.HopLimit
-			default:
-				if p.LeftState.SrcIP.Equal(ip.SrcIP) {
-					if p.LeftState.TTL != ip.HopLimit {
-						alpha.TTLChanges++
-						p.RightState.TTLChanges++
+
+			// Looks like TCP is generating huge number of errors.  So we'll try bypassing it and see
+			// how that changes the behavior.
+			if true {
+				// Get the TCP layer from this packet
+				if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+					tcp, _ := tcpLayer.(*layers.TCP)
+
+					// Special case handling for first two packets.
+					switch alpha.Packets {
+					case 0:
+						if tcp.SrcPort == 443 || tcp.DstPort == 443 {
+							// info.Println(p.GetUUID(testName))
+						}
+						p.LeftState.SrcPort = tcp.SrcPort
+						p.RightState.SrcPort = tcp.DstPort
+					case 1:
+						if p.RightState.SrcPort != tcp.SrcPort || !tcp.ACK {
+							// Use log for advisory/info logging.
+							info.Println("Bad sack block", p.RightState, p.LeftState, tcp.DstPort, tcp.ACK)
+						}
+					default:
 					}
-				} else if p.RightState.SrcIP.Equal(ip.SrcIP) {
-					if p.RightState.TTL != ip.HopLimit {
-						alpha.TTLChanges++
-						p.RightState.TTLChanges++
+
+					var sack int
+					// Handle options
+					for i := 0; i < len(tcp.Options); i++ {
+						// TODO test case for wrong index.
+						if tcp.Options[i].OptionType > 15 {
+							info.Printf("TCP Option %d has illegal option type %d", i, tcp.Options[i].OptionType)
+							continue
+						}
+						alpha.OptionCounts[tcp.Options[i].OptionType]++
+						if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
+							// TODO This is overcounting.  We want to count the distinct packets that are skipped in the SACKs.
+							sack = int(len(tcp.Options[i].OptionData) / 8)
+							alpha.Sacks += int64(sack)
+						}
 					}
-				} else {
-					alpha.IPChanges++
-				}
-			}
-		}
 
-		// Looks like TCP is generating huge number of errors.  So we'll try bypassing it and see
-		// how that changes the behavior.
-		continue
-		// Get the TCP layer from this packet
-		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-			tcp, _ := tcpLayer.(*layers.TCP)
+					// Update both state structs.
+					p.LeftState.Update(tcpLength, tcp, ci)
+					p.RightState.Update(tcpLength, tcp, ci)
 
-			// Special case handling for first two packets.
-			switch alpha.Packets {
-			case 0:
-				if tcp.SrcPort == 443 || tcp.DstPort == 443 {
-					// info.Println(p.GetUUID(testName))
-				}
-				p.LeftState.SrcPort = tcp.SrcPort
-				p.RightState.SrcPort = tcp.DstPort
-			case 1:
-				if p.RightState.SrcPort != tcp.SrcPort || !tcp.ACK {
-					// Use log for advisory/info logging.
-					info.Println("Bad sack block", p.RightState, p.LeftState, tcp.DstPort, tcp.ACK)
-				}
-			default:
-			}
+					if tcp.SYN {
+						if tcp.ACK {
+							alpha.SynAckTime = ci.Timestamp
+							alpha.SynAckPacket = alpha.Packets
+						} else {
+							alpha.SynTime = ci.Timestamp
+							alpha.SynPacket = alpha.Packets
+						}
+					}
 
-			var sack int
-			// Handle options
-			for i := 0; i < len(tcp.Options); i++ {
-				// TODO test case for wrong index.
-				if tcp.Options[i].OptionType > 15 {
-					info.Printf("TCP Option %d has illegal option type %d", i, tcp.Options[i].OptionType)
-					continue
+					if alpha.Packets < 100 && (tcp.SrcPort == 443 || tcp.DstPort == 443) {
+						//info.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
+					}
 				}
-				alpha.OptionCounts[tcp.Options[i].OptionType]++
-				if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
-					// TODO This is overcounting.  We want to count the distinct packets that are skipped in the SACKs.
-					sack = int(len(tcp.Options[i].OptionData) / 8)
-					alpha.Sacks += int64(sack)
-				}
-			}
-
-			// Update both state structs.
-			p.LeftState.Update(tcpLength, tcp, ci)
-			p.RightState.Update(tcpLength, tcp, ci)
-
-			if tcp.SYN {
-				if tcp.ACK {
-					alpha.SynAckTime = ci.Timestamp
-					alpha.SynAckPacket = alpha.Packets
-				} else {
-					alpha.SynTime = ci.Timestamp
-					alpha.SynPacket = alpha.Packets
-				}
-			}
-
-			if alpha.Packets < 100 && (tcp.SrcPort == 443 || tcp.DstPort == 443) {
-				//info.Printf("%2d, %10d, %10d, %s <--> %s", count, tcp.Seq, tcp.Ack, first, second)
 			}
 		}
 		alpha.Packets++
