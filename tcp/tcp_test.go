@@ -95,57 +95,46 @@ func TestTracker_SendNext(t *testing.T) {
 // TestParse exercises a lot of code, on the ipv4 path.  It only checks
 // some basic stats, which are assumed to be correct, but not inspected.
 func TestParse(t *testing.T) {
-	f, err := os.Open("testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap")
-	if err != nil {
-		t.Fatal(err)
+	type test struct {
+		name                                string
+		fn                                  string
+		packets                             int64
+		firstRetransmits, secondRetransmits int64
+		truncated                           int64
 	}
-	data, err := ioutil.ReadAll(f)
-	if err != nil {
-		t.Fatal(err)
+	tests := []test{
+		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap",
+			packets: 336, firstRetransmits: 11, secondRetransmits: 8, truncated: 0},
+		{name: "protocolErrors", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2E15.pcap.gz",
+			packets: 6774, firstRetransmits: 0, secondRetransmits: 73, truncated: 0},
+		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
+			packets: 15, firstRetransmits: 0, secondRetransmits: 0, truncated: 0},
 	}
-	tcp := tcp.Parser{}
-	summary, err := tcp.Parse(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if summary.Packets != 336 {
-		t.Errorf("Packets = %v, want %v", summary.Packets, 336)
-	}
-	if summary.FirstRetransmits != 11 {
-		t.Errorf("FirstRetransmits = %v, want %v", summary.FirstRetransmits, 11)
-	}
-	if summary.SecondRetransmits != 8 {
-		t.Errorf("SecondRetransmits = %v, want %v", summary.SecondRetransmits, 8)
-	}
-	if summary.TruncatedPackets != 0 {
-		t.Errorf("TruncatedPackets = %v, want %v", summary.TruncatedPackets, 0)
-	}
-}
-
-func TestProtocolError(t *testing.T) {
-	f, err := os.Open("testfiles/ndt-nnwk2_1611335823_00000000000C2E15.pcap.gz")
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := ioutil.ReadAll(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tcp := tcp.Parser{}
-	summary, err := tcp.Parse(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if summary.Packets != 6774 {
-		t.Errorf("Packets = %v, want %v", summary.Packets, 6774)
-	}
-	if summary.FirstRetransmits != 0 {
-		t.Errorf("FirstRetransmits = %v, want %v", summary.FirstRetransmits, 0)
-	}
-	if summary.SecondRetransmits != 73 {
-		t.Errorf("SecondRetransmits = %v, want %v", summary.SecondRetransmits, 73)
-	}
-	if summary.TruncatedPackets != 0 {
-		t.Errorf("TruncatedPackets = %v, want %v", summary.TruncatedPackets, 0)
+	for _, tt := range tests {
+		f, err := os.Open(tt.fn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := ioutil.ReadAll(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tcp := tcp.Parser{}
+		summary, err := tcp.Parse(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if summary.Packets != tt.packets {
+			t.Errorf("test:%s: Packets = %v, want %v", tt.name, summary.Packets, tt.packets)
+		}
+		if summary.FirstRetransmits != tt.firstRetransmits {
+			t.Errorf("test:%s: FirstRetransmits = %v, want %v", tt.name, summary.FirstRetransmits, tt.firstRetransmits)
+		}
+		if summary.SecondRetransmits != tt.secondRetransmits {
+			t.Errorf("test:%s: SecondRetransmits = %v, want %v", tt.name, summary.SecondRetransmits, tt.secondRetransmits)
+		}
+		if summary.TruncatedPackets != tt.truncated {
+			t.Errorf("test:%s: TruncatedPackets = %v, want %v", tt.name, summary.TruncatedPackets, tt.truncated)
+		}
 	}
 }
