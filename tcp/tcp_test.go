@@ -112,10 +112,38 @@ func TestParse(t *testing.T) {
 		t.Errorf("Packets = %v, want %v", summary.Packets, 336)
 	}
 	if summary.FirstRetransmits != 11 {
-		//t.Errorf("FirstRetransmits = %v, want %v", summary.FirstRetransmits, 11)
+		t.Errorf("FirstRetransmits = %v, want %v", summary.FirstRetransmits, 11)
 	}
 	if summary.SecondRetransmits != 8 {
-		//t.Errorf("SecondRetransmits = %v, want %v", summary.SecondRetransmits, 8)
+		t.Errorf("SecondRetransmits = %v, want %v", summary.SecondRetransmits, 8)
+	}
+	if summary.TruncatedPackets != 0 {
+		t.Errorf("TruncatedPackets = %v, want %v", summary.TruncatedPackets, 0)
+	}
+}
+
+func TestProtocolError(t *testing.T) {
+	f, err := os.Open("testfiles/ndt-nnwk2_1611335823_00000000000C2E15.pcap.gz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tcp := tcp.Parser{}
+	summary, err := tcp.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Packets != 6774 {
+		t.Errorf("Packets = %v, want %v", summary.Packets, 6774)
+	}
+	if summary.FirstRetransmits != 0 {
+		t.Errorf("FirstRetransmits = %v, want %v", summary.FirstRetransmits, 0)
+	}
+	if summary.SecondRetransmits != 73 {
+		t.Errorf("SecondRetransmits = %v, want %v", summary.SecondRetransmits, 73)
 	}
 	if summary.TruncatedPackets != 0 {
 		t.Errorf("TruncatedPackets = %v, want %v", summary.TruncatedPackets, 0)
