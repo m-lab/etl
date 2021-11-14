@@ -48,8 +48,8 @@ func TestTracker_SendNext(t *testing.T) {
 	if tr.SendNext() != 1275 {
 		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1275)
 	}
-	if tr.Errors() != 1 {
-		t.Errorf("Errors() = %v, want %v", tr.Errors(), 1)
+	if tr.Stats().BadDeltas != 1 {
+		t.Errorf("Stats().BadDeltas = %v, want %v", tr.Stats().BadDeltas, 1)
 	}
 
 	// Seq that doesn't match previous data length.
@@ -58,8 +58,8 @@ func TestTracker_SendNext(t *testing.T) {
 	if tr.SendNext() != 1300 {
 		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1300)
 	}
-	if tr.Errors() != 2 {
-		t.Errorf("Errors() = %v, want %v", tr.Errors(), 2)
+	if tr.Stats().MissingPackets != 1 {
+		t.Errorf("Stats() = %v, want %v", tr.Stats().MissingPackets, 1)
 	}
 
 	/*

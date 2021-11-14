@@ -64,6 +64,9 @@ type Tracker struct {
 	sackBytes uint64 // keeps track of total bytes reported missing in SACK blocks
 
 	lastDataLength uint16 // Used to compute NextSeq()
+
+	// These stats are useful for bigquery summaries.
+	schema.TcpStats
 }
 
 func (t *Tracker) Summary() string {
@@ -72,8 +75,8 @@ func (t *Tracker) Summary() string {
 }
 
 // Errors returns the number of errors encountered while parsing.
-func (t *Tracker) Errors() uint32 {
-	return t.errors
+func (t *Tracker) Stats() schema.TcpStats {
+	return t.TcpStats
 }
 
 // SendNext returns the uint32 value of the expected next sequence number.
@@ -95,6 +98,9 @@ func diff(clock uint32, previous uint32) (int32, error) {
 	return delta, nil
 }
 
+var badSeq = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
+var badAck = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
+
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
 // Initializes the tracker if it hasn't been initialized yet.
 // Returns the bytes in flight (not including retransmits) and boolean indicator if this is a retransmit
@@ -113,8 +119,8 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	// TODO handle errors
 	delta, err := diff(clock, t.seq)
 	if err != nil {
-		t.errors++
-		info.Printf("Bad seq %4X %4X\n", t.seq, clock)
+		t.BadDeltas++
+		badSeq.Printf("Bad seq %4X -> %4X\n", t.seq, clock)
 		return inflight, false
 	}
 	if delta < 0 {
@@ -126,7 +132,7 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	}
 	// delta is non-negative (not a retransmit)
 	if delta != int32(t.lastDataLength) {
-		t.errors++
+		t.MissingPackets++
 		sparse.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
 	}
 
@@ -169,8 +175,8 @@ func (t *Tracker) Ack(clock uint32, withData bool) {
 	}
 	delta, err := diff(clock, t.sendUNA)
 	if err != nil {
-		t.errors++
-		info.Printf("Bad ack %4X %4X\n", t.sendUNA, clock)
+		t.BadDeltas++
+		badAck.Printf("Bad ack %4X -> %4X\n", t.sendUNA, clock)
 		return
 	}
 	if delta > 0 {
@@ -217,7 +223,7 @@ func (t *Tracker) Sack(sb sackBlock) {
 	}
 	// Auto gen code
 	if err := t.checkSack(sb); err != nil {
-		t.errors++
+		t.BadSacks++
 		sparse.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
 	}
 	//t.sacks = append(t.sacks, block)
