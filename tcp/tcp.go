@@ -36,6 +36,7 @@ var ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
 var ErrInvalidDelta = fmt.Errorf("invalid delta")
 var ErrInvalidSackBlock = fmt.Errorf("invalid sack block")
 var ErrLateSackBlock = fmt.Errorf("sack block to left of ack")
+var ErrNoIPLayer = fmt.Errorf("no IP layer")
 
 // TODO - build a sackblock model, that consolidates new sack blocks into existing state.
 type sackBlock struct {
@@ -415,6 +416,19 @@ func (p *Parser) tcpLayer(tcp *layers.TCP, ci gopacket.CaptureInfo, tcpLength ui
 	return nil
 }
 
+func extractIPFields(packet gopacket.Packet) (srcIP net.IP, TTL uint8, tcpLength uint16, err error) {
+	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv4)
+		return ip.SrcIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
+	} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv6)
+		// In IPv6, the Length field is the payload length.
+		return ip.SrcIP, ip.HopLimit, ip.Length, nil
+	} else {
+		return nil, 0, 0, ErrNoIPLayer
+	}
+}
+
 // Parse parses an entire pcap file.
 func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
@@ -441,57 +455,31 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 			continue
 		}
 
-		// TODO This really needs to be refactored and simplified.
-		var tcpLength uint16
-		if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-			ip, _ := ipLayer.(*layers.IPv4)
-			tcpLength = ip.Length - uint16(4*ip.IHL)
-			switch alpha.Packets {
-			case 0:
-				p.LeftState.SrcIP = ip.SrcIP
-				p.LeftState.TTL = ip.TTL
-			case 1:
-				p.RightState.SrcIP = ip.SrcIP
-				p.RightState.TTL = ip.TTL
-			default:
-				if p.LeftState.SrcIP.Equal(ip.SrcIP) {
-					if p.LeftState.TTL != ip.TTL {
-						alpha.TTLChanges++
-						p.LeftState.TTLChanges++
-					}
-				} else if p.RightState.SrcIP.Equal(ip.SrcIP) {
-					if p.RightState.TTL != ip.TTL {
-						alpha.TTLChanges++
-						p.RightState.TTLChanges++
-					}
-				} else {
-					alpha.IPChanges++
+		srcIP, ttl, tcpLength, err := extractIPFields(packet)
+		if err != nil {
+			return nil, err
+		}
+
+		switch alpha.Packets {
+		case 0:
+			p.LeftState.SrcIP = srcIP
+			p.LeftState.TTL = ttl
+		case 1:
+			p.RightState.SrcIP = srcIP
+			p.RightState.TTL = ttl
+		default:
+			if p.LeftState.SrcIP.Equal(srcIP) {
+				if p.LeftState.TTL != ttl {
+					alpha.TTLChanges++
+					p.LeftState.TTLChanges++
 				}
-			}
-		} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-			ip, _ := ipLayer.(*layers.IPv6)
-			tcpLength = ip.Length // In IPv6, the Length field is the payload length.
-			switch alpha.Packets {
-			case 0:
-				p.LeftState.SrcIP = ip.SrcIP
-				p.LeftState.TTL = ip.HopLimit
-			case 1:
-				p.RightState.SrcIP = ip.SrcIP
-				p.RightState.TTL = ip.HopLimit
-			default:
-				if p.LeftState.SrcIP.Equal(ip.SrcIP) {
-					if p.LeftState.TTL != ip.HopLimit {
-						alpha.TTLChanges++
-						p.RightState.TTLChanges++
-					}
-				} else if p.RightState.SrcIP.Equal(ip.SrcIP) {
-					if p.RightState.TTL != ip.HopLimit {
-						alpha.TTLChanges++
-						p.RightState.TTLChanges++
-					}
-				} else {
-					alpha.IPChanges++
+			} else if p.RightState.SrcIP.Equal(srcIP) {
+				if p.RightState.TTL != ttl {
+					alpha.TTLChanges++
+					p.RightState.TTLChanges++
 				}
+			} else {
+				alpha.IPChanges++
 			}
 		}
 
