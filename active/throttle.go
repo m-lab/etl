@@ -28,9 +28,9 @@ func (ts *wsTokenSource) Acquire(ctx context.Context) error {
 		a := atomic.AddInt64(&ts.acquired, 1)
 		if a%100 == 0 {
 			r := atomic.LoadInt64(&ts.released)
+			// This clearly shows that the token bucket is WAI.
 			log.Printf("TokenBucket Acquired: %d Released: %d", a, r)
 		}
-
 	}
 	return err
 }
