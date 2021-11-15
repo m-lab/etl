@@ -10,17 +10,29 @@ import (
 )
 
 type TcpStats struct {
-	Packets               int64
-	Truncated             int64
-	ECE                   int64
-	RetransmitPackets     int64
-	RetransmitBytes       int64
-	Sacks                 int64
-	OptionCounts          []int64 // 16 counts, indicating how often each option type occurred.
-	BadSacks              int64   // Number of sacks with bad boundaries
-	BadDeltas             int64   // Number of seqs and acks that were more than 1<<30 off from previous value.
-	MissingPackets        int64   // Observations of packet sequence numbers that didn't match previous payload length.
-	SendNextExceededLimit int64   // Number of times SendNext() returned a value that exceeded the receiver window limit.
+	Packets   int64
+	Truncated int64
+
+	OptionCounts []int64 // 16 counts, indicating how often each option type occurred.
+
+	RetransmitPackets int64
+	RetransmitBytes   int64
+
+	Sacks int64
+
+	ECECount      int64
+	WindowChanges int64
+
+	// Errors and anomalies
+	BadSacks              int64 // Number of sacks with bad boundaries
+	BadDeltas             int64 // Number of seqs and acks that were more than 1<<30 off from previous value.
+	MissingPackets        int64 // Observations of packet sequence numbers that didn't match previous payload length.
+	SendNextExceededLimit int64 // Number of times SendNext() returned a value that exceeded the receiver window limit.
+	TTLChanges            int64 // Observed number of TTL values that don't match first IP header.
+	SrcPortErrors         int64 // Observed number of source ports that don't match first IP header.
+	DstPortErrors         int64 // Observed number of dest ports that don't match tcp.DstPort
+	OtherErrors           int64 // Number of other errors that occurred.
+
 }
 
 type AlphaFields struct {
@@ -31,8 +43,8 @@ type AlphaFields struct {
 	SynAckTime       time.Time `bigquery:"syn_ack_time" json:"syn_ack_time"`
 	Packets          int64     `bigquery:"packets" json:"packets"`
 	Sacks            int64     `bigquery:"sacks" json:"sacks"`
-	TTLChanges       int64     `bigquery:"ttl_changes" json:"ttl_changes"`
-	IPChanges        int64     `bigquery:"ip_changes" json:"ip_changes"`
+	IPAddrErrors     int64     `bigquery:"ip_addr_errors" json:"ip_addr_errors"` // Number of packets with IP addresses that don't match first IP header at all.
+	WithoutTCPLayer  int64     `bigquery:"no_tcp_layer" json:"no_tcp_layer"`     // Number of packets with no TCP layer.
 
 	LeftStats  TcpStats
 	RightStats TcpStats

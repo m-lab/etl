@@ -46,11 +46,9 @@ type sackBlock struct {
 
 type Tracker struct {
 	initialized bool
-	errors      uint32 // Number of errors encountered while parsing
 	packets     uint32 // Number of calls to Seq function
 	seq         uint32 // The last sequence number observed, not counting retransmits
-	synFin      uint32 // zero, one or two, depending on whether SYN and FIN were sent
-	sent        uint64 // actual bytes sent, including retransmits, but not SYN or FIN
+	synFin      uint32 // zero, one or two, depending on whether SYN and FIN have been sent
 
 	sendUNA  uint32 // greatest observed ack
 	acks     uint32 // number of acks (from other side)
@@ -58,24 +56,17 @@ type Tracker struct {
 	acked    uint64 // bytes acked
 	maxGap   int32  // Max observed gap between acked and NextSeq()
 
-	// sacks keeps track of outstanding SACK blocks
-	sacks     []sackBlock
-	sackBytes uint64 // keeps track of total bytes reported missing in SACK blocks
+	sent      uint64      // actual bytes sent, including retransmits, but not SYN or FIN
+	sacks     []sackBlock // keeps track of outstanding SACK blocks
+	sackBytes uint64      // keeps track of total bytes reported missing in SACK blocks
 
 	lastDataLength uint16 // Used to compute NextSeq()
 
-	// These stats are useful for bigquery summaries.
-	schema.TcpStats
 }
 
 func (t *Tracker) Summary() string {
-	return fmt.Sprintf("%8d bytes sent, %5d packets, %5d/%5d acks w/data, %5d max gap\n",
-		t.Sent(), t.packets, t.acks-t.onlyAcks, t.acks, t.maxGap)
-}
-
-// Errors returns the number of errors encountered while parsing.
-func (t *Tracker) Stats() schema.TcpStats {
-	return t.TcpStats
+	return fmt.Sprintf("%5d packets, %5d/%5d acks w/data, %5d max gap\n",
+		t.packets, t.acks-t.onlyAcks, t.acks, t.maxGap)
 }
 
 // SendNext returns the uint32 value of the expected next sequence number.
@@ -100,10 +91,25 @@ func diff(clock uint32, previous uint32) (int32, error) {
 var badSeq = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
 var badAck = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
 
+type StatsWrapper struct {
+	schema.TcpStats
+}
+
+func (sw *StatsWrapper) Retransmit(bytes uint16) {
+	sw.RetransmitPackets++
+	sw.RetransmitBytes += int64(bytes)
+}
+
+func (sw *StatsWrapper) Option(opt layers.TCPOptionKind) {
+	if opt < 16 {
+		sw.OptionCounts[opt]++
+	}
+}
+
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
 // Initializes the tracker if it hasn't been initialized yet.
 // Returns the bytes in flight (not including retransmits) and boolean indicator if this is a retransmit
-func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
+func (t *Tracker) Seq(clock uint32, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
 	t.packets++ // Some of these may be retransmits.
 
 	if !t.initialized {
@@ -121,20 +127,19 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	// TODO handle errors
 	delta, err := diff(clock, t.seq)
 	if err != nil {
-		t.BadDeltas++
+		sw.BadDeltas++
 		badSeq.Printf("Bad seq %4X -> %4X\n", t.seq, clock)
 		return inflight, false
 	}
 	if delta < 0 {
 		// DO NOT update w.seq or w.lastDataLength, as this is a retransmit
 		t.sent += uint64(length)
-		t.RetransmitPackets++
-		t.RetransmitBytes += int64(length)
+		sw.Retransmit(length)
 		return inflight, true
 	}
 	// delta is non-negative (not a retransmit)
 	if delta != int32(t.lastDataLength) {
-		t.MissingPackets++
+		sw.MissingPackets++
 		sparse.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
 	}
 
@@ -166,24 +171,18 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	return inflight, false
 }
 
-// Total bytes transmitted, not including retransmits.
-// TODO should this include the 1 byte SYN?
-func (t *Tracker) Sent() uint64 {
-	return t.sent - uint64(t.RetransmitBytes)
-}
-
 func (t *Tracker) Acked() uint64 {
 	return t.acked
 }
 
-func (t *Tracker) Ack(clock uint32, withData bool) {
+func (t *Tracker) Ack(clock uint32, withData bool, sw *StatsWrapper) {
 	if !t.initialized {
-		t.errors++
+		sw.OtherErrors++
 		info.Print("Ack called before Seq")
 	}
 	delta, err := diff(clock, t.sendUNA)
 	if err != nil {
-		t.BadDeltas++
+		sw.BadDeltas++
 		badAck.Printf("Bad ack %4X -> %4X\n", t.sendUNA, clock)
 		return
 	}
@@ -224,53 +223,44 @@ func (t *Tracker) checkSack(sb sackBlock) error {
 }
 
 // Sack updates the counter with sack information (from other direction)
-func (t *Tracker) Sack(sb sackBlock) {
+func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 	if !t.initialized {
-		t.errors++
+		sw.OtherErrors++
 		info.Println(ErrTrackerNotInitialized)
 	}
 	// Auto gen code
 	if err := t.checkSack(sb); err != nil {
-		t.BadSacks++
+		sw.BadSacks++
 		sparse.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
 	}
 	//t.sacks = append(t.sacks, block)
 	t.sackBytes += uint64(sb.Right - sb.Left)
 }
 
-type endpoint struct {
-	SrcIP net.IP
-	TTL   uint8
-
-	SrcPort layers.TCPPort // When this port is SrcPort, we update this stat struct.
-}
-
-type stats struct {
-	ECECount   uint64
-	TTLChanges uint64 // Observed number of TTL values that don't match first IP header.
-}
-
-// state keep track of the TCP state of one side of a connection.
+// state keeps track of the TCP state of one side of a connection.
 // TODO - add histograms for Ack inter-arrival time.
 type state struct {
-	endpoint // TODO
-	stats    // TODO
-
-	// TODO move these to SeqTracker, so that we can observe whether we are window limited.
+	// These should be static characteristics
+	SrcIP       net.IP
+	SrcPort     layers.TCPPort // When this port is SrcPort, we update this stat struct.
+	TTL         uint8
 	WindowScale uint8
-	Window      uint16
-	Limit       uint32 // The limit on data that can be sent, based on receiver window and ack data.
-	MSS         uint16
 
-	lastHeader *layers.TCP
+	LastPacketTimeUsec uint64 // This comes from the IP layer.
 
-	SeqTracker         Tracker // This should match the previous value of Sent.
-	Sacks              uint64
-	LastPacketTimeUsec uint64
+	MSS    uint16
+	Window uint16
+	Limit  uint32 // The limit on data that can be sent, based on receiver window and ack data.
+
+	//lastHeader *layers.TCP
+
+	SeqTracker Tracker // Track the seq/ack/sack related state.
+
+	Stats StatsWrapper
 }
 
 func NewState() *state {
-	return &state{SeqTracker: Tracker{TcpStats: schema.TcpStats{OptionCounts: make([]int64, 16)}}}
+	return &state{Stats: StatsWrapper{TcpStats: schema.TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
 func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
@@ -281,7 +271,7 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 		return
 	}
 	// TODO should some of these be counted in the opposite direction?
-	s.SeqTracker.OptionCounts[optionType]++
+	s.Stats.Option(optionType)
 
 	switch optionType {
 	case layers.TCPOptionKindSACK:
@@ -289,7 +279,7 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 		sacks := make([]sackBlock, len(data)/8)
 		binary.Read(bytes.NewReader(data), binary.BigEndian, &sacks)
 		for _, block := range sacks {
-			s.SeqTracker.Sack(block)
+			s.SeqTracker.Sack(block, &s.Stats)
 		}
 	case layers.TCPOptionKindMSS:
 		if len(opt.OptionData) != 2 {
@@ -310,11 +300,14 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 	}
 }
 
-func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInfo) {
+func (s *state) Update(srcIP, dstIP net.IP, tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInfo) {
 	dataLength := tcpLength - uint16(4*tcp.DataOffset)
-	if tcp.SrcPort == s.SrcPort {
+	if s.SrcIP.Equal(srcIP) {
+		if s.SrcPort != tcp.SrcPort {
+			s.Stats.SrcPortErrors++
+		}
 		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
-		if _, retrans := s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN); retrans {
+		if _, retrans := s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN, &s.Stats); retrans {
 			// TODO
 		}
 		if !tcp.SYN {
@@ -328,16 +321,19 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 				// that ack increased the window, then this might be a valid send, and an
 				// indication that we missed a packet in the capture.
 				log.Println("Protocol violation, SendNext > Limit:", s.SrcPort, s.SeqTracker.SendNext(), s.Limit, s.SeqTracker.packets)
-				s.SeqTracker.TcpStats.SendNextExceededLimit++
+				s.Stats.SendNextExceededLimit++
 			} else if remaining < int32(s.MSS) {
 				sparse.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", int64(s.Window)<<s.WindowScale, remaining, s.MSS)
 			}
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
 		if tcp.ECE {
-			s.ECECount++
+			s.Stats.ECECount++
 		}
-	} else {
+	} else if s.SrcIP.Equal(dstIP) {
+		if s.SrcPort != tcp.DstPort {
+			s.Stats.DstPortErrors++
+		}
 		// Process ACKs and SACKs from the other direction
 		// Handle all options, including SACKs from other direction
 		// TODO - should some of these be associated with the other direction?
@@ -345,12 +341,11 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 			s.Option(tcp.SrcPort, tcp.Options[i])
 		}
 		if s.Window != tcp.Window {
-			// VERY VERBOSE
-			sparse2.Printf("Remote %v window changed from %d to %d\n", tcp.SrcPort, uint32(s.Window)<<s.WindowScale, uint32(tcp.Window)<<s.WindowScale)
+			s.Stats.WindowChanges++
 			s.Window = tcp.Window
 		}
 		if tcp.ACK {
-			s.SeqTracker.Ack(tcp.Ack, dataLength > 0) // TODO
+			s.SeqTracker.Ack(tcp.Ack, dataLength > 0, &s.Stats) // TODO
 			s.Limit = s.SeqTracker.sendUNA + uint32(s.Window)<<s.WindowScale
 		}
 	}
@@ -362,17 +357,12 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 }
 
 func (s state) String() string {
-	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.SeqTracker.RetransmitPackets, s.ECECount)
+	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.Stats.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Stats.Sacks, s.Stats.RetransmitPackets, s.Stats.ECECount)
 }
 
 type Parser struct {
-	SrcIP   net.IP
-	DstIP   net.IP
-	SrcPort layers.TCPPort
-	DstPort layers.TCPPort
-
-	LeftState  *state
-	RightState *state
+	LeftState  *state // This is the state associated with the source of the first packet
+	RightState *state // This is the state associated with the destination of the first packet
 }
 
 func NewParser() *Parser {
@@ -383,26 +373,24 @@ func NewParser() *Parser {
 	}
 }
 
-func (p *Parser) tcpLayer(tcp *layers.TCP, ci gopacket.CaptureInfo, tcpLength uint16, alpha *schema.AlphaFields) error {
+func (p *Parser) tcpLayer(srcIP, dstIP net.IP, tcp *layers.TCP, ci gopacket.CaptureInfo, tcpLength uint16, alpha *schema.AlphaFields) error {
 	// Special case handling for first two packets.
 	switch alpha.Packets {
 	case 0:
-		if tcp.SrcPort == 443 || tcp.DstPort == 443 {
-			// info.Println(p.GetUUID(testName))
-		}
 		p.LeftState.SrcPort = tcp.SrcPort
 		p.RightState.SrcPort = tcp.DstPort
 	case 1:
+		// TODO - consider checking against IP address, too.
 		if p.RightState.SrcPort != tcp.SrcPort || !tcp.ACK {
 			// Use log for advisory/info logging.
-			info.Println("Bad sack block", p.RightState, p.LeftState, tcp.DstPort, tcp.ACK)
+			log.Println("Unexpected second packet", p.LeftState, p.RightState, tcp.DstPort, tcp.ACK)
 		}
 	default:
 	}
 
 	// Update both state structs.
-	p.LeftState.Update(tcpLength, tcp, ci)
-	p.RightState.Update(tcpLength, tcp, ci)
+	p.LeftState.Update(srcIP, dstIP, tcpLength, tcp, ci)
+	p.RightState.Update(srcIP, dstIP, tcpLength, tcp, ci)
 
 	if tcp.SYN {
 		if tcp.ACK {
@@ -416,16 +404,17 @@ func (p *Parser) tcpLayer(tcp *layers.TCP, ci gopacket.CaptureInfo, tcpLength ui
 	return nil
 }
 
-func extractIPFields(packet gopacket.Packet) (srcIP net.IP, TTL uint8, tcpLength uint16, err error) {
+func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tcpLength uint16, err error) {
 	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 		ip, _ := ipLayer.(*layers.IPv4)
-		return ip.SrcIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
+		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
+		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
 	} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
 		ip, _ := ipLayer.(*layers.IPv6)
 		// In IPv6, the Length field is the payload length.
-		return ip.SrcIP, ip.HopLimit, ip.Length, nil
+		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
 	} else {
-		return nil, 0, 0, ErrNoIPLayer
+		return nil, nil, 0, 0, ErrNoIPLayer
 	}
 }
 
@@ -455,7 +444,7 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 			continue
 		}
 
-		srcIP, ttl, tcpLength, err := extractIPFields(packet)
+		srcIP, dstIP, ttl, tcpLength, err := extractIPFields(packet)
 		if err != nil {
 			return nil, err
 		}
@@ -463,30 +452,37 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		switch alpha.Packets {
 		case 0:
 			p.LeftState.SrcIP = srcIP
+			p.RightState.SrcIP = dstIP
 			p.LeftState.TTL = ttl
 		case 1:
-			p.RightState.SrcIP = srcIP
 			p.RightState.TTL = ttl
+			fallthrough
 		default:
 			if p.LeftState.SrcIP.Equal(srcIP) {
+				if !p.RightState.SrcIP.Equal(dstIP) {
+					alpha.IPAddrErrors++
+				}
 				if p.LeftState.TTL != ttl {
-					alpha.TTLChanges++
-					p.LeftState.TTLChanges++
+					p.LeftState.Stats.TTLChanges++
 				}
 			} else if p.RightState.SrcIP.Equal(srcIP) {
+				if !p.LeftState.SrcIP.Equal(dstIP) {
+					alpha.IPAddrErrors++
+				}
 				if p.RightState.TTL != ttl {
-					alpha.TTLChanges++
-					p.RightState.TTLChanges++
+					p.RightState.Stats.TTLChanges++
 				}
 			} else {
-				alpha.IPChanges++
+				alpha.IPAddrErrors++
 			}
 		}
 
 		// Get the TCP layer from this packet
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
-			p.tcpLayer(tcp, ci, tcpLength, &alpha)
+			p.tcpLayer(srcIP, dstIP, tcp, ci, tcpLength, &alpha)
+		} else {
+			alpha.WithoutTCPLayer++
 		}
 		alpha.Packets++
 	}
@@ -494,8 +490,8 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	info.Printf("%20s: %v", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
 	info.Printf("%20s: %v", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())
 
-	alpha.LeftStats = p.LeftState.SeqTracker.TcpStats
-	alpha.RightStats = p.RightState.SeqTracker.TcpStats
+	alpha.LeftStats = p.LeftState.Stats.TcpStats
+	alpha.RightStats = p.RightState.Stats.TcpStats
 
 	return &alpha, nil
 }

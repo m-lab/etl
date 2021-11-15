@@ -10,16 +10,18 @@ import (
 )
 
 func TestTracker_SendNext(t *testing.T) {
+	stats := &tcp.StatsWrapper{}
+
 	tr := tcp.Tracker{}
-	tr.Seq(1234, 0, true) // SYN, no data
-	tr.Seq(1235, 20, false)
-	tr.Seq(1255, 10, false)
+	tr.Seq(1234, 0, true, stats) // SYN, no data
+	tr.Seq(1235, 20, false, stats)
+	tr.Seq(1255, 10, false, stats)
 	if tr.SendNext() != 1265 {
 		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1265)
 	}
 
 	// Retransmit
-	if _, b := tr.Seq(1240, 12, false); !b {
+	if _, b := tr.Seq(1240, 12, false, stats); !b {
 		t.Errorf("Seq() = %v, want %v", b, true)
 	}
 	// SendNext should be unchanged.
@@ -27,40 +29,40 @@ func TestTracker_SendNext(t *testing.T) {
 		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1265)
 	}
 
-	if _, b := tr.Seq(tr.SendNext(), 10, false); b {
+	if _, b := tr.Seq(tr.SendNext(), 10, false, stats); b {
 		t.Errorf("Seq() = %v, want %v", b, false)
 	}
 	if tr.SendNext() != 1275 {
 		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1275)
 	}
-	if tr.Sent() != 40 {
-		t.Errorf("Sent() = %v, want %v", tr.Sent(), 40)
+	if stats.RetransmitBytes != 12 {
+		t.Errorf("RetransmitBytes = %v, want %v", stats.RetransmitBytes, 12)
 	}
-	tr.Ack(1234, false)
+	tr.Ack(1234, false, stats)
 	if tr.Acked() != 0 {
 		t.Errorf("Acked() = %v, want %v", tr.Acked(), 0)
 	}
-	tr.Ack(1244, false)
+	tr.Ack(1244, false, stats)
 	if tr.Acked() != 10 {
 		t.Errorf("Acked() = %v, want %v", tr.Acked(), 10)
 	}
 
-	tr.Seq(5<<28, 0, false)
+	tr.Seq(5<<28, 0, false, stats)
 	if tr.SendNext() != 1275 {
 		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1275)
 	}
-	if tr.Stats().BadDeltas != 1 {
-		t.Errorf("Stats().BadDeltas = %v, want %v", tr.Stats().BadDeltas, 1)
+	if stats.BadDeltas != 1 {
+		t.Errorf("Stats().BadDeltas = %v, want %v", stats.BadDeltas, 1)
 	}
 
 	// Seq that doesn't match previous data length.
-	tr.Seq(1300, 0, false)
+	tr.Seq(1300, 0, false, stats)
 	// Seq should advance, but we should also observe an error.
 	if tr.SendNext() != 1300 {
 		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1300)
 	}
-	if tr.Stats().MissingPackets != 1 {
-		t.Errorf("Stats() = %v, want %v", tr.Stats().MissingPackets, 1)
+	if stats.MissingPackets != 1 {
+		t.Errorf("Stats() = %v, want %v", stats.MissingPackets, 1)
 	}
 
 }
