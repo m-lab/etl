@@ -91,7 +91,7 @@ func (t *Tracker) ByteCount() uint64 {
 func diff(clock uint32, previous uint32) (int32, error) {
 	delta := int32(clock - previous)
 	if !(-1<<30 < delta && delta < 1<<30) {
-		info.Printf("invalid sequence delta %d->%d (%d)", previous, clock, delta)
+		//	info.Printf("invalid sequence delta %d->%d (%d)", previous, clock, delta)
 		return delta, ErrInvalidDelta
 	}
 	return delta, nil
@@ -113,7 +113,10 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	}
 	// Use this unless we are sending new data.
 	// TODO - correct this for sum of sizes of sack block scoreboard.
-	inflight, _ := diff(t.SendNext(), t.sendUNA)
+	inflight, err := diff(t.SendNext(), t.sendUNA)
+	if err != nil {
+		log.Println("inflight diff error", t.SendNext(), t.sendUNA)
+	}
 
 	// TODO handle errors
 	delta, err := diff(clock, t.seq)
@@ -147,12 +150,18 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	t.seq = clock
 
 	gap, err := diff(t.seq, t.sendUNA)
+	if err != nil {
+		log.Println("gap diff error:", t.seq, t.sendUNA)
+	}
 	if gap > t.maxGap {
 		t.maxGap = gap
 		//info.Printf("%8p - %5d: MaxGap = %d\n", t, t.packets, gap)
 	}
 
-	inflight, _ = diff(t.SendNext(), t.sendUNA)
+	inflight, err = diff(t.SendNext(), t.sendUNA)
+	if err != nil {
+		log.Println("inflight diff error:", t.SendNext(), t.sendUNA)
+	}
 
 	return inflight, false
 }
@@ -304,13 +313,17 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 			// TODO
 		}
 		if !tcp.SYN {
-			if remaining, _ := diff(s.Limit, s.SeqTracker.SendNext()); remaining < 0 {
+			if remaining, err := diff(s.Limit, s.SeqTracker.SendNext()); remaining < 0 {
+				if err != nil {
+					log.Println("remaining diff err", s.Limit, s.SeqTracker.SendNext())
+				}
 				// TODO: This is currently triggering more often than expected.
 				// The stack should not send data beyond the window limit, which would have been
 				// specified in the last ack.  But if pcaps did not capture the last ack, and
 				// that ack increased the window, then this might be a valid send, and an
 				// indication that we missed a packet in the capture.
-				log.Println("Protocol violation", s.SrcPort, s.SeqTracker.packets)
+				log.Println("Protocol violation, SendNext > Limit:", s.SrcPort, s.SeqTracker.SendNext(), s.Limit, s.SeqTracker.packets)
+				s.SeqTracker.TcpStats.SendNextExceededLimit++
 			} else if remaining < int32(s.MSS) {
 				sparse.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", int64(s.Window)<<s.WindowScale, remaining, s.MSS)
 			}
@@ -502,6 +515,8 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	//alpha.SecondECECount = int64(p.RightState.ECECount)
 	alpha.FirstRetransmits = int64(p.LeftState.SeqTracker.retransPackets)
 	alpha.SecondRetransmits = int64(p.RightState.SeqTracker.retransPackets)
+	alpha.LeftStats = p.LeftState.SeqTracker.TcpStats
+	alpha.RightStats = p.RightState.SeqTracker.TcpStats
 	// TODO update these names
 	//alpha.TotalSrcSeq = int64(p.LeftState.SeqTracker.ByteCount())
 	//alpha.TotalDstSeq = int64(p.RightState.SeqTracker.ByteCount())

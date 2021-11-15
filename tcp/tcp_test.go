@@ -96,19 +96,20 @@ func TestTracker_SendNext(t *testing.T) {
 // some basic stats, which are assumed to be correct, but not inspected.
 func TestParse(t *testing.T) {
 	type test struct {
-		name                                string
-		fn                                  string
-		packets                             int64
-		firstRetransmits, secondRetransmits int64
-		truncated                           int64
+		name                              string
+		fn                                string
+		packets                           int64
+		leftRetransmits, rightRetransmits int64
+		truncated                         int64
+		exceeded                          int64
 	}
 	tests := []test{
 		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap",
-			packets: 336, firstRetransmits: 11, secondRetransmits: 8, truncated: 0},
-		{name: "protocolErrors", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2E15.pcap.gz",
-			packets: 6774, firstRetransmits: 0, secondRetransmits: 73, truncated: 0},
+			packets: 336, leftRetransmits: 11, rightRetransmits: 8, truncated: 0, exceeded: 0},
 		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, firstRetransmits: 0, secondRetransmits: 0, truncated: 0},
+			packets: 15, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 0},
+		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
+			packets: 5180, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 2880},
 	}
 	for _, tt := range tests {
 		f, err := os.Open(tt.fn)
@@ -127,14 +128,18 @@ func TestParse(t *testing.T) {
 		if summary.Packets != tt.packets {
 			t.Errorf("test:%s: Packets = %v, want %v", tt.name, summary.Packets, tt.packets)
 		}
-		if summary.FirstRetransmits != tt.firstRetransmits {
-			t.Errorf("test:%s: FirstRetransmits = %v, want %v", tt.name, summary.FirstRetransmits, tt.firstRetransmits)
+		// TODO - replace these with LeftStats and RightStats.
+		if summary.FirstRetransmits != tt.leftRetransmits {
+			t.Errorf("test:%s: FirstRetransmits = %v, want %v", tt.name, summary.FirstRetransmits, tt.leftRetransmits)
 		}
-		if summary.SecondRetransmits != tt.secondRetransmits {
-			t.Errorf("test:%s: SecondRetransmits = %v, want %v", tt.name, summary.SecondRetransmits, tt.secondRetransmits)
+		if summary.SecondRetransmits != tt.rightRetransmits {
+			t.Errorf("test:%s: SecondRetransmits = %v, want %v", tt.name, summary.SecondRetransmits, tt.rightRetransmits)
 		}
 		if summary.TruncatedPackets != tt.truncated {
 			t.Errorf("test:%s: TruncatedPackets = %v, want %v", tt.name, summary.TruncatedPackets, tt.truncated)
+		}
+		if summary.RightStats.SendNextExceededLimit != tt.exceeded {
+			t.Errorf("test:%s: SendNextExceededLimit = %v, want %v", tt.name, summary.RightStats.SendNextExceededLimit, tt.exceeded)
 		}
 	}
 }

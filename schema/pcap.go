@@ -10,15 +10,16 @@ import (
 )
 
 type TcpStats struct {
-	Packets        int64
-	Truncated      int64
-	ECE            int64
-	Retransmits    int64
-	Sacks          int64
-	OptionCounts   []int64 // 16 counts, indicating how often each option type occurred.
-	BadSacks       int64   // Number of sacks with bad boundaries
-	BadDeltas      int64   // Number of seqs and acks that were more than 1<<30 off from previous value.
-	MissingPackets int64   // Observations of packet sequence numbers that didn't match previous payload length.
+	Packets               int64
+	Truncated             int64
+	ECE                   int64
+	Retransmits           int64
+	Sacks                 int64
+	OptionCounts          []int64 // 16 counts, indicating how often each option type occurred.
+	BadSacks              int64   // Number of sacks with bad boundaries
+	BadDeltas             int64   // Number of seqs and acks that were more than 1<<30 off from previous value.
+	MissingPackets        int64   // Observations of packet sequence numbers that didn't match previous payload length.
+	SendNextExceededLimit int64   // Number of times SendNext() returned a value that exceeded the receiver window limit.
 }
 
 type AlphaFields struct {
