@@ -44,13 +44,12 @@ type sackBlock struct {
 }
 
 type Tracker struct {
-	initialized    bool
-	errors         uint32 // Number of errors encountered while parsing
-	packets        uint32 // Number of calls to Seq function
-	seq            uint32 // The last sequence number observed, not counting retransmits
-	synFin         uint32 // zero, one or two, depending on whether SYN and FIN were sent
-	sent           uint64 // actual bytes sent, including retransmits, but not SYN or FIN
-	retransPackets uint32 // number of retransmitted packets
+	initialized bool
+	errors      uint32 // Number of errors encountered while parsing
+	packets     uint32 // Number of calls to Seq function
+	seq         uint32 // The last sequence number observed, not counting retransmits
+	synFin      uint32 // zero, one or two, depending on whether SYN and FIN were sent
+	sent        uint64 // actual bytes sent, including retransmits, but not SYN or FIN
 
 	sendUNA  uint32 // greatest observed ack
 	acks     uint32 // number of acks (from other side)
@@ -128,8 +127,8 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 	if delta < 0 {
 		// DO NOT update w.seq or w.lastDataLength, as this is a retransmit
 		t.sent += uint64(length)
-		t.retransPackets++
-		t.Retransmits += int64(length)
+		t.RetransmitPackets++
+		t.RetransmitBytes += int64(length)
 		return inflight, true
 	}
 	// delta is non-negative (not a retransmit)
@@ -169,7 +168,7 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool) (int32, bool) {
 // Total bytes transmitted, not including retransmits.
 // TODO should this include the 1 byte SYN?
 func (t *Tracker) Sent() uint64 {
-	return t.sent - uint64(t.Retransmits)
+	return t.sent - uint64(t.RetransmitBytes)
 }
 
 func (t *Tracker) Acked() uint64 {
@@ -269,6 +268,10 @@ type state struct {
 	LastPacketTimeUsec uint64
 }
 
+func NewState() *state {
+	return &state{SeqTracker: Tracker{TcpStats: schema.TcpStats{OptionCounts: make([]int64, 16)}}}
+}
+
 func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 	// TODO test case for wrong index.
 	optionType := opt.OptionType
@@ -276,7 +279,8 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 		info.Printf("TCP Option has illegal option type %d", opt.OptionType)
 		return
 	}
-	// HACK s.OptionCounts[optionType]++
+	// TODO should some of these be counted in the opposite direction?
+	s.SeqTracker.OptionCounts[optionType]++
 
 	switch optionType {
 	case layers.TCPOptionKindSACK:
@@ -357,7 +361,7 @@ func (s *state) Update(tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInf
 }
 
 func (s state) String() string {
-	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.SeqTracker.Retransmits, s.ECECount)
+	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Sacks, s.SeqTracker.RetransmitPackets, s.ECECount)
 }
 
 type Parser struct {
@@ -366,8 +370,16 @@ type Parser struct {
 	SrcPort layers.TCPPort
 	DstPort layers.TCPPort
 
-	LeftState  state
-	RightState state
+	LeftState  *state
+	RightState *state
+}
+
+func NewParser() *Parser {
+	return &Parser{
+		// TODO Consider initializing these when the Syn and SynAck are seen.
+		LeftState:  NewState(),
+		RightState: NewState(),
+	}
 }
 
 func (p *Parser) tcpLayer(tcp *layers.TCP, ci gopacket.CaptureInfo, tcpLength uint16, alpha *schema.AlphaFields) error {
@@ -385,22 +397,6 @@ func (p *Parser) tcpLayer(tcp *layers.TCP, ci gopacket.CaptureInfo, tcpLength ui
 			info.Println("Bad sack block", p.RightState, p.LeftState, tcp.DstPort, tcp.ACK)
 		}
 	default:
-	}
-
-	var sack int
-	// Handle options
-	for i := 0; i < len(tcp.Options); i++ {
-		// TODO test case for wrong index.
-		if tcp.Options[i].OptionType > 15 {
-			info.Printf("TCP Option %d has illegal option type %d", i, tcp.Options[i].OptionType)
-			continue
-		}
-		alpha.OptionCounts[tcp.Options[i].OptionType]++
-		if tcp.Options[i].OptionType == layers.TCPOptionKindSACK {
-			// TODO This is overcounting.  We want to count the distinct packets that are skipped in the SACKs.
-			sack = int(len(tcp.Options[i].OptionData) / 8)
-			alpha.Sacks += int64(sack)
-		}
 	}
 
 	// Update both state structs.
@@ -428,9 +424,8 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	}
 
 	// This is used to keep track of some of the TCP state.
-	alpha := schema.AlphaFields{
-		OptionCounts: make([]int64, 16),
-	}
+	// TODO replace this with local variables, and copy at the end.
+	alpha := schema.AlphaFields{}
 
 	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		// Decode a packet
@@ -511,15 +506,8 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	info.Printf("%20s: %v", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
 	info.Printf("%20s: %v", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())
 
-	//alpha.FirstECECount = int64(p.LeftState.ECECount)
-	//alpha.SecondECECount = int64(p.RightState.ECECount)
-	alpha.FirstRetransmits = int64(p.LeftState.SeqTracker.retransPackets)
-	alpha.SecondRetransmits = int64(p.RightState.SeqTracker.retransPackets)
 	alpha.LeftStats = p.LeftState.SeqTracker.TcpStats
 	alpha.RightStats = p.RightState.SeqTracker.TcpStats
-	// TODO update these names
-	//alpha.TotalSrcSeq = int64(p.LeftState.SeqTracker.ByteCount())
-	//alpha.TotalDstSeq = int64(p.RightState.SeqTracker.ByteCount())
 
 	return &alpha, nil
 }
