@@ -339,12 +339,12 @@ func NewState() *state {
 		Stats: StatsWrapper{TcpStats: schema.TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
-func (s *state) handleTimestamp(pktTime time.Time, isOutgoing bool, opt layers.TCPOption) {
+func (s *state) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt layers.TCPOption) {
 	// These are arbitrary time offsets, but we will be
 	TSVal := time.Unix(0, 1e6*int64(binary.BigEndian.Uint32(opt.OptionData[0:4])))
 	TSEcr := time.Unix(0, 1e6*int64(binary.BigEndian.Uint32(opt.OptionData[4:8])))
 
-	if isOutgoing {
+	if isOutgoing && !retransmit {
 		if TSVal.Nanosecond() != 0 {
 			log.Println(s.SrcPort, "TSVal", binary.BigEndian.Uint32(opt.OptionData[0:4]))
 			delta := TSVal.Sub(pktTime)
@@ -362,7 +362,7 @@ func (s *state) handleTimestamp(pktTime time.Time, isOutgoing bool, opt layers.T
 
 // Option handles all options, both incoming and outgoing.
 // The relTime value is used for Timestamp analysis.
-func (s *state) Option(port layers.TCPPort, pTime time.Time, opt layers.TCPOption) {
+func (s *state) Option(port layers.TCPPort, retransmit bool, pTime time.Time, opt layers.TCPOption) {
 	// TODO test case for wrong index.
 	optionType := opt.OptionType
 	if optionType > 15 {
@@ -387,7 +387,7 @@ func (s *state) Option(port layers.TCPPort, pTime time.Time, opt layers.TCPOptio
 			s.MSS = binary.BigEndian.Uint16(opt.OptionData)
 		}
 	case layers.TCPOptionKindTimestamps:
-		s.handleTimestamp(pTime, port == s.SrcPort, opt)
+		s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
 
 	case layers.TCPOptionKindWindowScale:
 		if len(opt.OptionData) != 1 {
@@ -404,12 +404,12 @@ func (s *state) Option(port layers.TCPPort, pTime time.Time, opt layers.TCPOptio
 func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInfo) {
 	dataLength := tcpLength - uint16(4*tcp.DataOffset)
 	pTime := ci.Timestamp
+	var retransmit bool
 	if s.SrcIP.Equal(srcIP) {
 		if s.SrcPort != tcp.SrcPort {
 			s.Stats.SrcPortErrors++
 		}
 		window := int64(s.Window) << s.WindowScale
-		var retransmit bool
 		var inflight int32
 		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
 		if inflight, retransmit = s.SeqTracker.Seq(count, pTime, tcp.Seq, dataLength, tcp.SYN || tcp.FIN, &s.Stats); retransmit {
@@ -446,7 +446,7 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 		// Handle all options, including SACKs from other direction
 		// TODO - should some of these be associated with the other direction?
 		for i := 0; i < len(tcp.Options); i++ {
-			s.Option(tcp.SrcPort, pTime, tcp.Options[i])
+			s.Option(tcp.SrcPort, retransmit, pTime, tcp.Options[i])
 		}
 		if s.Window != tcp.Window {
 			s.Stats.WindowChanges++
@@ -463,7 +463,7 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 	}
 	// Handle options
 	for _, opt := range tcp.Options {
-		s.Option(tcp.SrcPort, pTime, opt)
+		s.Option(tcp.SrcPort, retransmit, pTime, opt)
 	}
 
 }

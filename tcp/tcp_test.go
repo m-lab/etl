@@ -139,10 +139,15 @@ func TestJitter(t *testing.T) {
 	j := tcp.JitterTracker{}
 	rand.Seed(12345)
 	for t := time.Date(2016, time.November, 10, 1, 1, 1, 1, time.UTC); t.Before(time.Date(2016, time.November, 10, 1, 1, 2, 2, time.UTC)); t = t.Add(10 * time.Millisecond) {
-		j.Add(5e10 + time.Duration(rand.Int63n(10000000)-5*int64(time.Millisecond)))
-		j.AddEcho(5e10 - 50*time.Millisecond)
+		delta := -5e10 + time.Duration(rand.Int63n(1e7)-5e6)
+		j.Add(delta)
+		j.AddEcho(-5e10 - 10*time.Millisecond)
+		avgSeconds := j.ValOffsetSum / float64(j.ValCount)
+		log.Printf("Avg: %10.4f Delta: %10.4f RTT: %8.4f Jitter: %8.4f at %v\n",
+			avgSeconds, delta.Seconds()-avgSeconds, j.Delay(), j.Jitter(), t)
 	}
 	if j.Jitter() > .005 || j.Jitter() < .001 {
 		t.Error(j.Jitter(), j.Delay(), j.ValCount)
 	}
+	t.Error()
 }
