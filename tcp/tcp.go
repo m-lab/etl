@@ -63,14 +63,14 @@ func (sw *StatsWrapper) Option(opt layers.TCPOptionKind) {
 
 type seqInfo struct {
 	count int
-	pTime float64
+	pTime time.Time
 }
 type Tracker struct {
 	initialized bool
-	startTime   float64 // Initial packet time, in seconds
-	packets     uint32  // Number of calls to Seq function
-	seq         uint32  // The last sequence number observed, not counting retransmits
-	synFin      uint32  // zero, one or two, depending on whether SYN and FIN have been sent
+	startTime   time.Time // Initial packet time
+	packets     uint32    // Number of calls to Seq function
+	seq         uint32    // The last sequence number observed, not counting retransmits
+	synFin      uint32    // zero, one or two, depending on whether SYN and FIN have been sent
 
 	sendUNA  uint32 // greatest observed ack
 	acks     uint32 // number of acks (from other side)
@@ -122,7 +122,7 @@ var badAck = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
 // Initializes the tracker if it hasn't been initialized yet.
 // Returns the bytes in flight (not including retransmits) and boolean indicator if this is a retransmit
-func (t *Tracker) Seq(count int, pTime float64, clock uint32, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
+func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
 	t.packets++ // Some of these may be retransmits.
 
 	if !t.initialized {
@@ -194,7 +194,7 @@ func (t *Tracker) Acked() uint64 {
 
 // Ack updates the tracker based on an observed ack value.
 // Returns the time observed by the packet capture since the correponding sequence number was sent.
-func (t *Tracker) Ack(count int, pTime float64, clock uint32, withData bool, sw *StatsWrapper) (int, float64) {
+func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, sw *StatsWrapper) (int, time.Duration) {
 	if !t.initialized {
 		sw.OtherErrors++
 		info.Printf("PKT: %d Ack called before Seq", count)
@@ -219,7 +219,7 @@ func (t *Tracker) Ack(count int, pTime float64, clock uint32, withData bool, sw 
 	if ok {
 		// TODO should we keep the entry but mark it as acked?  Or keep a limited cache?
 		delete(t.seqTimes, clock)
-		return si.count, pTime - si.pTime
+		return si.count, pTime.Sub(si.pTime)
 	} else {
 		log.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
 		return 0, 0
@@ -279,21 +279,21 @@ type JitterTracker struct {
 
 // Add adds a new offset between TSVal and packet capture time to the jitter tracker.
 // offset should be TSVal - packet capture time.
-func (jt *JitterTracker) Add(offset float64) {
+func (jt *JitterTracker) Add(offset time.Duration) {
 	jt.ValCount++
-	jt.ValOffsetSum += offset
-	jt.ValOffsetSumSq += offset * offset
+	jt.ValOffsetSum += offset.Seconds()
+	jt.ValOffsetSumSq += offset.Seconds() * offset.Seconds()
 }
 
 // Add adds a new offset between TSEcr and packet capture time to the jitter tracker.
 // offset should be TSEcr - packet capture time.
-func (jt *JitterTracker) AddEcho(offset float64) {
+func (jt *JitterTracker) AddEcho(offset time.Duration) {
 	jt.EchoCount++
-	jt.EchoOffsetSum += offset
-	jt.EchoOffsetSumSq += offset * offset
+	jt.EchoOffsetSum += offset.Seconds()
+	jt.EchoOffsetSumSq += offset.Seconds() * offset.Seconds()
 }
 
-func (jt *JitterTracker) GetJitter() float64 {
+func (jt *JitterTracker) Jitter() float64 {
 	if jt.ValCount == 0 {
 		return 0
 	}
@@ -302,7 +302,7 @@ func (jt *JitterTracker) GetJitter() float64 {
 
 }
 
-func (jt *JitterTracker) GetDelay() float64 {
+func (jt *JitterTracker) Delay() float64 {
 	if jt.EchoCount == 0 || jt.ValCount == 0 {
 		return 0
 	}
@@ -339,25 +339,30 @@ func NewState() *state {
 		Stats: StatsWrapper{TcpStats: schema.TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
-func (s *state) handleTimestamp(pktTime float64, isOutgoing bool, opt layers.TCPOption) {
-	TSVal := float64(binary.BigEndian.Uint32(opt.OptionData[0:4])) / 1000
-	TSEcr := float64(binary.BigEndian.Uint32(opt.OptionData[4:8])) / 1000
+func (s *state) handleTimestamp(pktTime time.Time, isOutgoing bool, opt layers.TCPOption) {
+	// These are arbitrary time offsets, but we will be
+	TSVal := time.Unix(0, 1e6*int64(binary.BigEndian.Uint32(opt.OptionData[0:4])))
+	TSEcr := time.Unix(0, 1e6*int64(binary.BigEndian.Uint32(opt.OptionData[4:8])))
 
 	if isOutgoing {
-		if TSVal != 0 {
+		if TSVal.Nanosecond() != 0 {
 			log.Println(s.SrcPort, "TSVal", binary.BigEndian.Uint32(opt.OptionData[0:4]))
-			s.Jitter.Add(TSVal - pktTime)
-			log.Printf("%20v RTT: %8.4f Jitter: %8.4f at %8.6f\n", s.SrcPort, s.Jitter.GetDelay(), s.Jitter.GetJitter(), pktTime)
+			delta := TSVal.Sub(pktTime)
+			s.Jitter.Add(delta)
+			avgSeconds := s.Jitter.ValOffsetSum / float64(s.Jitter.ValCount)
+			log.Printf("%20v Avg: %10.4f Delta: %10.4f RTT: %8.4f Jitter: %8.4f at %v\n", s.SrcPort,
+				avgSeconds, delta.Seconds()-avgSeconds, s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
 		}
-	} else if TSEcr != 0 {
+	} else if TSEcr.Nanosecond() != 0 {
 		log.Println(s.SrcPort, "TSEcr", binary.BigEndian.Uint32(opt.OptionData[4:8]))
-		s.Jitter.AddEcho(TSEcr - pktTime)
+		delta := TSEcr.Sub(pktTime)
+		s.Jitter.AddEcho(delta)
 	}
 }
 
 // Option handles all options, both incoming and outgoing.
 // The relTime value is used for Timestamp analysis.
-func (s *state) Option(port layers.TCPPort, relTime float64, opt layers.TCPOption) {
+func (s *state) Option(port layers.TCPPort, pTime time.Time, opt layers.TCPOption) {
 	// TODO test case for wrong index.
 	optionType := opt.OptionType
 	if optionType > 15 {
@@ -382,7 +387,7 @@ func (s *state) Option(port layers.TCPPort, relTime float64, opt layers.TCPOptio
 			s.MSS = binary.BigEndian.Uint16(opt.OptionData)
 		}
 	case layers.TCPOptionKindTimestamps:
-		s.handleTimestamp(relTime, port == s.SrcPort, opt)
+		s.handleTimestamp(pTime, port == s.SrcPort, opt)
 
 	case layers.TCPOptionKindWindowScale:
 		if len(opt.OptionData) != 1 {
@@ -398,7 +403,7 @@ func (s *state) Option(port layers.TCPPort, relTime float64, opt layers.TCPOptio
 
 func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInfo) {
 	dataLength := tcpLength - uint16(4*tcp.DataOffset)
-	pTime := float64(ci.Timestamp.Nanosecond()) / 1.0e9
+	pTime := ci.Timestamp
 	if s.SrcIP.Equal(srcIP) {
 		if s.SrcPort != tcp.SrcPort {
 			s.Stats.SrcPortErrors++
@@ -432,7 +437,7 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 		if tcp.ECE {
 			s.Stats.ECECount++
 		}
-		log.Printf("%5d: %8.6f %9d %20v %5v inflight: %6d / %6d %6d\n", count, pTime, s.SeqTracker.sent, s.SrcPort, retransmit, inflight, window, remaining)
+		log.Printf("%5d: %2d.%6d %9d %20v %5v inflight: %6d / %6d %6d\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, retransmit, inflight, window, remaining)
 	} else if s.SrcIP.Equal(dstIP) {
 		if s.SrcPort != tcp.DstPort {
 			s.Stats.DstPortErrors++
@@ -451,7 +456,7 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 			pn, delay := s.SeqTracker.Ack(count, pTime, tcp.Ack, dataLength > 0, &s.Stats) // TODO
 			if delay > 0 {
 				//xxx BUG in sent?
-				log.Printf("%5d: %8.6f %9d %20v Packet: %5d Delay: %8v\n", count, pTime, s.SeqTracker.sent, s.SrcPort, pn, delay)
+				log.Printf("%5d: %2d.%6d %9d %20v Packet: %5d Delay: %8v\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, pn, delay)
 			}
 			s.Limit = s.SeqTracker.sendUNA + uint32(s.Window)<<s.WindowScale
 		}
