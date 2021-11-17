@@ -267,7 +267,13 @@ func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 	t.sackBytes += uint64(sb.Right - sb.Left)
 }
 
+// JitterTracker TODO
+//  Likely need to look for the first occurance, or perhaps the lowest delay occurance, of each TSVal,
+// and the corresponding first occurance of TSEcr.
 type JitterTracker struct {
+	initialized bool
+	FirstVal    time.Duration
+
 	ValCount       int
 	ValOffsetSum   float64
 	ValOffsetSumSq float64
@@ -280,6 +286,13 @@ type JitterTracker struct {
 // Add adds a new offset between TSVal and packet capture time to the jitter tracker.
 // offset should be TSVal - packet capture time.
 func (jt *JitterTracker) Add(offset time.Duration) {
+	if !jt.initialized {
+		log.Println("Jitter init")
+		jt.FirstVal = offset
+		jt.initialized = true
+		return
+	}
+	offset -= jt.FirstVal
 	jt.ValCount++
 	jt.ValOffsetSum += offset.Seconds()
 	jt.ValOffsetSumSq += offset.Seconds() * offset.Seconds()
@@ -288,18 +301,27 @@ func (jt *JitterTracker) Add(offset time.Duration) {
 // Add adds a new offset between TSEcr and packet capture time to the jitter tracker.
 // offset should be TSEcr - packet capture time.
 func (jt *JitterTracker) AddEcho(offset time.Duration) {
+	if !jt.initialized {
+		return
+	}
+	offset -= jt.FirstVal
 	jt.EchoCount++
 	jt.EchoOffsetSum += offset.Seconds()
 	jt.EchoOffsetSumSq += offset.Seconds() * offset.Seconds()
+}
+
+func (jt *JitterTracker) Mean() float64 {
+	if jt.ValCount == 0 {
+		return 0
+	}
+	return jt.ValOffsetSum / float64(jt.ValCount)
 }
 
 func (jt *JitterTracker) Jitter() float64 {
 	if jt.ValCount == 0 {
 		return 0
 	}
-	return math.Sqrt(
-		jt.ValOffsetSumSq/float64(jt.ValCount) - (jt.ValOffsetSum/float64(jt.ValCount))*(jt.ValOffsetSum/float64(jt.ValCount)))
-
+	return math.Sqrt(jt.ValOffsetSumSq/float64(jt.ValCount) - jt.Mean()*jt.Mean())
 }
 
 func (jt *JitterTracker) Delay() float64 {
@@ -351,7 +373,7 @@ func (s *state) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing b
 			s.Jitter.Add(delta)
 			avgSeconds := s.Jitter.ValOffsetSum / float64(s.Jitter.ValCount)
 			log.Printf("%20v Avg: %10.4f Delta: %10.4f RTT: %8.4f Jitter: %8.4f at %v\n", s.SrcPort,
-				avgSeconds, delta.Seconds()-avgSeconds, s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
+				avgSeconds, (delta - s.Jitter.FirstVal).Seconds(), s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
 		}
 	} else if TSEcr.Nanosecond() != 0 {
 		log.Println(s.SrcPort, "TSEcr", binary.BigEndian.Uint32(opt.OptionData[4:8]))

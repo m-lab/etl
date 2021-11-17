@@ -131,8 +131,6 @@ func TestParse(t *testing.T) {
 			t.Errorf("test:%s: OptionCounts = %v, want %v", tt.name, summary.LeftStats.OptionCounts, tt.nopCount)
 		}
 	}
-
-	t.Fatal()
 }
 
 func TestJitter(t *testing.T) {
@@ -149,5 +147,4 @@ func TestJitter(t *testing.T) {
 	if j.Jitter() > .005 || j.Jitter() < .001 {
 		t.Error(j.Jitter(), j.Delay(), j.ValCount)
 	}
-	t.Error()
 }
