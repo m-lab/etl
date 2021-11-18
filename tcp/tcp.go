@@ -569,9 +569,9 @@ func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tc
 }
 
 type packet struct {
-	ci   gopacket.CaptureInfo
-	data []byte
-	err  error
+	ci  gopacket.CaptureInfo
+	pkt gopacket.Packet
+	err error
 }
 
 // Parse parses an entire pcap file.
@@ -584,23 +584,30 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 
 	packets := make([]*packet, 0, 1000)
 
+	start := time.Now()
 	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
-		packets = append(packets, &packet{ci: ci, data: data, err: err})
-	}
-
-	// This is used to keep track of some of the TCP state.
-	// TODO replace this with local variables, and copy at the end.
-	alpha := schema.AlphaFields{}
-	//var firstTimestamp time.Time
-	for _, pkt := range packets {
 		// Decode a packet
-		packet := gopacket.NewPacket(pkt.data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		pkt := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
 			Lazy:                     true,
 			NoCopy:                   true,
 			SkipDecodeRecovery:       true,
 			DecodeStreamsAsDatagrams: false,
 		})
+		packets = append(packets, &packet{ci: ci, pkt: pkt, err: err})
+	}
+	mid := time.Now()
 
+	//last := len(packets) - 1
+	//for i := len(packets) - 1; i >= 0; i-- {
+	//	srcIP, dstIP, ttl, tcpLength, err := extractIPFields(packets[i].pkt)
+	//	}
+
+	// This is used to keep track of some of the TCP state.
+	// TODO replace this with local variables, and copy at the end.
+	alpha := schema.AlphaFields{}
+	//var firstTimestamp time.Time
+	for _, rec := range packets {
+		packet := rec.pkt
 		if packet.ErrorLayer() != nil {
 			sparse.Printf("Error decoding packet: %v", packet.ErrorLayer().Error()) // Somewhat VERBOSE
 			continue
@@ -645,12 +652,15 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		// Get the TCP layer from this packet
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
-			p.tcpLayer(srcIP, dstIP, tcp, pkt.ci, tcpLength, &alpha)
+			p.tcpLayer(srcIP, dstIP, tcp, rec.ci, tcpLength, &alpha)
 		} else {
 			alpha.WithoutTCPLayer++
 		}
 		alpha.Packets++
 	}
+	end := time.Now()
+
+	log.Println(mid.Sub(start), end.Sub(mid))
 
 	info.Printf("%20s: %v", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
 	info.Printf("%20s: %v", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())

@@ -133,6 +133,7 @@ func TestParse(t *testing.T) {
 			t.Errorf("test:%s: OptionCounts = %v, want %v", tt.name, summary.LeftStats.OptionCounts, tt.nopCount)
 		}
 	}
+	t.Fatal()
 }
 
 func TestJitter(t *testing.T) {
