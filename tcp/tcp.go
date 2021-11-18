@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"os"
 	"strings"
@@ -264,6 +265,84 @@ func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 	t.sackBytes += uint64(sb.Right - sb.Left)
 }
 
+// JitterTracker TODO
+//  Likely need to look for the first occurance, or perhaps the lowest delay occurance, of each TSVal,
+// and the corresponding first occurance of TSEcr.
+type JitterTracker struct {
+	initialized  bool
+	firstTSVal   uint32
+	firstPktTime time.Time
+	tickRate     time.Duration // Interval between ticks.  For server side this is always 1 msec.
+
+	ValCount       int
+	ValOffsetSum   float64
+	ValOffsetSumSq float64
+
+	EchoCount       int
+	EchoOffsetSum   float64
+	EchoOffsetSumSq float64
+}
+
+// Adjust attempts to adjust the TSVal and pktTime to interval since the first reported packet.
+// The TSVal is adjusted based on the inferred tick rate.
+func (j *JitterTracker) Adjust(tsval uint32, pktTime time.Time) (time.Duration, time.Duration) {
+	return time.Duration(tsval-j.firstTSVal) * j.tickRate, pktTime.Sub(j.firstPktTime)
+}
+
+// Add adds a new offset between TSVal and packet capture time to the jitter tracker.
+// offset should be TSVal - packet capture time.
+func (jt *JitterTracker) Add(tsval uint32, pktTime time.Time) {
+	if !jt.initialized {
+		jt.tickRate = time.Millisecond
+		jt.firstTSVal = tsval
+		jt.firstPktTime = pktTime
+		log.Println("Jitter init")
+		jt.initialized = true
+		return
+	}
+	t, p := jt.Adjust(tsval, pktTime)
+	offset := t - p
+	jt.ValCount++
+	jt.ValOffsetSum += offset.Seconds()
+	jt.ValOffsetSumSq += offset.Seconds() * offset.Seconds()
+}
+
+// Add adds a new offset between TSEcr and packet capture time to the jitter tracker.
+// offset should be TSEcr - packet capture time.
+// TODO - deal with TSEcr wrapping
+func (jt *JitterTracker) AddEcho(tsecr uint32, pktTime time.Time) {
+	if !jt.initialized {
+		return
+	}
+	t, p := jt.Adjust(tsecr, pktTime)
+	offset := t - p
+	jt.EchoCount++
+	jt.EchoOffsetSum += offset.Seconds()
+	jt.EchoOffsetSumSq += offset.Seconds() * offset.Seconds()
+}
+
+func (jt *JitterTracker) Mean() float64 {
+	if jt.ValCount == 0 {
+		return 0
+	}
+	return jt.ValOffsetSum / float64(jt.ValCount)
+}
+
+func (jt *JitterTracker) Jitter() float64 {
+	if jt.ValCount == 0 {
+		return 0
+	}
+
+	return math.Sqrt(jt.ValOffsetSumSq/float64(jt.ValCount) - jt.Mean()*jt.Mean())
+}
+
+func (jt *JitterTracker) Delay() float64 {
+	if jt.EchoCount == 0 || jt.ValCount == 0 {
+		return 0
+	}
+	return jt.ValOffsetSum/float64(jt.ValCount) - jt.EchoOffsetSum/float64(jt.EchoCount)
+}
+
 // state keeps track of the TCP state of one side of a connection.
 // TODO - add histograms for Ack inter-arrival time.
 type state struct {
@@ -284,6 +363,8 @@ type state struct {
 	SeqTracker *Tracker // Track the seq/ack/sack related state.
 
 	Stats StatsWrapper
+
+	Jitter JitterTracker
 }
 
 func NewState() *state {
@@ -291,7 +372,21 @@ func NewState() *state {
 		Stats: StatsWrapper{TcpStats: schema.TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
-func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
+func (s *state) handleTimestamp(pktTime time.Time, isOutgoing bool, opt layers.TCPOption) {
+	// These are arbitrary time offsets, but we will be
+	TSVal := binary.BigEndian.Uint32(opt.OptionData[0:4])
+	TSEcr := binary.BigEndian.Uint32(opt.OptionData[4:8])
+
+	if isOutgoing {
+		if TSVal != 0 {
+			s.Jitter.Add(TSVal, pktTime)
+		}
+	} else if TSEcr != 0 {
+		s.Jitter.AddEcho(TSEcr, pktTime)
+	}
+}
+
+func (s *state) Option(port layers.TCPPort, pTime time.Time, opt layers.TCPOption) {
 	// TODO test case for wrong index.
 	optionType := opt.OptionType
 	if optionType > 15 {
@@ -316,6 +411,8 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 			s.MSS = binary.BigEndian.Uint16(opt.OptionData)
 		}
 	case layers.TCPOptionKindTimestamps:
+		s.handleTimestamp(pTime, port == s.SrcPort, opt)
+
 	case layers.TCPOptionKindWindowScale:
 		if len(opt.OptionData) != 1 {
 			info.Println("Invalid WindowScale option length", len(opt.OptionData))
@@ -368,7 +465,7 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 		// Handle all options, including SACKs from other direction
 		// TODO - should some of these be associated with the other direction?
 		for i := 0; i < len(tcp.Options); i++ {
-			s.Option(tcp.SrcPort, tcp.Options[i])
+			s.Option(tcp.SrcPort, ci.Timestamp, tcp.Options[i])
 		}
 		if s.Window != tcp.Window {
 			s.Stats.WindowChanges++
@@ -381,7 +478,7 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 	}
 	// Handle options
 	for _, opt := range tcp.Options {
-		s.Option(tcp.SrcPort, opt)
+		s.Option(tcp.SrcPort, ci.Timestamp, opt)
 	}
 
 }

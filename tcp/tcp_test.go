@@ -3,6 +3,7 @@ package tcp_test
 import (
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -129,5 +130,21 @@ func TestParse(t *testing.T) {
 		if summary.LeftStats.OptionCounts[layers.TCPOptionKindNop] != tt.nopCount {
 			t.Errorf("test:%s: OptionCounts = %v, want %v", tt.name, summary.LeftStats.OptionCounts, tt.nopCount)
 		}
+	}
+}
+
+func TestJitter(t *testing.T) {
+	j := tcp.JitterTracker{}
+	rand.Seed(12345)
+	t0 := rand.Uint32()
+	for p := time.Date(2016, time.November, 10, 1, 1, 1, 1, time.UTC); p.Before(time.Date(2016, time.November, 10, 1, 1, 2, 2, time.UTC)); p = p.Add(10 * time.Millisecond) {
+		//t := -5e10 + time.Duration(rand.Int63n(1e7)-5e6)
+		t := t0 + uint32(rand.Intn(7)) - 3
+		t0 += 10
+		j.Add(t, p)
+		//j.AddEcho(-5e10 - 10*time.Millisecond)
+	}
+	if j.Jitter() > .005 || j.Jitter() < .001 {
+		t.Error(j.Jitter(), j.Delay(), j.ValCount)
 	}
 }
