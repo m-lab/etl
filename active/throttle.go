@@ -3,7 +3,6 @@ package active
 import (
 	"context"
 	"log"
-	"sync/atomic"
 
 	"golang.org/x/sync/semaphore"
 )
@@ -16,31 +15,17 @@ type TokenSource interface {
 
 // wsTokenSource is a simple token source for initial testing.
 type wsTokenSource struct {
-	acquired int64
-	released int64
-	sem      *semaphore.Weighted
+	sem *semaphore.Weighted
 }
 
 // Acquire acquires an admission token.
 func (ts *wsTokenSource) Acquire(ctx context.Context) error {
 	err := ts.sem.Acquire(ctx, 1)
-	if err == nil {
-		a := atomic.AddInt64(&ts.acquired, 1)
-		if a%100 == 0 {
-			r := atomic.LoadInt64(&ts.released)
-			// This clearly shows that the token bucket is WAI.
-			log.Printf("TokenBucket Acquired: %d Released: %d", a, r)
-		}
-	}
 	return err
 }
 
 // Release releases an admission token.
 func (ts *wsTokenSource) Release() {
-	r := atomic.AddInt64(&ts.released, 1)
-	if r%1000 == 0 {
-		log.Printf("Released total of %d tokens.", r)
-	}
 	ts.sem.Release(1)
 }
 
