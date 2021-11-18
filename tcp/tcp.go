@@ -418,6 +418,42 @@ func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tc
 	}
 }
 
+type packet struct {
+	ci  gopacket.CaptureInfo
+	pkt gopacket.Packet
+	err error
+}
+
+type packetSummary struct {
+	srcIP, dstIP net.IP
+	tcpLength    uint16
+	pTime        time.Time
+	tsVal        uint32
+	tsEcr        uint32
+}
+
+func (p *packet) GetTimestamps() (summary packetSummary, err error) {
+	srcIP, dstIP, _, tcpLength, err := extractIPFields(p.pkt)
+	summary = packetSummary{srcIP, dstIP, tcpLength, p.ci.Timestamp, 0, 0}
+	if err != nil {
+		return
+	}
+
+	err = fmt.Errorf("No timestamp field")
+	if tcpLayer := p.pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp, _ := tcpLayer.(*layers.TCP)
+		for _, opt := range tcp.Options {
+			if opt.OptionType == layers.TCPOptionKindTimestamps {
+				summary.tsVal = binary.BigEndian.Uint32(opt.OptionData[0:4])
+				summary.tsEcr = binary.BigEndian.Uint32(opt.OptionData[4:8])
+				err = nil
+				break
+			}
+		}
+	}
+	return
+}
+
 // Parse parses an entire pcap file.
 func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
@@ -426,19 +462,46 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		return nil, err
 	}
 
-	// This is used to keep track of some of the TCP state.
-	// TODO replace this with local variables, and copy at the end.
-	alpha := schema.AlphaFields{}
+	packets := make([]*packet, 0, 1000)
 
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+	start := time.Now()
+	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		// Decode a packet
-		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		pkt := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
 			Lazy:                     true,
 			NoCopy:                   true,
 			SkipDecodeRecovery:       true,
 			DecodeStreamsAsDatagrams: false,
 		})
+		packets = append(packets, &packet{ci: ci, pkt: pkt, err: err})
+	}
+	mid := time.Now()
 
+	final := make(map[string]packetSummary, 2)
+
+	//last := len(packets) - 1
+	for i := len(packets) - 1; i >= 0; i-- {
+		summary, err := packets[i].GetTimestamps()
+		if err == nil {
+			if _, ok := final[summary.srcIP.String()]; !ok {
+				final[summary.srcIP.String()] = summary
+				if len(final) == 2 {
+					log.Println("Found two IPs", final)
+					break
+				}
+			}
+		}
+		if len(packets)-i > 100 {
+			break // Give up if we can't find two IPs in the last 100 packets.
+		}
+	}
+
+	// This is used to keep track of some of the TCP state.
+	// TODO replace this with local variables, and copy at the end.
+	alpha := schema.AlphaFields{}
+	//var firstTimestamp time.Time
+	for _, rec := range packets {
+		packet := rec.pkt
 		if packet.ErrorLayer() != nil {
 			sparse.Printf("Error decoding packet: %v", packet.ErrorLayer().Error()) // Somewhat VERBOSE
 			continue
@@ -480,12 +543,15 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		// Get the TCP layer from this packet
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
-			p.tcpLayer(srcIP, dstIP, tcp, ci, tcpLength, &alpha)
+			p.tcpLayer(srcIP, dstIP, tcp, rec.ci, tcpLength, &alpha)
 		} else {
 			alpha.WithoutTCPLayer++
 		}
 		alpha.Packets++
 	}
+	end := time.Now()
+
+	log.Println(mid.Sub(start), end.Sub(mid))
 
 	info.Printf("%20s: %v", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
 	info.Printf("%20s: %v", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())
