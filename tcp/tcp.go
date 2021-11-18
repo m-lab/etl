@@ -221,7 +221,7 @@ func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, s
 		delete(t.seqTimes, clock)
 		return si.count, pTime.Sub(si.pTime)
 	} else {
-		log.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
+		sparse.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
 		return 0, 0
 	}
 }
@@ -271,8 +271,10 @@ func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 //  Likely need to look for the first occurance, or perhaps the lowest delay occurance, of each TSVal,
 // and the corresponding first occurance of TSEcr.
 type JitterTracker struct {
-	initialized bool
-	FirstVal    time.Duration
+	initialized  bool
+	firstTSVal   uint32
+	firstPktTime time.Time
+	tickRate     time.Duration // Interval between ticks.  For server side this is always 1 msec.
 
 	ValCount       int
 	ValOffsetSum   float64
@@ -283,16 +285,25 @@ type JitterTracker struct {
 	EchoOffsetSumSq float64
 }
 
+// Adjust attempts to adjust the TSVal and pktTime to interval since the first reported packet.
+// The TSVal is adjusted based on the inferred tick rate.
+func (j *JitterTracker) Adjust(tsval uint32, pktTime time.Time) (time.Duration, time.Duration) {
+	return time.Duration(tsval-j.firstTSVal) * j.tickRate, pktTime.Sub(j.firstPktTime)
+}
+
 // Add adds a new offset between TSVal and packet capture time to the jitter tracker.
 // offset should be TSVal - packet capture time.
-func (jt *JitterTracker) Add(offset time.Duration) {
+func (jt *JitterTracker) Add(tsval uint32, pktTime time.Time) {
 	if !jt.initialized {
+		jt.tickRate = time.Millisecond
+		jt.firstTSVal = tsval
+		jt.firstPktTime = pktTime
 		log.Println("Jitter init")
-		jt.FirstVal = offset
 		jt.initialized = true
 		return
 	}
-	offset -= jt.FirstVal
+	t, p := jt.Adjust(tsval, pktTime)
+	offset := t - p
 	jt.ValCount++
 	jt.ValOffsetSum += offset.Seconds()
 	jt.ValOffsetSumSq += offset.Seconds() * offset.Seconds()
@@ -300,11 +311,13 @@ func (jt *JitterTracker) Add(offset time.Duration) {
 
 // Add adds a new offset between TSEcr and packet capture time to the jitter tracker.
 // offset should be TSEcr - packet capture time.
-func (jt *JitterTracker) AddEcho(offset time.Duration) {
+// TODO - deal with TSEcr wrapping
+func (jt *JitterTracker) AddEcho(tsecr uint32, pktTime time.Time) {
 	if !jt.initialized {
 		return
 	}
-	offset -= jt.FirstVal
+	t, p := jt.Adjust(tsecr, pktTime)
+	offset := t - p
 	jt.EchoCount++
 	jt.EchoOffsetSum += offset.Seconds()
 	jt.EchoOffsetSumSq += offset.Seconds() * offset.Seconds()
@@ -321,6 +334,7 @@ func (jt *JitterTracker) Jitter() float64 {
 	if jt.ValCount == 0 {
 		return 0
 	}
+
 	return math.Sqrt(jt.ValOffsetSumSq/float64(jt.ValCount) - jt.Mean()*jt.Mean())
 }
 
@@ -363,22 +377,22 @@ func NewState() *state {
 
 func (s *state) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt layers.TCPOption) {
 	// These are arbitrary time offsets, but we will be
-	TSVal := time.Unix(0, 1e6*int64(binary.BigEndian.Uint32(opt.OptionData[0:4])))
-	TSEcr := time.Unix(0, 1e6*int64(binary.BigEndian.Uint32(opt.OptionData[4:8])))
+	TSVal := binary.BigEndian.Uint32(opt.OptionData[0:4])
+	TSEcr := binary.BigEndian.Uint32(opt.OptionData[4:8])
 
 	if isOutgoing && !retransmit {
-		if TSVal.Nanosecond() != 0 {
-			log.Println(s.SrcPort, "TSVal", binary.BigEndian.Uint32(opt.OptionData[0:4]))
-			delta := TSVal.Sub(pktTime)
-			s.Jitter.Add(delta)
-			avgSeconds := s.Jitter.ValOffsetSum / float64(s.Jitter.ValCount)
-			log.Printf("%20v Avg: %10.4f Delta: %10.4f RTT: %8.4f Jitter: %8.4f at %v\n", s.SrcPort,
-				avgSeconds, (delta - s.Jitter.FirstVal).Seconds(), s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
+		if TSVal != 0 {
+			s.Jitter.Add(TSVal, pktTime)
+			//log.Println(s.SrcPort, "TSVal", binary.BigEndian.Uint32(opt.OptionData[0:4]))
+			t, p := s.Jitter.Adjust(TSVal, pktTime)
+			delta := t - p
+			avgSeconds := s.Jitter.Mean()
+			log.Printf("%20v Avg: %10.4f T: %6.3f P: %6.3f Delta: %6.3f RTT: %8.4f Jitter: %8.4f at %v\n", s.SrcPort,
+				avgSeconds, float32(t)/1e9, float32(p)/1e9, float32(delta)/1e9, s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
 		}
-	} else if TSEcr.Nanosecond() != 0 {
-		log.Println(s.SrcPort, "TSEcr", binary.BigEndian.Uint32(opt.OptionData[4:8]))
-		delta := TSEcr.Sub(pktTime)
-		s.Jitter.AddEcho(delta)
+	} else if TSEcr != 0 {
+		//log.Println(s.SrcPort, "TSEcr", binary.BigEndian.Uint32(opt.OptionData[4:8]))
+		s.Jitter.AddEcho(TSEcr, pktTime)
 	}
 }
 
@@ -432,9 +446,9 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 			s.Stats.SrcPortErrors++
 		}
 		window := int64(s.Window) << s.WindowScale
-		var inflight int32
+		//var inflight int32
 		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
-		if inflight, retransmit = s.SeqTracker.Seq(count, pTime, tcp.Seq, dataLength, tcp.SYN || tcp.FIN, &s.Stats); retransmit {
+		if _, retransmit = s.SeqTracker.Seq(count, pTime, tcp.Seq, dataLength, tcp.SYN || tcp.FIN, &s.Stats); retransmit {
 			// TODO
 		}
 		// TODO handle error here?
@@ -459,7 +473,7 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 		if tcp.ECE {
 			s.Stats.ECECount++
 		}
-		log.Printf("%5d: %2d.%6d %9d %20v %5v inflight: %6d / %6d %6d\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, retransmit, inflight, window, remaining)
+		//log.Printf("%5d: %2d.%6d %9d %20v %5v inflight: %6d / %6d %6d\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, retransmit, inflight, window, remaining)
 	} else if s.SrcIP.Equal(dstIP) {
 		if s.SrcPort != tcp.DstPort {
 			s.Stats.DstPortErrors++
@@ -475,10 +489,10 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 			s.Window = tcp.Window
 		}
 		if tcp.ACK {
-			pn, delay := s.SeqTracker.Ack(count, pTime, tcp.Ack, dataLength > 0, &s.Stats) // TODO
+			_, delay := s.SeqTracker.Ack(count, pTime, tcp.Ack, dataLength > 0, &s.Stats) // TODO
 			if delay > 0 {
 				//xxx BUG in sent?
-				log.Printf("%5d: %2d.%6d %9d %20v Packet: %5d Delay: %8v\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, pn, delay)
+				//	log.Printf("%5d: %2d.%6d %9d %20v Packet: %5d Delay: %8v\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, pn, delay)
 			}
 			s.Limit = s.SeqTracker.sendUNA + uint32(s.Window)<<s.WindowScale
 		}
@@ -554,6 +568,12 @@ func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tc
 	}
 }
 
+type packet struct {
+	ci   gopacket.CaptureInfo
+	data []byte
+	err  error
+}
+
 // Parse parses an entire pcap file.
 func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
@@ -562,13 +582,19 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		return nil, err
 	}
 
+	packets := make([]*packet, 0, 1000)
+
+	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+		packets = append(packets, &packet{ci: ci, data: data, err: err})
+	}
+
 	// This is used to keep track of some of the TCP state.
 	// TODO replace this with local variables, and copy at the end.
 	alpha := schema.AlphaFields{}
 	//var firstTimestamp time.Time
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+	for _, pkt := range packets {
 		// Decode a packet
-		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		packet := gopacket.NewPacket(pkt.data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
 			Lazy:                     true,
 			NoCopy:                   true,
 			SkipDecodeRecovery:       true,
@@ -619,7 +645,7 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		// Get the TCP layer from this packet
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
-			p.tcpLayer(srcIP, dstIP, tcp, ci, tcpLength, &alpha)
+			p.tcpLayer(srcIP, dstIP, tcp, pkt.ci, tcpLength, &alpha)
 		} else {
 			alpha.WithoutTCPLayer++
 		}

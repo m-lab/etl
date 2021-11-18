@@ -96,6 +96,8 @@ func TestParse(t *testing.T) {
 			packets: 15, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 0, nopCount: 47},
 		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
 			packets: 5180, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 2880, nopCount: 17087},
+		{name: "foobar", fn: "testfiles/ndt-xkrzj_1632230485_0000000000AE8EE2.pcap.gz",
+			packets: 49, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 0, nopCount: 1510},
 	}
 	for _, tt := range tests {
 		f, err := os.Open(tt.fn)
@@ -136,13 +138,13 @@ func TestParse(t *testing.T) {
 func TestJitter(t *testing.T) {
 	j := tcp.JitterTracker{}
 	rand.Seed(12345)
-	for t := time.Date(2016, time.November, 10, 1, 1, 1, 1, time.UTC); t.Before(time.Date(2016, time.November, 10, 1, 1, 2, 2, time.UTC)); t = t.Add(10 * time.Millisecond) {
-		delta := -5e10 + time.Duration(rand.Int63n(1e7)-5e6)
-		j.Add(delta)
-		j.AddEcho(-5e10 - 10*time.Millisecond)
-		avgSeconds := j.ValOffsetSum / float64(j.ValCount)
-		log.Printf("Avg: %10.4f Delta: %10.4f RTT: %8.4f Jitter: %8.4f at %v\n",
-			avgSeconds, delta.Seconds()-avgSeconds, j.Delay(), j.Jitter(), t)
+	t0 := rand.Uint32()
+	for p := time.Date(2016, time.November, 10, 1, 1, 1, 1, time.UTC); p.Before(time.Date(2016, time.November, 10, 1, 1, 2, 2, time.UTC)); p = p.Add(10 * time.Millisecond) {
+		//t := -5e10 + time.Duration(rand.Int63n(1e7)-5e6)
+		t := t0 + uint32(rand.Intn(7)) - 3
+		t0 += 10
+		j.Add(t, p)
+		//j.AddEcho(-5e10 - 10*time.Millisecond)
 	}
 	if j.Jitter() > .005 || j.Jitter() < .001 {
 		t.Error(j.Jitter(), j.Delay(), j.ValCount)
