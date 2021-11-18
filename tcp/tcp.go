@@ -574,6 +574,36 @@ type packet struct {
 	err error
 }
 
+type packetSummary struct {
+	srcIP, dstIP net.IP
+	tcpLength    uint16
+	pTime        time.Time
+	tsVal        uint32
+	tsEcr        uint32
+}
+
+func (p *packet) GetTimestamps() (summary packetSummary, err error) {
+	srcIP, dstIP, _, tcpLength, err := extractIPFields(p.pkt)
+	summary = packetSummary{srcIP, dstIP, tcpLength, p.ci.Timestamp, 0, 0}
+	if err != nil {
+		return
+	}
+
+	err = fmt.Errorf("No timestamp field")
+	if tcpLayer := p.pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp, _ := tcpLayer.(*layers.TCP)
+		for _, opt := range tcp.Options {
+			if opt.OptionType == layers.TCPOptionKindTimestamps {
+				summary.tsVal = binary.BigEndian.Uint32(opt.OptionData[0:4])
+				summary.tsEcr = binary.BigEndian.Uint32(opt.OptionData[4:8])
+				err = nil
+				break
+			}
+		}
+	}
+	return
+}
+
 // Parse parses an entire pcap file.
 func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
@@ -597,10 +627,24 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	}
 	mid := time.Now()
 
+	final := make(map[string]packetSummary, 2)
+
 	//last := len(packets) - 1
-	//for i := len(packets) - 1; i >= 0; i-- {
-	//	srcIP, dstIP, ttl, tcpLength, err := extractIPFields(packets[i].pkt)
-	//	}
+	for i := len(packets) - 1; i >= 0; i-- {
+		summary, err := packets[i].GetTimestamps()
+		if err == nil {
+			if _, ok := final[summary.srcIP.String()]; !ok {
+				final[summary.srcIP.String()] = summary
+				if len(final) == 2 {
+					log.Println("Found two IPs", final)
+					break
+				}
+			}
+		}
+		if len(packets)-i > 100 {
+			break // Give up if we can't find two IPs in the last 100 packets.
+		}
+	}
 
 	// This is used to keep track of some of the TCP state.
 	// TODO replace this with local variables, and copy at the end.
