@@ -44,11 +44,17 @@ type sackBlock struct {
 	Right uint32
 }
 
+type seqInfo struct {
+	count int
+	pTime time.Time
+}
+
 type Tracker struct {
 	initialized bool
-	packets     uint32 // Number of calls to Seq function
-	seq         uint32 // The last sequence number observed, not counting retransmits
-	synFin      uint32 // zero, one or two, depending on whether SYN and FIN have been sent
+	startTime   time.Time // Initial packet time
+	packets     uint32    // Number of calls to Seq function
+	seq         uint32    // The last sequence number observed, not counting retransmits
+	synFin      uint32    // zero, one or two, depending on whether SYN and FIN have been sent
 
 	sendUNA  uint32 // greatest observed ack
 	acks     uint32 // number of acks (from other side)
@@ -62,6 +68,12 @@ type Tracker struct {
 
 	lastDataLength uint16 // Used to compute NextSeq()
 
+	// This will get very large - one entry per packet.
+	seqTimes map[uint32]seqInfo
+}
+
+func NewTracker() *Tracker {
+	return &Tracker{seqTimes: make(map[uint32]seqInfo, 100)}
 }
 
 func (t *Tracker) Summary() string {
@@ -109,16 +121,19 @@ func (sw *StatsWrapper) Option(opt layers.TCPOptionKind) {
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
 // Initializes the tracker if it hasn't been initialized yet.
 // Returns the bytes in flight (not including retransmits) and boolean indicator if this is a retransmit
-func (t *Tracker) Seq(clock uint32, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
+func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
 	t.packets++ // Some of these may be retransmits.
 
 	if !t.initialized {
+		t.startTime = pTime
 		t.seq = clock
 		t.sendUNA = clock // nothing acked so far
 		t.initialized = true
 	}
 	// Use this unless we are sending new data.
 	// TODO - correct this for sum of sizes of sack block scoreboard.
+	// This does not include retransmits!!
+	// NOTE: This may be greater than the window size if capture missed some packets.
 	inflight, err := diff(t.SendNext(), t.sendUNA)
 	if err != nil {
 		log.Println("inflight diff error", t.SendNext(), t.sendUNA)
@@ -137,7 +152,8 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool, sw *StatsWrapper
 		sw.Retransmit(length)
 		return inflight, true
 	}
-	// delta is non-negative (not a retransmit)
+
+	// Everything below applies only to new data packets, not retransmits
 	if delta != int32(t.lastDataLength) {
 		sw.MissingPackets++
 		sparse.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
@@ -153,6 +169,7 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool, sw *StatsWrapper
 
 	t.sent += uint64(length)
 	t.seq = clock
+	t.seqTimes[clock] = seqInfo{count, pTime}
 
 	gap, err := diff(t.seq, t.sendUNA)
 	if err != nil {
@@ -160,7 +177,6 @@ func (t *Tracker) Seq(clock uint32, length uint16, synFin bool, sw *StatsWrapper
 	}
 	if gap > t.maxGap {
 		t.maxGap = gap
-		//info.Printf("%8p - %5d: MaxGap = %d\n", t, t.packets, gap)
 	}
 
 	inflight, err = diff(t.SendNext(), t.sendUNA)
@@ -175,16 +191,18 @@ func (t *Tracker) Acked() uint64 {
 	return t.acked
 }
 
-func (t *Tracker) Ack(clock uint32, withData bool, sw *StatsWrapper) {
+// Ack updates the tracker based on an observed ack value.
+// Returns the time observed by the packet capture since the correponding sequence number was sent.
+func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, sw *StatsWrapper) (int, time.Duration) {
 	if !t.initialized {
 		sw.OtherErrors++
-		info.Print("Ack called before Seq")
+		info.Printf("PKT: %d Ack called before Seq", count)
 	}
 	delta, err := diff(clock, t.sendUNA)
 	if err != nil {
 		sw.BadDeltas++
 		badAck.Printf("Bad ack %4X -> %4X\n", t.sendUNA, clock)
-		return
+		return 0, 0
 	}
 	if delta > 0 {
 		t.acked += uint64(delta)
@@ -193,7 +211,16 @@ func (t *Tracker) Ack(clock uint32, withData bool, sw *StatsWrapper) {
 	if !withData {
 		t.onlyAcks++
 	}
-	t.sendUNA = clock
+	defer func() { t.sendUNA = clock }()
+	si, ok := t.seqTimes[clock]
+	if ok {
+		// TODO should we keep the entry but mark it as acked?  Or keep a limited cache?
+		delete(t.seqTimes, clock)
+		return si.count, pTime.Sub(si.pTime)
+	} else {
+		sparse.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
+		return 0, 0
+	}
 }
 
 func (t *Tracker) SendUNA() uint32 {
@@ -254,13 +281,14 @@ type state struct {
 
 	//lastHeader *layers.TCP
 
-	SeqTracker Tracker // Track the seq/ack/sack related state.
+	SeqTracker *Tracker // Track the seq/ack/sack related state.
 
 	Stats StatsWrapper
 }
 
 func NewState() *state {
-	return &state{Stats: StatsWrapper{TcpStats: schema.TcpStats{OptionCounts: make([]int64, 16)}}}
+	return &state{SeqTracker: NewTracker(),
+		Stats: StatsWrapper{TcpStats: schema.TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
 func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
@@ -300,14 +328,16 @@ func (s *state) Option(port layers.TCPPort, opt layers.TCPOption) {
 	}
 }
 
-func (s *state) Update(srcIP, dstIP net.IP, tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInfo) {
+func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInfo) {
 	dataLength := tcpLength - uint16(4*tcp.DataOffset)
+	pTime := ci.Timestamp
+	var retransmit bool
 	if s.SrcIP.Equal(srcIP) {
 		if s.SrcPort != tcp.SrcPort {
 			s.Stats.SrcPortErrors++
 		}
 		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
-		if _, retrans := s.SeqTracker.Seq(tcp.Seq, dataLength, tcp.SYN || tcp.FIN, &s.Stats); retrans {
+		if _, retransmit = s.SeqTracker.Seq(count, pTime, tcp.Seq, dataLength, tcp.SYN || tcp.FIN, &s.Stats); retransmit {
 			// TODO
 		}
 		if !tcp.SYN {
@@ -345,7 +375,7 @@ func (s *state) Update(srcIP, dstIP net.IP, tcpLength uint16, tcp *layers.TCP, c
 			s.Window = tcp.Window
 		}
 		if tcp.ACK {
-			s.SeqTracker.Ack(tcp.Ack, dataLength > 0, &s.Stats) // TODO
+			s.SeqTracker.Ack(count, pTime, tcp.Ack, dataLength > 0, &s.Stats) // TODO
 			s.Limit = s.SeqTracker.sendUNA + uint32(s.Window)<<s.WindowScale
 		}
 	}
@@ -389,8 +419,8 @@ func (p *Parser) tcpLayer(srcIP, dstIP net.IP, tcp *layers.TCP, ci gopacket.Capt
 	}
 
 	// Update both state structs.
-	p.LeftState.Update(srcIP, dstIP, tcpLength, tcp, ci)
-	p.RightState.Update(srcIP, dstIP, tcpLength, tcp, ci)
+	p.LeftState.Update(int(alpha.Packets), srcIP, dstIP, tcpLength, tcp, ci)
+	p.RightState.Update(int(alpha.Packets), srcIP, dstIP, tcpLength, tcp, ci)
 
 	if tcp.SYN {
 		if tcp.ACK {
