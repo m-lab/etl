@@ -95,7 +95,6 @@ func (t *Tracker) ByteCount() uint64 {
 func diff(clock uint32, previous uint32) (int32, error) {
 	delta := int32(clock - previous)
 	if !(-1<<30 < delta && delta < 1<<30) {
-		//	info.Printf("invalid sequence delta %d->%d (%d)", previous, clock, delta)
 		return delta, ErrInvalidDelta
 	}
 	return delta, nil
@@ -390,6 +389,7 @@ func (s *state) Option(port layers.TCPPort, pTime time.Time, opt layers.TCPOptio
 	// TODO test case for wrong index.
 	optionType := opt.OptionType
 	if optionType > 15 {
+		// TODO replace with metrics
 		info.Printf("TCP Option has illegal option type %d", opt.OptionType)
 		return
 	}
@@ -406,6 +406,7 @@ func (s *state) Option(port layers.TCPPort, pTime time.Time, opt layers.TCPOptio
 		}
 	case layers.TCPOptionKindMSS:
 		if len(opt.OptionData) != 2 {
+			// TODO replace with metrics
 			info.Println("Invalid MSS option length", len(opt.OptionData))
 		} else {
 			s.MSS = binary.BigEndian.Uint16(opt.OptionData)
@@ -415,6 +416,7 @@ func (s *state) Option(port layers.TCPPort, pTime time.Time, opt layers.TCPOptio
 
 	case layers.TCPOptionKindWindowScale:
 		if len(opt.OptionData) != 1 {
+			// TODO replace with metrics
 			info.Println("Invalid WindowScale option length", len(opt.OptionData))
 		} else {
 			// TODO should this change after initialization?
@@ -433,7 +435,6 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 		if s.SrcPort != tcp.SrcPort {
 			s.Stats.SrcPortErrors++
 		}
-		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
 		if _, retransmit = s.SeqTracker.Seq(count, pTime, tcp.Seq, dataLength, tcp.SYN || tcp.FIN, &s.Stats); retransmit {
 			// TODO
 		}
@@ -546,8 +547,9 @@ func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tc
 }
 
 type packet struct {
-	ci  gopacket.CaptureInfo
-	pkt gopacket.Packet
+	ci   gopacket.CaptureInfo
+	data []byte
+	//pkt gopacket.Packet
 	err error
 }
 
@@ -560,14 +562,21 @@ type packetSummary struct {
 }
 
 func (p *packet) GetTimestamps() (summary packetSummary, err error) {
-	srcIP, dstIP, _, tcpLength, err := extractIPFields(p.pkt)
+	// Decode a packet
+	pkt := gopacket.NewPacket(p.data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		Lazy:                     true,
+		NoCopy:                   true,
+		SkipDecodeRecovery:       true,
+		DecodeStreamsAsDatagrams: false,
+	})
+	srcIP, dstIP, _, tcpLength, err := extractIPFields(pkt)
 	summary = packetSummary{srcIP, dstIP, tcpLength, p.ci.Timestamp, 0, 0}
 	if err != nil {
 		return
 	}
 
 	err = fmt.Errorf("No timestamp field")
-	if tcpLayer := p.pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+	if tcpLayer := pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp, _ := tcpLayer.(*layers.TCP)
 		for _, opt := range tcp.Options {
 			if opt.OptionType == layers.TCPOptionKindTimestamps {
@@ -593,14 +602,7 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 
 	start := time.Now()
 	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
-		// Decode a packet
-		pkt := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
-			Lazy:                     true,
-			NoCopy:                   true,
-			SkipDecodeRecovery:       true,
-			DecodeStreamsAsDatagrams: false,
-		})
-		packets = append(packets, &packet{ci: ci, pkt: pkt, err: err})
+		packets = append(packets, &packet{ci: ci, data: data, err: err})
 	}
 	mid := time.Now()
 
@@ -608,6 +610,7 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 
 	//last := len(packets) - 1
 	for i := len(packets) - 1; i >= 0; i-- {
+		// This does some redundant work, as some packets will be parsed both here and below.
 		summary, err := packets[i].GetTimestamps()
 		if err == nil {
 			if _, ok := final[summary.srcIP.String()]; !ok {
@@ -628,7 +631,13 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	alpha := schema.AlphaFields{}
 	//var firstTimestamp time.Time
 	for _, rec := range packets {
-		packet := rec.pkt
+		// Decode packet
+		packet := gopacket.NewPacket(rec.data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+			Lazy:                     true,
+			NoCopy:                   true,
+			SkipDecodeRecovery:       true,
+			DecodeStreamsAsDatagrams: false,
+		})
 		if packet.ErrorLayer() != nil {
 			sparse.Printf("Error decoding packet: %v", packet.ErrorLayer().Error()) // Somewhat VERBOSE
 			continue
