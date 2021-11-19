@@ -78,6 +78,14 @@ func NormalizeIP(ip string) string {
 	return n.String()
 }
 
+// GetHopID creates a unique identifier to join Hop Annotations
+// with traceroute datasets.
+func GetHopID(cycleStartTime float64, hostname string, address string) string {
+	traceStartTime := time.Unix(int64(cycleStartTime), 0).UTC()
+	date := traceStartTime.Format("20060102")
+	return fmt.Sprintf("%s_%s_%s", date, hostname, address)
+}
+
 // NewSinkParser creates an appropriate parser for a given data type.
 // Eventually all datatypes will use this instead of NewParser.
 func NewSinkParser(dt etl.DataType, sink row.Sink, table string, ann api.Annotator) etl.Parser {
