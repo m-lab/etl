@@ -39,15 +39,15 @@ type TcpStats struct {
 }
 
 type AlphaFields struct {
-	TruncatedPackets int64     `bigquery:"truncated_packets"`
-	SynPacket        int64     `bigquery:"syn_packet" json:"syn_packet"`
-	SynTime          time.Time `bigquery:"syn_time" json:"syn_time"`
-	SynAckPacket     int64     `bigquery:"syn_ack_packet" json:"syn_ack_packet"`
-	SynAckTime       time.Time `bigquery:"syn_ack_time" json:"syn_ack_time"`
-	Packets          int64     `bigquery:"packets" json:"packets"`
-	Sacks            int64     `bigquery:"sacks" json:"sacks"`
-	IPAddrErrors     int64     `bigquery:"ip_addr_errors" json:"ip_addr_errors"` // Number of packets with IP addresses that don't match first IP header at all.
-	WithoutTCPLayer  int64     `bigquery:"no_tcp_layer" json:"no_tcp_layer"`     // Number of packets with no TCP layer.
+	TruncatedPackets int64
+	SynPacket        int64
+	SynTime          time.Time
+	SynAckPacket     int64
+	SynAckTime       time.Time
+	Packets          int64
+	Sacks            int64
+	IPAddrErrors     int64 // Number of packets with IP addresses that don't match first IP header at all.
+	WithoutTCPLayer  int64 // Number of packets with no TCP layer.
 
 	LeftStats  TcpStats
 	RightStats TcpStats
@@ -59,10 +59,10 @@ type PCAPRow struct {
 	Parser ParseInfo  `bigquery:"parser" json:"parser"`
 	Date   civil.Date `bigquery:"date" json:"date"`
 
-	Alpha *AlphaFields `bigquery:"alpha" json:"alpha"`
+	Exp *AlphaFields `bigquery:"exp_a" json:"alpha"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
+	row.NullAnnotator `bigquery:"-" json:"-"`
 }
 
 // Schema returns the Bigquery schema for Pcap.

@@ -59,7 +59,7 @@ func TestPCAPParser_ParseAndInsert(t *testing.T) {
 		Parser: expectedParseInfo,
 		Date:   date,
 
-		Alpha: &schema.AlphaFields{
+		Exp: &schema.AlphaFields{
 			SynPacket:    0,
 			SynTime:      time.Date(2021, 07, 21, 00, 00, 01, 181050000, time.UTC),
 			SynAckPacket: 1,

@@ -73,7 +73,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			GitCommit:  GitCommit(),
 		},
 
-		Alpha: alpha,
+		Exp: alpha,
 	}
 
 	if err := p.Put(&row); err != nil {
