@@ -296,7 +296,7 @@ func (jt *JitterTracker) Add(tsval uint32, pktTime time.Time) {
 	if !jt.initialized {
 		jt.firstTSVal = tsval
 		jt.firstPktTime = pktTime
-		if !jt.lastPktTime.IsZero() {
+		if !jt.lastPktTime.IsZero() && (jt.lastTSVal != jt.firstTSVal) {
 			jt.tickRate = jt.lastPktTime.Sub(pktTime) / time.Duration(jt.lastTSVal-jt.firstTSVal)
 		} else {
 			jt.tickRate = time.Millisecond
