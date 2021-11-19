@@ -27,7 +27,7 @@ import (
 	"github.com/m-lab/go/logx"
 )
 
-var debug = logx.Debug
+var dbg = logx.Debug
 
 /* Discussion:
  What should happen if:
@@ -78,7 +78,7 @@ func (c *Context) Err() error {
 
 // Fail cancels the context, and sets the result of context.Err()
 func (c *Context) Fail(err error) {
-	debug.Output(2, "stopping")
+	dbg.Output(2, "stopping")
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.otherErr = err
@@ -154,7 +154,7 @@ func (src *GCSSource) Next(ctx context.Context) (Runnable, error) {
 			if ok {
 				return next, nil
 			}
-			debug.Println("iterator.Done")
+			dbg.Println("iterator.Done")
 			return nil, iterator.Done
 		}
 	}
@@ -181,7 +181,7 @@ func (src *GCSSource) streamToPending(ctx context.Context, job tracker.Job) {
 	skipCount := dataType.SkipCount()
 
 	for _, f := range files {
-		debug.Println(f)
+		dbg.Println(f)
 		if f == nil {
 			log.Println("Nil file!!")
 			metrics.ActiveErrors.WithLabelValues(src.Label(), "nil file").Inc()
@@ -194,7 +194,7 @@ func (src *GCSSource) streamToPending(ctx context.Context, job tracker.Job) {
 		}
 
 		if index%(skipCount+1) == 0 {
-			debug.Printf("Adding gs://%s/%s", f.Bucket, f.Name)
+			dbg.Printf("Adding gs://%s/%s", f.Bucket, f.Name)
 			// Blocks until consumer reads channel.
 			src.pendingChan <- src.toRunnable(f)
 		}

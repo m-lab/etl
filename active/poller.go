@@ -116,20 +116,25 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 			log.Println(postErr, "on heartbeat for", job.Path())
 		}
 
-		debug.Println("Starting func")
+		dbg.Println("Starting func")
 
-		f := func() error {
+		f := func() (err error) {
 			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Inc()
 			defer metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Dec()
 
-			err := run.Run(ctx)
+			// Capture any panic and convert it to an error.
+			defer func(tag string) {
+				err = metrics.PanicToErr(err, recover(), "Runall.f")
+			}(run.Info())
+
+			err = run.Run(ctx)
 			if err == nil {
 				update := tracker.UpdateURL(g.trackerBase, job, tracker.Parsing, run.Info())
 				if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {
 					log.Println(postErr, "on update for", job.Path())
 				}
 			}
-			return err
+			return
 		}
 
 		count++
