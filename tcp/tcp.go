@@ -592,7 +592,7 @@ func (p *packet) GetTimestamps() (summary packetSummary, err error) {
 		tcp, _ := tcpLayer.(*layers.TCP)
 		for _, opt := range tcp.Options {
 			if opt.OptionType == layers.TCPOptionKindTimestamps {
-				if opt.OptionLength < 8 {
+				if len(opt.OptionData) < 8 {
 					// TODO add a metric for this
 					log.Println("Bad TCP option", opt)
 					continue
