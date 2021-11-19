@@ -14,6 +14,7 @@ import (
 	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/traceroute-caller/hopannotation"
 )
 
 func TestParsePT(t *testing.T) {
@@ -169,8 +170,10 @@ func TestParseJSONLComplex(t *testing.T) {
 	}
 
 	wantHop := schema.ScamperHop{
-		Source: schema.HopIP{IP: "2001:550:1b01:1::1", ASN: 0},
-		Linkc:  1,
+		Source: schema.HopIP{IP: "2001:550:1b01:1::1", ASN: 0,
+			HopAnnotation1: &hopannotation.HopAnnotation1{ID: "20190825_ndt-plh7v_2001:550:1b01:1::1",
+				Timestamp: time.Date(2019, time.August, 25, 00, 01, 8, 0, time.UTC)}},
+		Linkc: 1,
 		Links: []schema.HopLink{
 			schema.HopLink{
 				HopDstIP: "2001:550:3::1ca",

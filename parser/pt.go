@@ -21,6 +21,7 @@ import (
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/traceroute-caller/hopannotation"
 )
 
 // -------------------------------------------------
@@ -273,12 +274,15 @@ func ParseJSONL(testName string, rawContent []byte, tableName string, taskFilena
 			}
 			links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
 		}
-		hops = append(hops, schema.ScamperHop{
-			Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
-			Linkc:  oneNode.Linkc,
-			Links:  links,
-		})
 
+		hopID := GetHopID(cycleStart.Start_time, cycleStart.Hostname, oneNode.Addr)
+		hopAnn := &hopannotation.HopAnnotation1{ID: hopID, Timestamp: time.Unix(int64(cycleStart.Start_time), 0).UTC()}
+		hops = append(hops, schema.ScamperHop{
+			Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name,
+				HopAnnotation1: hopAnn},
+			Linkc: oneNode.Linkc,
+			Links: links,
+		})
 	}
 
 	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)

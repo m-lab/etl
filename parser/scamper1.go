@@ -44,13 +44,6 @@ func NewScamper1Parser(sink row.Sink, table, suffix string, ann v2as.Annotator) 
 	}
 }
 
-// GetTraceStartDate extracts the date portion of the cycle-start timestamp in YYYYMMDD format.
-func GetTraceStartDate(cycleStartTime float64) string {
-	traceStartTime := time.Unix(int64(cycleStartTime), 0).UTC()
-	date := traceStartTime.Format("20060102")
-	return date
-}
-
 // parseTracelb parses the TracelbLine struct defined in traceroute-caller and populates the BQTracelbLine.
 func parseTracelb(bqScamperOutput *schema.BQScamperOutput, tracelb parser.TracelbLine) {
 	bqScamperOutput.Tracelb = schema.BQTracelbLine{
@@ -77,8 +70,6 @@ func parseTracelb(bqScamperOutput *schema.BQScamperOutput, tracelb parser.Tracel
 
 	nodes := tracelb.Nodes
 	bqScamperOutput.Tracelb.Nodes = make([]schema.BQScamperNode, 0, len(nodes))
-	date := GetTraceStartDate(bqScamperOutput.CycleStart.StartTime)
-	hostname := bqScamperOutput.CycleStart.Hostname
 
 	for _, node := range nodes {
 		bqLinkArray := make([]schema.BQScamperLinkArray, 0, len(node.Links))
@@ -90,7 +81,8 @@ func parseTracelb(bqScamperOutput *schema.BQScamperOutput, tracelb parser.Tracel
 		}
 
 		bqScamperNode := schema.BQScamperNode{
-			HopID: fmt.Sprintf("%s_%s_%s", date, hostname, node.Addr),
+			HopID: GetHopID(bqScamperOutput.CycleStart.StartTime, bqScamperOutput.CycleStart.Hostname,
+				node.Addr),
 			Addr:  node.Addr,
 			Name:  node.Name,
 			QTTL:  node.QTTL,
