@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
@@ -57,18 +58,31 @@ func TestPCAPParser_ParseAndInsert(t *testing.T) {
 		ID:     "ndt-4c6fb_1625899199_000000000121C1A0",
 		Parser: expectedParseInfo,
 		Date:   date,
-		/*
-			Alpha: &schema.AlphaFields{
-				SynPacket:    0,
-				SynTime:      time.Date(2021, 07, 21, 00, 00, 01, 181050000, time.UTC),
-				SynAckPacket: 1,
-				SynAckTime:   time.Date(2021, 07, 21, 00, 00, 01, 181063000, time.UTC),
-				Packets:      18240,
-				OptionCounts: []int64{18240, 18240, 18240, 757, 757, 755, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-				Sacks:        2077,
-				TotalSrcSeq:  238,
-				TotalDstSeq:  22121164,
-			},*/
+
+		Alpha: &schema.AlphaFields{
+			SynPacket:    0,
+			SynTime:      time.Date(2021, 07, 21, 00, 00, 01, 181050000, time.UTC),
+			SynAckPacket: 1,
+			SynAckTime:   time.Date(2021, 07, 21, 00, 00, 01, 181063000, time.UTC),
+			Packets:      18240,
+
+			LeftStats: schema.TcpStats{
+				OptionCounts:  []int64{0, 55673, 3, 3, 3, 755, 0, 0, 27083, 0, 0, 0, 0, 0, 0, 0},
+				WindowChanges: 2,
+				BadSacks:      2077,
+				Delay:         0.0004516243614685919,
+				Jitter:        0.004294499982849156,
+				TickInterval:  0.009988213,
+			},
+			RightStats: schema.TcpStats{
+				OptionCounts:      []int64{0, 58291, 3, 3, 3, 1510, 0, 0, 27637, 0, 0, 0, 0, 0, 0, 0},
+				WindowChanges:     1157,
+				RetransmitPackets: 39,
+				RetransmitBytes:   46332,
+				Delay:             -0.11833836178341439,
+				TickInterval:      1.8e-08,
+			},
+		},
 	}
 
 	if diff := deep.Equal(row, &expectedPCAPRow); diff != nil {

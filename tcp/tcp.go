@@ -271,6 +271,8 @@ type JitterTracker struct {
 	initialized  bool
 	firstTSVal   uint32
 	firstPktTime time.Time
+	lastTSVal    uint32
+	lastPktTime  time.Time
 	tickRate     time.Duration // Interval between ticks.  For server side this is always 1 msec.
 
 	ValCount       int
@@ -292,10 +294,14 @@ func (j *JitterTracker) Adjust(tsval uint32, pktTime time.Time) (time.Duration, 
 // offset should be TSVal - packet capture time.
 func (jt *JitterTracker) Add(tsval uint32, pktTime time.Time) {
 	if !jt.initialized {
-		jt.tickRate = time.Millisecond
 		jt.firstTSVal = tsval
 		jt.firstPktTime = pktTime
-		log.Println("Jitter init")
+		if !jt.lastPktTime.IsZero() {
+			jt.tickRate = jt.lastPktTime.Sub(pktTime) / time.Duration(jt.lastTSVal-jt.firstTSVal)
+		} else {
+			jt.tickRate = time.Millisecond
+		}
+		log.Println("Jitter init", jt.tickRate, "based on", jt.lastPktTime.Sub(pktTime))
 		jt.initialized = true
 		return
 	}
@@ -369,6 +375,11 @@ type state struct {
 func NewState() *state {
 	return &state{SeqTracker: NewTracker(),
 		Stats: StatsWrapper{TcpStats: schema.TcpStats{OptionCounts: make([]int64, 16)}}}
+}
+
+func (s *state) TSVals(summary packetSummary) {
+	s.Jitter.lastPktTime = summary.pTime
+	s.Jitter.lastTSVal = summary.tsVal
 }
 
 func (s *state) handleTimestamp(pktTime time.Time, isOutgoing bool, opt layers.TCPOption) {
@@ -448,7 +459,8 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 				// specified in the last ack.  But if pcaps did not capture the last ack, and
 				// that ack increased the window, then this might be a valid send, and an
 				// indication that we missed a packet in the capture.
-				log.Println("Protocol violation, SendNext > Limit:", s.SrcPort, s.SeqTracker.SendNext(), s.Limit, s.SeqTracker.packets)
+				// TODO add metrics, including likely missed Acks.
+				sparse.Println("Protocol violation, SendNext > Limit:", s.SrcPort, s.SeqTracker.SendNext(), s.Limit, s.SeqTracker.packets)
 				s.Stats.SendNextExceededLimit++
 			} else if remaining < int32(s.MSS) {
 				sparse.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", int64(s.Window)<<s.WindowScale, remaining, s.MSS)
@@ -611,17 +623,17 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	}
 	mid := time.Now()
 
-	final := make(map[string]packetSummary, 2)
+	finalPackets := make(map[string]packetSummary, 2)
 
 	//last := len(packets) - 1
 	for i := len(packets) - 1; i >= 0; i-- {
 		// This does some redundant work, as some packets will be parsed both here and below.
 		summary, err := packets[i].GetTimestamps()
 		if err == nil {
-			if _, ok := final[summary.srcIP.String()]; !ok {
-				final[summary.srcIP.String()] = summary
-				if len(final) == 2 {
-					log.Println("Found two IPs", final)
+			if _, ok := finalPackets[summary.srcIP.String()]; !ok {
+				finalPackets[summary.srcIP.String()] = summary
+				if len(finalPackets) == 2 {
+					log.Println("Found two IPs", finalPackets)
 					break
 				}
 			}
@@ -656,7 +668,15 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		switch alpha.Packets {
 		case 0:
 			p.LeftState.SrcIP = srcIP
+			summary, ok := finalPackets[srcIP.String()]
+			if ok {
+				p.LeftState.TSVals(summary)
+			}
 			p.RightState.SrcIP = dstIP
+			summary, ok = finalPackets[srcIP.String()]
+			if ok {
+				p.RightState.TSVals(summary)
+			}
 			p.LeftState.TTL = ttl
 		case 1:
 			p.RightState.TTL = ttl
@@ -690,6 +710,18 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 		}
 		alpha.Packets++
 	}
+
+	p.LeftState.Stats.Jitter = p.LeftState.Jitter.Jitter()
+	p.LeftState.Stats.Delay = p.LeftState.Jitter.Delay()
+	p.LeftState.Stats.TickInterval = p.LeftState.Jitter.tickRate.Seconds()
+
+	p.RightState.Stats.Delay = p.RightState.Jitter.Delay()
+	p.RightState.Stats.Delay = p.RightState.Jitter.Delay()
+	p.RightState.Stats.TickInterval = p.RightState.Jitter.tickRate.Seconds()
+
+	log.Printf("Left Jitter: %8.4f %8.4f\n", p.LeftState.Jitter.Delay(), p.LeftState.Jitter.Jitter())
+	log.Printf("Right Jitter: %8.4f %8.4f\n", p.RightState.Jitter.Delay(), p.RightState.Jitter.Jitter())
+
 	end := time.Now()
 
 	log.Println(mid.Sub(start), end.Sub(mid))

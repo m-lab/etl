@@ -33,6 +33,9 @@ type TcpStats struct {
 	DstPortErrors         int64 // Observed number of dest ports that don't match tcp.DstPort
 	OtherErrors           int64 // Number of other errors that occurred.
 
+	Delay        float64 // Delay in seconds between TSVal and TSecr.
+	Jitter       float64 // Jitter in seconds between TSVal and packet capture time.
+	TickInterval float64 // Interval between TSVal ticks in seconds.
 }
 
 type AlphaFields struct {

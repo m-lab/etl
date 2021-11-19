@@ -59,7 +59,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 
 	//log.Println(testName)
 	tcp := tcp.NewParser()
-	_, err := tcp.Parse(rawContent)
+	alpha, err := tcp.Parse(rawContent)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			GitCommit:  GitCommit(),
 		},
 
-		//Alpha: alpha,
+		Alpha: alpha,
 	}
 
 	if err := p.Put(&row); err != nil {
