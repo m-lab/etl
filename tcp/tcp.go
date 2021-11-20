@@ -667,6 +667,9 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 
 		switch alpha.Packets {
 		case 0:
+			//	alpha.LeftIPAddr = srcIP.String()
+			//	alpha.RightIPAddr = dstIP.String()
+
 			p.LeftState.SrcIP = srcIP
 			summary, ok := finalPackets[srcIP.String()]
 			if ok {
@@ -715,12 +718,12 @@ func (p *Parser) Parse(data []byte) (*schema.AlphaFields, error) {
 	p.LeftState.Stats.Delay = p.LeftState.Jitter.Delay()
 	p.LeftState.Stats.TickInterval = p.LeftState.Jitter.tickRate.Seconds()
 
-	p.RightState.Stats.Delay = p.RightState.Jitter.Delay()
+	p.RightState.Stats.Jitter = p.RightState.Jitter.Jitter()
 	p.RightState.Stats.Delay = p.RightState.Jitter.Delay()
 	p.RightState.Stats.TickInterval = p.RightState.Jitter.tickRate.Seconds()
 
-	log.Printf("Left Jitter: %8.4f %8.4f\n", p.LeftState.Jitter.Delay(), p.LeftState.Jitter.Jitter())
-	log.Printf("Right Jitter: %8.4f %8.4f\n", p.RightState.Jitter.Delay(), p.RightState.Jitter.Jitter())
+	log.Printf("Left Jitter: %8.4f %8.4f\n", p.LeftState.Stats.Delay, p.LeftState.Stats.Jitter)
+	log.Printf("Right Jitter: %8.4f %8.4f\n", p.RightState.Stats.Delay, p.RightState.Stats.Jitter)
 
 	end := time.Now()
 

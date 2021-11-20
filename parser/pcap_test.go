@@ -79,7 +79,8 @@ func TestPCAPParser_ParseAndInsert(t *testing.T) {
 				WindowChanges:     1157,
 				RetransmitPackets: 39,
 				RetransmitBytes:   46332,
-				Delay:             -0.11833836178341439,
+				Delay:             -0.11833836178341439, // TODO - these are goofy values.
+				Jitter:            2.7687400015472363,
 				TickInterval:      1.8e-08,
 			},
 		},
