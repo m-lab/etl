@@ -2,6 +2,7 @@ package parser_test
 
 import (
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 	"testing"
@@ -129,5 +130,47 @@ func TestPCAPParser_GetUUID(t *testing.T) {
 				t.Errorf("PCAPParser.GetUUID() got = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestIPLayer(t *testing.T) {
+	type test struct {
+		name         string
+		fn           string
+		packets      int64
+		srcIP, dstIP string
+		TTL          uint8
+	}
+	tests := []test{
+		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
+			packets: 336, srcIP: "173.49.19.128"},
+		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
+			packets: 15, srcIP: "2a0d:5600:24:a71::1d"},
+		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
+			packets: 5180, srcIP: "2a0d:5600:24:a71::1d"},
+	}
+	for _, tt := range tests {
+		f, err := os.Open(tt.fn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := ioutil.ReadAll(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		packets, err := parser.GetPackets(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(packets) != int(tt.packets) {
+			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
+		}
+		srcIP, _, _, _, err := packets[0].GetIP()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if srcIP.String() != tt.srcIP {
+			t.Errorf("%s: expected srcIP %s, got %s", tt.name, tt.srcIP, srcIP.String())
+		}
 	}
 }

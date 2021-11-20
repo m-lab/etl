@@ -1,17 +1,28 @@
 package parser
 
 import (
+	"fmt"
+	"log"
+	"math"
+	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcapgo"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/go/logx"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 //=====================================================================================
@@ -51,6 +62,85 @@ func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
 	return "", false
 }
 
+func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tcpLength uint16, err error) {
+	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv4)
+		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
+		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
+	} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv6)
+		// In IPv6, the Length field is the payload length.
+		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
+	} else {
+		return nil, nil, 0, 0, ErrNoIPLayer
+	}
+}
+
+type Packet struct {
+	ci   *gopacket.CaptureInfo
+	data []byte
+	err  error
+}
+
+var info = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
+var sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
+var sparse20 = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
+
+var ErrNoIPLayer = fmt.Errorf("no IP layer")
+
+func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
+	// Decode a packet
+	pkt := gopacket.NewPacket(p.data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		Lazy:                     true,
+		NoCopy:                   true,
+		SkipDecodeRecovery:       true,
+		DecodeStreamsAsDatagrams: false,
+	})
+	if ipLayer := pkt.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv4)
+		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
+		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
+	} else if ipLayer := pkt.Layer(layers.LayerTypeIPv6); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv6)
+		// In IPv6, the Length field is the payload length.
+		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
+	} else {
+		return nil, nil, 0, 0, ErrNoIPLayer
+	}
+}
+
+func GetPackets(data []byte) ([]Packet, error) {
+	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
+
+	// TODO - should we use MSS instead?
+	packets := make([]Packet, 0, len(data)/1500)
+
+	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+		packets = append(packets, Packet{ci: &ci, data: data, err: err})
+	}
+
+	return packets, nil
+}
+
+var PcapPacketCount = promauto.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name: "etl_pcap_packet_count",
+		Help: "Distribution of PCAP packet counts",
+		Buckets: []float64{
+			1, 2, 3, 5,
+			10, 18, 32, 56,
+			100, 178, 316, 562,
+			1000, 1780, 3160, 5620,
+			10000, 17800, 31600, 56200, math.Inf(1),
+		},
+	},
+	[]string{"port"},
+)
+
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
 func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
@@ -72,6 +162,29 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	// will these dates.
 	row.Date = fileMetadata["date"].(civil.Date)
 	row.ID = p.GetUUID(testName)
+
+	// Parse top level PCAP data.
+	packets, err := GetPackets(rawContent)
+	if err != nil {
+	}
+
+	if len(packets) > 0 {
+		srcIP, _, _, _, err := packets[0].GetIP()
+		if err != nil {
+			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
+			PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+		} else {
+			// TODO add TCP layer, so we can label the stats based on local port value.
+			if len(srcIP) == 4 {
+				// For now use /8 from the first IP address as the source, IFF it is IPv4.
+				PcapPacketCount.WithLabelValues(srcIP.Mask(net.CIDRMask(8, 32)).String() + "/8").Observe(float64(len(packets)))
+			} else {
+				PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
+			}
+		}
+	} else {
+		PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
+	}
 
 	// Insert the row.
 	if err := p.Put(&row); err != nil {
