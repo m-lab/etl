@@ -30,6 +30,7 @@ import (
 
 // CreateOrUpdateTCPInfo will update existing TCPInfo table, or create new table if update fails.
 func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
+	return nil // HACK to avoid collision with other sandbox work.
 	row := schema.TCPRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "TCPRow.Schema")
@@ -40,6 +41,7 @@ func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
 }
 
 func CreateOrUpdatePT(project string, dataset string, table string) error {
+	return nil // HACK to avoid collision with other sandbox work.
 	row := schema.PTTest{}
 	schema, err := row.Schema()
 	rtx.Must(err, "PTTest.Schema")
@@ -108,6 +110,7 @@ func CreateOrUpdateSwitchStats(project string, dataset string, table string) err
 }
 
 func CreateOrUpdatePCAPRow(project string, dataset string, table string) error {
+	return nil // HACK to avoid collision with other sandbox work.
 	row := schema.PCAPRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "PCAPRow.Schema")
