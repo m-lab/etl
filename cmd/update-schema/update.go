@@ -411,6 +411,7 @@ func main() {
 		}
 
 	case "pcap":
+		break // For sandbox, skip the update to allow coexistence with other schema changes.
 		if err := CreateOrUpdatePCAPRow(*project, "tmp_ndt", "pcap"); err != nil {
 			errCount++
 		}
