@@ -174,3 +174,21 @@ func TestIPLayer(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkGetPackets(b *testing.B) {
+	f, err := os.Open("testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz")
+	if err != nil {
+		b.Fatal(err)
+	}
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := parser.GetPackets(data)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
