@@ -41,6 +41,7 @@ func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
 }
 
 func CreateOrUpdatePT(project string, dataset string, table string) error {
+	return nil // HACK to avoid collision with other sandbox work.
 	row := schema.PTTest{}
 	schema, err := row.Schema()
 	rtx.Must(err, "PTTest.Schema")
