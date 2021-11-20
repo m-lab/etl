@@ -12,9 +12,17 @@ import (
 
 	"github.com/m-lab/etl-gardener/tracker"
 	"github.com/m-lab/etl/active"
+	"github.com/m-lab/go/logx"
 	"github.com/m-lab/go/rtx"
 	"google.golang.org/api/iterator"
 )
+
+func init() {
+	// Always prepend the filename and line number.
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	logx.LogxDebug.Set("true")
+	logx.Debug.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 type fakeGardener struct {
 	t *testing.T // for logging
@@ -129,7 +137,7 @@ func TestGardenerAPI_RunAll(t *testing.T) {
 	src, err := g.JobFileSource(ctx, job.Job, p.toRunnable)
 	rtx.Must(err, "file source")
 	eg, err := g.RunAll(ctx, src, job.Job)
-	if err != iterator.Done {
+	if err != nil {
 		t.Fatal(err)
 	}
 	err = eg.Wait()
