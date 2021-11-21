@@ -77,9 +77,10 @@ func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tc
 }
 
 type Packet struct {
-	ci   *gopacket.CaptureInfo
-	data []byte
-	err  error
+	// If we use a pointer here, for some reason we get zero value timestamps.
+	Ci   gopacket.CaptureInfo
+	Data []byte
+	Err  error
 }
 
 var info = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
@@ -90,7 +91,7 @@ var ErrNoIPLayer = fmt.Errorf("no IP layer")
 
 func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
 	// Decode a packet
-	pkt := gopacket.NewPacket(p.data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
 		Lazy:                     true,
 		NoCopy:                   true,
 		SkipDecodeRecovery:       true,
@@ -120,7 +121,7 @@ func GetPackets(data []byte) ([]Packet, error) {
 	packets := make([]Packet, 0, len(data)/1500)
 
 	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
-		packets = append(packets, Packet{ci: &ci, data: data, err: err})
+		packets = append(packets, Packet{Ci: ci, Data: data, Err: err})
 	}
 
 	return packets, nil
@@ -190,8 +191,8 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
 			PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
 		} else {
-			start := packets[0].ci.Timestamp
-			end := packets[len(packets)-1].ci.Timestamp
+			start := packets[0].Ci.Timestamp
+			end := packets[len(packets)-1].Ci.Timestamp
 			duration := end.Sub(start)
 			// TODO add TCP layer, so we can label the stats based on local port value.
 			if len(srcIP) == 4 {

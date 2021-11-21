@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
@@ -138,16 +139,17 @@ func TestIPLayer(t *testing.T) {
 		name         string
 		fn           string
 		packets      int64
+		duration     time.Duration
 		srcIP, dstIP string
 		TTL          uint8
 	}
 	tests := []test{
 		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
-			packets: 336, srcIP: "173.49.19.128"},
+			packets: 336, duration: 15409174000, srcIP: "173.49.19.128"},
 		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, srcIP: "2a0d:5600:24:a71::1d"},
+			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d"},
 		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
-			packets: 5180, srcIP: "2a0d:5600:24:a71::1d"},
+			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d"},
 	}
 	for _, tt := range tests {
 		f, err := os.Open(tt.fn)
@@ -161,6 +163,12 @@ func TestIPLayer(t *testing.T) {
 		packets, err := parser.GetPackets(data)
 		if err != nil {
 			t.Fatal(err)
+		}
+		start := packets[0].Ci.Timestamp
+		end := packets[len(packets)-1].Ci.Timestamp
+		duration := end.Sub(start)
+		if duration != tt.duration {
+			t.Errorf("%s: duration = %v, want %v", tt.name, duration, tt.duration)
 		}
 		if len(packets) != int(tt.packets) {
 			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
