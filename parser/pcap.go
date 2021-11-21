@@ -141,6 +141,21 @@ var PcapPacketCount = promauto.NewHistogramVec(
 	[]string{"port"},
 )
 
+var PcapConnectionDuration = promauto.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name: "etl_pcap_connection_duration",
+		Help: "Distribution of PCAP connection duration",
+		Buckets: []float64{
+			.1, .2, .3, .5,
+			1, 1.8, 3.2, 5.6,
+			10, 18, 32, 56,
+			100, 178, 316, 562,
+			1000, 1780, 3160, 5620, math.Inf(1),
+		},
+	},
+	[]string{"port"},
+)
+
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
 func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
@@ -166,23 +181,29 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	// Parse top level PCAP data.
 	packets, err := GetPackets(rawContent)
 	if err != nil {
-	}
-
-	if len(packets) > 0 {
+		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
+		PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+	} else if len(packets) > 0 {
 		srcIP, _, _, _, err := packets[0].GetIP()
 		// TODO - eventually we should identify key local ports, like 443 and 3001.
 		if err != nil {
 			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
 			PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
 		} else {
+			start := packets[0].ci.Timestamp
+			end := packets[len(packets)-1].ci.Timestamp
+			duration := end.Sub(start)
 			// TODO add TCP layer, so we can label the stats based on local port value.
 			if len(srcIP) == 4 {
 				PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
+				PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
 			} else {
 				PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
+				PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
 			}
 		}
 	} else {
+		// No packets.
 		PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
 	}
 
