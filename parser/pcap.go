@@ -170,14 +170,14 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 
 	if len(packets) > 0 {
 		srcIP, _, _, _, err := packets[0].GetIP()
+		// TODO - eventually we should identify key local ports, like 443 and 3001.
 		if err != nil {
 			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
 			PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
 		} else {
 			// TODO add TCP layer, so we can label the stats based on local port value.
 			if len(srcIP) == 4 {
-				// For now use /8 from the first IP address as the source, IFF it is IPv4.
-				PcapPacketCount.WithLabelValues(srcIP.Mask(net.CIDRMask(8, 32)).String() + "/8").Observe(float64(len(packets)))
+				PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
 			} else {
 				PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
 			}
