@@ -147,8 +147,8 @@ func (p *Packet) TCPLength() int {
 	return int(binary.BigEndian.Uint16(p.IPv6.Length[:]))
 }
 
-// ExtractIPFields extracts a few IP fields from the packet.
-func (p *Packet) ExtractIPFields() (srcIP, dstIP net.IP, TTL uint8, tcpLength uint16, err error) {
+// FastExtractIPFields extracts a few IP fields from the packet.
+func (p *Packet) FastExtractIPFields() (srcIP, dstIP net.IP, TTL uint8, tcpLength uint16, err error) {
 	if p.Eth == nil {
 		err = p.GetLayers()
 		if err != nil {
@@ -184,7 +184,7 @@ func (p *Packet) ExtractIPFields() (srcIP, dstIP net.IP, TTL uint8, tcpLength ui
 	return
 }
 
-func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
+func (p *Packet) SlowGetIP() (net.IP, net.IP, uint8, uint16, error) {
 	// Decode a packet
 	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
 		Lazy:                     true,
@@ -280,7 +280,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
 		PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
 	} else if len(packets) > 0 {
-		srcIP, _, _, _, err := packets[0].ExtractIPFields()
+		srcIP, _, _, _, err := packets[0].FastExtractIPFields()
 		// TODO - eventually we should identify key local ports, like 443 and 3001.
 		if err != nil {
 			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
@@ -296,6 +296,14 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			} else {
 				PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
 				PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
+			}
+			//start := time.Now()
+			total := 0
+			for i := range packets {
+				_, _, _, length, err := packets[i].FastExtractIPFields()
+				if err != nil {
+					total += int(length)
+				}
 			}
 		}
 	} else {

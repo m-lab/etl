@@ -174,7 +174,7 @@ func TestIPLayer(t *testing.T) {
 		if len(packets) != int(tt.packets) {
 			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
 		}
-		srcIP, _, _, length, err := packets[0].ExtractIPFields()
+		srcIP, _, _, length, err := packets[0].FastExtractIPFields()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -194,7 +194,7 @@ func TestIPLayer(t *testing.T) {
 // Custom Eth and IP:    BenchmarkGetPackets-8   	    7783	    146998 ns/op	  182428 B/op	     381 allocs/op
 // With IP decoding:     BenchmarkGetPackets-8   	    4279	    285547 ns/op	  376125 B/op	    1729 allocs/op
 // Extract tcp lengths:  BenchmarkGetPackets-8   	    3822	    295116 ns/op	  392779 B/op	    1725 allocs/op
-// Custom lengths:
+// Custom lengths:       BenchmarkGetPackets-8   	    8372	    159532 ns/op	  182427 B/op	     381 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
 	f, err := os.Open("testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz")
 	if err != nil {
@@ -215,7 +215,7 @@ func BenchmarkGetPackets(b *testing.B) {
 			total := 0
 			for i := range pkts {
 				if false {
-					_, _, _, l, err := pkts[i].GetIP()
+					_, _, _, l, err := pkts[i].SlowGetIP()
 					if err != nil {
 						b.Fatal(err)
 					}
