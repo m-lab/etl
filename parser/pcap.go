@@ -25,6 +25,44 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+var (
+	info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
+	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
+	sparse20     = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
+
+	ErrNoIPLayer = fmt.Errorf("no IP layer")
+
+	PcapPacketCount = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "etl_pcap_packet_count",
+			Help: "Distribution of PCAP packet counts",
+			Buckets: []float64{
+				1, 2, 3, 5,
+				10, 18, 32, 56,
+				100, 178, 316, 562,
+				1000, 1780, 3160, 5620,
+				10000, 17800, 31600, 56200, math.Inf(1),
+			},
+		},
+		[]string{"port"},
+	)
+
+	PcapConnectionDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "etl_pcap_connection_duration",
+			Help: "Distribution of PCAP connection duration",
+			Buckets: []float64{
+				.1, .2, .3, .5,
+				1, 1.8, 3.2, 5.6,
+				10, 18, 32, 56,
+				100, 178, 316, 562,
+				1000, 1780, 3160, 5620, math.Inf(1),
+			},
+		},
+		[]string{"port"},
+	)
+)
+
 //=====================================================================================
 //                       PCAP Parser
 //=====================================================================================
@@ -62,40 +100,24 @@ func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
 	return "", false
 }
 
-func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tcpLength uint16, err error) {
-	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv4)
-		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
-		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
-	} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv6)
-		// In IPv6, the Length field is the payload length.
-		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
-	} else {
-		return nil, nil, 0, 0, ErrNoIPLayer
-	}
-}
-
+// Packet struct contains the packet data and metadata.
 type Packet struct {
-	ci   *gopacket.CaptureInfo
-	data []byte
-	err  error
+	// If we use a pointer here, for some reason we get zero value timestamps.
+	Ci   gopacket.CaptureInfo
+	Data []byte
+	Err  error
 }
 
-var info = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
-var sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
-var sparse20 = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
-
-var ErrNoIPLayer = fmt.Errorf("no IP layer")
-
+// GetIP decodes the IP layers and returns some basic information.
 func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
 	// Decode a packet
-	pkt := gopacket.NewPacket(p.data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
 		Lazy:                     true,
 		NoCopy:                   true,
 		SkipDecodeRecovery:       true,
 		DecodeStreamsAsDatagrams: false,
 	})
+
 	if ipLayer := pkt.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 		ip, _ := ipLayer.(*layers.IPv4)
 		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
@@ -120,26 +142,11 @@ func GetPackets(data []byte) ([]Packet, error) {
 	packets := make([]Packet, 0, len(data)/1500)
 
 	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
-		packets = append(packets, Packet{ci: &ci, data: data, err: err})
+		packets = append(packets, Packet{Ci: ci, Data: data, Err: err})
 	}
 
 	return packets, nil
 }
-
-var PcapPacketCount = promauto.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name: "etl_pcap_packet_count",
-		Help: "Distribution of PCAP packet counts",
-		Buckets: []float64{
-			1, 2, 3, 5,
-			10, 18, 32, 56,
-			100, 178, 316, 562,
-			1000, 1780, 3160, 5620,
-			10000, 17800, 31600, 56200, math.Inf(1),
-		},
-	},
-	[]string{"port"},
-)
 
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
 func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
@@ -163,26 +170,32 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	row.Date = fileMetadata["date"].(civil.Date)
 	row.ID = p.GetUUID(testName)
 
-	// Parse top level PCAP data.
+	// Parse top level PCAP data and update metrics.
 	packets, err := GetPackets(rawContent)
 	if err != nil {
-	}
-
-	if len(packets) > 0 {
+		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
+		PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+	} else if len(packets) > 0 {
 		srcIP, _, _, _, err := packets[0].GetIP()
+		// TODO - eventually we should identify key local ports, like 443 and 3001.
 		if err != nil {
 			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
 			PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
 		} else {
+			start := packets[0].Ci.Timestamp
+			end := packets[len(packets)-1].Ci.Timestamp
+			duration := end.Sub(start)
 			// TODO add TCP layer, so we can label the stats based on local port value.
 			if len(srcIP) == 4 {
-				// For now use /8 from the first IP address as the source, IFF it is IPv4.
-				PcapPacketCount.WithLabelValues(srcIP.Mask(net.CIDRMask(8, 32)).String() + "/8").Observe(float64(len(packets)))
+				PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
+				PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
 			} else {
 				PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
+				PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
 			}
 		}
 	} else {
+		// No packets.
 		PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
 	}
 
@@ -196,6 +209,10 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 
 	return nil
 }
+
+//=====================================================================================
+//                       Implementation of the etl.Parser interface
+//=====================================================================================
 
 // GetUUID extracts the UUID from the filename.
 // For example, for filename 2021/07/22/ndt-4c6fb_1625899199_00000000013A4623.pcap.gz,
