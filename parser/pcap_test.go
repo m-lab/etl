@@ -1,6 +1,7 @@
 package parser_test
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -180,6 +181,20 @@ func TestIPLayer(t *testing.T) {
 		if srcIP.String() != tt.srcIP {
 			t.Errorf("%s: expected srcIP %s, got %s", tt.name, tt.srcIP, srcIP.String())
 		}
+	}
+}
+
+func TestPCAPGarbage(t *testing.T) {
+	data := []byte{0xd4, 0xc3, 0xb2, 0xa1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+	_, err := parser.GetPackets(data)
+	if err != io.ErrUnexpectedEOF {
+		t.Fatal(err)
+	}
+
+	data = append(data, data...)
+	_, err = parser.GetPackets(data)
+	if err == nil || !strings.Contains(err.Error(), "Unknown major") {
+		t.Fatal(err)
 	}
 }
 

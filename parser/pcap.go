@@ -145,33 +145,6 @@ func GetPackets(data []byte) ([]Packet, error) {
 		packets = append(packets, Packet{Ci: ci, Data: data, Err: err})
 	}
 
-	return packets, nil
-}
-
-// ParseAndInsert decodes the PCAP data and inserts it into BQ.
-func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
-	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
-	defer metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Dec()
-
-	row := schema.PCAPRow{
-		Parser: schema.ParseInfo{
-			Version:    Version(),
-			Time:       time.Now(),
-			ArchiveURL: fileMetadata["filename"].(string),
-			Filename:   testName,
-			GitCommit:  GitCommit(),
-		},
-	}
-
-	// NOTE: Civil is not TZ adjusted. It takes the year, month, and date from
-	// the given timestamp, regardless of the timestamp's timezone. Since we
-	// run our systems in UTC, all timestamps will be relative to UTC and as
-	// will these dates.
-	row.Date = fileMetadata["date"].(civil.Date)
-	row.ID = p.GetUUID(testName)
-
-	// Parse top level PCAP data and update metrics.
-	packets, err := GetPackets(rawContent)
 	if err != nil {
 		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
 		PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
@@ -198,6 +171,35 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 		// No packets.
 		PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
 	}
+
+	return packets, nil
+}
+
+// ParseAndInsert decodes the PCAP data and inserts it into BQ.
+func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
+	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
+	defer metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Dec()
+
+	row := schema.PCAPRow{
+		Parser: schema.ParseInfo{
+			Version:    Version(),
+			Time:       time.Now(),
+			ArchiveURL: fileMetadata["filename"].(string),
+			Filename:   testName,
+			GitCommit:  GitCommit(),
+		},
+	}
+
+	// NOTE: Civil is not TZ adjusted. It takes the year, month, and date from
+	// the given timestamp, regardless of the timestamp's timezone. Since we
+	// run our systems in UTC, all timestamps will be relative to UTC and as
+	// will these dates.
+	row.Date = fileMetadata["date"].(civil.Date)
+	row.ID = p.GetUUID(testName)
+
+	// Parse top level PCAP data and update metrics.
+	// TODO - add schema fields here.
+	_, _ = GetPackets(rawContent)
 
 	// Insert the row.
 	if err := p.Put(&row); err != nil {
