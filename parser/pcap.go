@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"math"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unsafe"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
@@ -30,6 +32,8 @@ import (
 //=====================================================================================
 
 const pcapSuffix = ".pcap.gz"
+
+var ErrNotTCP = fmt.Errorf("not a TCP packet")
 
 // PCAPParser parses the PCAP datatype from the packet-headers process.
 type PCAPParser struct {
@@ -62,24 +66,51 @@ func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
 	return "", false
 }
 
-func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tcpLength uint16, err error) {
-	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv4)
-		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
-		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
-	} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv6)
-		// In IPv6, the Length field is the payload length.
-		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
-	} else {
-		return nil, nil, 0, 0, ErrNoIPLayer
-	}
+type EthernetHeader struct {
+	SrcMAC, DstMAC [6]byte
+	etherType      [2]byte // BigEndian
+}
+
+func (e *EthernetHeader) EtherType() layers.EthernetType {
+	return layers.EthernetType(binary.BigEndian.Uint16(e.etherType[:]))
+}
+
+// IPv4Header struct for IPv4 header
+type IPv4Header struct {
+	VersionIHL   uint8   // Version (4 bits) + Internet header length (4 bits)
+	TOS          uint8   // Type of service
+	Length       [2]byte // Total length
+	Id           [2]byte // Identification
+	FlagsFragOff [2]byte // Flags (3 bits) + Fragment offset (13 bits)
+	TTL          uint8   // Time to live
+	Protocol     uint8   // Protocol of next following bytes
+	Checksum     [2]byte // Header checksum
+	SrcIP        [4]byte // Source address
+	DstIP        [4]byte // Destination address
+}
+
+func (h *IPv4Header) PayloadLength() uint16 {
+	ihl := h.VersionIHL & 0x0f
+	return binary.BigEndian.Uint16(h.Length[:]) - uint16(4*ihl)
+}
+
+// IPv6Header struct for IPv6 header
+type IPv6Header struct {
+	VersionTrafficClassFlowLabel [4]byte // Version (4 bits) + Traffic class (8 bits) + Flow label (20 bits)
+	Length                       [2]byte // Payload length
+	NextHeader                   uint8   // Protocol of next following bytes
+	HopLimit                     uint8   // Hop limit
+	SrcIP                        [16]byte
+	DstIP                        [16]byte
 }
 
 type Packet struct {
 	// If we use a pointer here, for some reason we get zero value timestamps.
 	Ci   gopacket.CaptureInfo
 	Data []byte
+	Eth  *EthernetHeader
+	IPv4 *IPv4Header // Nil unless we're parsing IPv4 packets.
+	IPv6 *IPv6Header // Nil unless we're parsing IPv6 packets.
 	Err  error
 }
 
@@ -88,6 +119,70 @@ var sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
 var sparse20 = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
 
 var ErrNoIPLayer = fmt.Errorf("no IP layer")
+var ErrTruncatedIPHeader = fmt.Errorf("truncated IP header")
+
+func (p *Packet) GetLayers() error {
+	p.Eth = (*EthernetHeader)(unsafe.Pointer(&p.Data[0]))
+	switch p.Eth.EtherType() {
+	case layers.EthernetTypeIPv4:
+		if len(p.Data) < int(14+unsafe.Sizeof(IPv4Header{})) {
+			return ErrTruncatedIPHeader
+		}
+		p.IPv4 = (*IPv4Header)(unsafe.Pointer(&p.Data[14]))
+	case layers.EthernetTypeIPv6:
+		if len(p.Data) < int(14+unsafe.Sizeof(IPv6Header{})) {
+			return ErrTruncatedIPHeader
+		}
+		p.IPv6 = (*IPv6Header)(unsafe.Pointer(&p.Data[14]))
+	default:
+		return ErrNoIPLayer
+	}
+	return nil
+}
+
+func (p *Packet) TCPLength() int {
+	if p.IPv4 != nil {
+		return int(p.IPv4.PayloadLength())
+	}
+	return int(binary.BigEndian.Uint16(p.IPv6.Length[:]))
+}
+
+// ExtractIPFields extracts a few IP fields from the packet.
+func (p *Packet) ExtractIPFields() (srcIP, dstIP net.IP, TTL uint8, tcpLength uint16, err error) {
+	if p.Eth == nil {
+		err = p.GetLayers()
+		if err != nil {
+			return nil, nil, 0, 0, err
+		}
+	}
+	if p.IPv4 != nil {
+		srcIP = make([]byte, 4)
+		dstIP = make([]byte, 4)
+		binary.BigEndian.PutUint32(srcIP, binary.BigEndian.Uint32(p.IPv4.SrcIP[:]))
+		binary.BigEndian.PutUint32(dstIP, binary.BigEndian.Uint32(p.IPv4.DstIP[:]))
+		TTL = p.IPv4.TTL
+		tcpLength = p.IPv4.PayloadLength()
+		if p.IPv4.Protocol != uint8(layers.IPProtocolTCP) {
+			err = ErrNotTCP
+		}
+	} else if p.IPv6 != nil {
+		srcIP = make([]byte, 16)
+		dstIP = make([]byte, 16)
+		// TODO - just copy!!
+		for i := 0; i < 16; i++ {
+			srcIP[i] = p.IPv6.SrcIP[i]
+			dstIP[i] = p.IPv6.DstIP[i]
+		}
+		TTL = p.IPv6.HopLimit
+		tcpLength = binary.BigEndian.Uint16(p.IPv6.Length[:])
+		if p.IPv6.NextHeader != uint8(layers.IPProtocolTCP) {
+			err = ErrNotTCP
+		}
+	} else {
+		return nil, nil, 0, 0, ErrNoIPLayer
+	}
+	return
+}
 
 func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
 	// Decode a packet
@@ -185,7 +280,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
 		PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
 	} else if len(packets) > 0 {
-		srcIP, _, _, _, err := packets[0].GetIP()
+		srcIP, _, _, _, err := packets[0].ExtractIPFields()
 		// TODO - eventually we should identify key local ports, like 443 and 3001.
 		if err != nil {
 			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()

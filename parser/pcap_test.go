@@ -142,14 +142,15 @@ func TestIPLayer(t *testing.T) {
 		duration     time.Duration
 		srcIP, dstIP string
 		TTL          uint8
+		length       uint16
 	}
 	tests := []test{
 		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
-			packets: 336, duration: 15409174000, srcIP: "173.49.19.128"},
+			packets: 336, duration: 15409174000, length: 40, srcIP: "173.49.19.128"},
 		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d"},
+			packets: 15, duration: 134434000, length: 40, srcIP: "2a0d:5600:24:a71::1d"},
 		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
-			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d"},
+			packets: 5180, duration: 13444117000, length: 40, srcIP: "2a0d:5600:24:a71::1d"},
 	}
 	for _, tt := range tests {
 		f, err := os.Open(tt.fn)
@@ -173,16 +174,27 @@ func TestIPLayer(t *testing.T) {
 		if len(packets) != int(tt.packets) {
 			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
 		}
-		srcIP, _, _, _, err := packets[0].GetIP()
+		srcIP, _, _, length, err := packets[0].ExtractIPFields()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if srcIP.String() != tt.srcIP {
 			t.Errorf("%s: expected srcIP %s, got %s", tt.name, tt.srcIP, srcIP.String())
 		}
+		if length != tt.length {
+			t.Errorf("%s: expected length %d, got %d", tt.name, tt.length, length)
+		}
 	}
 }
 
+// BenchmarkGetPackets-8   	    3757	    334434 ns/op	  165144 B/op	     381 allocs/op
+// RunParallel:
+// GetPacket no append:  BenchmarkGetPackets-8   	   15490	     84929 ns/op	   85784 B/op	     375 allocs/op
+// Just packet decoding: BenchmarkGetPackets-8   	    8678	    128426 ns/op	  165146 B/op	     381 allocs/op
+// Custom Eth and IP:    BenchmarkGetPackets-8   	    7783	    146998 ns/op	  182428 B/op	     381 allocs/op
+// With IP decoding:     BenchmarkGetPackets-8   	    4279	    285547 ns/op	  376125 B/op	    1729 allocs/op
+// Extract tcp lengths:  BenchmarkGetPackets-8   	    3822	    295116 ns/op	  392779 B/op	    1725 allocs/op
+// Custom lengths:
 func BenchmarkGetPackets(b *testing.B) {
 	f, err := os.Open("testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz")
 	if err != nil {
@@ -193,10 +205,32 @@ func BenchmarkGetPackets(b *testing.B) {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := parser.GetPackets(data)
-		if err != nil {
-			b.Fatal(err)
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			pkts, err := parser.GetPackets(data)
+			if err != nil {
+				b.Fatal(err)
+			}
+			total := 0
+			for i := range pkts {
+				if false {
+					_, _, _, l, err := pkts[i].GetIP()
+					if err != nil {
+						b.Fatal(err)
+					}
+					total += int(l)
+				} else {
+					if err := pkts[i].GetLayers(); err != nil {
+						b.Fatal(err)
+					}
+					total += pkts[i].TCPLength()
+				}
+			}
+			if total != 167003 {
+				b.Errorf("total = %d, want %d", total, len(data))
+			}
 		}
-	}
+	})
+
 }
