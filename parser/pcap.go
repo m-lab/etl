@@ -139,7 +139,7 @@ func GetPackets(data []byte) ([]Packet, error) {
 	}
 
 	// TODO - should we use MSS instead?
-	packets := make([]Packet, 0, len(data)/1500)
+	packets := make([]Packet, 0, len(data)/18)
 
 	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		packets = append(packets, Packet{Ci: ci, Data: data, Err: err})
