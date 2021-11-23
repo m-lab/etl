@@ -124,7 +124,7 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 
 			// Capture any panic and convert it to an error.
 			defer func(tag string) {
-				if err2 := metrics.PanicToErr(err, recover(), "Runall.f"); err2 != nil {
+				if err2 := metrics.PanicToErr(err, recover(), "Runall.f: "+tag); err2 != nil {
 					err = err2
 				}
 			}(run.Info())
@@ -217,8 +217,9 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 		err := eg.Wait()
 		if err != nil {
 			log.Println(err, "on wait for", job.Path())
+		} else {
+			log.Println("finished", job.Path())
 		}
-		log.Println("finished", job.Path())
 		update := tracker.UpdateURL(g.trackerBase, job.Job, tracker.ParseComplete, "")
 		// TODO - should this have a retry?
 		if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {

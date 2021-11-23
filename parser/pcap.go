@@ -3,7 +3,6 @@ package parser
 import (
 	"fmt"
 	"log"
-	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -21,8 +20,6 @@ import (
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/logx"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
@@ -31,74 +28,7 @@ var (
 	sparse20     = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
 
 	ErrNoIPLayer = fmt.Errorf("no IP layer")
-
-	PcapPacketCount = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "etl_pcap_packet_count",
-			Help: "Distribution of PCAP packet counts",
-			Buckets: []float64{
-				1, 2, 3, 5,
-				10, 18, 32, 56,
-				100, 178, 316, 562,
-				1000, 1780, 3160, 5620,
-				10000, 17800, 31600, 56200, math.Inf(1),
-			},
-		},
-		[]string{"port"},
-	)
-
-	PcapConnectionDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "etl_pcap_connection_duration",
-			Help: "Distribution of PCAP connection duration",
-			Buckets: []float64{
-				.1, .2, .3, .5,
-				1, 1.8, 3.2, 5.6,
-				10, 18, 32, 56,
-				100, 178, 316, 562,
-				1000, 1780, 3160, 5620, math.Inf(1),
-			},
-		},
-		[]string{"port"},
-	)
 )
-
-//=====================================================================================
-//                       PCAP Parser
-//=====================================================================================
-
-const pcapSuffix = ".pcap.gz"
-
-// PCAPParser parses the PCAP datatype from the packet-headers process.
-type PCAPParser struct {
-	*row.Base
-	table  string
-	suffix string
-}
-
-// NewPCAPParser returns a new parser for PCAP archives.
-func NewPCAPParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
-	bufSize := etl.PCAP.BQBufferSize()
-	if ann == nil {
-		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
-	}
-
-	return &PCAPParser{
-		Base:   row.NewBase(table, sink, bufSize, ann),
-		table:  table,
-		suffix: suffix,
-	}
-
-}
-
-// IsParsable returns the canonical test type and whether to parse data.
-func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
-	// Files look like (.*).pcap.gz .
-	if strings.HasSuffix(testName, pcapSuffix) {
-		return "pcap", true
-	}
-	return "", false
-}
 
 // Packet struct contains the packet data and metadata.
 type Packet struct {
@@ -109,8 +39,9 @@ type Packet struct {
 }
 
 // GetIP decodes the IP layers and returns some basic information.
+// It is a bit slow and does memory allocation.
 func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
-	// Decode a packet
+	// Decode a packet.
 	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
 		Lazy:                     true,
 		NoCopy:                   true,
@@ -147,32 +78,70 @@ func GetPackets(data []byte) ([]Packet, error) {
 
 	if err != nil {
 		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
-		PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+		metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+		return packets, err
 	} else if len(packets) > 0 {
 		srcIP, _, _, _, err := packets[0].GetIP()
 		// TODO - eventually we should identify key local ports, like 443 and 3001.
 		if err != nil {
 			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
-			PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
 		} else {
 			start := packets[0].Ci.Timestamp
 			end := packets[len(packets)-1].Ci.Timestamp
 			duration := end.Sub(start)
 			// TODO add TCP layer, so we can label the stats based on local port value.
 			if len(srcIP) == 4 {
-				PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
-				PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
+				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
+				metrics.PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
 			} else {
-				PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
-				PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
+				metrics.PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
+				metrics.PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
 			}
 		}
 	} else {
 		// No packets.
-		PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
+		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
 	}
 
 	return packets, nil
+}
+
+//=====================================================================================
+//                       PCAP Parser
+//=====================================================================================
+
+const pcapSuffix = ".pcap.gz"
+
+// PCAPParser parses the PCAP datatype from the packet-headers process.
+type PCAPParser struct {
+	*row.Base
+	table  string
+	suffix string
+}
+
+// NewPCAPParser returns a new parser for PCAP archives.
+func NewPCAPParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+	bufSize := etl.PCAP.BQBufferSize()
+	if ann == nil {
+		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
+	}
+
+	return &PCAPParser{
+		Base:   row.NewBase(table, sink, bufSize, ann),
+		table:  table,
+		suffix: suffix,
+	}
+
+}
+
+// IsParsable returns the canonical test type and whether to parse data.
+func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
+	// Files look like (.*).pcap.gz .
+	if strings.HasSuffix(testName, pcapSuffix) {
+		return "pcap", true
+	}
+	return "", false
 }
 
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.

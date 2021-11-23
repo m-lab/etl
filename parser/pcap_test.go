@@ -145,11 +145,11 @@ func TestIPLayer(t *testing.T) {
 		TTL          uint8
 	}
 	tests := []test{
-		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
+		{name: "retransmits", fn: "testdata/PCAP/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
 			packets: 336, duration: 15409174000, srcIP: "173.49.19.128"},
-		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
+		{name: "ipv6", fn: "testdata/PCAP/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
 			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d"},
-		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
+		{name: "protocolErrors2", fn: "testdata/PCAP/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
 			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d"},
 	}
 	for _, tt := range tests {
@@ -199,7 +199,7 @@ func TestPCAPGarbage(t *testing.T) {
 }
 
 func getTestFile(b *testing.B, name string) []byte {
-	f, err := os.Open(path.Join(`testfiles/`, name))
+	f, err := os.Open(path.Join(`testdata/PCAP/`, name))
 	if err != nil {
 		b.Fatal(err)
 	}
