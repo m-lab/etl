@@ -220,7 +220,7 @@ func DoGKETask(tsk *task.Task, path etl.DataPath) etl.ProcessingError {
 	// Count the files processed per-host-module per-weekday.
 	// TODO(soltesz): evaluate separating hosts and pods as separate metrics.
 	metrics.FileCount.WithLabelValues(
-		path.Host+"-"+path.Site+"-"+path.Experiment,
+		path.Experiment,
 		date.Weekday().String()).Add(float64(files))
 
 	if err != nil {

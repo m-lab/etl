@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
 	job "github.com/m-lab/etl-gardener/client"
@@ -95,13 +96,19 @@ func postAndIgnoreResponse(ctx context.Context, url url.URL) error {
 // or the context is canceled.
 func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job tracker.Job) (*errgroup.Group, error) {
 	eg := &errgroup.Group{}
+	count := 0
 	for {
 		run, err := rSrc.Next(ctx)
 		if err != nil {
-			metrics.BackendFailureCount.WithLabelValues(
-				job.Datatype, "rSrc.Next").Inc()
-			log.Println(err)
-			return eg, err
+			if err == iterator.Done {
+				debug.Printf("Dispatched total of %d archives for %s\n", count, job.String())
+				return eg, nil
+			} else {
+				metrics.BackendFailureCount.WithLabelValues(
+					job.Datatype, "rSrc.Next").Inc()
+				log.Println(err, "processing", job.String())
+				return eg, err
+			}
 		}
 
 		heartbeat := tracker.HeartbeatURL(g.trackerBase, job)
@@ -111,20 +118,28 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 
 		debug.Println("Starting func")
 
-		f := func() error {
+		f := func() (err error) {
 			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Inc()
 			defer metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Dec()
 
-			err := run.Run(ctx)
+			// Capture any panic and convert it to an error.
+			defer func(tag string) {
+				if err2 := metrics.PanicToErr(err, recover(), "Runall.f: "+tag); err2 != nil {
+					err = err2
+				}
+			}(run.Info())
+
+			err = run.Run(ctx)
 			if err == nil {
 				update := tracker.UpdateURL(g.trackerBase, job, tracker.Parsing, run.Info())
 				if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {
 					log.Println(postErr, "on update for", job.Path())
 				}
 			}
-			return err
+			return
 		}
 
+		count++
 		eg.Go(f)
 	}
 }
@@ -171,12 +186,14 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 	toRunnable func(o *storage.ObjectAttrs) Runnable, tokens TokenSource) error {
 	job, err := g.NextJob(ctx)
 	if err != nil {
+		log.Println(err, "on Gardener client.NextJob()")
 		return err
 	}
 
 	log.Println(job, "filter:", job.Filter)
 	gcsSource, err := g.JobFileSource(ctx, job.Job, toRunnable)
 	if err != nil {
+		log.Println(err, "on JobFileSource")
 		return err
 	}
 	src := Throttle(gcsSource, tokens)
@@ -189,13 +206,20 @@ func (g *GardenerAPI) pollAndRun(ctx context.Context,
 	}
 
 	eg, err := g.RunAll(ctx, src, job.Job)
+	if err != nil {
+		log.Println(err)
+	}
 
 	// Once all are dispatched, we want to wait until all have completed
 	// before posting the state change.
 	go func() {
 		log.Println("all tasks dispatched for", job.Path())
-		eg.Wait()
-		log.Println("finished", job.Path())
+		err := eg.Wait()
+		if err != nil {
+			log.Println(err, "on wait for", job.Path())
+		} else {
+			log.Println("finished", job.Path())
+		}
 		update := tracker.UpdateURL(g.trackerBase, job.Job, tracker.ParseComplete, "")
 		// TODO - should this have a retry?
 		if postErr := postAndIgnoreResponse(ctx, *update); postErr != nil {
