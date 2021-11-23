@@ -69,8 +69,12 @@ func GetPackets(data []byte) ([]Packet, error) {
 		return nil, err
 	}
 
-	// TODO - should we use MSS instead?
-	packets := make([]Packet, 0, len(data)/18)
+	// TODO: len(data)/18 provides much better estimate of number of packets.
+	// len(data)/18 was determined by looking at bytes/packet in a few pcaps files.
+	// The number seems too small, but perhaps the data is still compressed at this point.
+	// However, it seems to cause mysterious crashes in sandbox, so
+	// reverting to /1500 for now.
+	packets := make([]Packet, 0, len(data)/1500)
 
 	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		packets = append(packets, Packet{Ci: ci, Data: data, Err: err})
