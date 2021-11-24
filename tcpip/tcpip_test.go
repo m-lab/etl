@@ -128,8 +128,7 @@ func TestPCAPGarbage(t *testing.T) {
 // Fast Total, []*Packet:    BenchmarkGetPackets-8   	    2760	    419538 ns/op	  635526 B/op	    7410 allocs/op
 // Fast Total, computed *6:  BenchmarkGetPackets-8   	    2769	    409313 ns/op	  850179 B/op	    5570 allocs/op
 // Fast Total, computed *7:  BenchmarkGetPackets-8   	    3198	    379535 ns/op	  610168 B/op	    5570 allocs/op
-// Wrap                      BenchmarkGetPackets-8   	    3045	    358205 ns/op	  610127 B/op	    5570 allocs/op
-// Wrap, with total          BenchmarkGetPackets-8   	    3618	    319537 ns/op	  538017 B/op	    1886 allocs/op
+// Wrap, with total          BenchmarkGetPackets-8   	    1730	    590224 ns/op	 1078212 B/op	    8157 allocs/op
 
 func BenchmarkGetPackets(b *testing.B) {
 	type src struct {
@@ -139,10 +138,10 @@ func BenchmarkGetPackets(b *testing.B) {
 	}
 	sources := []src{
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
-		//{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
-		//{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
 	}
 	b.ResetTimer()
