@@ -3,6 +3,7 @@ package tcpip_test
 import (
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -12,6 +13,10 @@ import (
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/tcpip"
 )
+
+func init() {
+	log.Default().SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 func getTestfileForBenchmark(b *testing.B, name string) []byte {
 	f, err := os.Open(path.Join(`testdata/`, name))
@@ -63,7 +68,7 @@ func TestIPLayer(t *testing.T) {
 		for i := range packets {
 			_, err := tcpip.Wrap(packets[i].Ci, packets[i].Data)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("%s %v", tt.name, err)
 			}
 		}
 
@@ -144,6 +149,11 @@ func BenchmarkGetPackets(b *testing.B) {
 					}
 					_, _, _, tcpLength, _ := pkts[i].FastExtractIPFields()
 					total += int(tcpLength)
+
+					_, err := tcpip.Wrap(pkts[i].Ci, pkts[i].Data)
+					if err != nil {
+						b.Fatal(err)
+					}
 				}
 				if total != test.total {
 					b.Errorf("total = %d, want %d (%d)", total, test.total, len(test.data))

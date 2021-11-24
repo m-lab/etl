@@ -12,6 +12,7 @@ package tcpip
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/go/logx"
 )
 
@@ -171,25 +173,34 @@ type IPv6Header struct {
 var IPv6HeaderSize = int(unsafe.Sizeof(IPv6Header{}))
 
 // NewIPv6Header creates a new IPv6 header and the first associated ExtensionHeader, in an ExtensionHeaderWrapper.
-func NewIPv6Header(data []byte) (*IPv6Header, *EHWrapper, error) {
+func NewIPv6Header(data []byte) (*IPv6Header, *EHWrapper, *TCPHeader, error) {
 	if len(data) < int(unsafe.Sizeof(IPv6Header{})) {
-		return nil, nil, ErrTruncatedIPHeader
+		return nil, nil, nil, ErrTruncatedIPHeader
 	}
 	h := (*IPv6Header)(unsafe.Pointer(&data[0]))
-	if h.nextHeader == layers.IPProtocolNoNextHeader {
-		return h, nil, nil
+	if h.Version() != 6 {
+		return nil, nil, nil, fmt.Errorf("IPv6 packet with version %d", h.Version())
 	}
-	eh := (*ExtensionHeader)(unsafe.Pointer(&data[unsafe.Sizeof(IPv6Header{})]))
-	minSize := int(unsafe.Sizeof(IPv6Header{})) + int(eh.HeaderLength) + 8
-	if len(data) < minSize {
-		return h, nil, ErrTruncatedIPHeader
+	switch h.NextProtocol() {
+	case layers.IPProtocolNoNextHeader:
+		return h, nil, nil, nil
+	case layers.IPProtocolTCP:
+		return h, nil, (*TCPHeader)(unsafe.Pointer(&data[IPv6HeaderSize])), nil
+	case layers.IPProtocolIPv6HopByHop:
+		return h, &EHWrapper{}, nil, nil
+	default:
+		eh := (*ExtensionHeader)(unsafe.Pointer(&data[unsafe.Sizeof(IPv6Header{})]))
+		minSize := int(unsafe.Sizeof(IPv6Header{})) + int(eh.HeaderLength) + 8
+		if len(data) < minSize {
+			return h, nil, nil, ErrTruncatedIPHeader
+		}
+		return h, &EHWrapper{
+			HeaderType: h.nextHeader,
+			eh:         eh,
+			data:       data[minSize-8 : minSize+int(eh.HeaderLength)],
+			payload:    data[minSize+int(eh.HeaderLength):],
+		}, nil, nil
 	}
-	return h, &EHWrapper{
-		HeaderType: h.nextHeader,
-		eh:         eh,
-		data:       data[minSize-8 : minSize+int(eh.HeaderLength)],
-		payload:    data[minSize+int(eh.HeaderLength):],
-	}, nil
 }
 
 func (h *IPv6Header) Version() uint8 {
@@ -327,15 +338,26 @@ func Wrap(ci gopacket.CaptureInfo, data []byte) (*Packet, error) {
 		p.v4 = (*IPv4Header)(unsafe.Pointer(&data[EthernetHeaderSize]))
 		p.ip = p.v4
 	case layers.EthernetTypeIPv6:
+		log.Printf("%+v\n", p.eth)
 		if len(data) < EthernetHeaderSize+IPv6HeaderSize {
+			log.Println(hex.EncodeToString(data[EthernetHeaderSize:]))
 			return nil, ErrTruncatedIPHeader
 		}
 		var err error
-		p.v6, p.ext, err = NewIPv6Header(data[EthernetHeaderSize:])
+		var tcp *TCPHeader
+		p.v6, p.ext, tcp, err = NewIPv6Header(data[EthernetHeaderSize:])
 		if err != nil {
+			pp := parser.Packet{Ci: ci, Data: data}
+			log.Println(pp.SlowGetIP())
+			log.Println("  Eth:", hex.EncodeToString(data[0:14]))
+			log.Println("    IPv6:",
+				hex.EncodeToString(data[14:22]),
+				hex.EncodeToString(data[22:30]), hex.EncodeToString(data[30:38]),
+				hex.EncodeToString(data[38:46]), hex.EncodeToString(data[46:54]))
 			return nil, err
 		}
 		p.ip = p.v6
+		p.tcp = &TCPHeaderWrapper{TCP: tcp, Options: nil}
 	default:
 		return nil, ErrUnknownEtherType
 	}
