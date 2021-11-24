@@ -130,6 +130,7 @@ func TestPCAPGarbage(t *testing.T) {
 // Fast Total, computed *6:  BenchmarkGetPackets-8   	    2769	    409313 ns/op	  850179 B/op	    5570 allocs/op
 // Fast Total, computed *7:  BenchmarkGetPackets-8   	    3198	    379535 ns/op	  610168 B/op	    5570 allocs/op
 // Wrap                      BenchmarkGetPackets-8   	    3045	    358205 ns/op	  610127 B/op	    5570 allocs/op
+// Wrap, with total          BenchmarkGetPackets-8   	    3618	    319537 ns/op	  538017 B/op	    1886 allocs/op
 
 func BenchmarkGetPackets(b *testing.B) {
 	type tt struct {
@@ -153,23 +154,16 @@ func BenchmarkGetPackets(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			if true {
-				total := 0
-				for i := range pkts {
-					if err := pkts[i].GetLayers(); err != nil {
-						b.Fatal(err)
-					}
-					_, _, _, tcpLength, _ := pkts[i].FastExtractIPFields()
-					total += int(tcpLength)
-
-					_, err := tcpip.Wrap(pkts[i].Ci, pkts[i].Data)
-					if err != nil {
-						b.Fatal(err)
-					}
+			total := 0
+			for i := range pkts {
+				h, err := tcpip.Wrap(pkts[i].Ci, pkts[i].Data)
+				if err != nil {
+					b.Fatal(err)
 				}
-				if total != test.total {
-					b.Errorf("total = %d, want %d (%d)", total, test.total, len(test.data))
-				}
+				total += h.TCPLength()
+			}
+			if total != test.total {
+				b.Fatalf("total = %d, want %d", total, test.total)
 			}
 			if len(pkts) != test.numPkts {
 				b.Errorf("expected %d packets, got %d", test.numPkts, len(pkts))
