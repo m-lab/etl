@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/etl/parser"
+	"github.com/google/gopacket/layers"
 	"github.com/m-lab/etl/tcpip"
 )
 
@@ -50,20 +50,28 @@ func TestIPLayer(t *testing.T) {
 		packets          int64
 		duration         time.Duration
 		srcIP, dstIP     string
-		srcPort, dstPort uint16
+		srcPort, dstPort layers.TCPPort
 		TTL              uint8
+		totalPayload     int
 	}
 	tests := []test{
 		{name: "retransmits", fn: "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
-			packets: 336, duration: 15409174000, srcIP: "173.49.19.128", srcPort: 17664, dstPort: 60},
+			packets: 336, duration: 15409174000, srcIP: "173.49.19.128", srcPort: 40337, dstPort: 443},
 		{name: "ipv6", fn: "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 24576, dstPort: 31324},
+			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 1894, dstPort: 443},
 		{name: "protocolErrors2", fn: "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
-			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 24587, dstPort: 43482},
+			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 1896, dstPort: 443},
+
+		{name: "other1", fn: "ndt-m6znc_1632401351_000000000005BA77.pcap.gz",
+			packets: 40797, duration: 10719662000, srcIP: "70.187.37.14", srcPort: 60232, dstPort: 443, totalPayload: 239251626},
+		{name: "other2", fn: "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz",
+			packets: 146172, duration: 15081049000, srcIP: "2600:1700:42d0:67b0:71e7:d89:1d89:9484", srcPort: 49319, dstPort: 443, totalPayload: 158096007},
+		{name: "other3", fn: "ndt-m6znc_1632401351_000000000005B90B.pcap.gz",
+			packets: 30097, duration: 11415041000, srcIP: "104.129.205.7", srcPort: 15227, dstPort: 443, totalPayload: 126523401},
 	}
 	for _, tt := range tests {
 		data := getTestfile(t, tt.fn)
-		packets, err := parser.GetPackets(data)
+		packets, err := tcpip.GetPackets(data)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -74,8 +82,8 @@ func TestIPLayer(t *testing.T) {
 			}
 		}
 
-		start := packets[0].Ci.Timestamp
-		end := packets[len(packets)-1].Ci.Timestamp
+		start := packets[0].Timestamp()
+		end := packets[len(packets)-1].Timestamp()
 		duration := end.Sub(start)
 		if duration != tt.duration {
 			t.Errorf("%s: duration = %v, want %v", tt.name, duration, tt.duration)
@@ -84,18 +92,32 @@ func TestIPLayer(t *testing.T) {
 			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
 		}
 
-		all, err := tcpip.Wrap(packets[0].Ci, packets[0].Data)
+		first, err := tcpip.Wrap(packets[0].Ci, packets[0].Data)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !all.IP().SrcIP().Equal(net.ParseIP(tt.srcIP)) {
-			t.Errorf("%s: srcIP = %v, want %v", tt.name, all.IP().SrcIP(), tt.srcIP)
+		if !first.IP.SrcIP().Equal(net.ParseIP(tt.srcIP)) {
+			t.Errorf("%s: srcIP = %s, want %s", tt.name, first.IP.SrcIP(), tt.srcIP)
 		}
-		if all.TCP().SrcPort() != tt.srcPort {
-			t.Errorf("%s: srcPort = %v, want %v", tt.name, all.TCP().SrcPort(), tt.srcPort)
+		if first.TCP().SrcPort() != tt.srcPort {
+			t.Errorf("%s: srcPort = %d, want %d", tt.name, first.TCP().SrcPort(), tt.srcPort)
 		}
-		if all.TCP().DstPort() != tt.dstPort {
-			t.Errorf("%s: dstPort = %v, want %v", tt.name, all.TCP().DstPort(), tt.dstPort)
+		if first.TCP().DstPort() != tt.dstPort {
+			t.Errorf("%s: dstPort = %d, want %d", tt.name, first.TCP().DstPort(), tt.dstPort)
+		}
+		// Now check against gopacket values, too.
+		if src, dst, tcp, err := first.GetTCP(); err != nil {
+			t.Error(err)
+		} else {
+			if first.TCP().SrcPort() != src {
+				t.Errorf("%s: srcPort = %0.2x, want %0.2x", tt.name, first.TCP().SrcPort(), src)
+				t.Errorf("%+v", first.Data)
+				t.Errorf("\nfast:%+v\nslow:%+v\n", first.TCP(), tcp)
+				t.Error("IP HeaderLength:", first.IP.HeaderLength())
+			}
+			if first.TCP().DstPort() != dst {
+				t.Errorf("%s: dstPort = %d(%.2x), want %.2x", tt.name, first.TCP().DstPort(), first.TCP().DstPort(), dst)
+			}
 		}
 
 	}
@@ -103,13 +125,13 @@ func TestIPLayer(t *testing.T) {
 
 func TestPCAPGarbage(t *testing.T) {
 	data := []byte{0xd4, 0xc3, 0xb2, 0xa1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
-	_, err := parser.GetPackets(data)
+	_, err := tcpip.GetPackets(data)
 	if err != io.ErrUnexpectedEOF {
 		t.Fatal(err)
 	}
 
 	data = append(data, data...)
-	_, err = parser.GetPackets(data)
+	_, err = tcpip.GetPackets(data)
 	if err == nil || !strings.Contains(err.Error(), "Unknown major") {
 		t.Fatal(err)
 	}
@@ -129,51 +151,53 @@ func TestPCAPGarbage(t *testing.T) {
 // Fast Total, []*Packet:    BenchmarkGetPackets-8   	    2760	    419538 ns/op	  635526 B/op	    7410 allocs/op
 // Fast Total, computed *6:  BenchmarkGetPackets-8   	    2769	    409313 ns/op	  850179 B/op	    5570 allocs/op
 // Fast Total, computed *7:  BenchmarkGetPackets-8   	    3198	    379535 ns/op	  610168 B/op	    5570 allocs/op
-// Wrap                      BenchmarkGetPackets-8   	    3045	    358205 ns/op	  610127 B/op	    5570 allocs/op
+// Wrap, total, 2x2 files    BenchmarkGetPackets-8   	    1730	    590224 ns/op	 1078212 B/op	    8157 allocs/op
+// Wrap, total, 2x3 files    BenchmarkGetPackets-8   	    2619	    395314 ns/op	  735944 B/op	    5452 allocs/op
 
+// Wrap, total 1x6 files *6: BenchmarkGetPackets-8   	     129	   8372769 ns/op	19967908 B/op	   97448 allocs/op
+// Wrap, total 1x6 files *7: BenchmarkGetPackets-8   	     129	   8372769 ns/op	19967908 B/op	   97448 allocs/op
+
+// Correct ipv6 decoding:    BenchmarkGetPackets-8   	     100	  11350868 ns/op	19519358 B/op	  120908 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
-	type tt struct {
+	type src struct {
 		data    []byte
 		numPkts int
 		total   int
 	}
-	tests := []tt{
+	sources := []src{
+		// Approximately 220K packets, so this is about 140nsec/packet, and about 100 bytes/packet allocated,
+		// which is roughly the footprint of the packets themselves.
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797, 239251626},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172, 158096007},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097, 126523401},
 	}
 	b.ResetTimer()
 
 	i := 0
+	pktCount := 0
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			test := tests[i%len(tests)]
+			test := sources[i%len(sources)]
 			i++
-			pkts, err := parser.GetPackets(test.data)
+			pkts, err := tcpip.GetPackets(test.data)
 			if err != nil {
 				b.Fatal(err)
 			}
-			if true {
-				total := 0
-				for i := range pkts {
-					if err := pkts[i].GetLayers(); err != nil {
-						b.Fatal(err)
-					}
-					_, _, _, tcpLength, _ := pkts[i].FastExtractIPFields()
-					total += int(tcpLength)
-
-					_, err := tcpip.Wrap(pkts[i].Ci, pkts[i].Data)
-					if err != nil {
-						b.Fatal(err)
-					}
-				}
-				if total != test.total {
-					b.Errorf("total = %d, want %d (%d)", total, test.total, len(test.data))
-				}
+			total := 0
+			for i := range pkts {
+				total += pkts[i].TCPLength()
+			}
+			if total != test.total {
+				b.Fatalf("total = %d, want %d", total, test.total)
 			}
 			if len(pkts) != test.numPkts {
 				b.Errorf("expected %d packets, got %d", test.numPkts, len(pkts))
 			}
+			pktCount += len(pkts)
 		}
 	})
+	log.Println("BenchmarkGetPackets:", b.N, "iterations", pktCount, "packets")
 }

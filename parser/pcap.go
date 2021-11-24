@@ -69,12 +69,24 @@ func GetPackets(data []byte) ([]Packet, error) {
 		return nil, err
 	}
 
+	pktSize := int(pcap.Snaplen())
+	if pktSize < 1 {
+		pktSize = 1
+	}
+	pcapSize := len(data) // Only if the data is not compressed.
+	// Check magic number?
+	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
+		pcapSize *= 7 // 6 // Data is compressed, so guess that it might be 6 times bigger.
+	}
+
 	// TODO: len(data)/18 provides much better estimate of number of packets.
 	// len(data)/18 was determined by looking at bytes/packet in a few pcaps files.
-	// The number seems too small, but perhaps the data is still compressed at this point.
-	// However, it seems to cause mysterious crashes in sandbox, so
-	// reverting to /1500 for now.
-	packets := make([]Packet, 0, len(data)/1500)
+	// It seems to cause mysterious crashes in sandbox, so reverted to /1500 for now.
+	// UPDATE:
+	// This computed slice sizing alone changes the throughput in sandbox from about 640
+	// to about 820 MB/sec per instance.  No crashes after 2 hours.  GIT b46b033.
+	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
+	packets := make([]Packet, 0, pcapSize/pktSize)
 
 	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		packets = append(packets, Packet{Ci: ci, Data: data, Err: err})

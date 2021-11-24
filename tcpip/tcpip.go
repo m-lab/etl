@@ -11,6 +11,7 @@ package tcpip
 // and the unsafe pointer eligible for collection.
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -21,6 +22,8 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcapgo"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/logx"
 )
 
@@ -31,6 +34,7 @@ var (
 
 	ErrNotTCP                  = fmt.Errorf("not a TCP packet")
 	ErrNoIPLayer               = fmt.Errorf("no IP layer")
+	ErrNoTCPLayer              = fmt.Errorf("no TCP layer")
 	ErrTruncatedEthernetHeader = fmt.Errorf("truncated Ethernet header")
 	ErrTruncatedIPHeader       = fmt.Errorf("truncated IP header")
 	ErrTruncatedTCPHeader      = fmt.Errorf("truncated TCP header")
@@ -58,13 +62,12 @@ var EthernetHeaderSize = int(unsafe.Sizeof(EthernetHeader{}))
 // IP provides the common interface for IPv4 and IPv6 packet headers.
 type IP interface {
 	Version() uint8
-	// HeaderLength() int
 	PayloadLength() int
 	SrcIP() net.IP
 	DstIP() net.IP
 	NextProtocol() layers.IPProtocol
 	HopLimit() uint8
-	HeaderSize() int
+	HeaderLength() int
 }
 
 // IPv4Header struct for IPv4 header
@@ -92,10 +95,6 @@ func (h *IPv4Header) PayloadLength() int {
 	return int(binary.BigEndian.Uint16(h.length[:]) - uint16(4*ihl))
 }
 
-func (h *IPv4Header) HeaderLength() int {
-	return int(h.versionIHL&0x0f) << 2
-}
-
 func (h *IPv4Header) SrcIP() net.IP {
 	ip := make(net.IP, 4)
 	copy(ip, h.srcIP[:])
@@ -118,7 +117,7 @@ func (h *IPv4Header) HopLimit() uint8 {
 	return h.hopLimit
 }
 
-func (h *IPv4Header) HeaderSize() int {
+func (h *IPv4Header) HeaderLength() int {
 	return int(h.versionIHL&0x0f) << 2
 }
 
@@ -137,7 +136,8 @@ type EHWrapper struct {
 	HeaderType layers.IPProtocol // Type of THIS header, not the next header.
 	eh         *ExtensionHeader
 	data       []byte // All the options and padding, including the first 6 bytes.
-	payload    []byte // Any additional data remaining after the extension header.
+	// TODO - this does not need to be stored, but it is convenient for now.
+	//	payload []byte // Any additional data remaining after the extension header.
 }
 
 // Next the next EHWrapper.
@@ -146,7 +146,7 @@ func (w *EHWrapper) Next() (*EHWrapper, error) {
 	if w.eh.NextHeader == layers.IPProtocolNoNextHeader {
 		return nil, nil
 	}
-	if w.eh == nil || len(w.data)%8 != 0 || len(w.payload) < 8 {
+	if w.eh == nil || len(w.data)%8 != 0 { //|| len(w.payload) < 8 {
 		return nil, ErrTruncatedIPHeader
 	}
 	next := (*ExtensionHeader)(unsafe.Pointer(&w.data[0]))
@@ -154,7 +154,7 @@ func (w *EHWrapper) Next() (*EHWrapper, error) {
 		HeaderType: w.HeaderType,
 		eh:         next,
 		data:       w.data[2 : 8+next.HeaderLength],
-		payload:    w.payload[8+next.HeaderLength:],
+		//	payload:    w.payload[8+next.HeaderLength:],
 	}, nil
 }
 
@@ -170,35 +170,21 @@ type IPv6Header struct {
 
 var IPv6HeaderSize = int(unsafe.Sizeof(IPv6Header{}))
 
-// NewIPv6Header creates a new IPv6 header and the first associated ExtensionHeader, in an ExtensionHeaderWrapper.
-func NewIPv6Header(data []byte) (*IPv6Header, *EHWrapper, *TCPHeader, error) {
+// NewIPv6Header creates a new IPv6 header, and returns the header and remaining bytes.
+func NewIPv6Header(data []byte) (*IPv6Wrapper, []byte, error) {
 	if len(data) < int(unsafe.Sizeof(IPv6Header{})) {
-		return nil, nil, nil, ErrTruncatedIPHeader
+		return nil, nil, ErrTruncatedIPHeader
 	}
 	h := (*IPv6Header)(unsafe.Pointer(&data[0]))
 	if h.Version() != 6 {
-		return nil, nil, nil, fmt.Errorf("IPv6 packet with version %d", h.Version())
+		return nil, nil, fmt.Errorf("IPv6 packet with version %d", h.Version())
 	}
-	switch h.NextProtocol() {
-	case layers.IPProtocolNoNextHeader:
-		return h, nil, nil, nil
-	case layers.IPProtocolTCP:
-		return h, nil, (*TCPHeader)(unsafe.Pointer(&data[IPv6HeaderSize])), nil
-	case layers.IPProtocolIPv6HopByHop:
-		return h, &EHWrapper{}, nil, nil
-	default:
-		eh := (*ExtensionHeader)(unsafe.Pointer(&data[unsafe.Sizeof(IPv6Header{})]))
-		minSize := int(unsafe.Sizeof(IPv6Header{})) + int(eh.HeaderLength) + 8
-		if len(data) < minSize {
-			return h, nil, nil, ErrTruncatedIPHeader
-		}
-		return h, &EHWrapper{
-			HeaderType: h.nextHeader,
-			eh:         eh,
-			data:       data[minSize-8 : minSize+int(eh.HeaderLength)],
-			payload:    data[minSize+int(eh.HeaderLength):],
-		}, nil, nil
+	// Wrap the header, compute, the extension headers.
+	w, err := h.Wrap(data[IPv6HeaderSize:])
+	if err != nil {
+		return nil, nil, err
 	}
+	return w, data[w.headerLength:], err
 }
 
 func (h *IPv6Header) Version() uint8 {
@@ -231,12 +217,71 @@ func (h *IPv6Header) NextProtocol() layers.IPProtocol {
 	return h.nextHeader
 }
 
-func (h *IPv6Header) HeaderSize() int {
+func (h *IPv6Header) HeaderLength() int {
+	// BUG - this is WRONG
 	return IPv4HeaderSize
 }
 
 func assertV6IP(ip *IPv6Header) {
 	func(IP) {}(ip)
+}
+
+type IPv6Wrapper struct {
+	*IPv6Header
+	ext          []EHWrapper
+	headerLength int
+}
+
+func (w *IPv6Wrapper) HeaderLength() int {
+	return w.headerLength
+}
+
+// func (w *IPv6Wrapper) payload() []byte {
+// 	if len(w.ext) == 0 {
+// 		return nil
+// 	}
+// 	return w.ext[len(w.ext)-1].payload
+// }
+
+// Wrap creates a wrapper with extension headers.
+// data is the remainder of the header data, not including the IPv6 header.
+func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
+	w := IPv6Wrapper{
+		IPv6Header:   ip,
+		ext:          make([]EHWrapper, 0, 0),
+		headerLength: IPv6HeaderSize,
+	}
+	if w.nextHeader == layers.IPProtocolNoNextHeader {
+		return &w, nil
+	}
+
+	for np := w.NextProtocol(); np != layers.IPProtocolNoNextHeader; {
+		switch np {
+		case layers.IPProtocolNoNextHeader:
+			return &w, nil
+		case layers.IPProtocolIPv6HopByHop:
+		case layers.IPProtocolTCP:
+			return &w, nil
+		default:
+			log.Println("IPv6 header type", np)
+		}
+
+		if len(data) < 8 {
+			return nil, ErrTruncatedIPHeader
+		}
+
+		eh := (*ExtensionHeader)(unsafe.Pointer(&data[0]))
+		w.ext = append(w.ext, EHWrapper{
+			HeaderType: np,
+			eh:         eh,
+			data:       data[2 : 8+eh.HeaderLength],
+			//payload:    data[8+eh.HeaderLength:],
+		})
+		w.headerLength += int(eh.HeaderLength) + 8
+		data = data[8+eh.HeaderLength:]
+		np = eh.NextHeader
+	}
+	return nil, ErrTruncatedIPHeader
 }
 
 /******************************************************************************
@@ -262,12 +307,12 @@ type TCPHeader struct {
 
 var TCPHeaderSize = int(unsafe.Sizeof(TCPHeader{}))
 
-func (h *TCPHeader) SrcPort() uint16 {
-	return binary.BigEndian.Uint16(h.srcPort[:])
+func (h *TCPHeader) SrcPort() layers.TCPPort {
+	return layers.TCPPort(binary.BigEndian.Uint16(h.srcPort[:]))
 }
 
-func (h *TCPHeader) DstPort() uint16 {
-	return binary.BigEndian.Uint16(h.dstPort[:])
+func (h *TCPHeader) DstPort() layers.TCPPort {
+	return layers.TCPPort(binary.BigEndian.Uint16(h.dstPort[:]))
 }
 
 func (h *TCPHeader) DataOffset() int {
@@ -316,78 +361,152 @@ func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 // Packet struct contains the packet data and metadata.
 type Packet struct {
 	// If we use a pointer here, for some reason we get zero value timestamps.
-	ci   gopacket.CaptureInfo
-	data []byte
+	Ci   gopacket.CaptureInfo
+	Data []byte
 	eth  *EthernetHeader
-	ip   IP
-	v4   *IPv4Header       // Nil unless we're parsing IPv4 packets.
-	v6   *IPv6Header       // Nil unless we're parsing IPv6 packets.
-	ext  *EHWrapper        // Nil unless we're parsing IPv6 packets.
-	tcp  *TCPHeaderWrapper // This takes up a small amount of space for the options.
-	err  error
-}
-
-func (p *Packet) IP() IP {
-	return p.ip
+	IP
+	v4  *IPv4Header       // Nil unless we're parsing IPv4 packets.
+	v6  *IPv6Wrapper      // Nil unless we're parsing IPv6 packets.
+	tcp *TCPHeaderWrapper // This takes up a small amount of space for the options.
+	err error
 }
 
 func (p *Packet) TCP() *TCPHeader {
 	return p.tcp.TCP
 }
 
-func Wrap(ci gopacket.CaptureInfo, data []byte) (*Packet, error) {
+func Wrap(ci gopacket.CaptureInfo, data []byte) (Packet, error) {
 	if len(data) < EthernetHeaderSize {
-		return nil, ErrTruncatedEthernetHeader
+		return Packet{err: ErrTruncatedEthernetHeader}, ErrTruncatedEthernetHeader
 	}
 	p := Packet{
-		ci:   ci,
-		data: data,
+		Ci:   ci,
+		Data: data,
 		eth:  (*EthernetHeader)(unsafe.Pointer(&data[0])),
 	}
 	switch p.eth.EtherType() {
 	case layers.EthernetTypeIPv4:
 		if len(data) < EthernetHeaderSize+IPv4HeaderSize {
-			return nil, ErrTruncatedIPHeader
+			return Packet{err: ErrTruncatedIPHeader}, ErrTruncatedIPHeader
 		}
 		p.v4 = (*IPv4Header)(unsafe.Pointer(&data[EthernetHeaderSize]))
-		p.ip = p.v4
+		p.IP = p.v4
 	case layers.EthernetTypeIPv6:
 		if len(data) < EthernetHeaderSize+IPv6HeaderSize {
-			return nil, ErrTruncatedIPHeader
+			return Packet{err: ErrTruncatedIPHeader}, ErrTruncatedIPHeader
 		}
 		var err error
-		var tcp *TCPHeader
-		p.v6, p.ext, tcp, err = NewIPv6Header(data[EthernetHeaderSize:])
+		p.v6, _, err = NewIPv6Header(data[EthernetHeaderSize:])
 		if err != nil {
-			return nil, err
+			return Packet{}, err
 		}
-		p.ip = p.v6
-		p.tcp = &TCPHeaderWrapper{TCP: tcp, Options: nil}
+		p.IP = p.v6
 	default:
-		return nil, ErrUnknownEtherType
+		return Packet{err: ErrUnknownEtherType}, ErrUnknownEtherType
 	}
 	// TODO needs more work
-	if p.ip != nil {
-		switch p.ip.NextProtocol() {
+	if p.IP != nil {
+		switch p.IP.NextProtocol() {
 		case layers.IPProtocolTCP:
-			if len(data) < EthernetHeaderSize+p.ip.HeaderSize()+TCPHeaderSize {
-				return nil, ErrTruncatedTCPHeader
+			var err error
+			p.tcp, err = WrapTCP(data[EthernetHeaderSize+p.IP.HeaderLength():])
+			if err != nil {
+				return Packet{}, err
 			}
-			p.tcp = &TCPHeaderWrapper{
-				TCP: (*TCPHeader)(unsafe.Pointer(&data[EthernetHeaderSize])),
-			}
-			return &p, nil
 		}
 	}
 
-	return &p, nil
+	return p, nil
 }
 
 func (p *Packet) TCPLength() int {
-	if p.v4 != nil {
-		return int(p.v4.PayloadLength())
+	if p.IP == nil {
+		return 0
 	}
-	return int(binary.BigEndian.Uint16(p.v6.payloadLength[:]))
+	return p.IP.PayloadLength()
+}
+
+// GetIP decodes the IP layers and returns some basic information.
+// It is a bit slow and does memory allocation.
+func (p *Packet) GetTCP() (layers.TCPPort, layers.TCPPort, *layers.TCP, error) {
+	// Decode a packet.
+	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		Lazy:                     true,
+		NoCopy:                   true,
+		SkipDecodeRecovery:       true,
+		DecodeStreamsAsDatagrams: false,
+	})
+
+	if tcpLayer := pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp, _ := tcpLayer.(*layers.TCP)
+		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
+		return tcp.SrcPort, tcp.DstPort, tcp, nil
+	} else {
+		return 0, 0, nil, ErrNoTCPLayer
+	}
+}
+
+func GetPackets(data []byte) ([]Packet, error) {
+	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
+
+	pktSize := int(pcap.Snaplen())
+	if pktSize < 1 {
+		pktSize = 1
+	}
+	pcapSize := len(data) // Only if the data is not compressed.
+	// Check magic number?
+	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
+		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
+		pcapSize *= 8
+	}
+
+	// TODO: len(data)/18 provides much better estimate of number of packets.
+	// len(data)/18 was determined by looking at bytes/packet in a few pcaps files.
+	// It seems to cause mysterious crashes in sandbox, so reverted to /1500 for now.
+	// UPDATE:
+	// This computed slice sizing alone changes the throughput in sandbox from about 640
+	// to about 820 MB/sec per instance.  No crashes after 2 hours.  GIT b46b033.
+	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
+	packets := make([]Packet, 0, pcapSize/pktSize)
+
+	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+		p, _ := Wrap(ci, data)
+		packets = append(packets, p)
+	}
+
+	if err != nil {
+		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
+		metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+		return packets, err
+	} else if len(packets) > 0 {
+		srcIP, _, _, _, err := packets[0].GetIP()
+		// TODO - eventually we should identify key local ports, like 443 and 3001.
+		if err != nil {
+			metrics.WarningCount.WithLabelValues("pcap", "?", "ip_layer_failure").Inc()
+			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+		} else {
+			start := packets[0].Ci.Timestamp
+			end := packets[len(packets)-1].Ci.Timestamp
+			duration := end.Sub(start)
+			// TODO add TCP layer, so we can label the stats based on local port value.
+			if len(srcIP) == 4 {
+				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
+				metrics.PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
+			} else {
+				metrics.PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
+				metrics.PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
+			}
+		}
+	} else {
+		// No packets.
+		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
+	}
+
+	return packets, nil
 }
 
 // GetTCP constructs or retrieves the TCPHeaderWrapper for this packet.
@@ -396,4 +515,17 @@ func (p *Packet) TCPLength() int {
 // The result is cached in the Packet's TCP field.
 func GetTCP(data []byte) (*TCPHeaderWrapper, error) {
 	return nil, ErrNotTCP
+}
+
+// GetIP decodes the IP layers and returns some basic information.
+// It is a bit slow and does memory allocation.
+func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
+	if p.IP == nil {
+		return nil, nil, 0, 0, ErrNoIPLayer
+	}
+	return p.IP.SrcIP(), p.IP.DstIP(), p.IP.HopLimit(), uint16(p.IP.PayloadLength()), nil
+}
+
+func (p *Packet) Timestamp() time.Time {
+	return p.Ci.Timestamp
 }
