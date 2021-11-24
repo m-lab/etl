@@ -64,6 +64,7 @@ type IP interface {
 	DstIP() net.IP
 	NextProtocol() layers.IPProtocol
 	HopLimit() uint8
+	HeaderSize() int
 }
 
 // IPv4Header struct for IPv4 header
@@ -115,6 +116,10 @@ func (h *IPv4Header) NextProtocol() layers.IPProtocol {
 
 func (h *IPv4Header) HopLimit() uint8 {
 	return h.hopLimit
+}
+
+func (h *IPv4Header) HeaderSize() int {
+	return int(h.versionIHL&0x0f) << 2
 }
 
 func assertV4isIP(ip *IPv4Header) {
@@ -215,6 +220,10 @@ func (h *IPv6Header) HopLimit() uint8 {
 // TODO - This may not be what we want.
 func (h *IPv6Header) NextProtocol() layers.IPProtocol {
 	return h.nextHeader
+}
+
+func (h *IPv6Header) HeaderSize() int {
+	return IPv4HeaderSize
 }
 
 func assertV6IP(ip *IPv6Header) {
@@ -334,7 +343,7 @@ func Wrap(ci gopacket.CaptureInfo, data []byte) (*Packet, error) {
 	if p.ip != nil {
 		switch p.ip.NextProtocol() {
 		case layers.IPProtocolTCP:
-			if len(data) < EthernetHeaderSize+p.ip.PayloadLength() {
+			if len(data) < EthernetHeaderSize+p.ip.HeaderSize()+TCPHeaderSize {
 				return nil, ErrTruncatedTCPHeader
 			}
 			p.tcp = &TCPHeaderWrapper{

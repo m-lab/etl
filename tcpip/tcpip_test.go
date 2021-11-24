@@ -1,4 +1,4 @@
-package tcpip
+package tcpip_test
 
 import (
 	"io"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/parser"
+	"github.com/m-lab/etl/tcpip"
 )
 
 func getTestfileForBenchmark(b *testing.B, name string) []byte {
@@ -59,6 +60,13 @@ func TestIPLayer(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		for i := range packets {
+			_, err := tcpip.Wrap(packets[i].Ci, packets[i].Data)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
 		start := packets[0].Ci.Timestamp
 		end := packets[len(packets)-1].Ci.Timestamp
 		duration := end.Sub(start)
