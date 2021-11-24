@@ -11,6 +11,7 @@ package tcpip
 // and the unsafe pointer eligible for collection.
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -21,6 +22,8 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcapgo"
+	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/logx"
 )
 
@@ -316,78 +319,137 @@ func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 // Packet struct contains the packet data and metadata.
 type Packet struct {
 	// If we use a pointer here, for some reason we get zero value timestamps.
-	ci   gopacket.CaptureInfo
-	data []byte
+	Ci   gopacket.CaptureInfo
+	Data []byte
 	eth  *EthernetHeader
-	ip   IP
-	v4   *IPv4Header       // Nil unless we're parsing IPv4 packets.
-	v6   *IPv6Header       // Nil unless we're parsing IPv6 packets.
-	ext  *EHWrapper        // Nil unless we're parsing IPv6 packets.
-	tcp  *TCPHeaderWrapper // This takes up a small amount of space for the options.
-	err  error
-}
-
-func (p *Packet) IP() IP {
-	return p.ip
+	IP
+	v4  *IPv4Header       // Nil unless we're parsing IPv4 packets.
+	v6  *IPv6Header       // Nil unless we're parsing IPv6 packets.
+	ext *EHWrapper        // Nil unless we're parsing IPv6 packets.
+	tcp *TCPHeaderWrapper // This takes up a small amount of space for the options.
+	err error
 }
 
 func (p *Packet) TCP() *TCPHeader {
 	return p.tcp.TCP
 }
 
-func Wrap(ci gopacket.CaptureInfo, data []byte) (*Packet, error) {
+func Wrap(ci gopacket.CaptureInfo, data []byte) (Packet, error) {
 	if len(data) < EthernetHeaderSize {
-		return nil, ErrTruncatedEthernetHeader
+		return Packet{err: ErrTruncatedEthernetHeader}, ErrTruncatedEthernetHeader
 	}
 	p := Packet{
-		ci:   ci,
-		data: data,
+		Ci:   ci,
+		Data: data,
 		eth:  (*EthernetHeader)(unsafe.Pointer(&data[0])),
 	}
 	switch p.eth.EtherType() {
 	case layers.EthernetTypeIPv4:
 		if len(data) < EthernetHeaderSize+IPv4HeaderSize {
-			return nil, ErrTruncatedIPHeader
+			return Packet{err: ErrTruncatedIPHeader}, ErrTruncatedIPHeader
 		}
 		p.v4 = (*IPv4Header)(unsafe.Pointer(&data[EthernetHeaderSize]))
-		p.ip = p.v4
+		p.IP = p.v4
 	case layers.EthernetTypeIPv6:
 		if len(data) < EthernetHeaderSize+IPv6HeaderSize {
-			return nil, ErrTruncatedIPHeader
+			return Packet{err: ErrTruncatedIPHeader}, ErrTruncatedIPHeader
 		}
 		var err error
 		var tcp *TCPHeader
 		p.v6, p.ext, tcp, err = NewIPv6Header(data[EthernetHeaderSize:])
 		if err != nil {
-			return nil, err
+			return Packet{}, err
 		}
-		p.ip = p.v6
+		p.IP = p.v6
 		p.tcp = &TCPHeaderWrapper{TCP: tcp, Options: nil}
 	default:
-		return nil, ErrUnknownEtherType
+		return Packet{err: ErrUnknownEtherType}, ErrUnknownEtherType
 	}
 	// TODO needs more work
-	if p.ip != nil {
-		switch p.ip.NextProtocol() {
+	if p.IP != nil {
+		switch p.IP.NextProtocol() {
 		case layers.IPProtocolTCP:
-			if len(data) < EthernetHeaderSize+p.ip.HeaderSize()+TCPHeaderSize {
-				return nil, ErrTruncatedTCPHeader
+			if len(data) < EthernetHeaderSize+p.IP.HeaderSize()+TCPHeaderSize {
+				return Packet{}, ErrTruncatedTCPHeader
 			}
 			p.tcp = &TCPHeaderWrapper{
 				TCP: (*TCPHeader)(unsafe.Pointer(&data[EthernetHeaderSize])),
 			}
-			return &p, nil
+			return p, nil
 		}
 	}
 
-	return &p, nil
+	return p, nil
 }
 
 func (p *Packet) TCPLength() int {
-	if p.ip == nil {
+	if p.IP == nil {
 		return 0
 	}
-	return p.ip.PayloadLength()
+	return p.IP.PayloadLength()
+}
+
+func GetPackets(data []byte) ([]Packet, error) {
+	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
+
+	pktSize := int(pcap.Snaplen())
+	if pktSize < 1 {
+		pktSize = 1
+	}
+	pcapSize := len(data) // Only if the data is not compressed.
+	// Check magic number?
+	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
+		pcapSize *= 7 // 6 // Data is compressed, so guess that it might be 6 times bigger.
+	}
+
+	// TODO: len(data)/18 provides much better estimate of number of packets.
+	// len(data)/18 was determined by looking at bytes/packet in a few pcaps files.
+	// It seems to cause mysterious crashes in sandbox, so reverted to /1500 for now.
+	// UPDATE:
+	// This computed slice sizing alone changes the throughput in sandbox from about 640
+	// to about 820 MB/sec per instance.  No crashes after 2 hours.  GIT b46b033.
+	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
+	packets := make([]Packet, 0, pcapSize/pktSize)
+
+	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+		p, _ := Wrap(ci, data)
+		// TODO: Does *p do what we want here.
+		packets = append(packets, p)
+	}
+
+	if err != nil {
+		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
+		metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+		return packets, err
+	} else if len(packets) > 0 {
+		srcIP, _, _, _, err := packets[0].GetIP()
+		// TODO - eventually we should identify key local ports, like 443 and 3001.
+		if err != nil {
+			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
+			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+		} else {
+			start := packets[0].Ci.Timestamp
+			end := packets[len(packets)-1].Ci.Timestamp
+			duration := end.Sub(start)
+			// TODO add TCP layer, so we can label the stats based on local port value.
+			if len(srcIP) == 4 {
+				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
+				metrics.PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
+			} else {
+				metrics.PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
+				metrics.PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
+			}
+		}
+	} else {
+		// No packets.
+		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
+	}
+
+	return packets, nil
 }
 
 // GetTCP constructs or retrieves the TCPHeaderWrapper for this packet.
@@ -396,4 +458,17 @@ func (p *Packet) TCPLength() int {
 // The result is cached in the Packet's TCP field.
 func GetTCP(data []byte) (*TCPHeaderWrapper, error) {
 	return nil, ErrNotTCP
+}
+
+// GetIP decodes the IP layers and returns some basic information.
+// It is a bit slow and does memory allocation.
+func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
+	if p.IP == nil {
+		return nil, nil, 0, 0, ErrNoIPLayer
+	}
+	return p.IP.SrcIP(), p.IP.DstIP(), p.IP.HopLimit(), uint16(p.IP.PayloadLength()), nil
+}
+
+func (p *Packet) Timestamp() time.Time {
+	return p.Ci.Timestamp
 }
