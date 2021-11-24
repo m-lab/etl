@@ -384,10 +384,10 @@ func Wrap(ci gopacket.CaptureInfo, data []byte) (*Packet, error) {
 }
 
 func (p *Packet) TCPLength() int {
-	if p.v4 != nil {
-		return int(p.v4.PayloadLength())
+	if p.ip == nil {
+		return 0
 	}
-	return int(binary.BigEndian.Uint16(p.v6.payloadLength[:]))
+	return p.ip.PayloadLength()
 }
 
 // GetTCP constructs or retrieves the TCPHeaderWrapper for this packet.
