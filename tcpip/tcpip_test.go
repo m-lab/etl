@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/tcpip"
 )
 
@@ -63,7 +62,7 @@ func TestIPLayer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		data := getTestfile(t, tt.fn)
-		packets, err := parser.GetPackets(data)
+		packets, err := tcpip.GetPackets(data)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -74,8 +73,8 @@ func TestIPLayer(t *testing.T) {
 			}
 		}
 
-		start := packets[0].Ci.Timestamp
-		end := packets[len(packets)-1].Ci.Timestamp
+		start := packets[0].Timestamp()
+		end := packets[len(packets)-1].Timestamp()
 		duration := end.Sub(start)
 		if duration != tt.duration {
 			t.Errorf("%s: duration = %v, want %v", tt.name, duration, tt.duration)
@@ -88,8 +87,8 @@ func TestIPLayer(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !all.IP().SrcIP().Equal(net.ParseIP(tt.srcIP)) {
-			t.Errorf("%s: srcIP = %v, want %v", tt.name, all.IP().SrcIP(), tt.srcIP)
+		if !all.IP.SrcIP().Equal(net.ParseIP(tt.srcIP)) {
+			t.Errorf("%s: srcIP = %v, want %v", tt.name, all.IP.SrcIP(), tt.srcIP)
 		}
 		if all.TCP().SrcPort() != tt.srcPort {
 			t.Errorf("%s: srcPort = %v, want %v", tt.name, all.TCP().SrcPort(), tt.srcPort)
@@ -103,13 +102,13 @@ func TestIPLayer(t *testing.T) {
 
 func TestPCAPGarbage(t *testing.T) {
 	data := []byte{0xd4, 0xc3, 0xb2, 0xa1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
-	_, err := parser.GetPackets(data)
+	_, err := tcpip.GetPackets(data)
 	if err != io.ErrUnexpectedEOF {
 		t.Fatal(err)
 	}
 
 	data = append(data, data...)
-	_, err = parser.GetPackets(data)
+	_, err = tcpip.GetPackets(data)
 	if err == nil || !strings.Contains(err.Error(), "Unknown major") {
 		t.Fatal(err)
 	}
@@ -133,14 +132,17 @@ func TestPCAPGarbage(t *testing.T) {
 // Wrap, with total          BenchmarkGetPackets-8   	    3618	    319537 ns/op	  538017 B/op	    1886 allocs/op
 
 func BenchmarkGetPackets(b *testing.B) {
-	type tt struct {
+	type src struct {
 		data    []byte
 		numPkts int
 		total   int
 	}
-	tests := []tt{
+	sources := []src{
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
+		//{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
+		//{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
 	}
 	b.ResetTimer()
@@ -148,19 +150,15 @@ func BenchmarkGetPackets(b *testing.B) {
 	i := 0
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			test := tests[i%len(tests)]
+			test := sources[i%len(sources)]
 			i++
-			pkts, err := parser.GetPackets(test.data)
+			pkts, err := tcpip.GetPackets(test.data)
 			if err != nil {
 				b.Fatal(err)
 			}
 			total := 0
 			for i := range pkts {
-				h, err := tcpip.Wrap(pkts[i].Ci, pkts[i].Data)
-				if err != nil {
-					b.Fatal(err)
-				}
-				total += h.TCPLength()
+				total += pkts[i].TCPLength()
 			}
 			if total != test.total {
 				b.Fatalf("total = %d, want %d", total, test.total)
