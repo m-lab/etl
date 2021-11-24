@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -44,20 +45,21 @@ func getTestfile(t *testing.T, name string) []byte {
 
 func TestIPLayer(t *testing.T) {
 	type test struct {
-		name         string
-		fn           string
-		packets      int64
-		duration     time.Duration
-		srcIP, dstIP string
-		TTL          uint8
+		name             string
+		fn               string
+		packets          int64
+		duration         time.Duration
+		srcIP, dstIP     string
+		srcPort, dstPort uint16
+		TTL              uint8
 	}
 	tests := []test{
 		{name: "retransmits", fn: "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
-			packets: 336, duration: 15409174000, srcIP: "173.49.19.128"},
+			packets: 336, duration: 15409174000, srcIP: "173.49.19.128", srcPort: 17664, dstPort: 60},
 		{name: "ipv6", fn: "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d"},
+			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 24576, dstPort: 31324},
 		{name: "protocolErrors2", fn: "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
-			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d"},
+			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 24587, dstPort: 43482},
 	}
 	for _, tt := range tests {
 		data := getTestfile(t, tt.fn)
@@ -81,13 +83,21 @@ func TestIPLayer(t *testing.T) {
 		if len(packets) != int(tt.packets) {
 			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
 		}
-		srcIP, _, _, _, err := packets[0].SlowGetIP()
+
+		all, err := tcpip.Wrap(packets[0].Ci, packets[0].Data)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if srcIP.String() != tt.srcIP {
-			t.Errorf("%s: expected srcIP %s, got %s", tt.name, tt.srcIP, srcIP.String())
+		if !all.IP().SrcIP().Equal(net.ParseIP(tt.srcIP)) {
+			t.Errorf("%s: srcIP = %v, want %v", tt.name, all.IP().SrcIP(), tt.srcIP)
 		}
+		if all.TCP().SrcPort() != tt.srcPort {
+			t.Errorf("%s: srcPort = %v, want %v", tt.name, all.TCP().SrcPort(), tt.srcPort)
+		}
+		if all.TCP().DstPort() != tt.dstPort {
+			t.Errorf("%s: dstPort = %v, want %v", tt.name, all.TCP().DstPort(), tt.dstPort)
+		}
+
 	}
 }
 
@@ -119,6 +129,8 @@ func TestPCAPGarbage(t *testing.T) {
 // Fast Total, []*Packet:    BenchmarkGetPackets-8   	    2760	    419538 ns/op	  635526 B/op	    7410 allocs/op
 // Fast Total, computed *6:  BenchmarkGetPackets-8   	    2769	    409313 ns/op	  850179 B/op	    5570 allocs/op
 // Fast Total, computed *7:  BenchmarkGetPackets-8   	    3198	    379535 ns/op	  610168 B/op	    5570 allocs/op
+// Wrap                      BenchmarkGetPackets-8   	    3045	    358205 ns/op	  610127 B/op	    5570 allocs/op
+
 func BenchmarkGetPackets(b *testing.B) {
 	type tt struct {
 		data    []byte

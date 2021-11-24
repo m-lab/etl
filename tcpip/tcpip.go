@@ -12,7 +12,6 @@ package tcpip
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -22,7 +21,6 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/go/logx"
 )
 
@@ -264,6 +262,14 @@ type TCPHeader struct {
 
 var TCPHeaderSize = int(unsafe.Sizeof(TCPHeader{}))
 
+func (h *TCPHeader) SrcPort() uint16 {
+	return binary.BigEndian.Uint16(h.srcPort[:])
+}
+
+func (h *TCPHeader) DstPort() uint16 {
+	return binary.BigEndian.Uint16(h.dstPort[:])
+}
+
 func (h *TCPHeader) DataOffset() int {
 	return 4 * (int(h.dataOffsetFlags&0xf0) >> 4)
 }
@@ -321,6 +327,14 @@ type Packet struct {
 	err  error
 }
 
+func (p *Packet) IP() IP {
+	return p.ip
+}
+
+func (p *Packet) TCP() *TCPHeader {
+	return p.tcp.TCP
+}
+
 func Wrap(ci gopacket.CaptureInfo, data []byte) (*Packet, error) {
 	if len(data) < EthernetHeaderSize {
 		return nil, ErrTruncatedEthernetHeader
@@ -338,22 +352,13 @@ func Wrap(ci gopacket.CaptureInfo, data []byte) (*Packet, error) {
 		p.v4 = (*IPv4Header)(unsafe.Pointer(&data[EthernetHeaderSize]))
 		p.ip = p.v4
 	case layers.EthernetTypeIPv6:
-		log.Printf("%+v\n", p.eth)
 		if len(data) < EthernetHeaderSize+IPv6HeaderSize {
-			log.Println(hex.EncodeToString(data[EthernetHeaderSize:]))
 			return nil, ErrTruncatedIPHeader
 		}
 		var err error
 		var tcp *TCPHeader
 		p.v6, p.ext, tcp, err = NewIPv6Header(data[EthernetHeaderSize:])
 		if err != nil {
-			pp := parser.Packet{Ci: ci, Data: data}
-			log.Println(pp.SlowGetIP())
-			log.Println("  Eth:", hex.EncodeToString(data[0:14]))
-			log.Println("    IPv6:",
-				hex.EncodeToString(data[14:22]),
-				hex.EncodeToString(data[22:30]), hex.EncodeToString(data[30:38]),
-				hex.EncodeToString(data[38:46]), hex.EncodeToString(data[46:54]))
 			return nil, err
 		}
 		p.ip = p.v6
@@ -378,25 +383,6 @@ func Wrap(ci gopacket.CaptureInfo, data []byte) (*Packet, error) {
 	return &p, nil
 }
 
-func (p *Packet) GetLayers() error {
-	p.eth = (*EthernetHeader)(unsafe.Pointer(&p.data[0]))
-	switch p.eth.EtherType() {
-	case layers.EthernetTypeIPv4:
-		if len(p.data) < int(14+unsafe.Sizeof(IPv4Header{})) {
-			return ErrTruncatedIPHeader
-		}
-		p.v4 = (*IPv4Header)(unsafe.Pointer(&p.data[14]))
-	case layers.EthernetTypeIPv6:
-		if len(p.data) < int(14+unsafe.Sizeof(IPv6Header{})) {
-			return ErrTruncatedIPHeader
-		}
-		p.v6 = (*IPv6Header)(unsafe.Pointer(&p.data[14]))
-	default:
-		return ErrNoIPLayer
-	}
-	return nil
-}
-
 func (p *Packet) TCPLength() int {
 	if p.v4 != nil {
 		return int(p.v4.PayloadLength())
@@ -410,39 +396,4 @@ func (p *Packet) TCPLength() int {
 // The result is cached in the Packet's TCP field.
 func GetTCP(data []byte) (*TCPHeaderWrapper, error) {
 	return nil, ErrNotTCP
-}
-
-// FastExtractIPFields extracts a few IP fields from the packet.
-func (p *Packet) FastExtractIPFields() (srcIP, dstIP net.IP, TTL uint8, tcpLength uint16, err error) {
-	if p.eth == nil {
-		err = p.GetLayers()
-		if err != nil {
-			return nil, nil, 0, 0, err
-		}
-	}
-	if p.v4 != nil {
-		srcIP = make([]byte, 4)
-		dstIP = make([]byte, 4)
-		copy(srcIP, p.v4.SrcIP())
-		copy(dstIP, p.v4.DstIP())
-		TTL = p.v4.hopLimit
-		tcpLength = uint16(p.v4.PayloadLength())
-		if p.v4.protocol != layers.IPProtocolTCP {
-			err = ErrNotTCP
-		}
-	} else if p.v6 != nil {
-		srcIP = make([]byte, 16)
-		dstIP = make([]byte, 16)
-		copy(srcIP, p.v6.SrcIP())
-		copy(dstIP, p.v6.DstIP())
-		TTL = p.v6.hopLimit
-		tcpLength = binary.BigEndian.Uint16(p.v6.payloadLength[:])
-		// TODO - needs more work
-		if p.ext.HeaderType != layers.IPProtocolTCP {
-			err = ErrNotTCP
-		}
-	} else {
-		return nil, nil, 0, 0, ErrNoIPLayer
-	}
-	return
 }
