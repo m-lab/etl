@@ -131,19 +131,11 @@ func BenchmarkGetPackets(b *testing.B) {
 			if true {
 				total := 0
 				for i := range pkts {
-					if false {
-						_, _, _, l, err := pkts[i].SlowGetIP()
-						if err != nil {
-							b.Fatal(err)
-						}
-						total += int(l)
-					} else {
-						if err := pkts[i].GetLayers(); err != nil {
-							b.Fatal(err)
-						}
-						_, _, _, tcpLength, _ := pkts[i].FastExtractIPFields()
-						total += int(tcpLength)
+					if err := pkts[i].GetLayers(); err != nil {
+						b.Fatal(err)
 					}
+					_, _, _, tcpLength, _ := pkts[i].FastExtractIPFields()
+					total += int(tcpLength)
 				}
 				if total != test.total {
 					b.Errorf("total = %d, want %d (%d)", total, test.total, len(test.data))
