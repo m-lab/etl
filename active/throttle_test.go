@@ -73,6 +73,9 @@ func (s *source) Next(ctx context.Context) (active.Runnable, error) {
 func (s *source) Label() string {
 	return "label"
 }
+func (s *source) Datatype() string {
+	return "datatype"
+}
 
 func (sr *statsRunnable) Run(ctx context.Context) error {
 	now := sr.stats.add()
