@@ -101,7 +101,8 @@ type GCSSource struct {
 
 	pendingChan chan Runnable
 
-	label string
+	label    string
+	datatype string
 }
 
 // NewGCSSource creates a new source for active processing.
@@ -113,6 +114,7 @@ func NewGCSSource(ctx context.Context, job tracker.Job, fl FileLister, toRunnabl
 
 		pendingChan: make(chan Runnable, 0),
 		label:       job.Path(),
+		datatype:    job.Datatype,
 	}
 
 	go src.streamToPending(ctx, job)
@@ -123,6 +125,10 @@ func NewGCSSource(ctx context.Context, job tracker.Job, fl FileLister, toRunnabl
 // Label implements Source.Label
 func (src *GCSSource) Label() string {
 	return src.label
+}
+
+func (src *GCSSource) Datatype() string {
+	return src.datatype
 }
 
 // CancelStreaming terminates the streaming goroutine context.
