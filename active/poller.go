@@ -119,8 +119,8 @@ func (g *GardenerAPI) RunAll(ctx context.Context, rSrc RunnableSource, job track
 		debug.Println("Starting func")
 
 		f := func() (err error) {
-			metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Inc()
-			defer metrics.ActiveTasks.WithLabelValues(rSrc.Label()).Dec()
+			metrics.ActiveTasks.WithLabelValues(rSrc.Datatype()).Inc()
+			defer metrics.ActiveTasks.WithLabelValues(rSrc.Datatype()).Dec()
 
 			// Capture any panic and convert it to an error.
 			defer func(tag string) {
