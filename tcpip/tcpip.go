@@ -137,7 +137,7 @@ type EHWrapper struct {
 	eh         *ExtensionHeader
 	data       []byte // All the options and padding, including the first 6 bytes.
 	// TODO - this does not need to be stored, but it is convenient for now.
-	payload []byte // Any additional data remaining after the extension header.
+	//	payload []byte // Any additional data remaining after the extension header.
 }
 
 // Next the next EHWrapper.
@@ -146,7 +146,7 @@ func (w *EHWrapper) Next() (*EHWrapper, error) {
 	if w.eh.NextHeader == layers.IPProtocolNoNextHeader {
 		return nil, nil
 	}
-	if w.eh == nil || len(w.data)%8 != 0 || len(w.payload) < 8 {
+	if w.eh == nil || len(w.data)%8 != 0 { //|| len(w.payload) < 8 {
 		return nil, ErrTruncatedIPHeader
 	}
 	next := (*ExtensionHeader)(unsafe.Pointer(&w.data[0]))
@@ -154,7 +154,7 @@ func (w *EHWrapper) Next() (*EHWrapper, error) {
 		HeaderType: w.HeaderType,
 		eh:         next,
 		data:       w.data[2 : 8+next.HeaderLength],
-		payload:    w.payload[8+next.HeaderLength:],
+		//	payload:    w.payload[8+next.HeaderLength:],
 	}, nil
 }
 
@@ -236,19 +236,19 @@ func (w *IPv6Wrapper) HeaderLength() int {
 	return w.headerLength
 }
 
-func (w *IPv6Wrapper) payload() []byte {
-	if len(w.ext) == 0 {
-		return nil
-	}
-	return w.ext[len(w.ext)-1].payload
-}
+// func (w *IPv6Wrapper) payload() []byte {
+// 	if len(w.ext) == 0 {
+// 		return nil
+// 	}
+// 	return w.ext[len(w.ext)-1].payload
+// }
 
 // Wrap creates a wrapper with extension headers.
 // data is the remainder of the header data, not including the IPv6 header.
 func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
 	w := IPv6Wrapper{
 		IPv6Header:   ip,
-		ext:          make([]EHWrapper, 0, 2),
+		ext:          make([]EHWrapper, 0, 0),
 		headerLength: IPv6HeaderSize,
 	}
 	if w.nextHeader == layers.IPProtocolNoNextHeader {
@@ -256,38 +256,30 @@ func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
 	}
 
 	for np := w.NextProtocol(); np != layers.IPProtocolNoNextHeader; {
-		if len(data) < 8 {
-			return nil, ErrTruncatedIPHeader
-		}
 		switch np {
 		case layers.IPProtocolNoNextHeader:
 			return &w, nil
 		case layers.IPProtocolIPv6HopByHop:
-			eh := (*ExtensionHeader)(unsafe.Pointer(&data[0]))
-			w.ext = append(w.ext, EHWrapper{
-				HeaderType: np,
-				eh:         eh,
-				data:       data[2 : 8+eh.HeaderLength],
-				payload:    data[8+eh.HeaderLength:],
-			})
-			w.headerLength += int(eh.HeaderLength) + 8
-			data = data[8+eh.HeaderLength:]
-			np = eh.NextHeader
 		case layers.IPProtocolTCP:
 			return &w, nil
 		default:
 			log.Println("IPv6 header type", np)
-			eh := (*ExtensionHeader)(unsafe.Pointer(&data[0]))
-			w.ext = append(w.ext, EHWrapper{
-				HeaderType: np,
-				eh:         eh,
-				data:       data[2 : 8+eh.HeaderLength],
-				payload:    data[8+eh.HeaderLength:],
-			})
-			w.headerLength += int(eh.HeaderLength) + 8
-			data = data[8+eh.HeaderLength:]
-			np = eh.NextHeader
 		}
+
+		if len(data) < 8 {
+			return nil, ErrTruncatedIPHeader
+		}
+
+		eh := (*ExtensionHeader)(unsafe.Pointer(&data[0]))
+		w.ext = append(w.ext, EHWrapper{
+			HeaderType: np,
+			eh:         eh,
+			data:       data[2 : 8+eh.HeaderLength],
+			//payload:    data[8+eh.HeaderLength:],
+		})
+		w.headerLength += int(eh.HeaderLength) + 8
+		data = data[8+eh.HeaderLength:]
+		np = eh.NextHeader
 	}
 	return nil, ErrTruncatedIPHeader
 }
@@ -404,14 +396,11 @@ func Wrap(ci gopacket.CaptureInfo, data []byte) (Packet, error) {
 			return Packet{err: ErrTruncatedIPHeader}, ErrTruncatedIPHeader
 		}
 		var err error
-		var remaining []byte
-		p.v6, remaining, err = NewIPv6Header(data[EthernetHeaderSize:])
+		p.v6, _, err = NewIPv6Header(data[EthernetHeaderSize:])
 		if err != nil {
 			return Packet{}, err
 		}
 		p.IP = p.v6
-		tcp := (*TCPHeader)(unsafe.Pointer(&remaining[0]))
-		p.tcp = &TCPHeaderWrapper{TCP: tcp, Options: nil}
 	default:
 		return Packet{err: ErrUnknownEtherType}, ErrUnknownEtherType
 	}
@@ -419,13 +408,11 @@ func Wrap(ci gopacket.CaptureInfo, data []byte) (Packet, error) {
 	if p.IP != nil {
 		switch p.IP.NextProtocol() {
 		case layers.IPProtocolTCP:
-			if len(data) < EthernetHeaderSize+p.IP.HeaderLength()+TCPHeaderSize {
-				return Packet{}, ErrTruncatedTCPHeader
+			var err error
+			p.tcp, err = WrapTCP(data[EthernetHeaderSize+p.IP.HeaderLength():])
+			if err != nil {
+				return Packet{}, err
 			}
-			p.tcp = &TCPHeaderWrapper{
-				TCP: (*TCPHeader)(unsafe.Pointer(&data[EthernetHeaderSize+p.IP.HeaderLength()])),
-			}
-			return p, nil
 		}
 	}
 

@@ -58,16 +58,16 @@ func TestIPLayer(t *testing.T) {
 		{name: "retransmits", fn: "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
 			packets: 336, duration: 15409174000, srcIP: "173.49.19.128", srcPort: 40337, dstPort: 443},
 		{name: "ipv6", fn: "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 24576, dstPort: 31324},
+			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 1894, dstPort: 443},
 		{name: "protocolErrors2", fn: "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
-			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 24587, dstPort: 43482},
+			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 1896, dstPort: 443},
 
 		{name: "other1", fn: "ndt-m6znc_1632401351_000000000005BA77.pcap.gz",
-			packets: 40797, duration: 10719662000, srcIP: "70.187.37.14", srcPort: 17664, dstPort: 64, totalPayload: 239251626},
+			packets: 40797, duration: 10719662000, srcIP: "70.187.37.14", srcPort: 60232, dstPort: 443, totalPayload: 239251626},
 		{name: "other2", fn: "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz",
-			packets: 146172, duration: 15081049000, srcIP: "2600:1700:42d0:67b0:71e7:d89:1d89:9484", srcPort: 24578, dstPort: 2564, totalPayload: 158096007},
+			packets: 146172, duration: 15081049000, srcIP: "2600:1700:42d0:67b0:71e7:d89:1d89:9484", srcPort: 49319, dstPort: 443, totalPayload: 158096007},
 		{name: "other3", fn: "ndt-m6znc_1632401351_000000000005B90B.pcap.gz",
-			packets: 30097, duration: 11415041000, srcIP: "104.129.205.7", srcPort: 17664, dstPort: 64, totalPayload: 126523401},
+			packets: 30097, duration: 11415041000, srcIP: "104.129.205.7", srcPort: 15227, dstPort: 443, totalPayload: 126523401},
 	}
 	for _, tt := range tests {
 		data := getTestfile(t, tt.fn)
@@ -157,6 +157,7 @@ func TestPCAPGarbage(t *testing.T) {
 // Wrap, total 1x6 files *6: BenchmarkGetPackets-8   	     129	   8372769 ns/op	19967908 B/op	   97448 allocs/op
 // Wrap, total 1x6 files *7: BenchmarkGetPackets-8   	     129	   8372769 ns/op	19967908 B/op	   97448 allocs/op
 
+// Correct ipv6 decoding:    BenchmarkGetPackets-8   	     100	  11350868 ns/op	19519358 B/op	  120908 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
 	type src struct {
 		data    []byte
@@ -176,6 +177,7 @@ func BenchmarkGetPackets(b *testing.B) {
 	b.ResetTimer()
 
 	i := 0
+	pktCount := 0
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			test := sources[i%len(sources)]
@@ -194,6 +196,8 @@ func BenchmarkGetPackets(b *testing.B) {
 			if len(pkts) != test.numPkts {
 				b.Errorf("expected %d packets, got %d", test.numPkts, len(pkts))
 			}
+			pktCount += len(pkts)
 		}
 	})
+	log.Println("BenchmarkGetPackets:", b.N, "iterations", pktCount, "packets")
 }
