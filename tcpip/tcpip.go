@@ -361,7 +361,7 @@ func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 // Packet struct contains the packet data and metadata.
 type Packet struct {
 	// If we use a pointer here, for some reason we get zero value timestamps.
-	Ci   *gopacket.CaptureInfo
+	Ci   gopacket.CaptureInfo
 	Data []byte
 	eth  *EthernetHeader
 	IP
@@ -375,12 +375,14 @@ func (p *Packet) TCP() *TCPHeader {
 	return p.tcp.TCP
 }
 
+// Wrap creates a wrapper with partially decoded headers.
+// ci is passed by value, since gopacket NoCopy doesn't preserve the values.
 func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 	if len(data) < EthernetHeaderSize {
 		return Packet{err: ErrTruncatedEthernetHeader}, ErrTruncatedEthernetHeader
 	}
 	p := Packet{
-		Ci:   ci,
+		Ci:   *ci, // Make a copy, since gopacket NoCopy doesn't preserve the values.
 		Data: data,
 		eth:  (*EthernetHeader)(unsafe.Pointer(&data[0])),
 	}
@@ -474,6 +476,7 @@ func GetPackets(data []byte) ([]Packet, error) {
 	packets := make([]Packet, 0, pcapSize/pktSize)
 
 	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
 		p, _ := Wrap(&ci, data)
 		packets = append(packets, p)
 	}
