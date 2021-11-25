@@ -13,12 +13,12 @@ import (
 	"cloud.google.com/go/civil"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/etl/tcpip"
 	"github.com/m-lab/go/logx"
 )
 
@@ -40,7 +40,7 @@ type Packet struct {
 
 // GetIP decodes the IP layers and returns some basic information.
 // It is a bit slow and does memory allocation.
-func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
+func (p *Packet) SlowGetIP() (net.IP, net.IP, uint8, uint16, error) {
 	// Decode a packet.
 	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
 		Lazy:                     true,
@@ -60,67 +60,6 @@ func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
 	} else {
 		return nil, nil, 0, 0, ErrNoIPLayer
 	}
-}
-
-func GetPackets(data []byte) ([]Packet, error) {
-	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
-	if err != nil {
-		log.Print(err)
-		return nil, err
-	}
-
-	pktSize := int(pcap.Snaplen())
-	if pktSize < 1 {
-		pktSize = 1
-	}
-	pcapSize := len(data) // Only if the data is not compressed.
-	// Check magic number?
-	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
-		pcapSize *= 7 // 6 // Data is compressed, so guess that it might be 6 times bigger.
-	}
-
-	// TODO: len(data)/18 provides much better estimate of number of packets.
-	// len(data)/18 was determined by looking at bytes/packet in a few pcaps files.
-	// It seems to cause mysterious crashes in sandbox, so reverted to /1500 for now.
-	// UPDATE:
-	// This computed slice sizing alone changes the throughput in sandbox from about 640
-	// to about 820 MB/sec per instance.  No crashes after 2 hours.  GIT b46b033.
-	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
-	packets := make([]Packet, 0, pcapSize/pktSize)
-
-	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
-		packets = append(packets, Packet{Ci: ci, Data: data, Err: err})
-	}
-
-	if err != nil {
-		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
-		metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
-		return packets, err
-	} else if len(packets) > 0 {
-		srcIP, _, _, _, err := packets[0].GetIP()
-		// TODO - eventually we should identify key local ports, like 443 and 3001.
-		if err != nil {
-			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
-			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
-		} else {
-			start := packets[0].Ci.Timestamp
-			end := packets[len(packets)-1].Ci.Timestamp
-			duration := end.Sub(start)
-			// TODO add TCP layer, so we can label the stats based on local port value.
-			if len(srcIP) == 4 {
-				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
-				metrics.PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
-			} else {
-				metrics.PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
-				metrics.PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
-			}
-		}
-	} else {
-		// No packets.
-		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
-	}
-
-	return packets, nil
 }
 
 //=====================================================================================
@@ -184,7 +123,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 
 	// Parse top level PCAP data and update metrics.
 	// TODO - add schema fields here.
-	_, _ = GetPackets(rawContent)
+	_, _ = tcpip.GetPackets(rawContent)
 
 	// Insert the row.
 	if err := p.Put(&row); err != nil {
