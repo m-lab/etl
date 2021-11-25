@@ -361,7 +361,7 @@ func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 // Packet struct contains the packet data and metadata.
 type Packet struct {
 	// If we use a pointer here, for some reason we get zero value timestamps.
-	Ci   gopacket.CaptureInfo
+	Ci   *gopacket.CaptureInfo
 	Data []byte
 	eth  *EthernetHeader
 	IP
@@ -375,7 +375,7 @@ func (p *Packet) TCP() *TCPHeader {
 	return p.tcp.TCP
 }
 
-func Wrap(ci gopacket.CaptureInfo, data []byte) (Packet, error) {
+func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 	if len(data) < EthernetHeaderSize {
 		return Packet{err: ErrTruncatedEthernetHeader}, ErrTruncatedEthernetHeader
 	}
@@ -474,7 +474,7 @@ func GetPackets(data []byte) ([]Packet, error) {
 	packets := make([]Packet, 0, pcapSize/pktSize)
 
 	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
-		p, _ := Wrap(ci, data)
+		p, _ := Wrap(&ci, data)
 		packets = append(packets, p)
 	}
 
