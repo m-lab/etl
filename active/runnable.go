@@ -23,4 +23,7 @@ type RunnableSource interface {
 
 	// Label returns a string for use in metrics and debug logs'
 	Label() string
+
+	// Datatype returns the datatype for use in metrics
+	Datatype() string
 }
