@@ -75,12 +75,6 @@ func TestIPLayer(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for i := range packets {
-			_, err := tcpip.Wrap(packets[i].Ci, packets[i].Data)
-			if err != nil {
-				t.Fatalf("%s %v", tt.name, err)
-			}
-		}
 
 		start := packets[0].Timestamp()
 		end := packets[len(packets)-1].Timestamp()
@@ -92,7 +86,7 @@ func TestIPLayer(t *testing.T) {
 			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
 		}
 
-		first, err := tcpip.Wrap(packets[0].Ci, packets[0].Data)
+		first := packets[0]
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -158,6 +152,9 @@ func TestPCAPGarbage(t *testing.T) {
 // Wrap, total 1x6 files *7: BenchmarkGetPackets-8   	     129	   8372769 ns/op	19967908 B/op	   97448 allocs/op
 
 // Correct ipv6 decoding:    BenchmarkGetPackets-8   	     100	  11350868 ns/op	19519358 B/op	  120908 allocs/op
+// Use pointer fgor CI:      BenchmarkGetPackets-8   	     100	  10318408 ns/op	12376754 B/op	   96639 allocs/op
+// This one makes a single copy of CaptureInfo, because pointer referent gets cleared:
+// Don't wrap twice!!        BenchmarkGetPackets:            145	   7881966 ns/op	16814909 B/op	   98956 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
 	type src struct {
 		data    []byte
