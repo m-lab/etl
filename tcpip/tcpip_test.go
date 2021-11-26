@@ -62,55 +62,52 @@ func TestIPLayer(t *testing.T) {
 		{name: "protocolErrors2", fn: "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
 			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 1896, dstPort: 443},
 
-		{name: "other1", fn: "ndt-m6znc_1632401351_000000000005BA77.pcap.gz",
+		{name: "large_ipv4_1", fn: "ndt-m6znc_1632401351_000000000005BA77.pcap.gz",
 			packets: 40797, duration: 10719662000, srcIP: "70.187.37.14", srcPort: 60232, dstPort: 443, totalPayload: 239251626},
-		{name: "other2", fn: "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz",
+		{name: "large_ipv6", fn: "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz",
 			packets: 146172, duration: 15081049000, srcIP: "2600:1700:42d0:67b0:71e7:d89:1d89:9484", srcPort: 49319, dstPort: 443, totalPayload: 158096007},
-		{name: "other3", fn: "ndt-m6znc_1632401351_000000000005B90B.pcap.gz",
+		{name: "large_ipv4_2", fn: "ndt-m6znc_1632401351_000000000005B90B.pcap.gz",
 			packets: 30097, duration: 11415041000, srcIP: "104.129.205.7", srcPort: 15227, dstPort: 443, totalPayload: 126523401},
+
+		{name: "Nops", fn: "ndt-nnwk2_1611335823_00000000000C2DA2.pcap.gz", srcIP: "69.124.153.192", srcPort: 3855, dstPort: 3010,
+			packets: 18, duration: 173433000},
 	}
 	for _, tt := range tests {
 		data := getTestfile(t, tt.fn)
-		packets, err := tcpip.GetPackets(data)
+		summary, err := tcpip.ProcessPackets(tt.fn, data)
 		if err != nil {
 			t.Fatal(err)
 		}
+		if len(summary.Errors) > 0 {
+			t.Error(summary.Errors)
+		}
 
-		start := packets[0].Timestamp()
-		end := packets[len(packets)-1].Timestamp()
-		duration := end.Sub(start)
+		duration := summary.LastTime.Sub(summary.StartTime)
 		if duration != tt.duration {
 			t.Errorf("%s: duration = %v, want %v", tt.name, duration, tt.duration)
 		}
-		if len(packets) != int(tt.packets) {
-			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
+		if summary.Packets != int(tt.packets) {
+			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, summary.Packets)
 		}
 
-		first := packets[0]
-		if err != nil {
-			t.Fatal(err)
+		if !summary.SrcIP.Equal(net.ParseIP(tt.srcIP)) {
+			t.Errorf("%s: srcIP = %s, want %s", tt.name, summary.SrcIP, tt.srcIP)
 		}
-		if !first.IP.SrcIP().Equal(net.ParseIP(tt.srcIP)) {
-			t.Errorf("%s: srcIP = %s, want %s", tt.name, first.IP.SrcIP(), tt.srcIP)
+		if summary.SrcPort != tt.srcPort {
+			t.Errorf("%s: srcPort = %d, want %d", tt.name, summary.SrcPort, tt.srcPort)
 		}
-		if first.TCP().SrcPort() != tt.srcPort {
-			t.Errorf("%s: srcPort = %d, want %d", tt.name, first.TCP().SrcPort(), tt.srcPort)
-		}
-		if first.TCP().DstPort() != tt.dstPort {
-			t.Errorf("%s: dstPort = %d, want %d", tt.name, first.TCP().DstPort(), tt.dstPort)
+		if summary.DstPort != tt.dstPort {
+			t.Errorf("%s: dstPort = %d, want %d", tt.name, summary.DstPort, tt.dstPort)
 		}
 		// Now check against gopacket values, too.
-		if src, dst, tcp, err := first.GetTCP(); err != nil {
+		if tcp, err := summary.GetFirstTCP(); err != nil {
 			t.Error(err)
 		} else {
-			if first.TCP().SrcPort() != src {
-				t.Errorf("%s: srcPort = %0.2x, want %0.2x", tt.name, first.TCP().SrcPort(), src)
-				t.Errorf("%+v", first.Data)
-				t.Errorf("\nfast:%+v\nslow:%+v\n", first.TCP(), tcp)
-				t.Error("IP HeaderLength:", first.IP.HeaderLength())
+			if summary.SrcPort != tcp.SrcPort {
+				t.Errorf("%s: srcPort = %0.2x, want %0.2x", tt.name, summary.SrcPort, tcp.SrcPort)
 			}
-			if first.TCP().DstPort() != dst {
-				t.Errorf("%s: dstPort = %d(%.2x), want %.2x", tt.name, first.TCP().DstPort(), first.TCP().DstPort(), dst)
+			if summary.DstPort != tcp.DstPort {
+				t.Errorf("%s: dstPort = %d(%.2x), want %.2x", tt.name, summary.DstPort, summary.DstPort, tcp.DstPort)
 			}
 		}
 
@@ -119,13 +116,13 @@ func TestIPLayer(t *testing.T) {
 
 func TestPCAPGarbage(t *testing.T) {
 	data := []byte{0xd4, 0xc3, 0xb2, 0xa1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
-	_, err := tcpip.GetPackets(data)
+	_, err := tcpip.ProcessPackets("garbage", data)
 	if err != io.ErrUnexpectedEOF {
 		t.Fatal(err)
 	}
 
 	data = append(data, data...)
-	_, err = tcpip.GetPackets(data)
+	_, err = tcpip.ProcessPackets("garbage", data)
 	if err == nil || !strings.Contains(err.Error(), "Unknown major") {
 		t.Fatal(err)
 	}
@@ -157,6 +154,8 @@ func TestPCAPGarbage(t *testing.T) {
 // This one makes a single copy of CaptureInfo, because pointer referent gets cleared:
 // Don't wrap twice!!          BenchmarkGetPackets:          145	   7881966 ns/op	16814909 B/op	   98956 allocs/op
 // Fix TCP header/decode opt:  BenchmarkGetPackets-8   	     136	   8110814 ns/op	16549726 B/op	   97431 allocs/op
+//                             BenchmarkGetPackets-8   	     100	  13316191 ns/op	16989482 B/op	  132680 allocs/op
+// Summary only:               BenchmarkGetPackets-8   	     223	   5492522 ns/op	 3666003 B/op	   99160 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
 	type src struct {
 		data    []byte
@@ -166,12 +165,12 @@ func BenchmarkGetPackets(b *testing.B) {
 	sources := []src{
 		// Approximately 220K packets, so this is about 140nsec/packet, and about 100 bytes/packet allocated,
 		// which is roughly the footprint of the packets themselves.
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
-		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797, 239251626},
-		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172, 158096007},
-		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097, 126523401},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 166963},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4534},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408254},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797, 239251582},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172, 158095963},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097, 126523361},
 	}
 	b.ResetTimer()
 
@@ -181,21 +180,18 @@ func BenchmarkGetPackets(b *testing.B) {
 		for pb.Next() {
 			test := sources[i%len(sources)]
 			i++
-			pkts, err := tcpip.GetPackets(test.data)
+			summary, err := tcpip.ProcessPackets("foobar", test.data)
 			if err != nil {
 				b.Fatal(err)
 			}
-			total := 0
-			for i := range pkts {
-				total += pkts[i].TCPLength()
+
+			if int(summary.PayloadBytes) != test.total {
+				b.Fatalf("total = %d, want %d", summary.PayloadBytes, test.total)
 			}
-			if total != test.total {
-				b.Fatalf("total = %d, want %d", total, test.total)
+			if summary.Packets != test.numPkts {
+				b.Errorf("expected %d packets, got %d", test.numPkts, summary.Packets)
 			}
-			if len(pkts) != test.numPkts {
-				b.Errorf("expected %d packets, got %d", test.numPkts, len(pkts))
-			}
-			pktCount += len(pkts)
+			pktCount += summary.Packets
 		}
 	})
 }
