@@ -288,7 +288,7 @@ func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
  * TCP Header and state machine
 ******************************************************************************/
 type TCPOption struct {
-	Kind uint8
+	Kind layers.TCPOptionKind
 	Len  uint8
 	// This byte array may be shorter than 38 bytes, and cause panics if improperly accessed.
 	Data [38]byte // Max length of all TCP options is 40 bytes, so data is limited to 38 bytes.
@@ -299,7 +299,8 @@ type TCPHeader struct {
 	srcPort, dstPort [2]byte // Source and destination port
 	seqNum           [4]byte // Sequence number
 	ackNum           [4]byte // Acknowledgement number
-	dataOffsetFlags  uint16  // DataOffset, and Flags
+	dataOffset       uint8   //  DataOffset: upper 4 bits
+	flags            uint8   // Flags
 	window           [2]byte // Window
 	checksum         [2]byte // Checksum
 	urgent           [2]byte // Urgent pointer
@@ -316,27 +317,27 @@ func (h *TCPHeader) DstPort() layers.TCPPort {
 }
 
 func (h *TCPHeader) DataOffset() int {
-	return 4 * int((h.dataOffsetFlags>>12)&0x0f)
+	return 4 * int(h.dataOffset>>4)
 }
 
 func (h *TCPHeader) FIN() bool {
-	return (h.dataOffsetFlags & 0x01) != 0
+	return (h.flags & 0x01) != 0
 }
 
 func (h *TCPHeader) SYN() bool {
-	return (h.dataOffsetFlags & 0x02) != 0
+	return (h.flags & 0x02) != 0
 }
 
 func (h *TCPHeader) RST() bool {
-	return (h.dataOffsetFlags & 0x04) != 0
+	return (h.flags & 0x04) != 0
 }
 
 func (h *TCPHeader) PSH() bool {
-	return (h.dataOffsetFlags & 0x08) != 0
+	return (h.flags & 0x08) != 0
 }
 
 func (h *TCPHeader) ACK() bool {
-	return (h.dataOffsetFlags & 0x10) != 0
+	return (h.flags & 0x10) != 0
 }
 
 type TCPHeaderWrapper struct {
@@ -352,11 +353,30 @@ func parseTCPOptions(data []byte) ([]*TCPOption, error) {
 	// TODO - should we omit the empty option padding?
 	for len(data) > 0 {
 		if len(data) < 2 || len(data) < int(data[1]) {
+			log.Println("Truncated option field:", data)
 			return nil, ErrTruncatedTCPHeader
 		}
 		opt := (*TCPOption)(unsafe.Pointer(&data[0]))
-		options = append(options, opt)
-		data = data[opt.Len:]
+		switch opt.Kind {
+		case layers.TCPOptionKindEndList:
+			return options, nil
+		case layers.TCPOptionKindNop:
+			data = data[1:]
+		// Do nothing
+		case layers.TCPOptionKindMSS:
+			fallthrough
+		case layers.TCPOptionKindTimestamps:
+			fallthrough
+		case layers.TCPOptionKindWindowScale:
+			fallthrough
+		case layers.TCPOptionKindSACKPermitted:
+			fallthrough
+		case layers.TCPOptionKindSACK:
+			fallthrough
+		default:
+			options = append(options, opt)
+			data = data[opt.Len:]
+		}
 	}
 	return options, nil
 }
@@ -375,12 +395,9 @@ func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 	}
 	var err error
 	if tcp.DataOffset() > TCPHeaderSize {
-		w.Options, err = parseTCPOptions(data[TCPHeaderSize:])
+		w.Options, err = parseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
 	} else {
 		w.Options = make([]*TCPOption, 0)
-	}
-	if err != nil {
-		log.Println("parseTCPOptions", err, data[TCPHeaderSize:tcp.DataOffset()])
 	}
 	return &w, err
 }
