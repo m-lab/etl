@@ -123,7 +123,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 
 	// Parse top level PCAP data and update metrics.
 	// TODO - add schema fields here.
-	_, _ = tcpip.GetPackets(rawContent)
+	_, _ = tcpip.ProcessPackets(testName, rawContent)
 
 	// Insert the row.
 	if err := p.Put(&row); err != nil {
