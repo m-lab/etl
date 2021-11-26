@@ -299,7 +299,7 @@ type TCPHeader struct {
 	srcPort, dstPort [2]byte // Source and destination port
 	seqNum           [4]byte // Sequence number
 	ackNum           [4]byte // Acknowledgement number
-	dataOffsetFlags  uint8   // DataOffset, and Flags
+	dataOffsetFlags  uint16  // DataOffset, and Flags
 	window           [2]byte // Window
 	checksum         [2]byte // Checksum
 	urgent           [2]byte // Urgent pointer
@@ -316,7 +316,7 @@ func (h *TCPHeader) DstPort() layers.TCPPort {
 }
 
 func (h *TCPHeader) DataOffset() int {
-	return 4 * (int(h.dataOffsetFlags&0xf0) >> 4)
+	return 4 * int((h.dataOffsetFlags>>12)&0x0f)
 }
 
 func (h *TCPHeader) FIN() bool {
@@ -344,6 +344,23 @@ type TCPHeaderWrapper struct {
 	Options []*TCPOption
 }
 
+func parseTCPOptions(data []byte) ([]*TCPOption, error) {
+	if len(data) == 0 {
+		return make([]*TCPOption, 0), nil
+	}
+	var options []*TCPOption = make([]*TCPOption, 0, 2)
+	// TODO - should we omit the empty option padding?
+	for len(data) > 0 {
+		if len(data) < 2 || len(data) < int(data[1]) {
+			return nil, ErrTruncatedTCPHeader
+		}
+		opt := (*TCPOption)(unsafe.Pointer(&data[0]))
+		options = append(options, opt)
+		data = data[opt.Len:]
+	}
+	return options, nil
+}
+
 func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 	if len(data) < TCPHeaderSize {
 		return nil, ErrTruncatedTCPHeader
@@ -352,10 +369,20 @@ func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 	if tcp.DataOffset() > len(data) {
 		return nil, ErrTruncatedTCPHeader
 	}
-	return &TCPHeaderWrapper{
+	w := TCPHeaderWrapper{
 		TCP:     tcp,
-		Options: nil, // parseTCPOptions(data[TCPHeaderSize:]),
-	}, nil
+		Options: nil,
+	}
+	var err error
+	if tcp.DataOffset() > TCPHeaderSize {
+		w.Options, err = parseTCPOptions(data[TCPHeaderSize:])
+	} else {
+		w.Options = make([]*TCPOption, 0)
+	}
+	if err != nil {
+		log.Println("parseTCPOptions", err, data[TCPHeaderSize:tcp.DataOffset()])
+	}
+	return &w, err
 }
 
 // Packet struct contains the packet data and metadata.
