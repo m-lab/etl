@@ -153,8 +153,10 @@ func TestPCAPGarbage(t *testing.T) {
 
 // Correct ipv6 decoding:    BenchmarkGetPackets-8   	     100	  11350868 ns/op	19519358 B/op	  120908 allocs/op
 // Use pointer fgor CI:      BenchmarkGetPackets-8   	     100	  10318408 ns/op	12376754 B/op	   96639 allocs/op
+
 // This one makes a single copy of CaptureInfo, because pointer referent gets cleared:
-// Don't wrap twice!!        BenchmarkGetPackets:            145	   7881966 ns/op	16814909 B/op	   98956 allocs/op
+// Don't wrap twice!!          BenchmarkGetPackets:          145	   7881966 ns/op	16814909 B/op	   98956 allocs/op
+// Fix TCP header/decode opt:  BenchmarkGetPackets-8   	     136	   8110814 ns/op	16549726 B/op	   97431 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
 	type src struct {
 		data    []byte
@@ -196,5 +198,4 @@ func BenchmarkGetPackets(b *testing.B) {
 			pktCount += len(pkts)
 		}
 	})
-	log.Println("BenchmarkGetPackets:", b.N, "iterations", pktCount, "packets")
 }
