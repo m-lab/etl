@@ -452,7 +452,7 @@ func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 			var err error
 			p.tcp, err = WrapTCP(data[EthernetHeaderSize+p.IP.HeaderLength():])
 			if err != nil {
-				log.Printf("Error parsing TCP: %v for %v", err, p)
+				sparse20.Printf("Error parsing TCP: %v for %v", err, p)
 				return Packet{}, err
 			}
 		}
