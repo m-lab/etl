@@ -530,7 +530,7 @@ func (s *Summary) GetIP() (net.IP, net.IP, uint8) {
 	return s.SrcIP, s.DstIP, s.HopLimit
 }
 
-func ProcessPackets(fn string, data []byte) (Summary, error) {
+func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	summary := Summary{
 		OptionCounts: make(map[layers.TCPOptionKind]int),
 		Errors:       make(map[int]error, 1),
@@ -565,7 +565,7 @@ func ProcessPackets(fn string, data []byte) (Summary, error) {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
 		p, err := Wrap(&ci, data)
 		if err != nil {
-			log.Println(fn, err, data)
+			log.Println(archive, fn, err, data)
 			summary.Errors[summary.Packets] = err
 			continue
 		}

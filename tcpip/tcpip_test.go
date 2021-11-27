@@ -76,7 +76,7 @@ func TestIPLayer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		data := getTestfile(t, tt.fn)
-		summary, err := tcpip.ProcessPackets(tt.fn, data)
+		summary, err := tcpip.ProcessPackets("none", tt.fn, data)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -163,13 +163,13 @@ func TestShortData(t *testing.T) {
 
 func TestPCAPGarbage(t *testing.T) {
 	data := []byte{0xd4, 0xc3, 0xb2, 0xa1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
-	_, err := tcpip.ProcessPackets("garbage", data)
+	_, err := tcpip.ProcessPackets("none", "garbage", data)
 	if err != io.ErrUnexpectedEOF {
 		t.Fatal(err)
 	}
 
 	data = append(data, data...)
-	_, err = tcpip.ProcessPackets("garbage", data)
+	_, err = tcpip.ProcessPackets("none", "garbage", data)
 	if err == nil || !strings.Contains(err.Error(), "Unknown major") {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func BenchmarkGetPackets(b *testing.B) {
 		for pb.Next() {
 			test := sources[i%len(sources)]
 			i++
-			summary, err := tcpip.ProcessPackets("foobar", test.data)
+			summary, err := tcpip.ProcessPackets("foo", "bar", test.data)
 			if err != nil {
 				b.Fatal(err)
 			}
