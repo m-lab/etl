@@ -585,7 +585,7 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 			metrics.WarningCount.WithLabelValues("pcap", "?", "ip_layer_failure").Inc()
 			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(summary.Packets))
 		} else {
-			duration := summary.StartTime.Sub(summary.LastTime)
+			duration := summary.LastTime.Sub(summary.StartTime)
 			// TODO add TCP layer, so we can label the stats based on local port value.
 			if len(srcIP) == 4 {
 				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(summary.Packets))
