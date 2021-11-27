@@ -169,6 +169,8 @@ func NewIPv6Header(data []byte) (*IPv6Wrapper, []byte, error) {
 	}
 	if len(data) < w.headerLength {
 		return nil, nil, ErrTruncatedIPHeader
+
+		// TODO remove this check.
 	} else if len(data) == w.headerLength {
 		return w, []byte{}, nil
 	}
@@ -336,6 +338,51 @@ type TCPHeaderWrapper struct {
 	Options []*TCPOption
 }
 
+func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
+	if len(data) == 0 {
+		w.Options = make([]*TCPOption, 0, 0)
+		return nil
+	}
+	w.Options = make([]*TCPOption, 0, 2)
+	// TODO - should we omit the empty option padding?
+	for len(data) > 0 {
+		opt := (*TCPOption)(unsafe.Pointer(&data[0]))
+		switch opt.Kind {
+		case layers.TCPOptionKindEndList:
+			return nil
+		case layers.TCPOptionKindNop:
+			// For NoOperation, just advance the pointer.
+			// No need to save the option.
+			data = data[1:]
+		default:
+			if len(data) < 2 || len(data) < int(opt.Len) {
+				log.Println("Truncated option field:", data)
+				return ErrTruncatedTCPHeader
+			}
+			switch opt.Kind {
+			case layers.TCPOptionKindMSS:
+				fallthrough
+			case layers.TCPOptionKindTimestamps:
+				fallthrough
+			case layers.TCPOptionKindWindowScale:
+				fallthrough
+			case layers.TCPOptionKindSACKPermitted:
+				fallthrough
+			case layers.TCPOptionKindSACK:
+				fallthrough
+			default:
+				if len(data) < int(opt.Len) {
+					log.Println("Truncated option field:", data)
+					return ErrTruncatedTCPHeader
+				}
+				w.Options = append(w.Options, opt)
+				data = data[opt.Len:]
+			}
+		}
+	}
+	return nil
+}
+
 func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 	if len(data) < TCPHeaderSize {
 		return nil, ErrTruncatedTCPHeader
@@ -344,10 +391,12 @@ func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 	if tcp.DataOffset() > len(data) {
 		return nil, ErrTruncatedTCPHeader
 	}
-	return &TCPHeaderWrapper{
+	w := TCPHeaderWrapper{
 		TCP:     tcp,
-		Options: nil, // parseTCPOptions(data[TCPHeaderSize:]),
-	}, nil
+		Options: nil,
+	}
+	err := w.parseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
+	return &w, err
 }
 
 // Packet struct contains the packet data and metadata.
