@@ -470,11 +470,11 @@ func (p *Packet) TCPLength() int {
 	return p.IP.PayloadLength()
 }
 
-// GetIP decodes the IP layers and returns some basic information.
+// GetGopacketFirstTCP uses gopacket to decode the  TCP layer for the first packet.
 // It is a bit slow and does memory allocation.
-func (p *Packet) GetTCP() (layers.TCPPort, layers.TCPPort, *layers.TCP, error) {
+func (s *Summary) GetGopacketFirstTCP() (*layers.TCP, error) {
 	// Decode a packet.
-	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+	pkt := gopacket.NewPacket(s.FirstPacket, layers.LayerTypeEthernet, gopacket.DecodeOptions{
 		Lazy:                     true,
 		NoCopy:                   true,
 		SkipDecodeRecovery:       true,
@@ -484,17 +484,64 @@ func (p *Packet) GetTCP() (layers.TCPPort, layers.TCPPort, *layers.TCP, error) {
 	if tcpLayer := pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp, _ := tcpLayer.(*layers.TCP)
 		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
-		return tcp.SrcPort, tcp.DstPort, tcp, nil
+		return tcp, nil
 	} else {
-		return 0, 0, nil, ErrNoTCPLayer
+		return nil, ErrNoTCPLayer
 	}
 }
 
-func GetPackets(data []byte) ([]Packet, error) {
+type Summary struct {
+	Packets      int
+	FirstPacket  []byte
+	SrcIP        net.IP
+	DstIP        net.IP
+	SrcPort      layers.TCPPort
+	DstPort      layers.TCPPort
+	HopLimit     uint8
+	PayloadBytes uint64
+	StartTime    time.Time
+	LastTime     time.Time
+	OptionCounts map[layers.TCPOptionKind]int
+	Errors       map[int]error
+	Details      []string
+}
+
+func (s *Summary) Add(p *Packet) {
+	if s.Packets == 0 {
+		s.FirstPacket = p.Data[:]
+	}
+	if p.err != nil {
+		s.Errors[s.Packets] = p.err
+	} else if s.Packets == 0 {
+		s.StartTime = p.Ci.Timestamp
+		s.SrcIP = p.SrcIP()
+		s.DstIP = p.DstIP()
+		s.SrcPort = p.TCP().SrcPort()
+		s.DstPort = p.TCP().DstPort()
+		s.HopLimit = p.IP.HopLimit()
+	} else {
+		s.LastTime = p.Ci.Timestamp
+		s.PayloadBytes += uint64(p.TCPLength())
+	}
+	s.Packets++
+}
+
+// GetIP decodes the IP layers and returns some basic information.
+// It is a bit slow and does memory allocation.
+func (s *Summary) GetIP() (net.IP, net.IP, uint8) {
+	return s.SrcIP, s.DstIP, s.HopLimit
+}
+
+func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
+	summary := Summary{
+		OptionCounts: make(map[layers.TCPOptionKind]int),
+		Errors:       make(map[int]error, 1),
+	}
+
 	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
 	if err != nil {
 		log.Print(err)
-		return nil, err
+		return summary, err
 	}
 
 	pktSize := int(pcap.Snaplen())
@@ -504,7 +551,7 @@ func GetPackets(data []byte) ([]Packet, error) {
 	pcapSize := len(data) // Only if the data is not compressed.
 	// Check magic number?
 	if len(data) < 4 {
-		return nil, ErrTruncatedPcap
+		return summary, ErrTruncatedPcap
 	}
 	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
 		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
@@ -514,62 +561,44 @@ func GetPackets(data []byte) ([]Packet, error) {
 	// This computed slice sizing alone changes the throughput in sandbox from about 640
 	// to about 820 MB/sec per instance.  No crashes after 2 hours.  GIT b46b033.
 	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
-	packets := make([]Packet, 0, pcapSize/pktSize)
+	summary.Details = make([]string, 0, pcapSize/pktSize)
 
 	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
-		p, _ := Wrap(&ci, data)
-		packets = append(packets, p)
+		p, err := Wrap(&ci, data)
+		if err != nil {
+			log.Println(archive, fn, err, data)
+			summary.Errors[summary.Packets] = err
+			continue
+		}
+		summary.Add(&p)
 	}
 
 	if err != nil {
 		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
-		metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
-		return packets, err
-	} else if len(packets) > 0 {
-		srcIP, _, _, _, err := packets[0].GetIP()
+		metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(summary.Packets))
+		return summary, err
+	} else if summary.Packets > 0 {
+		srcIP, _, _ := summary.GetIP()
 		// TODO - eventually we should identify key local ports, like 443 and 3001.
 		if err != nil {
 			metrics.WarningCount.WithLabelValues("pcap", "?", "ip_layer_failure").Inc()
-			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(summary.Packets))
 		} else {
-			start := packets[0].Ci.Timestamp
-			end := packets[len(packets)-1].Ci.Timestamp
-			duration := end.Sub(start)
+			duration := summary.LastTime.Sub(summary.StartTime)
 			// TODO add TCP layer, so we can label the stats based on local port value.
 			if len(srcIP) == 4 {
-				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
+				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(summary.Packets))
 				metrics.PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
 			} else {
-				metrics.PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
+				metrics.PcapPacketCount.WithLabelValues("ipv6").Observe(float64(summary.Packets))
 				metrics.PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
 			}
 		}
 	} else {
 		// No packets.
-		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
+		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(summary.Packets))
 	}
 
-	return packets, nil
-}
-
-// GetTCP constructs or retrieves the TCPHeaderWrapper for this packet.
-// This requires correctly parsing the IP header to find the correct offset,
-// and then parsing the TCP header and creating the options array.
-// The result is cached in the Packet's TCP field.
-func GetTCP(data []byte) (*TCPHeaderWrapper, error) {
-	return nil, ErrNotTCP
-}
-
-// GetIP decodes the IP layers and returns some basic information.
-// It is a bit slow and does memory allocation.
-func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
-	if p.IP == nil {
-		return nil, nil, 0, 0, ErrNoIPLayer
-	}
-	return p.IP.SrcIP(), p.IP.DstIP(), p.IP.HopLimit(), uint16(p.IP.PayloadLength()), nil
-}
-
-func (p *Packet) Timestamp() time.Time {
-	return p.Ci.Timestamp
+	return summary, nil
 }
