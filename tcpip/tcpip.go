@@ -32,6 +32,7 @@ var (
 	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
 	sparse20     = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
 
+	ErrTruncatedPcap           = fmt.Errorf("Truncated PCAP file")
 	ErrNotTCP                  = fmt.Errorf("not a TCP packet")
 	ErrNoIPLayer               = fmt.Errorf("no IP layer")
 	ErrNoTCPLayer              = fmt.Errorf("no TCP layer")
@@ -140,24 +141,6 @@ type EHWrapper struct {
 	//	payload []byte // Any additional data remaining after the extension header.
 }
 
-// Next the next EHWrapper.
-// It may return nil if there are no more, or ErrTruncatedIPHeader if the header is truncated.
-func (w *EHWrapper) Next() (*EHWrapper, error) {
-	if w.eh.NextHeader == layers.IPProtocolNoNextHeader {
-		return nil, nil
-	}
-	if w.eh == nil || len(w.data)%8 != 0 { //|| len(w.payload) < 8 {
-		return nil, ErrTruncatedIPHeader
-	}
-	next := (*ExtensionHeader)(unsafe.Pointer(&w.data[0]))
-	return &EHWrapper{
-		HeaderType: w.HeaderType,
-		eh:         next,
-		data:       w.data[2 : 8+next.HeaderLength],
-		//	payload:    w.payload[8+next.HeaderLength:],
-	}, nil
-}
-
 // IPv6Header struct for IPv6 header
 type IPv6Header struct {
 	versionTrafficClassFlowLabel [4]byte           // Version (4 bits) + Traffic class (8 bits) + Flow label (20 bits)
@@ -183,6 +166,11 @@ func NewIPv6Header(data []byte) (*IPv6Wrapper, []byte, error) {
 	w, err := h.Wrap(data[IPv6HeaderSize:])
 	if err != nil {
 		return nil, nil, err
+	}
+	if len(data) < w.headerLength {
+		return nil, nil, ErrTruncatedIPHeader
+	} else if len(data) == w.headerLength {
+		return w, []byte{}, nil
 	}
 	return w, data[w.headerLength:], err
 }
@@ -271,6 +259,9 @@ func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
 		}
 
 		eh := (*ExtensionHeader)(unsafe.Pointer(&data[0]))
+		if len(data) < int(8+eh.HeaderLength) {
+			return nil, ErrTruncatedIPHeader
+		}
 		w.ext = append(w.ext, EHWrapper{
 			HeaderType: np,
 			eh:         eh,
@@ -378,6 +369,10 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 			case layers.TCPOptionKindSACK:
 				fallthrough
 			default:
+				if len(data) < int(opt.Len) {
+					log.Println("Truncated option field:", data)
+					return ErrTruncatedTCPHeader
+				}
 				w.Options = append(w.Options, opt)
 				data = data[opt.Len:]
 			}
@@ -553,6 +548,9 @@ func ProcessPackets(fn string, data []byte) (Summary, error) {
 	}
 	pcapSize := len(data) // Only if the data is not compressed.
 	// Check magic number?
+	if len(data) < 4 {
+		return summary, ErrTruncatedPcap
+	}
 	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
 		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
 		pcapSize *= 8
