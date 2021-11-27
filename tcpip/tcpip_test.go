@@ -1,6 +1,7 @@
 package tcpip_test
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/etl/tcpip"
 )
 
@@ -62,12 +64,15 @@ func TestIPLayer(t *testing.T) {
 		{name: "protocolErrors2", fn: "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
 			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 1896, dstPort: 443},
 
-		{name: "other1", fn: "ndt-m6znc_1632401351_000000000005BA77.pcap.gz",
+		{name: "large_ipv4_1", fn: "ndt-m6znc_1632401351_000000000005BA77.pcap.gz",
 			packets: 40797, duration: 10719662000, srcIP: "70.187.37.14", srcPort: 60232, dstPort: 443, totalPayload: 239251626},
-		{name: "other2", fn: "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz",
+		{name: "large_ipv6", fn: "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz",
 			packets: 146172, duration: 15081049000, srcIP: "2600:1700:42d0:67b0:71e7:d89:1d89:9484", srcPort: 49319, dstPort: 443, totalPayload: 158096007},
-		{name: "other3", fn: "ndt-m6znc_1632401351_000000000005B90B.pcap.gz",
+		{name: "large_ipv4_2", fn: "ndt-m6znc_1632401351_000000000005B90B.pcap.gz",
 			packets: 30097, duration: 11415041000, srcIP: "104.129.205.7", srcPort: 15227, dstPort: 443, totalPayload: 126523401},
+
+		{name: "Nops", fn: "ndt-nnwk2_1611335823_00000000000C2DA2.pcap.gz", srcIP: "69.124.153.192", srcPort: 3855, dstPort: 3010,
+			packets: 18, duration: 173433000},
 	}
 	for _, tt := range tests {
 		data := getTestfile(t, tt.fn)
@@ -114,6 +119,51 @@ func TestIPLayer(t *testing.T) {
 			}
 		}
 
+	}
+}
+
+func ProcessShortPackets(t *testing.T, data []byte) {
+	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check magic number?
+	if len(data) < 4 {
+		//	return summary, ErrTruncatedPcap
+	}
+	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
+		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
+	}
+
+	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
+		for i := 0; i < len(data); i++ {
+			tcpip.Wrap(&ci, data[:i])
+			tcpip.Wrap(&ci, data[i:])
+		}
+	}
+}
+
+func TestShortData(t *testing.T) {
+	type test struct {
+		name             string
+		fn               string
+		packets          int64
+		duration         time.Duration
+		srcIP, dstIP     string
+		srcPort, dstPort layers.TCPPort
+		TTL              uint8
+		totalPayload     int
+	}
+	tests := []test{
+		{name: "retransmits", fn: "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
+			packets: 336, duration: 15409174000, srcIP: "173.49.19.128", srcPort: 40337, dstPort: 443},
+		{name: "ipv6", fn: "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
+			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 1894, dstPort: 443},
+	}
+	for _, tt := range tests {
+		data := getTestfile(t, tt.fn)
+		ProcessShortPackets(t, data)
 	}
 }
 

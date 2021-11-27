@@ -32,6 +32,7 @@ var (
 	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
 	sparse20     = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
 
+	ErrTruncatedPcap           = fmt.Errorf("Truncated PCAP file")
 	ErrNotTCP                  = fmt.Errorf("not a TCP packet")
 	ErrNoIPLayer               = fmt.Errorf("no IP layer")
 	ErrNoTCPLayer              = fmt.Errorf("no TCP layer")
@@ -140,24 +141,6 @@ type EHWrapper struct {
 	//	payload []byte // Any additional data remaining after the extension header.
 }
 
-// Next the next EHWrapper.
-// It may return nil if there are no more, or ErrTruncatedIPHeader if the header is truncated.
-func (w *EHWrapper) Next() (*EHWrapper, error) {
-	if w.eh.NextHeader == layers.IPProtocolNoNextHeader {
-		return nil, nil
-	}
-	if w.eh == nil || len(w.data)%8 != 0 { //|| len(w.payload) < 8 {
-		return nil, ErrTruncatedIPHeader
-	}
-	next := (*ExtensionHeader)(unsafe.Pointer(&w.data[0]))
-	return &EHWrapper{
-		HeaderType: w.HeaderType,
-		eh:         next,
-		data:       w.data[2 : 8+next.HeaderLength],
-		//	payload:    w.payload[8+next.HeaderLength:],
-	}, nil
-}
-
 // IPv6Header struct for IPv6 header
 type IPv6Header struct {
 	versionTrafficClassFlowLabel [4]byte           // Version (4 bits) + Traffic class (8 bits) + Flow label (20 bits)
@@ -183,6 +166,11 @@ func NewIPv6Header(data []byte) (*IPv6Wrapper, []byte, error) {
 	w, err := h.Wrap(data[IPv6HeaderSize:])
 	if err != nil {
 		return nil, nil, err
+	}
+	if len(data) < w.headerLength {
+		return nil, nil, ErrTruncatedIPHeader
+	} else if len(data) == w.headerLength {
+		return w, []byte{}, nil
 	}
 	return w, data[w.headerLength:], err
 }
@@ -271,6 +259,9 @@ func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
 		}
 
 		eh := (*ExtensionHeader)(unsafe.Pointer(&data[0]))
+		if len(data) < int(8+eh.HeaderLength) {
+			return nil, ErrTruncatedIPHeader
+		}
 		w.ext = append(w.ext, EHWrapper{
 			HeaderType: np,
 			eh:         eh,
@@ -288,7 +279,7 @@ func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
  * TCP Header and state machine
 ******************************************************************************/
 type TCPOption struct {
-	Kind uint8
+	Kind layers.TCPOptionKind
 	Len  uint8
 	// This byte array may be shorter than 38 bytes, and cause panics if improperly accessed.
 	Data [38]byte // Max length of all TCP options is 40 bytes, so data is limited to 38 bytes.
@@ -299,7 +290,8 @@ type TCPHeader struct {
 	srcPort, dstPort [2]byte // Source and destination port
 	seqNum           [4]byte // Sequence number
 	ackNum           [4]byte // Acknowledgement number
-	dataOffsetFlags  uint8   // DataOffset, and Flags
+	dataOffset       uint8   //  DataOffset: upper 4 bits
+	flags            uint8   // Flags
 	window           [2]byte // Window
 	checksum         [2]byte // Checksum
 	urgent           [2]byte // Urgent pointer
@@ -316,27 +308,27 @@ func (h *TCPHeader) DstPort() layers.TCPPort {
 }
 
 func (h *TCPHeader) DataOffset() int {
-	return 4 * (int(h.dataOffsetFlags&0xf0) >> 4)
+	return 4 * int(h.dataOffset>>4)
 }
 
 func (h *TCPHeader) FIN() bool {
-	return (h.dataOffsetFlags & 0x01) != 0
+	return (h.flags & 0x01) != 0
 }
 
 func (h *TCPHeader) SYN() bool {
-	return (h.dataOffsetFlags & 0x02) != 0
+	return (h.flags & 0x02) != 0
 }
 
 func (h *TCPHeader) RST() bool {
-	return (h.dataOffsetFlags & 0x04) != 0
+	return (h.flags & 0x04) != 0
 }
 
 func (h *TCPHeader) PSH() bool {
-	return (h.dataOffsetFlags & 0x08) != 0
+	return (h.flags & 0x08) != 0
 }
 
 func (h *TCPHeader) ACK() bool {
-	return (h.dataOffsetFlags & 0x10) != 0
+	return (h.flags & 0x10) != 0
 }
 
 type TCPHeaderWrapper struct {
@@ -413,6 +405,7 @@ func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 			var err error
 			p.tcp, err = WrapTCP(data[EthernetHeaderSize+p.IP.HeaderLength():])
 			if err != nil {
+				sparse20.Printf("Error parsing TCP: %v for %v", err, p)
 				return Packet{}, err
 			}
 		}
@@ -461,21 +454,20 @@ func GetPackets(data []byte) ([]Packet, error) {
 	}
 	pcapSize := len(data) // Only if the data is not compressed.
 	// Check magic number?
+	if len(data) < 4 {
+		return nil, ErrTruncatedPcap
+	}
 	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
 		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
 		pcapSize *= 8
 	}
 
-	// TODO: len(data)/18 provides much better estimate of number of packets.
-	// len(data)/18 was determined by looking at bytes/packet in a few pcaps files.
-	// It seems to cause mysterious crashes in sandbox, so reverted to /1500 for now.
-	// UPDATE:
 	// This computed slice sizing alone changes the throughput in sandbox from about 640
 	// to about 820 MB/sec per instance.  No crashes after 2 hours.  GIT b46b033.
 	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
 	packets := make([]Packet, 0, pcapSize/pktSize)
 
-	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
 		p, _ := Wrap(&ci, data)
 		packets = append(packets, p)
