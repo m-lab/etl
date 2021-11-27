@@ -1,6 +1,7 @@
 package tcpip_test
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/etl/tcpip"
 )
 
@@ -111,6 +113,51 @@ func TestIPLayer(t *testing.T) {
 			}
 		}
 
+	}
+}
+
+func ProcessShortPackets(t *testing.T, data []byte) {
+	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check magic number?
+	if len(data) < 4 {
+		//	return summary, ErrTruncatedPcap
+	}
+	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
+		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
+	}
+
+	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
+		for i := 0; i < len(data); i++ {
+			tcpip.Wrap(&ci, data[:i])
+			tcpip.Wrap(&ci, data[i:])
+		}
+	}
+}
+
+func TestShortData(t *testing.T) {
+	type test struct {
+		name             string
+		fn               string
+		packets          int64
+		duration         time.Duration
+		srcIP, dstIP     string
+		srcPort, dstPort layers.TCPPort
+		TTL              uint8
+		totalPayload     int
+	}
+	tests := []test{
+		{name: "retransmits", fn: "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
+			packets: 336, duration: 15409174000, srcIP: "173.49.19.128", srcPort: 40337, dstPort: 443},
+		{name: "ipv6", fn: "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
+			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 1894, dstPort: 443},
+	}
+	for _, tt := range tests {
+		data := getTestfile(t, tt.fn)
+		ProcessShortPackets(t, data)
 	}
 }
 
