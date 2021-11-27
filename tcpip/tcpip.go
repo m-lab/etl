@@ -562,7 +562,6 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// to about 820 MB/sec per instance.  No crashes after 2 hours.  GIT b46b033.
 	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
 	summary.Details = make([]string, 0, pcapSize/pktSize)
-	packets := make([]Packet, 0, pcapSize/pktSize)
 
 	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
@@ -572,7 +571,6 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 			summary.Errors[summary.Packets] = err
 			continue
 		}
-		packets = append(packets, p)
 		summary.Add(&p)
 	}
 
@@ -580,28 +578,26 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
 		metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(summary.Packets))
 		return summary, err
-	} else if len(packets) > 0 {
+	} else if summary.Packets > 0 {
 		srcIP, _, _ := summary.GetIP()
 		// TODO - eventually we should identify key local ports, like 443 and 3001.
 		if err != nil {
 			metrics.WarningCount.WithLabelValues("pcap", "?", "ip_layer_failure").Inc()
-			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
+			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(summary.Packets))
 		} else {
-			start := packets[0].Ci.Timestamp
-			end := packets[len(packets)-1].Ci.Timestamp
-			duration := end.Sub(start)
+			duration := summary.StartTime.Sub(summary.LastTime)
 			// TODO add TCP layer, so we can label the stats based on local port value.
 			if len(srcIP) == 4 {
-				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
+				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(summary.Packets))
 				metrics.PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
 			} else {
-				metrics.PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
+				metrics.PcapPacketCount.WithLabelValues("ipv6").Observe(float64(summary.Packets))
 				metrics.PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
 			}
 		}
 	} else {
 		// No packets.
-		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
+		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(summary.Packets))
 	}
 
 	return summary, nil
