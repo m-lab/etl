@@ -375,7 +375,7 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 					log.Println("Truncated option field:", data)
 					return ErrTruncatedTCPHeader
 				}
-				w.Options = append(w.Options, opt)
+				//w.Options = append(w.Options, opt)
 				data = data[opt.Len:]
 			}
 		}
