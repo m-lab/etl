@@ -76,46 +76,40 @@ func TestIPLayer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		data := getTestfile(t, tt.fn)
-		packets, err := tcpip.GetPackets(data)
+		summary, err := tcpip.ProcessPackets("none", tt.fn, data)
 		if err != nil {
 			t.Fatal(err)
 		}
+		if len(summary.Errors) > 0 {
+			t.Error(summary.Errors)
+		}
 
-		start := packets[0].Timestamp()
-		end := packets[len(packets)-1].Timestamp()
-		duration := end.Sub(start)
+		duration := summary.LastTime.Sub(summary.StartTime)
 		if duration != tt.duration {
 			t.Errorf("%s: duration = %v, want %v", tt.name, duration, tt.duration)
 		}
-		if len(packets) != int(tt.packets) {
-			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
+		if summary.Packets != int(tt.packets) {
+			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, summary.Packets)
 		}
 
-		first := packets[0]
-		if err != nil {
-			t.Fatal(err)
+		if !summary.SrcIP.Equal(net.ParseIP(tt.srcIP)) {
+			t.Errorf("%s: srcIP = %s, want %s", tt.name, summary.SrcIP, tt.srcIP)
 		}
-		if !first.IP.SrcIP().Equal(net.ParseIP(tt.srcIP)) {
-			t.Errorf("%s: srcIP = %s, want %s", tt.name, first.IP.SrcIP(), tt.srcIP)
+		if summary.SrcPort != tt.srcPort {
+			t.Errorf("%s: srcPort = %d, want %d", tt.name, summary.SrcPort, tt.srcPort)
 		}
-		if first.TCP().SrcPort() != tt.srcPort {
-			t.Errorf("%s: srcPort = %d, want %d", tt.name, first.TCP().SrcPort(), tt.srcPort)
-		}
-		if first.TCP().DstPort() != tt.dstPort {
-			t.Errorf("%s: dstPort = %d, want %d", tt.name, first.TCP().DstPort(), tt.dstPort)
+		if summary.DstPort != tt.dstPort {
+			t.Errorf("%s: dstPort = %d, want %d", tt.name, summary.DstPort, tt.dstPort)
 		}
 		// Now check against gopacket values, too.
-		if src, dst, tcp, err := first.GetTCP(); err != nil {
+		if tcp, err := summary.GetGopacketFirstTCP(); err != nil {
 			t.Error(err)
 		} else {
-			if first.TCP().SrcPort() != src {
-				t.Errorf("%s: srcPort = %0.2x, want %0.2x", tt.name, first.TCP().SrcPort(), src)
-				t.Errorf("%+v", first.Data)
-				t.Errorf("\nfast:%+v\nslow:%+v\n", first.TCP(), tcp)
-				t.Error("IP HeaderLength:", first.IP.HeaderLength())
+			if summary.SrcPort != tcp.SrcPort {
+				t.Errorf("%s: srcPort = %0.2x, want %0.2x", tt.name, summary.SrcPort, tcp.SrcPort)
 			}
-			if first.TCP().DstPort() != dst {
-				t.Errorf("%s: dstPort = %d(%.2x), want %.2x", tt.name, first.TCP().DstPort(), first.TCP().DstPort(), dst)
+			if summary.DstPort != tcp.DstPort {
+				t.Errorf("%s: dstPort = %d(%.2x), want %.2x", tt.name, summary.DstPort, summary.DstPort, tcp.DstPort)
 			}
 		}
 
@@ -169,13 +163,13 @@ func TestShortData(t *testing.T) {
 
 func TestPCAPGarbage(t *testing.T) {
 	data := []byte{0xd4, 0xc3, 0xb2, 0xa1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
-	_, err := tcpip.GetPackets(data)
+	_, err := tcpip.ProcessPackets("none", "garbage", data)
 	if err != io.ErrUnexpectedEOF {
 		t.Fatal(err)
 	}
 
 	data = append(data, data...)
-	_, err = tcpip.GetPackets(data)
+	_, err = tcpip.ProcessPackets("none", "garbage", data)
 	if err == nil || !strings.Contains(err.Error(), "Unknown major") {
 		t.Fatal(err)
 	}
@@ -229,22 +223,18 @@ func BenchmarkGetPackets(b *testing.B) {
 		for pb.Next() {
 			test := sources[i%len(sources)]
 			i++
-			pkts, err := tcpip.GetPackets(test.data)
+			summary, err := tcpip.ProcessPackets("foo", "bar", test.data)
 			if err != nil {
 				b.Fatal(err)
 			}
-			total := 0
-			for i := range pkts {
-				total += pkts[i].TCPLength()
+
+			if int(summary.PayloadBytes) != test.total {
+				b.Fatalf("total = %d, want %d", summary.PayloadBytes, test.total)
 			}
-			if total != test.total {
-				b.Fatalf("total = %d, want %d", total, test.total)
+			if summary.Packets != test.numPkts {
+				b.Errorf("expected %d packets, got %d", test.numPkts, summary.Packets)
 			}
-			if len(pkts) != test.numPkts {
-				b.Errorf("expected %d packets, got %d", test.numPkts, len(pkts))
-			}
-			pktCount += len(pkts)
+			pktCount += summary.Packets
 		}
 	})
-	log.Println("BenchmarkGetPackets:", b.N, "iterations", pktCount, "packets")
 }
