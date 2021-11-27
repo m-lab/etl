@@ -40,6 +40,7 @@ var (
 	ErrTruncatedIPHeader       = fmt.Errorf("truncated IP header")
 	ErrTruncatedTCPHeader      = fmt.Errorf("truncated TCP header")
 	ErrUnknownEtherType        = fmt.Errorf("unknown Ethernet type")
+	ErrMalformedTCPOption      = fmt.Errorf("malformed TCP option")
 )
 
 /******************************************************************************
@@ -137,8 +138,6 @@ type EHWrapper struct {
 	HeaderType layers.IPProtocol // Type of THIS header, not the next header.
 	eh         *ExtensionHeader
 	data       []byte // All the options and padding, including the first 6 bytes.
-	// TODO - this does not need to be stored, but it is convenient for now.
-	//	payload []byte // Any additional data remaining after the extension header.
 }
 
 // IPv6Header struct for IPv6 header
@@ -340,16 +339,16 @@ func (h *TCPHeader) ACK() bool {
 }
 
 type TCPHeaderWrapper struct {
-	TCP      *TCPHeader
-	xOptions []TCPOption
+	TCP     *TCPHeader
+	Options []TCPOption
 }
 
 func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 	if len(data) == 0 {
-		w.xOptions = make([]TCPOption, 0, 0)
+		w.Options = make([]TCPOption, 0, 0)
 		return nil
 	}
-	w.xOptions = make([]TCPOption, 0, 2)
+	w.Options = make([]TCPOption, 0, 1+len(data)/4)
 	// TODO - should we omit the empty option padding?
 	for len(data) > 0 {
 		overlay := (*tcpOption)(unsafe.Pointer(&data[0]))
@@ -361,6 +360,10 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 			// No need to save the option.
 			data = data[1:]
 		default:
+			if overlay.len > 38 {
+				log.Println("Malformed option field", overlay.kind, overlay.len)
+				return ErrMalformedTCPOption
+			}
 			if len(data) < 2 || len(data) < int(overlay.len) {
 				log.Println("Truncated option field:", data)
 				return ErrTruncatedTCPHeader
@@ -388,7 +391,7 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 					log.Println("Truncated option field:", data)
 					return ErrTruncatedTCPHeader
 				}
-				w.xOptions = append(w.xOptions, opt)
+				w.Options = append(w.Options, opt)
 				data = data[opt.Len:]
 			}
 		}
@@ -405,8 +408,8 @@ func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
 		return nil, ErrTruncatedTCPHeader
 	}
 	w := TCPHeaderWrapper{
-		TCP:      tcp,
-		xOptions: nil,
+		TCP:     tcp,
+		Options: nil,
 	}
 	err := w.parseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
 	return &w, err
@@ -576,7 +579,7 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
 	summary.Details = make([]string, 0, pcapSize/pktSize)
 
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
 		p, err := Wrap(&ci, data)
 		if err != nil {
