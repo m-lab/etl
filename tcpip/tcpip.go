@@ -339,6 +339,7 @@ type TCPHeaderWrapper struct {
 }
 
 func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
+	return nil
 	if len(data) == 0 {
 		w.Options = make([]*TCPOption, 0, 0)
 		return nil
