@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -27,16 +28,177 @@ models for:
 
 */
 
-var info = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
-var sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
-var sparse = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
-var sparse2 = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
+var (
+	info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
+	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
+	sparse       = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
+	sparse2      = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
 
-var ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
-var ErrInvalidDelta = fmt.Errorf("invalid delta")
-var ErrInvalidSackBlock = fmt.Errorf("invalid sack block")
-var ErrLateSackBlock = fmt.Errorf("sack block to left of ack")
-var ErrNoIPLayer = fmt.Errorf("no IP layer")
+	ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
+	ErrInvalidDelta          = fmt.Errorf("invalid delta")
+	ErrInvalidSackBlock      = fmt.Errorf("invalid sack block")
+	ErrLateSackBlock         = fmt.Errorf("sack block to left of ack")
+	ErrNoIPLayer             = fmt.Errorf("no IP layer")
+
+	ErrNotTCP             = fmt.Errorf("not a TCP packet")
+	ErrTruncatedTCPHeader = fmt.Errorf("truncated TCP header")
+)
+
+/******************************************************************************
+ * TCP Header and state machine
+******************************************************************************/
+type TCPHeader struct {
+	srcPort, dstPort [2]byte // Source and destination port
+	seqNum           [4]byte // Sequence number
+	ackNum           [4]byte // Acknowledgement number
+	dataOffset       uint8   //  DataOffset: upper 4 bits
+	flags            uint8   // Flags
+	window           [2]byte // Window
+	checksum         [2]byte // Checksum
+	urgent           [2]byte // Urgent pointer
+}
+
+var TCPHeaderSize = int(unsafe.Sizeof(TCPHeader{}))
+
+func (h *TCPHeader) SrcPort() layers.TCPPort {
+	return layers.TCPPort(binary.BigEndian.Uint16(h.srcPort[:]))
+}
+
+func (h *TCPHeader) DstPort() layers.TCPPort {
+	return layers.TCPPort(binary.BigEndian.Uint16(h.dstPort[:]))
+}
+
+func (h *TCPHeader) DataOffset() int {
+	return 4 * int(h.dataOffset>>4)
+}
+
+func (h *TCPHeader) Window() uint16 {
+	return binary.BigEndian.Uint16(h.window[:])
+}
+
+func (h *TCPHeader) Seq() uint32 {
+	return binary.BigEndian.Uint32(h.seqNum[:])
+}
+
+func (h *TCPHeader) Ack() uint32 {
+	return binary.BigEndian.Uint32(h.ackNum[:])
+}
+
+func (h *TCPHeader) FIN() bool {
+	return (h.flags & 0x01) != 0
+}
+
+func (h *TCPHeader) SYN() bool {
+	return (h.flags & 0x02) != 0
+}
+
+func (h *TCPHeader) RST() bool {
+	return (h.flags & 0x04) != 0
+}
+
+func (h *TCPHeader) PSH() bool {
+	return (h.flags & 0x08) != 0
+}
+
+func (h *TCPHeader) ACK() bool {
+	return (h.flags & 0x10) != 0
+}
+
+func (h *TCPHeader) URG() bool {
+	return (h.flags & 0x20) != 0
+}
+
+func (h *TCPHeader) ECE() bool {
+	return (h.flags & 0x40) != 0
+}
+
+func (h *TCPHeader) CWR() bool {
+	return (h.flags & 0x80) != 0
+
+type TCPOption struct {
+	layers.TCPOption
+}
+
+type tcpOption struct {
+	kind layers.TCPOptionKind
+	len  uint8
+	data [38]byte
+}
+
+type TCPHeaderWrapper struct {
+	*TCPHeader
+	Options []TCPOption
+}
+
+func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
+	if len(data) == 0 {
+		w.Options = make([]TCPOption, 0, 0)
+		return nil
+	}
+	w.Options = make([]TCPOption, 0, 2)
+	// TODO - should we omit the empty option padding?
+	for len(data) > 0 {
+		overlay := (*tcpOption)(unsafe.Pointer(&data[0]))
+		switch overlay.kind {
+		case layers.TCPOptionKindEndList:
+			return nil
+		case layers.TCPOptionKindNop:
+			// For NoOperation, just advance the pointer.
+			// No need to save the option.
+			data = data[1:]
+		default:
+			if len(data) < 2 || len(data) < int(overlay.len) {
+				log.Println("Truncated option field:", data)
+				return ErrTruncatedTCPHeader
+			}
+			// copy to a persistent Option struct
+			opt := TCPOption{
+				layers.TCPOption{
+					OptionType:   overlay.kind,
+					OptionLength: overlay.len,
+					OptionData:   make([]byte, overlay.len-2),
+				},
+			}
+			copy(opt.OptionData, data[2:overlay.len])
+			switch opt.OptionType {
+			case layers.TCPOptionKindMSS:
+				fallthrough
+			case layers.TCPOptionKindTimestamps:
+				fallthrough
+			case layers.TCPOptionKindWindowScale:
+				fallthrough
+			case layers.TCPOptionKindSACKPermitted:
+				fallthrough
+			case layers.TCPOptionKindSACK:
+				fallthrough
+			default:
+				if len(data) < int(opt.OptionLength) {
+					log.Println("Truncated option field:", data)
+					return ErrTruncatedTCPHeader
+				}
+				w.Options = append(w.Options, opt)
+				data = data[opt.OptionLength:]
+			}
+		}
+	}
+	return nil
+}
+
+func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
+	if len(data) < TCPHeaderSize {
+		return nil, ErrTruncatedTCPHeader
+	}
+	tcp := (*TCPHeader)(unsafe.Pointer(&data[0]))
+	if tcp.DataOffset() > len(data) {
+		return nil, ErrTruncatedTCPHeader
+	}
+	w := TCPHeaderWrapper{
+		TCPHeader: tcp,
+		Options:   nil,
+	}
+	err := w.parseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
+	return &w, err
+}
 
 type TcpStats struct {
 	Packets   int64
@@ -385,9 +547,9 @@ func (jt *JitterTracker) Delay() float64 {
 	return jt.ValOffsetSum/float64(jt.ValCount) - jt.EchoOffsetSum/float64(jt.EchoCount)
 }
 
-// state keeps track of the TCP state of one side of a connection.
+// State keeps track of the TCP State of one side of a connection.
 // TODO - add histograms for Ack inter-arrival time.
-type state struct {
+type State struct {
 	// These should be static characteristics
 	StartTime   time.Time // Convenience, for computing relative time for all other packets.
 	SrcIP       net.IP
@@ -410,12 +572,12 @@ type state struct {
 	Jitter JitterTracker
 }
 
-func NewState() *state {
-	return &state{SeqTracker: NewTracker(),
+func NewState() *State {
+	return &State{SeqTracker: NewTracker(),
 		Stats: StatsWrapper{TcpStats: TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
-func (s *state) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt layers.TCPOption) {
+func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt layers.TCPOption) {
 	// These are arbitrary time offsets, but we will be
 	TSVal := binary.BigEndian.Uint32(opt.OptionData[0:4])
 	TSEcr := binary.BigEndian.Uint32(opt.OptionData[4:8])
@@ -438,7 +600,7 @@ func (s *state) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing b
 
 // Option handles all options, both incoming and outgoing.
 // The relTime value is used for Timestamp analysis.
-func (s *state) Option(port layers.TCPPort, retransmit bool, pTime time.Time, opt layers.TCPOption) {
+func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, opt layers.TCPOption) {
 	// TODO test case for wrong index.
 	optionType := opt.OptionType
 	if optionType > 15 {
@@ -477,18 +639,20 @@ func (s *state) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 	}
 }
 
-func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *layers.TCP, ci gopacket.CaptureInfo) {
-	dataLength := tcpLength - uint16(4*tcp.DataOffset)
+func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderWrapper, ci gopacket.CaptureInfo) {
+	options := tcp.Options
+
+	dataLength := tcpLength - uint16(tcp.DataOffset())
 	pTime := ci.Timestamp
 	var retransmit bool
 	if s.SrcIP.Equal(srcIP) {
-		if s.SrcPort != tcp.SrcPort {
+		if s.SrcPort != tcp.SrcPort() {
 			s.Stats.SrcPortErrors++
 		}
 		window := int64(s.Window) << s.WindowScale
 		//var inflight int32
 		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
-		if _, retransmit = s.SeqTracker.Seq(count, pTime, tcp.Seq, dataLength, tcp.SYN || tcp.FIN, &s.Stats); retransmit {
+		if _, retransmit = s.SeqTracker.Seq(count, pTime, tcp.Seq(), dataLength, tcp.SYN() || tcp.FIN(), &s.Stats); retransmit {
 			// TODO
 		}
 		// TODO handle error here?
@@ -496,7 +660,7 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 		if err != nil {
 			log.Println("remaining diff err", s.Limit, s.SeqTracker.SendNext())
 		}
-		if !tcp.SYN {
+		if !tcp.SYN() {
 			if remaining < 0 {
 				// TODO: This is currently triggering more often than expected.
 				// The stack should not send data beyond the window limit, which would have been
@@ -510,26 +674,26 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 			}
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
-		if tcp.ECE {
+		if tcp.ECE() {
 			s.Stats.ECECount++
 		}
 		//log.Printf("%5d: %2d.%6d %9d %20v %5v inflight: %6d / %6d %6d\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, retransmit, inflight, window, remaining)
 	} else if s.SrcIP.Equal(dstIP) {
-		if s.SrcPort != tcp.DstPort {
+		if s.SrcPort != tcp.DstPort() {
 			s.Stats.DstPortErrors++
 		}
 		// Process ACKs and SACKs from the other direction
 		// Handle all options, including SACKs from other direction
 		// TODO - should some of these be associated with the other direction?
-		for i := 0; i < len(tcp.Options); i++ {
-			s.Option(tcp.SrcPort, retransmit, pTime, tcp.Options[i])
+		for i := 0; i < len(options); i++ {
+			s.Option(tcp.SrcPort(), retransmit, pTime, options[i].TCPOption)
 		}
-		if s.Window != tcp.Window {
+		if s.Window != tcp.Window() {
 			s.Stats.WindowChanges++
-			s.Window = tcp.Window
+			s.Window = tcp.Window()
 		}
-		if tcp.ACK {
-			_, delay := s.SeqTracker.Ack(count, pTime, tcp.Ack, dataLength > 0, &s.Stats) // TODO
+		if tcp.ACK() {
+			_, delay := s.SeqTracker.Ack(count, pTime, tcp.Ack(), dataLength > 0, &s.Stats) // TODO
 			if delay > 0 {
 				//xxx BUG in sent?
 				//	log.Printf("%5d: %2d.%6d %9d %20v Packet: %5d Delay: %8v\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, pn, delay)
@@ -538,19 +702,19 @@ func (s *state) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *la
 		}
 	}
 	// Handle options
-	for _, opt := range tcp.Options {
-		s.Option(tcp.SrcPort, retransmit, pTime, opt)
+	for _, opt := range options {
+		s.Option(tcp.SrcPort(), retransmit, pTime, opt.TCPOption)
 	}
 
 }
 
-func (s state) String() string {
+func (s State) String() string {
 	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.Stats.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Stats.Sacks, s.Stats.RetransmitPackets, s.Stats.ECECount)
 }
 
 type Parser struct {
-	LeftState  *state // This is the state associated with the source of the first packet
-	RightState *state // This is the state associated with the destination of the first packet
+	LeftState  *State // This is the state associated with the source of the first packet
+	RightState *State // This is the state associated with the destination of the first packet
 }
 
 func NewParser() *Parser {
@@ -561,17 +725,17 @@ func NewParser() *Parser {
 	}
 }
 
-func (p *Parser) tcpLayer(srcIP, dstIP net.IP, tcp *layers.TCP, ci gopacket.CaptureInfo, tcpLength uint16, alpha *AlphaFields) error {
+func (p *Parser) tcpLayer(srcIP, dstIP net.IP, tcp *TCPHeaderWrapper, ci gopacket.CaptureInfo, tcpLength uint16, alpha *AlphaFields) error {
 	// Special case handling for first two packets.
 	switch alpha.Packets {
 	case 0:
 		p.LeftState.StartTime = ci.Timestamp
 		p.RightState.StartTime = ci.Timestamp
-		p.LeftState.SrcPort = tcp.SrcPort
-		p.RightState.SrcPort = tcp.DstPort
+		p.LeftState.SrcPort = tcp.SrcPort()
+		p.RightState.SrcPort = tcp.DstPort()
 	case 1:
 		// TODO - consider checking against IP address, too.
-		if p.RightState.SrcPort != tcp.SrcPort || !tcp.ACK {
+		if p.RightState.SrcPort != tcp.SrcPort() || !tcp.ACK() {
 			// Use log for advisory/info logging.
 			log.Println("Unexpected second packet", p.LeftState, p.RightState, tcp.DstPort, tcp.ACK)
 		}
@@ -582,8 +746,8 @@ func (p *Parser) tcpLayer(srcIP, dstIP net.IP, tcp *layers.TCP, ci gopacket.Capt
 	p.LeftState.Update(int(alpha.Packets), srcIP, dstIP, tcpLength, tcp, ci)
 	p.RightState.Update(int(alpha.Packets), srcIP, dstIP, tcpLength, tcp, ci)
 
-	if tcp.SYN {
-		if tcp.ACK {
+	if tcp.SYN() {
+		if tcp.ACK() {
 			alpha.SynAckTime = ci.Timestamp
 			alpha.SynAckPacket = alpha.Packets
 		} else {
