@@ -290,7 +290,7 @@ type Packet struct {
 }
 
 func (p *Packet) TCP() *tcp.TCPHeader {
-	return p.tcp.TCP
+	return p.tcp.TCPHeader
 }
 
 // Wrap creates a wrapper with partially decoded headers.
@@ -369,6 +369,8 @@ type Summary struct {
 func (s *Summary) Add(p *Packet) {
 	if s.Packets == 0 {
 		s.FirstPacket = p.Data[:]
+		s.LeftState = tcp.NewState(p.ip.SrcIP())
+		s.RightState = tcp.NewState(p.ip.DstIP())
 	}
 	if p.err != nil {
 		s.Errors[s.Packets] = p.err
@@ -383,7 +385,8 @@ func (s *Summary) Add(p *Packet) {
 		s.LastTime = p.Ci.Timestamp
 		s.PayloadBytes += uint64(p.TCPLength())
 	}
-	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.TCP(), p.Ci)
+	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.tcp, p.Ci)
+	s.RightState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.tcp, p.Ci)
 	s.Packets++
 }
 
@@ -397,8 +400,6 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	summary := Summary{
 		OptionCounts: make(map[layers.TCPOptionKind]int),
 		Errors:       make(map[int]error, 1),
-		LeftState:    tcp.NewState(),
-		RightState:   tcp.NewState(),
 	}
 
 	pcap, err := pcapgo.NewReader(bytes.NewReader(data))

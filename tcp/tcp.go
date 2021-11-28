@@ -9,13 +9,11 @@ import (
 	"math"
 	"net"
 	"os"
-	"strings"
 	"time"
 	"unsafe"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/go/logx"
 )
 
@@ -114,6 +112,7 @@ func (h *TCPHeader) ECE() bool {
 
 func (h *TCPHeader) CWR() bool {
 	return (h.flags & 0x80) != 0
+}
 
 type TCPOption struct {
 	layers.TCPOption
@@ -572,8 +571,8 @@ type State struct {
 	Jitter JitterTracker
 }
 
-func NewState() *State {
-	return &State{SeqTracker: NewTracker(),
+func NewState(srcIP net.IP) *State {
+	return &State{SrcIP: srcIP, SeqTracker: NewTracker(),
 		Stats: StatsWrapper{TcpStats: TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
@@ -710,211 +709,4 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 
 func (s State) String() string {
 	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.Stats.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Stats.Sacks, s.Stats.RetransmitPackets, s.Stats.ECECount)
-}
-
-type Parser struct {
-	LeftState  *State // This is the state associated with the source of the first packet
-	RightState *State // This is the state associated with the destination of the first packet
-}
-
-func NewParser() *Parser {
-	return &Parser{
-		// TODO Consider initializing these when the Syn and SynAck are seen.
-		LeftState:  NewState(),
-		RightState: NewState(),
-	}
-}
-
-func (p *Parser) tcpLayer(srcIP, dstIP net.IP, tcp *TCPHeaderWrapper, ci gopacket.CaptureInfo, tcpLength uint16, alpha *AlphaFields) error {
-	// Special case handling for first two packets.
-	switch alpha.Packets {
-	case 0:
-		p.LeftState.StartTime = ci.Timestamp
-		p.RightState.StartTime = ci.Timestamp
-		p.LeftState.SrcPort = tcp.SrcPort()
-		p.RightState.SrcPort = tcp.DstPort()
-	case 1:
-		// TODO - consider checking against IP address, too.
-		if p.RightState.SrcPort != tcp.SrcPort() || !tcp.ACK() {
-			// Use log for advisory/info logging.
-			log.Println("Unexpected second packet", p.LeftState, p.RightState, tcp.DstPort, tcp.ACK)
-		}
-	default:
-	}
-
-	// Update both state structs.
-	p.LeftState.Update(int(alpha.Packets), srcIP, dstIP, tcpLength, tcp, ci)
-	p.RightState.Update(int(alpha.Packets), srcIP, dstIP, tcpLength, tcp, ci)
-
-	if tcp.SYN() {
-		if tcp.ACK() {
-			alpha.SynAckTime = ci.Timestamp
-			alpha.SynAckPacket = alpha.Packets
-		} else {
-			alpha.SynTime = ci.Timestamp
-			alpha.SynPacket = alpha.Packets
-		}
-	}
-	return nil
-}
-
-func extractIPFields(packet gopacket.Packet) (srcIP, dstIP net.IP, TTL uint8, tcpLength uint16, err error) {
-	if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv4)
-		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
-		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
-	} else if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv6)
-		// In IPv6, the Length field is the payload length.
-		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
-	} else {
-		return nil, nil, 0, 0, ErrNoIPLayer
-	}
-}
-
-type packet struct {
-	ci  gopacket.CaptureInfo
-	pkt gopacket.Packet
-	err error
-}
-
-type packetSummary struct {
-	srcIP, dstIP net.IP
-	tcpLength    uint16
-	pTime        time.Time
-	tsVal        uint32
-	tsEcr        uint32
-}
-
-func (p *packet) GetTimestamps() (summary packetSummary, err error) {
-	srcIP, dstIP, _, tcpLength, err := extractIPFields(p.pkt)
-	summary = packetSummary{srcIP, dstIP, tcpLength, p.ci.Timestamp, 0, 0}
-	if err != nil {
-		return
-	}
-
-	err = fmt.Errorf("No timestamp field")
-	if tcpLayer := p.pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-		tcp, _ := tcpLayer.(*layers.TCP)
-		for _, opt := range tcp.Options {
-			if opt.OptionType == layers.TCPOptionKindTimestamps {
-				summary.tsVal = binary.BigEndian.Uint32(opt.OptionData[0:4])
-				summary.tsEcr = binary.BigEndian.Uint32(opt.OptionData[4:8])
-				err = nil
-				break
-			}
-		}
-	}
-	return
-}
-
-// Parse parses an entire pcap file.
-func (p *Parser) Parse(data []byte) (*AlphaFields, error) {
-	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
-	if err != nil {
-		info.Print(err)
-		return nil, err
-	}
-
-	packets := make([]*packet, 0, 1000)
-
-	start := time.Now()
-	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
-		// Decode a packet
-		pkt := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
-			Lazy:                     true,
-			NoCopy:                   true,
-			SkipDecodeRecovery:       true,
-			DecodeStreamsAsDatagrams: false,
-		})
-		packets = append(packets, &packet{ci: ci, pkt: pkt, err: err})
-	}
-	mid := time.Now()
-
-	final := make(map[string]packetSummary, 2)
-
-	//last := len(packets) - 1
-	for i := len(packets) - 1; i >= 0; i-- {
-		summary, err := packets[i].GetTimestamps()
-		if err == nil {
-			if _, ok := final[summary.srcIP.String()]; !ok {
-				final[summary.srcIP.String()] = summary
-				if len(final) == 2 {
-					log.Println("Found two IPs", final)
-					break
-				}
-			}
-		}
-		if len(packets)-i > 100 {
-			break // Give up if we can't find two IPs in the last 100 packets.
-		}
-	}
-
-	// This is used to keep track of some of the TCP state.
-	// TODO replace this with local variables, and copy at the end.
-	alpha := AlphaFields{}
-	//var firstTimestamp time.Time
-	for _, rec := range packets {
-		packet := rec.pkt
-		if packet.ErrorLayer() != nil {
-			sparse.Printf("Error decoding packet: %v", packet.ErrorLayer().Error()) // Somewhat VERBOSE
-			continue
-		}
-
-		srcIP, dstIP, ttl, tcpLength, err := extractIPFields(packet)
-		if err != nil {
-			return nil, err
-		}
-
-		switch alpha.Packets {
-		case 0:
-			//firstTimestamp = ci.Timestamp
-			p.LeftState.SrcIP = srcIP
-			p.RightState.SrcIP = dstIP
-			p.LeftState.TTL = ttl
-		case 1:
-			p.RightState.TTL = ttl
-			fallthrough
-		default:
-			//			log.Println(ci.Timestamp.Sub(firstTimestamp), srcIP)
-
-			if p.LeftState.SrcIP.Equal(srcIP) {
-				if !p.RightState.SrcIP.Equal(dstIP) {
-					alpha.IPAddrErrors++
-				}
-				if p.LeftState.TTL != ttl {
-					p.LeftState.Stats.TTLChanges++
-				}
-			} else if p.RightState.SrcIP.Equal(srcIP) {
-				if !p.LeftState.SrcIP.Equal(dstIP) {
-					alpha.IPAddrErrors++
-				}
-				if p.RightState.TTL != ttl {
-					p.RightState.Stats.TTLChanges++
-				}
-			} else {
-				alpha.IPAddrErrors++
-			}
-		}
-
-		// Get the TCP layer from this packet
-		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-			tcp, _ := tcpLayer.(*layers.TCP)
-			p.tcpLayer(srcIP, dstIP, tcp, rec.ci, tcpLength, &alpha)
-		} else {
-			alpha.WithoutTCPLayer++
-		}
-		alpha.Packets++
-	}
-	end := time.Now()
-
-	log.Println(mid.Sub(start), end.Sub(mid))
-
-	info.Printf("%20s: %v", p.LeftState.SrcPort, p.LeftState.SeqTracker.Summary())
-	info.Printf("%20s: %v", p.RightState.SrcPort, p.RightState.SeqTracker.Summary())
-
-	alpha.LeftStats = p.LeftState.Stats.TcpStats
-	alpha.RightStats = p.RightState.Stats.TcpStats
-
-	return &alpha, nil
 }
