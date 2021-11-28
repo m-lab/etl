@@ -2,7 +2,6 @@ package parser_test
 
 import (
 	"io/ioutil"
-	"os"
 	"path"
 	"strings"
 	"testing"
@@ -12,7 +11,6 @@ import (
 	"github.com/go-test/deep"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
-	"github.com/m-lab/etl/tcpip"
 	"github.com/m-lab/go/rtx"
 )
 
@@ -132,163 +130,4 @@ func TestPCAPParser_GetUUID(t *testing.T) {
 			}
 		})
 	}
-}
-
-// func TestIPLayer(t *testing.T) {
-// 	type test struct {
-// 		name         string
-// 		fn           string
-// 		packets      int64
-// 		duration     time.Duration
-// 		srcIP, dstIP string
-// 		TTL          uint8
-// 	}
-// 	tests := []test{
-// 		{name: "retransmits", fn: "testdata/PCAP/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
-// 			packets: 336, duration: 15409174000, srcIP: "173.49.19.128"},
-// 		{name: "ipv6", fn: "testdata/PCAP/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-// 			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d"},
-// 		{name: "protocolErrors2", fn: "testdata/PCAP/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
-// 			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d"},
-// 	}
-// 	for _, tt := range tests {
-// 		f, err := os.Open(tt.fn)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		data, err := ioutil.ReadAll(f)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		packets, err := parser.GetPackets(data)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		start := packets[0].Ci.Timestamp
-// 		end := packets[len(packets)-1].Ci.Timestamp
-// 		duration := end.Sub(start)
-// 		if duration != tt.duration {
-// 			t.Errorf("%s: duration = %v, want %v", tt.name, duration, tt.duration)
-// 		}
-// 		if len(packets) != int(tt.packets) {
-// 			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
-// 		}
-// 		srcIP, _, _, _, err := packets[0].GetIP()
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		if srcIP.String() != tt.srcIP {
-// 			t.Errorf("%s: expected srcIP %s, got %s", tt.name, tt.srcIP, srcIP.String())
-// 		}
-// 	}
-// }
-
-// func TestPCAPGarbage(t *testing.T) {
-// 	data := []byte{0xd4, 0xc3, 0xb2, 0xa1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
-// 	_, err := parser.GetPackets(data)
-// 	if err != io.ErrUnexpectedEOF {
-// 		t.Fatal(err)
-// 	}
-
-// 	data = append(data, data...)
-// 	_, err = parser.GetPackets(data)
-// 	if err == nil || !strings.Contains(err.Error(), "Unknown major") {
-// 		t.Fatal(err)
-// 	}
-// }
-
-func getTestfileForBenchmark(b *testing.B, name string) []byte {
-	f, err := os.Open(path.Join(`testdata/PCAP/`, name))
-	if err != nil {
-		b.Fatal(err)
-	}
-	data, err := ioutil.ReadAll(f)
-	if err != nil {
-		b.Fatal(err)
-	}
-	return data
-}
-
-// Original single file RunParallel:
-// Just packet decoding: BenchmarkGetPackets-8   	    8678	    128426 ns/op	  165146 B/op	     381 allocs/op
-// With IP decoding:     BenchmarkGetPackets-8   	    4279	    285547 ns/op	  376125 B/op	    1729 allocs/op
-
-// Enhanced RunParallel: BenchmarkGetPackets-8   	    2311	    514898 ns/op	 1181138 B/op	    1886 allocs/op
-// Estimate num packets: BenchmarkGetPackets-8   	    3688	    329539 ns/op	  571419 B/op	    1888 allocs/op
-func BenchmarkGetPackets(b *testing.B) {
-	type tt struct {
-		data    []byte
-		numPkts int
-	}
-	tests := []tt{
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336},
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15},
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180},
-	}
-	b.ResetTimer()
-
-	i := 0
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			test := tests[i%len(tests)]
-			i++
-			pkts, err := tcpip.GetPackets(test.data)
-			if err != nil {
-				b.Fatal(err)
-			}
-			if len(pkts) != test.numPkts {
-				b.Errorf("expected %d packets, got %d", test.numPkts, len(pkts))
-			}
-		}
-	})
-}
-
-// cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
-// Before packet count opt:    128	   8052268 ns/op	 219.25 MB/s	     36522 packets/op	28021501 B/op	   36747 allocs/op
-// After packet count opt:     234	   5896273 ns/op	 299.42 MB/s	     37099 packets/op	11927524 B/op	   37314 allocs/op
-//							   235	   5228191 ns/op	 337.68 MB/s	     37436 packets/op	12051418 B/op	   37652 allocs/op
-//							   236	   5022948 ns/op	 351.48 MB/s	     36786 packets/op	11827143 B/op	   37000 allocs/op
-// Approximately 300 bytes/packet on average.
-func BenchmarkGetPackets2(b *testing.B) {
-	type tt struct {
-		data    []byte
-		numPkts int
-	}
-	tests := []tt{
-		// Approximately 220K packets, so this is about 140nsec/packet, and about 100 bytes/packet allocated,
-		// which is roughly the footprint of the packets themselves.
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336},
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15},
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180},
-		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797},
-		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172},
-		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097},
-	}
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	b.ReportMetric(220000, "packets/op")
-
-	i := 0
-
-	numPkts := 0
-	ops := 0
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			test := tests[i%len(tests)]
-			ops++
-			numPkts += test.numPkts
-			i++
-			pkts, err := tcpip.GetPackets(test.data)
-			if err != nil {
-				b.Fatal(err)
-			}
-			if len(pkts) != test.numPkts {
-				b.Errorf("expected %d packets, got %d", test.numPkts, len(pkts))
-			}
-			b.SetBytes(int64(len(test.data)))
-		}
-	})
-	b.Log("total packets", numPkts, "total ops", ops)
-	b.ReportMetric(float64(numPkts/ops), "packets/op")
 }

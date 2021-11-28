@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/etl/tcpip"
@@ -43,6 +44,50 @@ func getTestfile(t *testing.T, name string) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+// SlowGetIP decodes the IP layers and returns some basic information.
+// It is a bit slow and does memory allocation.
+func SlowGetIP(p *tcpip.Packet) (net.IP, net.IP, uint8, uint16, error) {
+	// Decode a packet.
+	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		Lazy:                     true,
+		NoCopy:                   true,
+		SkipDecodeRecovery:       true,
+		DecodeStreamsAsDatagrams: false,
+	})
+
+	if ipLayer := pkt.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv4)
+		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
+		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
+	} else if ipLayer := pkt.Layer(layers.LayerTypeIPv6); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv6)
+		// In IPv6, the Length field is the payload length.
+		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
+	} else {
+		return nil, nil, 0, 0, tcpip.ErrNoIPLayer
+	}
+}
+
+// GetGopacketFirstTCP uses gopacket to decode the  TCP layer for the first packet.
+// It is a bit slow and does memory allocation.
+func GetGopacketFirstTCP(s *tcpip.Summary) (*layers.TCP, error) {
+	// Decode a packet.
+	pkt := gopacket.NewPacket(s.FirstPacket, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		Lazy:                     true,
+		NoCopy:                   true,
+		SkipDecodeRecovery:       true,
+		DecodeStreamsAsDatagrams: false,
+	})
+
+	if tcpLayer := pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp, _ := tcpLayer.(*layers.TCP)
+		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
+		return tcp, nil
+	} else {
+		return nil, tcpip.ErrNoTCPLayer
+	}
 }
 
 func TestIPLayer(t *testing.T) {
@@ -102,7 +147,7 @@ func TestIPLayer(t *testing.T) {
 			t.Errorf("%s: dstPort = %d, want %d", tt.name, summary.DstPort, tt.dstPort)
 		}
 		// Now check against gopacket values, too.
-		if tcp, err := summary.GetGopacketFirstTCP(); err != nil {
+		if tcp, err := GetGopacketFirstTCP(&summary); err != nil {
 			t.Error(err)
 		} else {
 			if summary.SrcPort != tcp.SrcPort {
@@ -237,4 +282,60 @@ func BenchmarkGetPackets(b *testing.B) {
 			pktCount += summary.Packets
 		}
 	})
+}
+
+// cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
+// Before packet count opt:    128	   8052268 ns/op	 219.25 MB/s	     36522 packets/op	28021501 B/op	   36747 allocs/op
+// After packet count opt:     234	   5896273 ns/op	 299.42 MB/s	     37099 packets/op	11927524 B/op	   37314 allocs/op
+//							   235	   5228191 ns/op	 337.68 MB/s	     37436 packets/op	12051418 B/op	   37652 allocs/op
+//							   236	   5022948 ns/op	 351.48 MB/s	     36786 packets/op	11827143 B/op	   37000 allocs/op
+//   ...                       159	   9528634 ns/op	 185.28 MB/s	     72868 packets/op	 9735622 B/op	  174743 allocs/op
+// Approximately 300 bytes/packet on average.
+func BenchmarkProcessPackets2(b *testing.B) {
+	type tt struct {
+		data           []byte
+		numPkts        int
+		ipPayloadBytes int
+	}
+	tests := []tt{
+		// Approximately 220K packets, so this is about 140nsec/packet, and about 100 bytes/packet allocated,
+		// which is roughly the footprint of the packets themselves.
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797, 239251626},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172, 158096007},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097, 126523401},
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	b.ReportMetric(220000, "packets/op")
+
+	i := 0
+
+	numPkts := 0
+	ops := 0
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			test := tests[i%len(tests)]
+			ops++
+			numPkts += test.numPkts
+			i++
+			summary, err := tcpip.ProcessPackets("foo", "bar", test.data)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if int(summary.PayloadBytes) != test.ipPayloadBytes {
+				b.Fatalf("total = %d, want %d", summary.PayloadBytes, test.ipPayloadBytes)
+			}
+			if summary.Packets != test.numPkts {
+				b.Errorf("expected %d packets, got %d", test.numPkts, summary.Packets)
+			}
+			numPkts += summary.Packets
+			b.SetBytes(int64(len(test.data)))
+		}
+	})
+	b.Log("total packets", numPkts, "total ops", ops)
+	b.ReportMetric(float64(numPkts/ops), "packets/op")
 }
