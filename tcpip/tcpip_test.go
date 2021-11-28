@@ -158,6 +158,26 @@ func TestIPLayer(t *testing.T) {
 			}
 		}
 
+		// if summary.Packets != tt.packets {
+		// 	t.Errorf("test:%s: Packets = %v, want %v", tt.name, summary.Packets, tt.packets)
+		// }
+		// // TODO - replace these with LeftStats and RightStats.
+		// if summary.LeftStats.RetransmitPackets != tt.leftRetransmits {
+		// 	t.Errorf("test:%s: Left.Retransmits = %v, want %v", tt.name, summary.LeftStats.RetransmitPackets, tt.leftRetransmits)
+		// }
+		// if summary.RightStats.RetransmitPackets != tt.rightRetransmits {
+		// 	t.Errorf("test:%s: Right.Retransmits = %v, want %v", tt.name, summary.RightStats.RetransmitPackets, tt.rightRetransmits)
+		// }
+		// if summary.TruncatedPackets != tt.truncated {
+		// 	t.Errorf("test:%s: TruncatedPackets = %v, want %v", tt.name, summary.TruncatedPackets, tt.truncated)
+		// }
+		// if summary.RightStats.SendNextExceededLimit != tt.exceeded {
+		// 	t.Errorf("test:%s: SendNextExceededLimit = %v, want %v", tt.name, summary.RightStats.SendNextExceededLimit, tt.exceeded)
+		// }
+		// if summary.LeftStats.OptionCounts[layers.TCPOptionKindNop] != tt.nopCount {
+		// 	t.Errorf("test:%s: OptionCounts = %v, want %v", tt.name, summary.LeftStats.OptionCounts, tt.nopCount)
+		// }
+		t.Logf("%+v\n", summary)
 	}
 }
 
