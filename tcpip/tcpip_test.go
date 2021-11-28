@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/etl/tcpip"
@@ -43,6 +44,50 @@ func getTestfile(t *testing.T, name string) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+// SlowGetIP decodes the IP layers and returns some basic information.
+// It is a bit slow and does memory allocation.
+func SlowGetIP(p *tcpip.Packet) (net.IP, net.IP, uint8, uint16, error) {
+	// Decode a packet.
+	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		Lazy:                     true,
+		NoCopy:                   true,
+		SkipDecodeRecovery:       true,
+		DecodeStreamsAsDatagrams: false,
+	})
+
+	if ipLayer := pkt.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv4)
+		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
+		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
+	} else if ipLayer := pkt.Layer(layers.LayerTypeIPv6); ipLayer != nil {
+		ip, _ := ipLayer.(*layers.IPv6)
+		// In IPv6, the Length field is the payload length.
+		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
+	} else {
+		return nil, nil, 0, 0, tcpip.ErrNoIPLayer
+	}
+}
+
+// GetGopacketFirstTCP uses gopacket to decode the  TCP layer for the first packet.
+// It is a bit slow and does memory allocation.
+func GetGopacketFirstTCP(s *tcpip.Summary) (*layers.TCP, error) {
+	// Decode a packet.
+	pkt := gopacket.NewPacket(s.FirstPacket, layers.LayerTypeEthernet, gopacket.DecodeOptions{
+		Lazy:                     true,
+		NoCopy:                   true,
+		SkipDecodeRecovery:       true,
+		DecodeStreamsAsDatagrams: false,
+	})
+
+	if tcpLayer := pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp, _ := tcpLayer.(*layers.TCP)
+		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
+		return tcp, nil
+	} else {
+		return nil, tcpip.ErrNoTCPLayer
+	}
 }
 
 func TestIPLayer(t *testing.T) {
@@ -102,7 +147,7 @@ func TestIPLayer(t *testing.T) {
 			t.Errorf("%s: dstPort = %d, want %d", tt.name, summary.DstPort, tt.dstPort)
 		}
 		// Now check against gopacket values, too.
-		if tcp, err := summary.GetGopacketFirstTCP(); err != nil {
+		if tcp, err := GetGopacketFirstTCP(&summary); err != nil {
 			t.Error(err)
 		} else {
 			if summary.SrcPort != tcp.SrcPort {

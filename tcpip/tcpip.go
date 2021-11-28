@@ -418,11 +418,11 @@ type Packet struct {
 	Ci   gopacket.CaptureInfo
 	Data []byte
 	eth  *EthernetHeader
-	IP
-	v4  *IPv4Header       // Nil unless we're parsing IPv4 packets.
-	v6  *IPv6Wrapper      // Nil unless we're parsing IPv6 packets.
-	tcp *TCPHeaderWrapper // This takes up a small amount of space for the options.
-	err error
+	ip   IP
+	v4   *IPv4Header       // Nil unless we're parsing IPv4 packets.
+	v6   *IPv6Wrapper      // Nil unless we're parsing IPv6 packets.
+	tcp  *TCPHeaderWrapper // This takes up a small amount of space for the options.
+	err  error
 }
 
 func (p *Packet) TCP() *TCPHeader {
@@ -446,7 +446,7 @@ func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 			return Packet{err: ErrTruncatedIPHeader}, ErrTruncatedIPHeader
 		}
 		p.v4 = (*IPv4Header)(unsafe.Pointer(&data[EthernetHeaderSize]))
-		p.IP = p.v4
+		p.ip = p.v4
 	case layers.EthernetTypeIPv6:
 		if len(data) < EthernetHeaderSize+IPv6HeaderSize {
 			return Packet{err: ErrTruncatedIPHeader}, ErrTruncatedIPHeader
@@ -456,16 +456,16 @@ func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 		if err != nil {
 			return Packet{}, err
 		}
-		p.IP = p.v6
+		p.ip = p.v6
 	default:
 		return Packet{err: ErrUnknownEtherType}, ErrUnknownEtherType
 	}
 	// TODO needs more work
-	if p.IP != nil {
-		switch p.IP.NextProtocol() {
+	if p.ip != nil {
+		switch p.ip.NextProtocol() {
 		case layers.IPProtocolTCP:
 			var err error
-			p.tcp, err = WrapTCP(data[EthernetHeaderSize+p.IP.HeaderLength():])
+			p.tcp, err = WrapTCP(data[EthernetHeaderSize+p.ip.HeaderLength():])
 			if err != nil {
 				sparse20.Printf("Error parsing TCP: %v for %v", err, p)
 				return Packet{}, err
@@ -477,30 +477,10 @@ func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 }
 
 func (p *Packet) TCPLength() int {
-	if p.IP == nil {
+	if p.ip == nil {
 		return 0
 	}
-	return p.IP.PayloadLength()
-}
-
-// GetGopacketFirstTCP uses gopacket to decode the  TCP layer for the first packet.
-// It is a bit slow and does memory allocation.
-func (s *Summary) GetGopacketFirstTCP() (*layers.TCP, error) {
-	// Decode a packet.
-	pkt := gopacket.NewPacket(s.FirstPacket, layers.LayerTypeEthernet, gopacket.DecodeOptions{
-		Lazy:                     true,
-		NoCopy:                   true,
-		SkipDecodeRecovery:       true,
-		DecodeStreamsAsDatagrams: false,
-	})
-
-	if tcpLayer := pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-		tcp, _ := tcpLayer.(*layers.TCP)
-		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
-		return tcp, nil
-	} else {
-		return nil, ErrNoTCPLayer
-	}
+	return p.ip.PayloadLength()
 }
 
 type Summary struct {
@@ -527,11 +507,11 @@ func (s *Summary) Add(p *Packet) {
 		s.Errors[s.Packets] = p.err
 	} else if s.Packets == 0 {
 		s.StartTime = p.Ci.Timestamp
-		s.SrcIP = p.SrcIP()
-		s.DstIP = p.DstIP()
+		s.SrcIP = p.ip.SrcIP()
+		s.DstIP = p.ip.DstIP()
 		s.SrcPort = p.TCP().SrcPort()
 		s.DstPort = p.TCP().DstPort()
-		s.HopLimit = p.IP.HopLimit()
+		s.HopLimit = p.ip.HopLimit()
 	} else {
 		s.LastTime = p.Ci.Timestamp
 		s.PayloadBytes += uint64(p.TCPLength())

@@ -3,7 +3,6 @@ package parser
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,8 +10,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -29,38 +26,6 @@ var (
 
 	ErrNoIPLayer = fmt.Errorf("no IP layer")
 )
-
-// Packet struct contains the packet data and metadata.
-type Packet struct {
-	// If we use a pointer here, for some reason we get zero value timestamps.
-	Ci   gopacket.CaptureInfo
-	Data []byte
-	Err  error
-}
-
-// GetIP decodes the IP layers and returns some basic information.
-// It is a bit slow and does memory allocation.
-func (p *Packet) SlowGetIP() (net.IP, net.IP, uint8, uint16, error) {
-	// Decode a packet.
-	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
-		Lazy:                     true,
-		NoCopy:                   true,
-		SkipDecodeRecovery:       true,
-		DecodeStreamsAsDatagrams: false,
-	})
-
-	if ipLayer := pkt.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv4)
-		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
-		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
-	} else if ipLayer := pkt.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv6)
-		// In IPv6, the Length field is the payload length.
-		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
-	} else {
-		return nil, nil, 0, 0, ErrNoIPLayer
-	}
-}
 
 //=====================================================================================
 //                       PCAP Parser
