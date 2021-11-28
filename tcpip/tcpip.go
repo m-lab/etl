@@ -435,6 +435,7 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 			summary.Errors[summary.Packets] = err
 			continue
 		}
+		// This now includes some of the TCP state modelling.
 		summary.Add(&p)
 	}
 
