@@ -130,19 +130,20 @@ func TestSummary(t *testing.T) {
 		fn                                string
 		packets                           int
 		leftRetransmits, rightRetransmits int64
+		leftSacks, rightSacks             int64
 		truncated                         int64
 		exceeded                          int64
-		tsCount                           int64
+		leftTimestamps                    int64
 	}
 	tests := []test{
 		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap",
-			packets: 336, leftRetransmits: 11, rightRetransmits: 8, truncated: 0, exceeded: 0, tsCount: 510},
+			packets: 336, leftRetransmits: 11, rightRetransmits: 8, truncated: 0, exceeded: 0, leftTimestamps: 510, leftSacks: 79, rightSacks: 86},
 		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 0, tsCount: 22},
+			packets: 15, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 0, leftTimestamps: 22, leftSacks: 0, rightSacks: 0},
 		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
-			packets: 5180, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 2880, tsCount: 8542},
+			packets: 5180, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 2880, leftTimestamps: 8542, leftSacks: 0, rightSacks: 0},
 		{name: "foobar", fn: "testfiles/ndt-xkrzj_1632230485_0000000000AE8EE2.pcap.gz",
-			packets: 49, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 0, tsCount: 77},
+			packets: 49, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 0, leftTimestamps: 77, leftSacks: 0, rightSacks: 0},
 	}
 	for _, tt := range tests {
 		f, err := os.Open(tt.fn)
@@ -160,22 +161,28 @@ func TestSummary(t *testing.T) {
 		if summary.Packets != tt.packets {
 			t.Errorf("test:%s: Packets = %v, want %v", tt.name, summary.Packets, tt.packets)
 		}
-		// TODO - replace these with LeftStats and RightStats.
 		if summary.LeftState.Stats.RetransmitPackets != tt.leftRetransmits {
 			t.Errorf("test:%s: Left.Retransmits = %v, want %v", tt.name, summary.LeftState.Stats.RetransmitPackets, tt.leftRetransmits)
 		}
 		if summary.RightState.Stats.RetransmitPackets != tt.rightRetransmits {
 			t.Errorf("test:%s: Right.Retransmits = %v, want %v", tt.name, summary.RightState.Stats.RetransmitPackets, tt.rightRetransmits)
 		}
+		if summary.RightState.Stats.Sacks != tt.rightSacks {
+			t.Errorf("test:%s: Right.Sacks = %v, want %v", tt.name, summary.RightState.Stats.Sacks, tt.rightSacks)
+		}
+		if summary.LeftState.Stats.Sacks != tt.leftSacks {
+			t.Errorf("test:%s: Left.Sacks = %v, want %v", tt.name, summary.LeftState.Stats.Sacks, tt.leftSacks)
+		}
+
 		// if summary.TruncatedPackets != tt.truncated {
 		// 	t.Errorf("test:%s: TruncatedPackets = %v, want %v", tt.name, summary.TruncatedPackets, tt.truncated)
 		// }
 		if summary.RightState.Stats.SendNextExceededLimit != tt.exceeded {
 			t.Errorf("test:%s: SendNextExceededLimit = %v, want %v", tt.name, summary.RightState.Stats.SendNextExceededLimit, tt.exceeded)
 		}
-		if summary.LeftState.Stats.OptionCounts[layers.TCPOptionKindTimestamps] != tt.tsCount {
+		if summary.LeftState.Stats.OptionCounts[layers.TCPOptionKindTimestamps] != tt.leftTimestamps {
 			t.Errorf("test:%s: Timestamps = %v, want %v", tt.name,
-				summary.LeftState.Stats.OptionCounts[layers.TCPOptionKindTimestamps], tt.tsCount)
+				summary.LeftState.Stats.OptionCounts[layers.TCPOptionKindTimestamps], tt.leftTimestamps)
 		}
 	}
 }

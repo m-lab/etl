@@ -459,6 +459,7 @@ func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 		sw.OtherErrors++
 		info.Println(ErrTrackerNotInitialized)
 	}
+	sw.Sacks++
 	// Auto gen code
 	if err := t.checkSack(sb); err != nil {
 		sw.BadSacks++
