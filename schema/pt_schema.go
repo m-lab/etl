@@ -16,11 +16,11 @@ import (
 )
 
 type HopIP struct {
-	IP             string                        `json:"ip"`
-	City           string                        `json:"city"`
-	CountryCode    string                        `json:"country_code"`
-	Hostname       string                        `json:"hostname"`
-	ASN            uint32                        `json:"asn,uint32"`
+	IP             string                        `json:"ip" bigquery:"IP"`
+	City           string                        `json:"city" bigquery:"City"`
+	CountryCode    string                        `json:"country_code" bigquery:"CountryCode"`
+	Hostname       string                        `json:"hostname" bigquery:"Hostname"`
+	ASN            uint32                        `json:"asn,uint32" bigquery:"ASN"`
 	HopAnnotation1 *hopannotation.HopAnnotation1 `json:"hopannotation1" bigquery:"hopannotation1"`
 }
 
