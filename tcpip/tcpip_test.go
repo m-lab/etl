@@ -267,6 +267,8 @@ func TestPCAPGarbage(t *testing.T) {
 //
 // Costly option decoding:   BenchmarkGetPackets:			 100	  18097318 ns/op	20975383 B/op	  658780 allocs/op
 //                                                           100	  18369065 ns/op	25097387 B/op	  843705 allocs/op
+
+// Explicit byte reversal:   BenchmarkGetPackets-8:          100	  13365349 ns/op	17741200 B/op	  453337 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
 	type src struct {
 		data    []byte

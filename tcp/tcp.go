@@ -198,6 +198,7 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 				return ErrTruncatedTCPHeader
 			}
 			// copy to a persistent Option struct
+			// This is fairly expensive!!
 			opt := layers.TCPOption{
 				OptionType:   overlay.kind,
 				OptionLength: overlay.len,
@@ -380,14 +381,14 @@ func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, s
 	// NOTE: This may be greater than the window size if capture missed some packets.
 	inflight, err := diff(t.SendNext(), t.sendUNA)
 	if err != nil {
-		sparse500.Println("inflight diff error", t.SendNext(), t.sendUNA)
+		//sparse500.Println("inflight diff error", t.SendNext(), t.sendUNA)
 	}
 
 	// TODO handle errors
 	delta, err := diff(clock, t.seq)
 	if err != nil {
 		sw.BadDeltas++
-		badSeq.Printf("Bad seq %4X -> %4X\n", t.seq, clock)
+		//badSeq.Printf("Bad seq %4X -> %4X\n", t.seq, clock)
 		return inflight, false
 	}
 	if delta < 0 {
@@ -400,7 +401,7 @@ func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, s
 	// Everything below applies only to new data packets, not retransmits
 	if delta != int32(t.lastDataLength) {
 		sw.MissingPackets++
-		sparse500.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
+		//sparse500.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
 	}
 
 	if synFin {
@@ -417,7 +418,7 @@ func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, s
 
 	gap, err := diff(t.seq, t.sendUNA)
 	if err != nil {
-		sparse2.Println("gap diff error:", t.seq, t.sendUNA)
+		//sparse2.Println("gap diff error:", t.seq, t.sendUNA)
 	}
 	if gap > t.maxGap {
 		t.maxGap = gap
@@ -425,7 +426,7 @@ func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, s
 
 	inflight, err = diff(t.SendNext(), t.sendUNA)
 	if err != nil {
-		sparse2.Println("inflight diff error:", t.SendNext(), t.sendUNA)
+		//sparse2.Println("inflight diff error:", t.SendNext(), t.sendUNA)
 	}
 
 	return inflight, false
@@ -445,7 +446,7 @@ func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, s
 	delta, err := diff(clock, t.sendUNA)
 	if err != nil {
 		sw.BadDeltas++
-		badAck.Printf("Bad ack %4X -> %4X\n", t.sendUNA, clock)
+		//badAck.Printf("Bad ack %4X -> %4X\n", t.sendUNA, clock)
 		// TODO should this sometimes update the sendUNA, or always?
 		t.sendUNA = clock // Let's assume we missed many many packets.
 		return 0, 0
@@ -464,7 +465,7 @@ func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, s
 		delete(t.seqTimes, clock)
 		return si.count, pTime.Sub(si.pTime)
 	} else {
-		sparse500.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
+		//sparse500.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
 		return 0, 0
 	}
 }
@@ -620,9 +621,13 @@ func NewState(srcIP net.IP) *State {
 }
 
 func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt layers.TCPOption) {
-	// These are arbitrary time offsets, but we will be
-	TSVal := binary.BigEndian.Uint32(opt.OptionData[0:4])
-	TSEcr := binary.BigEndian.Uint32(opt.OptionData[4:8])
+	var TSVal, TSEcr uint32
+	pVal := (*[4]byte)(unsafe.Pointer(&TSVal))
+	pEcr := (*[4]byte)(unsafe.Pointer(&TSEcr))
+	for i := 0; i < 4; i++ {
+		pVal[i] = opt.OptionData[3-i]
+		pEcr[i] = opt.OptionData[7-i]
+	}
 
 	if isOutgoing && !retransmit {
 		if TSVal != 0 {
@@ -655,11 +660,18 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 	switch optionType {
 	case layers.TCPOptionKindSACK:
 		data := opt.OptionData
-		sacks := make([]sackBlock, len(data)/8)
-		binary.Read(bytes.NewReader(data), binary.BigEndian, &sacks)
-		for _, block := range sacks {
+		block := sackBlock{}
+		for i := 0; i < len(data)/8; i++ {
+			//	block.Left = binary.BigEndian.Uint32(data[i*8 : i*8+4])
+			//	block.Right = binary.BigEndian.Uint32(data[i*8+4 : i*8+8])
+			bl := (*[8]byte)(unsafe.Pointer(&block))
+			for j := 0; j < 4; j++ {
+				bl[j] = data[i*8+3-j]
+				bl[j+4] = data[i*8+7-j]
+			}
 			s.SeqTracker.Sack(block, &s.Stats)
 		}
+
 	case layers.TCPOptionKindMSS:
 		if len(opt.OptionData) != 2 {
 			info.Println("Invalid MSS option length", len(opt.OptionData))

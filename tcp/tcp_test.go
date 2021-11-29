@@ -2,6 +2,7 @@ package tcp_test
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -11,7 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unsafe"
 
 	"github.com/go-test/deep"
 	"github.com/google/gopacket/layers"
@@ -201,12 +201,13 @@ func BenchmarkStateOptions(b *testing.B) {
 	s.SeqTracker.Seq(2, pTime, 1124, 2000, true, &s.Stats)
 	opts := []layers.TCPOption{
 		{OptionType: layers.TCPOptionKindMSS, OptionLength: 4, OptionData: []byte{0x00, 0x00}},                                   // 5 nsec
-		{OptionType: layers.TCPOptionKindTimestamps, OptionLength: 14, OptionData: []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}}, // 10 nsec
+		{OptionType: layers.TCPOptionKindTimestamps, OptionLength: 14, OptionData: []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}}, // 18 nsec
 		{OptionType: layers.TCPOptionKindSACK, OptionLength: 18,
-			OptionData: []byte{0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 3, 0, 0, 2, 4}}, // 500 nsec
+			OptionData: []byte{0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 3, 0, 0, 2, 4}}, // 500 nsec -> 34 nsec
 	}
 	for i := 0; i < b.N; i++ {
 		for _, opt := range opts {
+			// Explicit byte reversal improves this from 480 nsec (6 allocs, 120 bytes) to 56 nsec (no allocs) per op.
 			s.Option(port, false, pTime, opt)
 		}
 	}
@@ -236,16 +237,32 @@ func TestToTCPHeaderGo(t *testing.T) {
 		data[i] = byte(b)
 	}
 
-	raw := (*tcp.TCPHeader)(unsafe.Pointer(&data[0]))
-	var out tcp.TCPHeaderGo
-	raw.ToTCPHeaderGo2(&out)
-
-	if diff := deep.Equal(&out, &want); diff != nil {
+	hw := tcp.TCPHeaderWrapper{}
+	tcp.WrapTCP(data, &hw)
+	if diff := deep.Equal(&hw.TCPHeaderGo, &want); diff != nil {
 		t.Error(diff)
+	}
+
+	if len(hw.Options) != 1 {
+		t.Errorf("Options = %v, want 1", len(hw.Options))
+	}
+	if hw.Options[0].OptionType != layers.TCPOptionKindTimestamps {
+		t.Errorf("OptionType = %v, want %v", hw.Options[0].OptionType, layers.TCPOptionKindTimestamps)
+	}
+	if hw.Options[0].OptionLength != 10 {
+		t.Errorf("OptionLength = %v, want 10", hw.Options[0].OptionLength)
+	}
+	tsVal := binary.BigEndian.Uint32(hw.Options[0].OptionData[:4])
+	tsEcn := binary.BigEndian.Uint32(hw.Options[0].OptionData[4:8])
+	if tsVal != 191012137 {
+		t.Errorf("TimestampValue = %v, want 191012137", tsVal)
+	}
+	if tsEcn != 733325070 {
+		t.Errorf("TimestampECN = %v, want 0", tsEcn)
 	}
 }
 
-func BenchmarkGo(b *testing.B) {
+func BenchmarkToTCPHeaderBinary_Read(b *testing.B) {
 	var in tcp.TCPHeader
 	var out tcp.TCPHeaderGo
 	for i := 0; i < b.N; i++ {
@@ -254,11 +271,38 @@ func BenchmarkGo(b *testing.B) {
 	log.Println(out)
 }
 
-func BenchmarkGo2(b *testing.B) {
+func BenchmarkToTCPHeaderGo_Swaps(b *testing.B) {
+	// These byte values are taken from a WireShark decoded packet.
+	hex := "9d 91 01 bb 31 f4 e2 0c 46 f4 b1 ba 80 10 02 a4 29 e1 00 00 01 01 08 0a 0b 62 9d 29 2b b5 a7 0e"
+	hexArray := strings.Split(hex, " ")
+	data := make([]byte, len(hexArray))
+	for i, v := range hexArray {
+		b, _ := strconv.ParseInt(v, 16, 16)
+		data[i] = byte(b)
+	}
+
+	//hw := tcp.TCPHeaderWrapper{}
 	var in tcp.TCPHeader
 	var out tcp.TCPHeaderGo
+
 	for i := 0; i < b.N; i++ {
 		in.ToTCPHeaderGo2(&out)
 	}
-	log.Println(out)
+}
+
+func BenchmarkWrapTCP(b *testing.B) {
+	// These byte values are taken from a WireShark decoded packet.
+	hex := "9d 91 01 bb 31 f4 e2 0c 46 f4 b1 ba 80 10 02 a4 29 e1 00 00 01 01 08 0a 0b 62 9d 29 2b b5 a7 0e"
+	hexArray := strings.Split(hex, " ")
+	data := make([]byte, len(hexArray))
+	for i, v := range hexArray {
+		b, _ := strconv.ParseInt(v, 16, 16)
+		data[i] = byte(b)
+	}
+
+	hw := tcp.TCPHeaderWrapper{}
+
+	for i := 0; i < b.N; i++ {
+		tcp.WrapTCP(data, &hw)
+	}
 }
