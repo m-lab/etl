@@ -289,8 +289,8 @@ type Packet struct {
 	err  error
 }
 
-func (p *Packet) TCP() *tcp.TCPHeader {
-	return p.tcp.TCPHeader
+func (p *Packet) TCP() *tcp.TCPHeaderGo {
+	return &p.tcp.TCPHeaderGo
 }
 
 // Wrap creates a wrapper with partially decoded headers.
@@ -328,8 +328,8 @@ func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 	if p.ip != nil {
 		switch p.ip.NextProtocol() {
 		case layers.IPProtocolTCP:
-			var err error
-			p.tcp, err = tcp.WrapTCP(data[EthernetHeaderSize+p.ip.HeaderLength():])
+			p.tcp = &tcp.TCPHeaderWrapper{}
+			err := tcp.WrapTCP(data[EthernetHeaderSize+p.ip.HeaderLength():], p.tcp)
 			if err != nil {
 				sparse20.Printf("Error parsing TCP: %v for %v", err, p)
 				return Packet{}, err
@@ -374,19 +374,21 @@ func (s *Summary) Add(p *Packet) {
 	}
 	if p.err != nil {
 		s.Errors[s.Packets] = p.err
+		log.Println(p.err)
 	} else if s.Packets == 0 {
 		s.StartTime = p.Ci.Timestamp
 		s.SrcIP = p.ip.SrcIP()
 		s.DstIP = p.ip.DstIP()
-		s.SrcPort = p.TCP().SrcPort()
-		s.DstPort = p.TCP().DstPort()
+		s.SrcPort = p.tcp.SrcPort
+		s.DstPort = p.tcp.DstPort
 		s.HopLimit = p.ip.HopLimit()
 	} else {
 		s.LastTime = p.Ci.Timestamp
-		s.PayloadBytes += uint64(p.TCPLength())
 	}
-	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.tcp, p.Ci)
-	s.RightState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.tcp, p.Ci)
+
+	s.PayloadBytes += uint64(p.TCPLength())
+	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.TCP(), p.tcp.Options, p.Ci)
+	s.RightState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.TCP(), p.tcp.Options, p.Ci)
 	s.Packets++
 }
 

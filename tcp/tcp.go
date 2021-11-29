@@ -29,8 +29,8 @@ models for:
 var (
 	info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
 	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
-	sparse       = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
-	sparse2      = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
+	sparse500    = logx.NewLogEvery(sparseLogger, 500*time.Millisecond)
+	sparse2      = logx.NewLogEvery(sparseLogger, 501*time.Millisecond)
 
 	ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
 	ErrInvalidDelta          = fmt.Errorf("invalid delta")
@@ -50,7 +50,7 @@ type TCPHeader struct {
 	seqNum           [4]byte // Sequence number
 	ackNum           [4]byte // Acknowledgement number
 	dataOffset       uint8   //  DataOffset: upper 4 bits
-	flags            uint8   // Flags
+	Flags                    // Flags
 	window           [2]byte // Window
 	checksum         [2]byte // Checksum
 	urgent           [2]byte // Urgent pointer
@@ -58,19 +58,101 @@ type TCPHeader struct {
 
 var TCPHeaderSize = int(unsafe.Sizeof(TCPHeader{}))
 
-func (h *TCPHeader) SrcPort() layers.TCPPort {
-	return layers.TCPPort(binary.BigEndian.Uint16(h.srcPort[:]))
+type Flags uint8
+
+func (f Flags) FIN() bool {
+	return (f & 0x01) != 0
 }
 
-func (h *TCPHeader) DstPort() layers.TCPPort {
-	return layers.TCPPort(binary.BigEndian.Uint16(h.dstPort[:]))
+func (f Flags) SYN() bool {
+	return (f & 0x02) != 0
+}
+
+func (f Flags) RST() bool {
+	return (f & 0x04) != 0
+}
+
+func (f Flags) PSH() bool {
+	return (f & 0x08) != 0
+}
+
+func (f Flags) ACK() bool {
+	return (f & 0x10) != 0
+}
+
+func (f Flags) URG() bool {
+	return (f & 0x20) != 0
+}
+
+func (f Flags) ECE() bool {
+	return (f & 0x40) != 0
+}
+
+func (f Flags) CWR() bool {
+	return (f & 0x80) != 0
+}
+
+type TCPHeaderGo struct {
+	SrcPort, DstPort layers.TCPPort // Source and destination port
+	SeqNum           uint32         // Sequence number
+	AckNum           uint32         // Acknowledgement number
+	DataOffset       uint8          //  DataOffset: upper 4 bits
+	Flags                           // Flags
+	Window           uint16         // Window
+	Checksum         uint16         // Checksum
+	Urgent           uint16         // Urgent pointer
+}
+
+func (h *TCPHeader) XToTCPHeaderGo(out *TCPHeaderGo) error {
+	p := (*[unsafe.Sizeof(TCPHeader{})]byte)(unsafe.Pointer(&h))
+	return binary.Read(bytes.NewReader(p[:]), binary.BigEndian, &out)
+}
+
+func swap2(dst *uint16, src [2]byte) {
+	dstBytes := (*[2]byte)(unsafe.Pointer(dst))
+	dstBytes[0] = src[1]
+	dstBytes[1] = src[0]
+}
+
+func swap4(dst *uint32, src [4]byte) {
+	dstBytes := (*[4]byte)(unsafe.Pointer(dst))
+	dstBytes[0] = src[3]
+	dstBytes[1] = src[2]
+	dstBytes[2] = src[1]
+	dstBytes[3] = src[0]
+}
+
+// ToTCPHeaderGo is a very fast converter.  encoding/binary takes 350nsec.
+// This function takes 11 nsec.
+func (h *TCPHeader) ToTCPHeaderGo2(out *TCPHeaderGo) {
+	swap2((*uint16)(&out.SrcPort), h.srcPort)
+	swap2((*uint16)(&out.DstPort), h.dstPort)
+	swap4((*uint32)(&out.SeqNum), h.seqNum)
+	swap4((*uint32)(&out.AckNum), h.ackNum)
+	swap2((*uint16)(&out.Window), h.window)
+	swap2((*uint16)(&out.Checksum), h.checksum)
+	swap2((*uint16)(&out.Urgent), h.urgent)
+	out.DataOffset = h.dataOffset
+	out.Flags = h.Flags
 }
 
 func (h *TCPHeader) DataOffset() int {
 	return 4 * int(h.dataOffset>>4)
 }
 
-func (h *TCPHeader) Window() uint16 {
+/*
+func (h *TCPHeader) SrcPort() layers.TCPPort {
+	var p layers.TCPPort
+	binary.Read(bytes.NewReader(h.srcPort[:]), binary.BigEndian, &p)
+	return p
+}
+
+func (h *TCPHeader) xDstPort() layers.TCPPort {
+	return layers.TCPPort(binary.BigEndian.Uint16(h.dstPort[:]))
+}
+
+
+func (h *TCPHeader) xWindow() uint16 {
 	return binary.BigEndian.Uint16(h.window[:])
 }
 
@@ -81,42 +163,7 @@ func (h *TCPHeader) Seq() uint32 {
 func (h *TCPHeader) Ack() uint32 {
 	return binary.BigEndian.Uint32(h.ackNum[:])
 }
-
-func (h *TCPHeader) FIN() bool {
-	return (h.flags & 0x01) != 0
-}
-
-func (h *TCPHeader) SYN() bool {
-	return (h.flags & 0x02) != 0
-}
-
-func (h *TCPHeader) RST() bool {
-	return (h.flags & 0x04) != 0
-}
-
-func (h *TCPHeader) PSH() bool {
-	return (h.flags & 0x08) != 0
-}
-
-func (h *TCPHeader) ACK() bool {
-	return (h.flags & 0x10) != 0
-}
-
-func (h *TCPHeader) URG() bool {
-	return (h.flags & 0x20) != 0
-}
-
-func (h *TCPHeader) ECE() bool {
-	return (h.flags & 0x40) != 0
-}
-
-func (h *TCPHeader) CWR() bool {
-	return (h.flags & 0x80) != 0
-}
-
-type TCPOption struct {
-	layers.TCPOption
-}
+*/
 
 type tcpOption struct {
 	kind layers.TCPOptionKind
@@ -125,16 +172,16 @@ type tcpOption struct {
 }
 
 type TCPHeaderWrapper struct {
-	*TCPHeader
-	Options []TCPOption
+	TCPHeaderGo
+	Options []layers.TCPOption
 }
 
 func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 	if len(data) == 0 {
-		w.Options = make([]TCPOption, 0, 0)
+		w.Options = make([]layers.TCPOption, 0, 0)
 		return nil
 	}
-	w.Options = make([]TCPOption, 0, 2)
+	w.Options = make([]layers.TCPOption, 0, 2)
 	// TODO - should we omit the empty option padding?
 	for len(data) > 0 {
 		overlay := (*tcpOption)(unsafe.Pointer(&data[0]))
@@ -151,12 +198,10 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 				return ErrTruncatedTCPHeader
 			}
 			// copy to a persistent Option struct
-			opt := TCPOption{
-				layers.TCPOption{
-					OptionType:   overlay.kind,
-					OptionLength: overlay.len,
-					OptionData:   make([]byte, overlay.len-2),
-				},
+			opt := layers.TCPOption{
+				OptionType:   overlay.kind,
+				OptionLength: overlay.len,
+				OptionData:   make([]byte, overlay.len-2),
 			}
 			copy(opt.OptionData, data[2:overlay.len])
 			switch opt.OptionType {
@@ -183,20 +228,17 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 	return nil
 }
 
-func WrapTCP(data []byte) (*TCPHeaderWrapper, error) {
+func WrapTCP(data []byte, w *TCPHeaderWrapper) error {
 	if len(data) < TCPHeaderSize {
-		return nil, ErrTruncatedTCPHeader
+		return ErrTruncatedTCPHeader
 	}
+
 	tcp := (*TCPHeader)(unsafe.Pointer(&data[0]))
 	if tcp.DataOffset() > len(data) {
-		return nil, ErrTruncatedTCPHeader
+		return ErrTruncatedTCPHeader
 	}
-	w := TCPHeaderWrapper{
-		TCPHeader: tcp,
-		Options:   nil,
-	}
-	err := w.parseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
-	return &w, err
+	tcp.ToTCPHeaderGo2(&w.TCPHeaderGo)
+	return w.parseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
 }
 
 type TcpStats struct {
@@ -338,7 +380,7 @@ func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, s
 	// NOTE: This may be greater than the window size if capture missed some packets.
 	inflight, err := diff(t.SendNext(), t.sendUNA)
 	if err != nil {
-		log.Println("inflight diff error", t.SendNext(), t.sendUNA)
+		sparse500.Println("inflight diff error", t.SendNext(), t.sendUNA)
 	}
 
 	// TODO handle errors
@@ -358,7 +400,7 @@ func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, s
 	// Everything below applies only to new data packets, not retransmits
 	if delta != int32(t.lastDataLength) {
 		sw.MissingPackets++
-		sparse.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
+		sparse500.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
 	}
 
 	if synFin {
@@ -375,7 +417,7 @@ func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, s
 
 	gap, err := diff(t.seq, t.sendUNA)
 	if err != nil {
-		log.Println("gap diff error:", t.seq, t.sendUNA)
+		sparse2.Println("gap diff error:", t.seq, t.sendUNA)
 	}
 	if gap > t.maxGap {
 		t.maxGap = gap
@@ -383,7 +425,7 @@ func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, s
 
 	inflight, err = diff(t.SendNext(), t.sendUNA)
 	if err != nil {
-		log.Println("inflight diff error:", t.SendNext(), t.sendUNA)
+		sparse2.Println("inflight diff error:", t.SendNext(), t.sendUNA)
 	}
 
 	return inflight, false
@@ -422,7 +464,7 @@ func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, s
 		delete(t.seqTimes, clock)
 		return si.count, pTime.Sub(si.pTime)
 	} else {
-		sparse.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
+		sparse500.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
 		return 0, 0
 	}
 }
@@ -435,19 +477,19 @@ func (t *Tracker) SendUNA() uint32 {
 func (t *Tracker) checkSack(sb sackBlock) error {
 	// block should ALWAYS have positive width
 	if width, err := diff(sb.Right, sb.Left); err != nil || width <= 0 {
-		sparse.Println(ErrInvalidSackBlock, err, width, t.Acked())
+		sparse500.Println(ErrInvalidSackBlock, err, width, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// block Right should ALWAYS be to the left of NextSeq()
 	// If not, we may have missed recording a packet!
 	if overlap, err := diff(t.SendNext(), sb.Right); err != nil || overlap < 0 {
-		sparse.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
+		sparse500.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// Left should be to the right of ack
 	if overlap, err := diff(sb.Left, t.sendUNA); err != nil || overlap < 0 {
 		// These often correspond to packets that show up as spurious retransmits in WireShark.
-		sparse.Println(ErrLateSackBlock, err, overlap, t.Acked())
+		sparse500.Println(ErrLateSackBlock, err, overlap, t.Acked())
 		return ErrLateSackBlock
 	}
 	return nil
@@ -463,7 +505,7 @@ func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 	// Auto gen code
 	if err := t.checkSack(sb); err != nil {
 		sw.BadSacks++
-		sparse.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
+		sparse500.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
 	}
 	//t.sacks = append(t.sacks, block)
 	t.sackBytes += uint64(sb.Right - sb.Left)
@@ -500,7 +542,7 @@ func (jt *JitterTracker) Add(tsval uint32, pktTime time.Time) {
 		jt.tickRate = time.Millisecond
 		jt.firstTSVal = tsval
 		jt.firstPktTime = pktTime
-		log.Println("Jitter init")
+		//log.Println("Jitter init")
 		jt.initialized = true
 		return
 	}
@@ -632,33 +674,31 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 			info.Println("Invalid WindowScale option length", len(opt.OptionData))
 		} else {
 			// TODO should this change after initialization?
-			sparse.Printf("%v WindowScale change %d -> %d\n", port, s.WindowScale, opt.OptionData[0])
+			sparse500.Printf("%v WindowScale change %d -> %d\n", port, s.WindowScale, opt.OptionData[0])
 			s.WindowScale = opt.OptionData[0]
 		}
 	default:
 	}
 }
 
-func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderWrapper, ci gopacket.CaptureInfo) {
-	options := tcp.Options
-
-	dataLength := tcpLength - uint16(tcp.DataOffset())
+func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, options []layers.TCPOption, ci gopacket.CaptureInfo) {
+	dataLength := tcpLength - uint16(tcp.DataOffset)
 	pTime := ci.Timestamp
 	var retransmit bool
 	if s.SrcIP.Equal(srcIP) {
-		if s.SrcPort != tcp.SrcPort() {
+		if s.SrcPort != tcp.SrcPort {
 			s.Stats.SrcPortErrors++
 		}
 		window := int64(s.Window) << s.WindowScale
 		//var inflight int32
 		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
-		if _, retransmit = s.SeqTracker.Seq(count, pTime, tcp.Seq(), dataLength, tcp.SYN() || tcp.FIN(), &s.Stats); retransmit {
+		if _, retransmit = s.SeqTracker.Seq(count, pTime, tcp.SeqNum, dataLength, tcp.SYN() || tcp.FIN(), &s.Stats); retransmit {
 			// TODO
 		}
 		// TODO handle error here?
 		remaining, err := diff(s.Limit, s.SeqTracker.SendNext())
 		if err != nil {
-			log.Println("remaining diff err", s.Limit, s.SeqTracker.SendNext())
+			sparse500.Println("remaining diff err", s.Limit, s.SeqTracker.SendNext())
 		}
 		if !tcp.SYN() {
 			if remaining < 0 {
@@ -667,10 +707,10 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 				// specified in the last ack.  But if pcaps did not capture the last ack, and
 				// that ack increased the window, then this might be a valid send, and an
 				// indication that we missed a packet in the capture.
-				sparse.Println("Protocol violation, SendNext > Limit:", s.SrcPort, s.SeqTracker.SendNext(), s.Limit, s.SeqTracker.packets)
+				sparse500.Println("Protocol violation, SendNext > Limit:", s.SrcPort, s.SeqTracker.SendNext(), s.Limit, s.SeqTracker.packets)
 				s.Stats.SendNextExceededLimit++
 			} else if remaining < int32(s.MSS) {
-				sparse.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", window, remaining, s.MSS)
+				sparse500.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", window, remaining, s.MSS)
 			}
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
@@ -679,21 +719,21 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		}
 		//log.Printf("%5d: %2d.%6d %9d %20v %5v inflight: %6d / %6d %6d\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, retransmit, inflight, window, remaining)
 	} else if s.SrcIP.Equal(dstIP) {
-		if s.SrcPort != tcp.DstPort() {
+		if s.SrcPort != tcp.DstPort {
 			s.Stats.DstPortErrors++
 		}
 		// Process ACKs and SACKs from the other direction
 		// Handle all options, including SACKs from other direction
 		// TODO - should some of these be associated with the other direction?
 		for i := 0; i < len(options); i++ {
-			s.Option(tcp.SrcPort(), retransmit, pTime, options[i].TCPOption)
+			s.Option(tcp.SrcPort, retransmit, pTime, options[i])
 		}
-		if s.Window != tcp.Window() {
+		if s.Window != tcp.Window {
 			s.Stats.WindowChanges++
-			s.Window = tcp.Window()
+			s.Window = tcp.Window
 		}
 		if tcp.ACK() {
-			_, delay := s.SeqTracker.Ack(count, pTime, tcp.Ack(), dataLength > 0, &s.Stats) // TODO
+			_, delay := s.SeqTracker.Ack(count, pTime, tcp.AckNum, dataLength > 0, &s.Stats) // TODO
 			if delay > 0 {
 				//xxx BUG in sent?
 				//	log.Printf("%5d: %2d.%6d %9d %20v Packet: %5d Delay: %8v\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, pn, delay)
@@ -703,7 +743,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 	}
 	// Handle options
 	for _, opt := range options {
-		s.Option(tcp.SrcPort(), retransmit, pTime, opt.TCPOption)
+		s.Option(tcp.SrcPort, retransmit, pTime, opt)
 	}
 
 }

@@ -5,10 +5,15 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
+	"github.com/go-test/deep"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/etl/tcp"
@@ -137,13 +142,13 @@ func TestSummary(t *testing.T) {
 	}
 	tests := []test{
 		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap",
-			packets: 336, leftRetransmits: 11, rightRetransmits: 8, truncated: 0, exceeded: 0, leftTimestamps: 510, leftSacks: 79, rightSacks: 86},
+			packets: 336, leftRetransmits: 11, rightRetransmits: 8, truncated: 0, exceeded: 57, leftTimestamps: 510, leftSacks: 79, rightSacks: 86},
 		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 0, leftTimestamps: 22, leftSacks: 0, rightSacks: 0},
+			packets: 15, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 5, leftTimestamps: 22, leftSacks: 0, rightSacks: 0},
 		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
-			packets: 5180, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 2880, leftTimestamps: 8542, leftSacks: 0, rightSacks: 0},
+			packets: 5180, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 2890, leftTimestamps: 8542, leftSacks: 0, rightSacks: 0},
 		{name: "foobar", fn: "testfiles/ndt-xkrzj_1632230485_0000000000AE8EE2.pcap.gz",
-			packets: 49, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 0, leftTimestamps: 77, leftSacks: 0, rightSacks: 0},
+			packets: 49, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 22, leftTimestamps: 77, leftSacks: 0, rightSacks: 0},
 	}
 	for _, tt := range tests {
 		f, err := os.Open(tt.fn)
@@ -185,4 +190,75 @@ func TestSummary(t *testing.T) {
 				summary.LeftState.Stats.OptionCounts[layers.TCPOptionKindTimestamps], tt.leftTimestamps)
 		}
 	}
+}
+
+func BenchmarkStateOptions(b *testing.B) {
+	port := layers.TCPPort(80)
+	s := tcp.NewState(net.IP{})
+	pTime := time.Now()
+	s.SeqTracker.Seq(0, pTime, 123, 0, true, &s.Stats)
+	s.SeqTracker.Seq(1, pTime, 124, 1000, false, &s.Stats)
+	s.SeqTracker.Seq(2, pTime, 1124, 2000, true, &s.Stats)
+	opts := []layers.TCPOption{
+		{OptionType: layers.TCPOptionKindMSS, OptionLength: 4, OptionData: []byte{0x00, 0x00}},                                   // 5 nsec
+		{OptionType: layers.TCPOptionKindTimestamps, OptionLength: 14, OptionData: []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}}, // 10 nsec
+		{OptionType: layers.TCPOptionKindSACK, OptionLength: 18,
+			OptionData: []byte{0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 3, 0, 0, 2, 4}}, // 500 nsec
+	}
+	for i := 0; i < b.N; i++ {
+		for _, opt := range opts {
+			s.Option(port, false, pTime, opt)
+		}
+	}
+}
+
+func TestToTCPHeaderGo(t *testing.T) {
+	// These values are mostly taken from WireShark.
+	want := tcp.TCPHeaderGo{
+		SrcPort:    40337,
+		DstPort:    443,
+		SeqNum:     838132236,
+		AckNum:     1190441402,
+		DataOffset: 128,
+		Flags:      0x10,
+		Window:     676,
+		Checksum:   10721,
+		Urgent:     0,
+	}
+	t.Logf("Want: %#v", want)
+
+	// These byte values are taken from a WireShark decoded packet.
+	hex := "9d 91 01 bb 31 f4 e2 0c 46 f4 b1 ba 80 10 02 a4 29 e1 00 00 01 01 08 0a 0b 62 9d 29 2b b5 a7 0e"
+	hexArray := strings.Split(hex, " ")
+	data := make([]byte, len(hexArray))
+	for i, v := range hexArray {
+		b, _ := strconv.ParseInt(v, 16, 16)
+		data[i] = byte(b)
+	}
+
+	raw := (*tcp.TCPHeader)(unsafe.Pointer(&data[0]))
+	var out tcp.TCPHeaderGo
+	raw.ToTCPHeaderGo2(&out)
+
+	if diff := deep.Equal(&out, &want); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func BenchmarkGo(b *testing.B) {
+	var in tcp.TCPHeader
+	var out tcp.TCPHeaderGo
+	for i := 0; i < b.N; i++ {
+		_ = in.XToTCPHeaderGo(&out)
+	}
+	log.Println(out)
+}
+
+func BenchmarkGo2(b *testing.B) {
+	var in tcp.TCPHeader
+	var out tcp.TCPHeaderGo
+	for i := 0; i < b.N; i++ {
+		in.ToTCPHeaderGo2(&out)
+	}
+	log.Println(out)
 }

@@ -151,10 +151,10 @@ func TestIPLayer(t *testing.T) {
 			t.Error(err)
 		} else {
 			if summary.SrcPort != tcp.SrcPort {
-				t.Errorf("%s: srcPort = %0.2x, want %0.2x", tt.name, summary.SrcPort, tcp.SrcPort)
+				t.Errorf("%s: srcPort = %d, want %d", tt.name, summary.SrcPort, tcp.SrcPort)
 			}
 			if summary.DstPort != tcp.DstPort {
-				t.Errorf("%s: dstPort = %d(%.2x), want %.2x", tt.name, summary.DstPort, summary.DstPort, tcp.DstPort)
+				t.Errorf("%s: dstPort = %d, want %d", tt.name, summary.DstPort, tcp.DstPort)
 			}
 		}
 
@@ -264,6 +264,9 @@ func TestPCAPGarbage(t *testing.T) {
 // Use pointer fgor CI:      BenchmarkGetPackets-8   	     100	  10318408 ns/op	12376754 B/op	   96639 allocs/op
 // This one makes a single copy of CaptureInfo, because pointer referent gets cleared:
 // Don't wrap twice!!        BenchmarkGetPackets:            145	   7881966 ns/op	16814909 B/op	   98956 allocs/op
+//
+// Costly option decoding:   BenchmarkGetPackets:			 100	  18097318 ns/op	20975383 B/op	  658780 allocs/op
+//                                                           100	  18369065 ns/op	25097387 B/op	  843705 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
 	type src struct {
 		data    []byte
@@ -294,7 +297,7 @@ func BenchmarkGetPackets(b *testing.B) {
 			}
 
 			if int(summary.PayloadBytes) != test.total {
-				b.Fatalf("total = %d, want %d", summary.PayloadBytes, test.total)
+				b.Errorf("total = %d, want %d", summary.PayloadBytes, test.total)
 			}
 			if summary.Packets != test.numPkts {
 				b.Errorf("expected %d packets, got %d", test.numPkts, summary.Packets)
