@@ -582,6 +582,36 @@ var (
 		},
 		[]string{"table", "kind", "group"},
 	)
+
+	PcapPacketCount = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "etl_pcap_packet_count",
+			Help: "Distribution of PCAP packet counts",
+			Buckets: []float64{
+				1, 2, 3, 5,
+				10, 18, 32, 56,
+				100, 178, 316, 562,
+				1000, 1780, 3160, 5620,
+				10000, 17800, 31600, 56200, math.Inf(1),
+			},
+		},
+		[]string{"port"},
+	)
+
+	PcapConnectionDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "etl_pcap_connection_duration",
+			Help: "Distribution of PCAP connection duration",
+			Buckets: []float64{
+				.1, .2, .3, .5,
+				1, 1.8, 3.2, 5.6,
+				10, 18, 32, 56,
+				100, 178, 316, 562,
+				1000, 1780, 3160, 5620, math.Inf(1),
+			},
+		},
+		[]string{"port"},
+	)
 )
 
 // catchStatus wraps the native http.ResponseWriter and captures any written HTTP

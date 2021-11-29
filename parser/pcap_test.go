@@ -1,10 +1,13 @@
 package parser_test
 
 import (
+	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
@@ -130,4 +133,112 @@ func TestPCAPParser_GetUUID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIPLayer(t *testing.T) {
+	type test struct {
+		name         string
+		fn           string
+		packets      int64
+		duration     time.Duration
+		srcIP, dstIP string
+		TTL          uint8
+	}
+	tests := []test{
+		{name: "retransmits", fn: "testdata/PCAP/ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
+			packets: 336, duration: 15409174000, srcIP: "173.49.19.128"},
+		{name: "ipv6", fn: "testdata/PCAP/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
+			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d"},
+		{name: "protocolErrors2", fn: "testdata/PCAP/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
+			packets: 5180, duration: 13444117000, srcIP: "2a0d:5600:24:a71::1d"},
+	}
+	for _, tt := range tests {
+		f, err := os.Open(tt.fn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := ioutil.ReadAll(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		packets, err := parser.GetPackets(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		start := packets[0].Ci.Timestamp
+		end := packets[len(packets)-1].Ci.Timestamp
+		duration := end.Sub(start)
+		if duration != tt.duration {
+			t.Errorf("%s: duration = %v, want %v", tt.name, duration, tt.duration)
+		}
+		if len(packets) != int(tt.packets) {
+			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, len(packets))
+		}
+		srcIP, _, _, _, err := packets[0].GetIP()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if srcIP.String() != tt.srcIP {
+			t.Errorf("%s: expected srcIP %s, got %s", tt.name, tt.srcIP, srcIP.String())
+		}
+	}
+}
+
+func TestPCAPGarbage(t *testing.T) {
+	data := []byte{0xd4, 0xc3, 0xb2, 0xa1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+	_, err := parser.GetPackets(data)
+	if err != io.ErrUnexpectedEOF {
+		t.Fatal(err)
+	}
+
+	data = append(data, data...)
+	_, err = parser.GetPackets(data)
+	if err == nil || !strings.Contains(err.Error(), "Unknown major") {
+		t.Fatal(err)
+	}
+}
+
+func getTestFile(b *testing.B, name string) []byte {
+	f, err := os.Open(path.Join(`testdata/PCAP/`, name))
+	if err != nil {
+		b.Fatal(err)
+	}
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		b.Fatal(err)
+	}
+	return data
+}
+
+// Original single file RunParallel:
+// Just packet decoding: BenchmarkGetPackets-8   	    8678	    128426 ns/op	  165146 B/op	     381 allocs/op
+// With IP decoding:     BenchmarkGetPackets-8   	    4279	    285547 ns/op	  376125 B/op	    1729 allocs/op
+
+// Enhanced RunParallel: BenchmarkGetPackets-8   	    2311	    514898 ns/op	 1181138 B/op	    1886 allocs/op
+func BenchmarkGetPackets(b *testing.B) {
+	type tt struct {
+		data    []byte
+		numPkts int
+	}
+	tests := []tt{
+		{getTestFile(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336},
+		{getTestFile(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15},
+		{getTestFile(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180},
+	}
+	b.ResetTimer()
+
+	i := 0
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			test := tests[i%len(tests)]
+			i++
+			pkts, err := parser.GetPackets(test.data)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if len(pkts) != test.numPkts {
+				b.Errorf("expected %d packets, got %d", test.numPkts, len(pkts))
+			}
+		}
+	})
 }
