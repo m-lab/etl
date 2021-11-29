@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -133,7 +134,6 @@ func TestParse(t *testing.T) {
 			t.Errorf("test:%s: OptionCounts = %v, want %v", tt.name, summary.LeftStats.OptionCounts, tt.nopCount)
 		}
 	}
-	t.Fatal()
 }
 
 func TestJitter(t *testing.T) {
@@ -150,4 +150,57 @@ func TestJitter(t *testing.T) {
 	if j.Jitter() > .005 || j.Jitter() < .001 {
 		t.Error(j.Jitter(), j.Delay(), j.ValCount)
 	}
+}
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
+func getTestfileForBenchmark(b *testing.B, name string) []byte {
+	f, err := os.Open(path.Join(`testfiles/`, name))
+	if err != nil {
+		b.Fatal(err)
+	}
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		b.Fatal(err)
+	}
+	return data
+}
+
+// cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz,  BenchmarkGetPackets-8
+// Old gfr-rtt-jitter using gopacket layers:     100	  41001560 ns/op	56535609 B/op	  620864 allocs/op
+func BenchmarkGetPackets(b *testing.B) {
+	type src struct {
+		data    []byte
+		numPkts int
+		total   int
+	}
+	sources := []src{
+		// Approximately 220K packets, so this is about 140nsec/packet, and about 100 bytes/packet allocated,
+		// which is roughly the footprint of the packets themselves.
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797, 239251626},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172, 158096007},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097, 126523401},
+	}
+	b.ResetTimer()
+
+	i := 0
+	pktCount := int64(0)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			test := sources[i%len(sources)]
+			i++
+			tcp := tcp.NewParser()
+			alpha, err := tcp.Parse(test.data)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			pktCount += alpha.Packets
+		}
+	})
 }

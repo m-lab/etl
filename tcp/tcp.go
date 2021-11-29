@@ -384,11 +384,11 @@ func (s *state) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing b
 		if TSVal != 0 {
 			s.Jitter.Add(TSVal, pktTime)
 			//log.Println(s.SrcPort, "TSVal", binary.BigEndian.Uint32(opt.OptionData[0:4]))
-			t, p := s.Jitter.Adjust(TSVal, pktTime)
-			delta := t - p
-			avgSeconds := s.Jitter.Mean()
-			log.Printf("%20v Avg: %10.4f T: %6.3f P: %6.3f Delta: %6.3f RTT: %8.4f Jitter: %8.4f at %v\n", s.SrcPort,
-				avgSeconds, float32(t)/1e9, float32(p)/1e9, float32(delta)/1e9, s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
+			//t, p := s.Jitter.Adjust(TSVal, pktTime)
+			//delta := t - p
+			//avgSeconds := s.Jitter.Mean()
+			//log.Printf("%20v Avg: %10.4f T: %6.3f P: %6.3f Delta: %6.3f RTT: %8.4f Jitter: %8.4f at %v\n", s.SrcPort,
+			//	avgSeconds, float32(t)/1e9, float32(p)/1e9, float32(delta)/1e9, s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
 		}
 	} else if TSEcr != 0 {
 		//log.Println(s.SrcPort, "TSEcr", binary.BigEndian.Uint32(opt.OptionData[4:8]))
