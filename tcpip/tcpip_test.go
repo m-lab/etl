@@ -311,8 +311,8 @@ func BenchmarkGetPackets(b *testing.B) {
 //							   236	   5022948 ns/op	 351.48 MB/s	     36786 packets/op	11827143 B/op	   37000 allocs/op
 //   ...                       159	   9528634 ns/op	 185.28 MB/s	     72868 packets/op	 9735622 B/op	  174743 allocs/op
 // Approximately 300 bytes/packet on average.
-//                           100	  17760632 ns/op	  99.40 MB/s	     36078 packets/op	20975442 B/op	  658780 allocs/op
-
+// 							   100	  17760632 ns/op	  99.40 MB/s	     36078 packets/op	20975442 B/op	  658780 allocs/op
+//						       100	  17696214 ns/op	  99.77 MB/s	     72157 packets/op	20974294 B/op	  658772 allocs/op
 func BenchmarkProcessPackets2(b *testing.B) {
 	type tt struct {
 		data           []byte

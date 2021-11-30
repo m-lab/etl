@@ -384,6 +384,8 @@ func (s *Summary) Add(p *Packet) {
 	} else {
 		s.LastTime = p.Ci.Timestamp
 	}
+	// This was previously in the last else clause, causing error in total payload bytes.
+	s.PayloadBytes += uint64(p.TCPLength())
 	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.tcp, p.Ci)
 	s.RightState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.tcp, p.Ci)
 	s.PayloadBytes += uint64(p.TCPLength())
