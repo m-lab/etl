@@ -112,6 +112,38 @@ func TestNormalizeIP(t *testing.T) {
 	}
 }
 
+func TestGetHopID(t *testing.T) {
+	tests := []struct {
+		name           string
+		cycleStartTime float64
+		hostname       string
+		address        string
+		want           string
+	}{
+		{
+			name:           "success",
+			cycleStartTime: float64(1566691268),
+			hostname:       "ndt-plh7v",
+			address:        "2001:550:3::1ca",
+			want:           "20190825_ndt-plh7v_2001:550:3::1ca",
+		},
+		{
+			name:           "unix-start",
+			cycleStartTime: float64(0),
+			hostname:       "ndt-plh7v",
+			address:        "2001:550:3::1ca",
+			want:           "19700101_ndt-plh7v_2001:550:3::1ca",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parser.GetHopID(tt.cycleStartTime, tt.hostname, tt.address); got != tt.want {
+				t.Errorf("GetHopID() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 //------------------------------------------------------------------------------------
 // TestParser ignores the content, returns a MapSaver containing meta data and
 // "testname":"..."

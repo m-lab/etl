@@ -9,17 +9,19 @@ import (
 	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/go/cloud/bqx"
+	"github.com/m-lab/traceroute-caller/hopannotation"
 	"github.com/m-lab/uuid-annotator/annotator"
 
 	"github.com/m-lab/etl/metrics"
 )
 
 type HopIP struct {
-	IP          string `json:"ip"`
-	City        string `json:"city"`
-	CountryCode string `json:"country_code"`
-	Hostname    string `json:"hostname"`
-	ASN         uint32 `json:"asn,uint32"`
+	IP             string                        `json:"ip" bigquery:"IP"`
+	City           string                        `json:"city" bigquery:"City"`
+	CountryCode    string                        `json:"country_code" bigquery:"CountryCode"`
+	Hostname       string                        `json:"hostname" bigquery:"Hostname"`
+	ASN            uint32                        `json:"asn,uint32" bigquery:"ASN"`
+	HopAnnotation1 *hopannotation.HopAnnotation1 `json:"hopannotation1" bigquery:"HopAnnotation1"`
 }
 
 type HopProbe struct {
@@ -99,6 +101,7 @@ func (row *PTTest) GetServerIP() string {
 	return row.Source.IP
 }
 
+// AnnotateHops adds geolocation and network information to the hops.
 func (row *PTTest) AnnotateHops(annMap map[string]*api.Annotations) error {
 	for index, _ := range row.Hop {
 		ann, ok := annMap[row.Hop[index].Source.IP]
@@ -120,6 +123,10 @@ func (row *PTTest) AnnotateHops(annMap map[string]*api.Annotations) error {
 				metrics.AnnotationMissingCount.WithLabelValues("PT Hop ASN failed").Inc()
 			}
 			row.Hop[index].Source.ASN = uint32(asn)
+		}
+
+		if row.Hop[index].Source.HopAnnotation1 != nil {
+			row.Hop[index].Source.HopAnnotation1.Annotations = v2as.ConvertAnnotationsToClientAnnotations(ann)
 		}
 	}
 	return nil

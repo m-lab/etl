@@ -1,7 +1,6 @@
 package parser_test
 
 import (
-	"fmt"
 	"io/ioutil"
 	"path"
 	"strings"
@@ -217,9 +216,8 @@ func expectedScamper1Row() schema.Scamper1Row {
 	}
 
 	cycleStartTime := float64(1566691268)
-	cycleStartDate := parser.GetTraceStartDate(float64(cycleStartTime))
 	bqScamperNode1 := schema.BQScamperNode{
-		HopID: fmt.Sprintf("%s_ndt-plh7v_2001:550:1b01:1::1", cycleStartDate),
+		HopID: parser.GetHopID(cycleStartTime, "ndt-plh7v", "2001:550:1b01:1::1"),
 		Addr:  "2001:550:1b01:1::1",
 		Name:  "",
 		QTTL:  1,
@@ -227,7 +225,7 @@ func expectedScamper1Row() schema.Scamper1Row {
 		Links: bqScamperLinkArray1,
 	}
 	bqScamperNode2 := schema.BQScamperNode{
-		HopID: fmt.Sprintf("%s_ndt-plh7v_2001:4888:3f:6092:3a2:26:0:1", cycleStartDate),
+		HopID: parser.GetHopID(cycleStartTime, "ndt-plh7v", "2001:4888:3f:6092:3a2:26:0:1"),
 		Addr:  "2001:4888:3f:6092:3a2:26:0:1",
 		Name:  "",
 		QTTL:  1,
