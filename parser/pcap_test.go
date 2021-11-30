@@ -245,7 +245,11 @@ func BenchmarkGetPackets(b *testing.B) {
 }
 
 // cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
-// Before packet size opt:  128	   8052268 ns/op	 219.25 MB/s	     36522 packets/op	28021501 B/op	   36747 allocs/op
+// Before packet count opt:    128	   8052268 ns/op	 219.25 MB/s	     36522 packets/op	28021501 B/op	   36747 allocs/op
+// After packet count opt:     234	   5896273 ns/op	 299.42 MB/s	     37099 packets/op	11927524 B/op	   37314 allocs/op
+//							   235	   5228191 ns/op	 337.68 MB/s	     37436 packets/op	12051418 B/op	   37652 allocs/op
+//							   236	   5022948 ns/op	 351.48 MB/s	     36786 packets/op	11827143 B/op	   37000 allocs/op
+// Approximately 300 bytes/packet on average.
 func BenchmarkGetPackets2(b *testing.B) {
 	type tt struct {
 		data    []byte

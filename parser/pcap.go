@@ -27,7 +27,8 @@ var (
 	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
 	sparse20     = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
 
-	ErrNoIPLayer = fmt.Errorf("no IP layer")
+	ErrNoIPLayer     = fmt.Errorf("no IP layer")
+	ErrTruncatedPcap = fmt.Errorf("truncated pcap file")
 )
 
 // Packet struct contains the packet data and metadata.
@@ -69,14 +70,30 @@ func GetPackets(data []byte) ([]Packet, error) {
 		return nil, err
 	}
 
-	// TODO: len(data)/18 provides much better estimate of number of packets.
-	// len(data)/18 was determined by looking at bytes/packet in a few pcaps files.
-	// The number seems too small, but perhaps the data is still compressed at this point.
-	// However, it seems to cause mysterious crashes in sandbox, so
-	// reverting to /1500 for now.
-	packets := make([]Packet, 0, len(data)/1500)
+	// Estimate the number of packets in the file.
+	pktSize := int(pcap.Snaplen())
+	if pktSize < 1 {
+		pktSize = 1
+	}
+	pcapSize := len(data) // Only if the data is not compressed.
+	// Check magic number?
+	if len(data) < 4 {
+		return nil, ErrTruncatedPcap
+	}
+	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
+		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
+		pcapSize *= 8
+	}
 
-	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+	// This computed slice sizing alone changes the throughput in sandbox from
+	// about 640 to about 820 MB/sec per instance.
+	// NOTE that previously, we got about 1.07 GB/sec for just indexing.
+	packets := make([]Packet, 0, pcapSize/pktSize)
+
+	// NOTE: The ReadPacketData call is doing about 99% of the allocs, and
+	// allocating about 30% of the bytes.  Using ZeroCopy eliminates most of
+	// this, but then the packets in the slice have corrupted content.
+	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		packets = append(packets, Packet{Ci: ci, Data: data, Err: err})
 	}
 
