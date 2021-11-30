@@ -657,7 +657,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		// TODO handle error here?
 		remaining, err := diff(s.Limit, s.SeqTracker.SendNext())
 		if err != nil {
-			log.Println("remaining diff err", s.Limit, s.SeqTracker.SendNext())
+			//log.Println("remaining diff err", s.Limit, s.SeqTracker.SendNext())
 		}
 		if !tcp.SYN() {
 			if remaining < 0 {

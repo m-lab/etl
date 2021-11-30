@@ -311,6 +311,8 @@ func BenchmarkGetPackets(b *testing.B) {
 //							   236	   5022948 ns/op	 351.48 MB/s	     36786 packets/op	11827143 B/op	   37000 allocs/op
 //   ...                       159	   9528634 ns/op	 185.28 MB/s	     72868 packets/op	 9735622 B/op	  174743 allocs/op
 // Approximately 300 bytes/packet on average.
+//                           100	  17760632 ns/op	  99.40 MB/s	     36078 packets/op	20975442 B/op	  658780 allocs/op
+
 func BenchmarkProcessPackets2(b *testing.B) {
 	type tt struct {
 		data           []byte
@@ -320,8 +322,8 @@ func BenchmarkProcessPackets2(b *testing.B) {
 	tests := []tt{
 		// Approximately 220K packets, so this is about 140nsec/packet, and about 100 bytes/packet allocated,
 		// which is roughly the footprint of the packets themselves.
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
 		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
 		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797, 239251626},
 		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172, 158096007},
@@ -346,11 +348,11 @@ func BenchmarkProcessPackets2(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			if int(summary.PayloadBytes) != test.ipPayloadBytes {
-				b.Fatalf("total = %d, want %d", summary.PayloadBytes, test.ipPayloadBytes)
-			}
 			if summary.Packets != test.numPkts {
 				b.Errorf("expected %d packets, got %d", test.numPkts, summary.Packets)
+			}
+			if int(summary.PayloadBytes) != test.ipPayloadBytes {
+				b.Fatalf("total = %d, want %d", summary.PayloadBytes, test.ipPayloadBytes)
 			}
 			b.SetBytes(int64(len(test.data)))
 		}
