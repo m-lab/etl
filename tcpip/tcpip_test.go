@@ -332,7 +332,6 @@ func BenchmarkProcessPackets2(b *testing.B) {
 			if summary.Packets != test.numPkts {
 				b.Errorf("expected %d packets, got %d", test.numPkts, summary.Packets)
 			}
-			numPkts += summary.Packets
 			b.SetBytes(int64(len(test.data)))
 		}
 	})
