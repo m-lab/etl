@@ -198,7 +198,7 @@ func TestPCAPGarbage(t *testing.T) {
 	}
 }
 
-func getTestFile(b *testing.B, name string) []byte {
+func getTestfileForBenchmark(b *testing.B, name string) []byte {
 	f, err := os.Open(path.Join(`testdata/PCAP/`, name))
 	if err != nil {
 		b.Fatal(err)
@@ -215,15 +215,16 @@ func getTestFile(b *testing.B, name string) []byte {
 // With IP decoding:     BenchmarkGetPackets-8   	    4279	    285547 ns/op	  376125 B/op	    1729 allocs/op
 
 // Enhanced RunParallel: BenchmarkGetPackets-8   	    2311	    514898 ns/op	 1181138 B/op	    1886 allocs/op
+// Estimate num packets: BenchmarkGetPackets-8   	    3688	    329539 ns/op	  571419 B/op	    1888 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
 	type tt struct {
 		data    []byte
 		numPkts int
 	}
 	tests := []tt{
-		{getTestFile(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336},
-		{getTestFile(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15},
-		{getTestFile(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180},
 	}
 	b.ResetTimer()
 
@@ -241,4 +242,50 @@ func BenchmarkGetPackets(b *testing.B) {
 			}
 		}
 	})
+}
+
+// cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
+// Before packet size opt:  128	   8052268 ns/op	 219.25 MB/s	     36522 packets/op	28021501 B/op	   36747 allocs/op
+func BenchmarkGetPackets2(b *testing.B) {
+	type tt struct {
+		data    []byte
+		numPkts int
+	}
+	tests := []tt{
+		// Approximately 220K packets, so this is about 140nsec/packet, and about 100 bytes/packet allocated,
+		// which is roughly the footprint of the packets themselves.
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097},
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	b.ReportMetric(220000, "packets/op")
+
+	i := 0
+
+	numPkts := 0
+	ops := 0
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			test := tests[i%len(tests)]
+			ops++
+			numPkts += test.numPkts
+			i++
+			pkts, err := parser.GetPackets(test.data)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if len(pkts) != test.numPkts {
+				b.Errorf("expected %d packets, got %d", test.numPkts, len(pkts))
+			}
+			b.SetBytes(int64(len(test.data)))
+		}
+	})
+	b.Log("total packets", numPkts, "total ops", ops)
+	b.ReportMetric(float64(numPkts/ops), "packets/op")
 }
