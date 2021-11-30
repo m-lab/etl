@@ -21,7 +21,7 @@ type HopIP struct {
 	CountryCode    string                        `json:"country_code" bigquery:"CountryCode"`
 	Hostname       string                        `json:"hostname" bigquery:"Hostname"`
 	ASN            uint32                        `json:"asn,uint32" bigquery:"ASN"`
-	HopAnnotation1 *hopannotation.HopAnnotation1 `json:"hopannotation1" bigquery:"hopannotation1"`
+	HopAnnotation1 *hopannotation.HopAnnotation1 `json:"hopannotation1" bigquery:"HopAnnotation1"`
 }
 
 type HopProbe struct {

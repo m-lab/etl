@@ -80,6 +80,10 @@ func NormalizeIP(ip string) string {
 
 // GetHopID creates a unique identifier to join Hop Annotations
 // with traceroute datasets.
+// The same logic exists in traceroute-caller.
+// https://github.com/m-lab/traceroute-caller/blob/773bb092b18589d2fee20418ed1fa9aa6c5850cc/triggertrace/triggertrace.go#L147
+// https://github.com/m-lab/traceroute-caller/blob/773bb092b18589d2fee20418ed1fa9aa6c5850cc/hopannotation/hopannotation.go#L235
+// https://github.com/m-lab/traceroute-caller/blob/773bb092b18589d2fee20418ed1fa9aa6c5850cc/hopannotation/hopannotation.go#L237
 func GetHopID(cycleStartTime float64, hostname string, address string) string {
 	traceStartTime := time.Unix(int64(cycleStartTime), 0).UTC()
 	date := traceStartTime.Format("20060102")
