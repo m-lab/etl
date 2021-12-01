@@ -2,7 +2,6 @@
 package tcp
 
 import (
-	"encoding/binary"
 	"fmt"
 	"log"
 	"math"
@@ -39,6 +38,7 @@ var (
 
 	ErrNotTCP             = fmt.Errorf("not a TCP packet")
 	ErrTruncatedTCPHeader = fmt.Errorf("truncated TCP header")
+	ErrBadOption          = fmt.Errorf("bad option")
 )
 
 type BE16 [2]byte
@@ -169,27 +169,38 @@ func (o *tcpOption) getUint16(i int) uint16 {
 	return be.Uint16()
 }
 
-func (o *tcpOption) getMSS() uint16 {
-	return o.getUint16(0)
-}
-
-func (o *tcpOption) getWS() uint8 {
-	return o.data[0]
-}
-
-func (o *tcpOption) getTS() (uint32, uint32) {
-	return o.getUint32(0), o.getUint32(1)
-}
-
-func (o *tcpOption) getSACK() []sackBlock {
-	blocks := make([]sackBlock, (o.len-2)/8)
-	for i := 0; i < int(o.len-2); i += 8 {
-		blocks = append(blocks, sackBlock{
-			Left:  o.getUint32(i / 4),
-			Right: o.getUint32(i/4 + 1),
-		})
+func (o *tcpOption) GetMSS() (uint16, error) {
+	if o.kind != layers.TCPOptionKindMSS || o.len != 4 {
+		return 0, ErrBadOption
 	}
-	return blocks
+	return o.getUint16(0), nil
+}
+
+func (o *tcpOption) GetWS() (uint8, error) {
+	if o.kind != layers.TCPOptionKindWindowScale || o.len != 3 {
+		return 0, ErrBadOption
+	}
+	return o.data[0], nil
+}
+
+func (o *tcpOption) GetTimestamps() (uint32, uint32, error) {
+	if o.kind != layers.TCPOptionKindTimestamps || o.len != 10 {
+		return 0, 0, ErrBadOption
+	}
+	return o.getUint32(0), o.getUint32(1), nil
+}
+
+func (o *tcpOption) GetSACKs() ([]sackBlock, error) {
+	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 {
+		return nil, ErrBadOption
+	}
+	numBlocks := (int(o.len) - 2) / 8
+	blocks := make([]sackBlock, numBlocks)
+	for i := 0; i < numBlocks; i++ {
+		blocks[i].Left = o.getUint32(i * 2)
+		blocks[i].Right = o.getUint32(i*2 + 1)
+	}
+	return blocks, nil
 }
 
 type TCPHeaderWrapper struct {
@@ -199,24 +210,23 @@ type TCPHeaderWrapper struct {
 
 // TODO - this currently uses about 6% of the CPU in the benchmark,
 // so it might be worth optimizing.  A lot of makeslice().
-func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
+func ParseTCPOptions(data []byte) ([]tcpOption, error) {
 	//w.optionData = make([]byte, len(data))
 	//copy(w.optionData, data)
 	//data = w.optionData // Just the slice, not the data.
 	if len(data) == 0 {
-		w.Options = make([]tcpOption, 0, 0)
-		return nil
+		return make([]tcpOption, 0, 0), nil
 	}
 	// We could alternatively count the non-trivial
 	// options before allocating the slice.
 	// The choice of initial size is based on the tcpip benchmark test.
-	w.Options = make([]tcpOption, 0, 1)
+	options := make([]tcpOption, 0, 1)
 	// TODO - should we omit the empty option padding?
 	for len(data) > 0 {
 		overlay := (*tcpOption)(unsafe.Pointer(&data[0]))
 		switch overlay.kind {
 		case layers.TCPOptionKindEndList:
-			return nil
+			return options, nil
 		case layers.TCPOptionKindNop:
 			// For NoOperation, just advance the pointer.
 			// No need to save the option.
@@ -224,7 +234,7 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 		default:
 			if len(data) < 2 || len(data) < int(overlay.len) {
 				log.Println("Truncated option field:", data)
-				return ErrTruncatedTCPHeader
+				return options, ErrTruncatedTCPHeader
 			}
 			// Make a persistent copy of the option data.
 			// This copy is required if we use zerocopy.  Would it
@@ -234,7 +244,7 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 				kind: overlay.kind,
 				len:  overlay.len,
 			}
-			copy(opt.data[:], data[:overlay.len])
+			copy(opt.data[:], data[2:overlay.len])
 
 			switch opt.kind {
 			case layers.TCPOptionKindMSS:
@@ -250,14 +260,14 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 			default:
 				if len(data) < int(opt.len) {
 					log.Println("Truncated option field:", data)
-					return ErrTruncatedTCPHeader
+					return options, ErrTruncatedTCPHeader
 				}
-				w.Options = append(w.Options, opt)
+				options = append(options, opt)
 				data = data[opt.len:]
 			}
 		}
 	}
-	return nil
+	return options, nil
 }
 
 func WrapTCP(data []byte, w *TCPHeaderWrapper) error {
@@ -270,7 +280,9 @@ func WrapTCP(data []byte, w *TCPHeaderWrapper) error {
 		return ErrTruncatedTCPHeader
 	}
 	tcp.ToTCPHeaderGo2(&w.TCPHeaderGo)
-	return w.parseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
+	var err error
+	w.Options, err = ParseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
+	return err
 }
 
 type TcpStats struct {
@@ -652,18 +664,14 @@ func NewState(srcIP net.IP) *State {
 		Stats: StatsWrapper{TcpStats: TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
-func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt layers.TCPOption) {
-	var TSVal, TSEcr uint32
-	pVal := (*BE32)(unsafe.Pointer(&TSVal))
-	pEcr := (*BE32)(unsafe.Pointer(&TSEcr))
-	for i := 0; i < 4; i++ {
-		pVal[i] = opt.OptionData[3-i]
-		pEcr[i] = opt.OptionData[7-i]
+func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt tcpOption) {
+	tsVal, tsEcr, err := opt.GetTimestamps()
+	if err != nil {
+		log.Println(err, "on timestamp option")
 	}
-
 	if isOutgoing && !retransmit {
-		if TSVal != 0 {
-			s.Jitter.Add(TSVal, pktTime)
+		if tsVal != 0 {
+			s.Jitter.Add(tsVal, pktTime)
 			//log.Println(s.SrcPort, "TSVal", binary.BigEndian.Uint32(opt.OptionData[0:4]))
 			// t, p := s.Jitter.Adjust(TSVal, pktTime)
 			// delta := t - p
@@ -671,9 +679,9 @@ func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing b
 			// log.Printf("%20v Avg: %10.4f T: %6.3f P: %6.3f Delta: %6.3f RTT: %8.4f Jitter: %8.4f at %v\n", s.SrcPort,
 			// 	avgSeconds, float32(t)/1e9, float32(p)/1e9, float32(delta)/1e9, s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
 		}
-	} else if TSEcr != 0 {
+	} else if tsEcr != 0 {
 		//log.Println(s.SrcPort, "TSEcr", binary.BigEndian.Uint32(opt.OptionData[4:8]))
-		s.Jitter.AddEcho(TSEcr, pktTime)
+		s.Jitter.AddEcho(tsEcr, pktTime)
 	}
 }
 
@@ -691,36 +699,22 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 
 	switch optionType {
 	case layers.TCPOptionKindSACK:
-		data := opt.OptionData
-		block := sackBlock{}
-		for i := 0; i < len(data)/8; i++ {
-			//	block.Left = binary.BigEndian.Uint32(data[i*8 : i*8+4])
-			//	block.Right = binary.BigEndian.Uint32(data[i*8+4 : i*8+8])
-			bl := (*[8]byte)(unsafe.Pointer(&block))
-			for j := 0; j < 4; j++ {
-				bl[j] = data[i*8+3-j]
-				bl[j+4] = data[i*8+7-j]
-			}
-			s.SeqTracker.Sack(&block, &s.Stats)
+		sacks, err := opt.GetSACKs()
+		if err != nil {
+			log.Println(err, "on SACK option")
+			return
+		}
+		for i := range sacks {
+			s.SeqTracker.Sack(&sacks[i], &s.Stats)
 		}
 
 	case layers.TCPOptionKindMSS:
-		if len(opt.OptionData) != 2 {
-			info.Println("Invalid MSS option length", len(opt.OptionData))
-		} else {
-			s.MSS = binary.BigEndian.Uint16(opt.OptionData)
-		}
+		s.MSS, _ = opt.GetMSS()
 	case layers.TCPOptionKindTimestamps:
 		s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
 
 	case layers.TCPOptionKindWindowScale:
-		if len(opt.OptionData) != 1 {
-			info.Println("Invalid WindowScale option length", len(opt.OptionData))
-		} else {
-			// TODO should this change after initialization?
-			sparse500.Printf("%v WindowScale change %d -> %d\n", port, s.WindowScale, opt.OptionData[0])
-			s.WindowScale = opt.OptionData[0]
-		}
+		s.WindowScale, _ = opt.GetWS()
 	default:
 	}
 }

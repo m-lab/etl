@@ -2,7 +2,6 @@ package tcp_test
 
 import (
 	"bytes"
-	"encoding/binary"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -199,7 +198,16 @@ func BenchmarkStateOptions(b *testing.B) {
 	s.SeqTracker.Seq(0, pTime, 123, 0, true, &s.Stats)
 	s.SeqTracker.Seq(1, pTime, 124, 1000, false, &s.Stats)
 	s.SeqTracker.Seq(2, pTime, 1124, 2000, true, &s.Stats)
-	opts := []layers.TCPOption{
+	fakeOptions := []byte{
+		layers.TCPOptionKindMSS, 4, 0, 0,
+		layers.TCPOptionKindTimestamps, 14, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+		layers.TCPOptionKindSACK, 18, 0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 3, 0, 0, 2, 4,
+	}
+	opts, err := tcp.ParseTCPOptions(fakeOptions)
+	if err != nil {
+		b.Fatal(err)
+	}
+	_ = []layers.TCPOption{
 		{OptionType: layers.TCPOptionKindMSS, OptionLength: 4, OptionData: []byte{0x00, 0x00}},                                   // 5 nsec
 		{OptionType: layers.TCPOptionKindTimestamps, OptionLength: 14, OptionData: []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}}, // 18 nsec
 		{OptionType: layers.TCPOptionKindSACK, OptionLength: 18,
@@ -246,19 +254,16 @@ func TestToTCPHeaderGo(t *testing.T) {
 	if len(hw.Options) != 1 {
 		t.Errorf("Options = %v, want 1", len(hw.Options))
 	}
-	if hw.Options[0].OptionType != layers.TCPOptionKindTimestamps {
-		t.Errorf("OptionType = %v, want %v", hw.Options[0].OptionType, layers.TCPOptionKindTimestamps)
+
+	tsVal, tsEcn, err := hw.Options[0].GetTimestamps()
+	if err != nil {
+		t.Fatalf("getTimestamps() = %v", err)
 	}
-	if hw.Options[0].OptionLength != 10 {
-		t.Errorf("OptionLength = %v, want 10", hw.Options[0].OptionLength)
-	}
-	tsVal := binary.BigEndian.Uint32(hw.Options[0].OptionData[:4])
-	tsEcn := binary.BigEndian.Uint32(hw.Options[0].OptionData[4:8])
 	if tsVal != 191012137 {
 		t.Errorf("TimestampValue = %v, want 191012137", tsVal)
 	}
 	if tsEcn != 733325070 {
-		t.Errorf("TimestampECN = %v, want 0", tsEcn)
+		t.Errorf("TimestampECN = %v, want 733325070", tsEcn)
 	}
 }
 
