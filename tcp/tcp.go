@@ -253,6 +253,45 @@ type TCPHeaderWrapper struct {
 	Options []tcpOption
 }
 
+// This skips Nop options, and returns nil data there are no more options.
+// This makes a copy of the option data.
+func NextOption(data []byte) ([]byte, tcpOption, error) {
+	// For loop to handle Nop options.
+	for len(data) > 0 && data[0] == layers.TCPOptionKindNop {
+		data = data[1:]
+	}
+	if len(data) == 0 {
+		return nil, tcpOption{
+			kind: layers.TCPOptionKindEndList,
+			len:  1,
+		}, nil
+	}
+
+	overlay := (*tcpOption)(unsafe.Pointer(&data[0]))
+	if overlay.kind > 15 {
+		return nil, tcpOption{}, ErrBadOption
+	}
+	switch overlay.kind {
+	// This won't be a nop, because we already handled those above.
+	case layers.TCPOptionKindEndList:
+		return nil, tcpOption{kind: layers.TCPOptionKindEndList, len: 1}, nil
+	default:
+		if len(data) < 2 {
+			return nil, tcpOption{}, ErrTruncatedTCPHeader
+		}
+		if int(overlay.len) > len(data) {
+			return nil, tcpOption{}, ErrTruncatedTCPHeader
+		}
+		if overlay.len > 40 {
+			return nil, tcpOption{}, ErrBadOption
+		}
+		// Could also use a byte array copy here.
+		opt := tcpOption{kind: overlay.kind, len: overlay.len}
+		copy(opt.data[:], overlay.data[:overlay.len-2])
+		return data[overlay.len:], opt, nil
+	}
+}
+
 // TODO - this currently uses about 6% of the CPU in the benchmark,
 // so it might be worth optimizing.  A lot of makeslice().
 func ParseTCPOptions(data []byte) ([]tcpOption, error) {
@@ -266,51 +305,18 @@ func ParseTCPOptions(data []byte) ([]tcpOption, error) {
 	// options before allocating the slice.
 	// The choice of initial size is based on the tcpip benchmark test.
 	options := make([]tcpOption, 0, 1)
-	// TODO - should we omit the empty option padding?
-	for len(data) > 0 {
-		overlay := (*tcpOption)(unsafe.Pointer(&data[0]))
-		switch overlay.kind {
-		case layers.TCPOptionKindEndList:
-			return options, nil
-		case layers.TCPOptionKindNop:
-			// For NoOperation, just advance the pointer.
-			// No need to save the option.
-			data = data[1:]
-		default:
-			if len(data) < 2 || len(data) < int(overlay.len) {
-				//	log.Println("Truncated option field:", overlay.kind, overlay.len)
-				return options, ErrTruncatedTCPHeader
-			}
-			// Make a persistent copy of the option data.
-			// This copy is required if we use zerocopy.  Would it
-			// be better to copy all the packet data, and then
-			// just use a slice of that data instead of copying?
-			opt := tcpOption{
-				kind: overlay.kind,
-				len:  overlay.len,
-			}
-			copy(opt.data[:], data[2:overlay.len])
 
-			switch opt.kind {
-			case layers.TCPOptionKindMSS:
-				fallthrough
-			case layers.TCPOptionKindTimestamps:
-				fallthrough
-			case layers.TCPOptionKindWindowScale:
-				fallthrough
-			case layers.TCPOptionKindSACKPermitted:
-				fallthrough
-			case layers.TCPOptionKindSACK:
-				fallthrough
-			default:
-				if len(data) < int(opt.len) {
-					//	log.Println("Truncated option field:", opt.kind, opt.len)
-					return options, ErrTruncatedTCPHeader
-				}
-				options = append(options, opt)
-				data = data[opt.len:]
-			}
+	for {
+		var opt tcpOption
+		var err error
+		data, opt, err = NextOption(data)
+		if err != nil {
+			return nil, err
 		}
+		if len(data) == 0 || opt.kind == layers.TCPOptionKindEndList {
+			break
+		}
+		options = append(options, opt)
 	}
 	return options, nil
 }
@@ -763,6 +769,41 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 	default:
 	}
 }
+
+// // Options2 handles all options, both incoming and outgoing.
+// // The relTime value is used for Timestamp analysis.
+// func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, optData []byte) {
+// 	// TODO test case for wrong index.
+
+// 	optionType := opt.kind
+// 	if optionType > 15 {
+// 		//info.Printf("TCP Option has illegal option type %d", opt.kind)
+// 		return
+// 	}
+// 	// TODO should some of these be counted in the opposite direction?
+// 	s.Stats.Option(optionType)
+
+// 	switch optionType {
+// 	case layers.TCPOptionKindSACK:
+// 		err := opt.processSACKs(s.SeqTracker.Sack, &s.Stats)
+// 		if err != nil {
+// 			log.Println(err, "on SACK option")
+// 			return
+// 		}
+// 		// for i := range sacks {
+// 		// 	s.SeqTracker.Sack(&sacks[i], &s.Stats)
+// 		// }
+
+// 	case layers.TCPOptionKindMSS:
+// 		s.MSS, _ = opt.GetMSS()
+// 	case layers.TCPOptionKindTimestamps:
+// 		s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
+
+// 	case layers.TCPOptionKindWindowScale:
+// 		s.WindowScale, _ = opt.GetWS()
+// 	default:
+// 	}
+// }
 
 func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, options []tcpOption, ci gopacket.CaptureInfo) {
 	dataLength := tcpLength - uint16(tcp.DataOffset)
