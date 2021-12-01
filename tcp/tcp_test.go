@@ -302,6 +302,7 @@ func BenchmarkWrapTCP(b *testing.B) {
 	}
 
 	hw := tcp.TCPHeaderWrapper{}
+	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		tcp.WrapTCP(data, &hw)

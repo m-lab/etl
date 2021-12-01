@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"time"
 	"unsafe"
 
@@ -24,13 +23,12 @@ import (
 	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/tcp"
-	"github.com/m-lab/go/logx"
 )
 
 var (
-	info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
-	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
-	sparse20     = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
+	// info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
+	// sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
+	// sparse20     = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
 
 	ErrTruncatedPcap           = fmt.Errorf("Truncated PCAP file")
 	ErrNoIPLayer               = fmt.Errorf("no IP layer")
@@ -347,7 +345,7 @@ func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 			p.tcp = &tcp.TCPHeaderWrapper{}
 			err := tcp.WrapTCP(data[EthernetHeaderSize+p.ip.HeaderLength():], p.tcp)
 			if err != nil {
-				sparse20.Printf("Error parsing TCP: %v for %v", err, p)
+				//sparse20.Printf("Error parsing TCP: %v for %v", err, p)
 				return Packet{}, err
 			}
 		}
@@ -356,7 +354,7 @@ func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 	return p, nil
 }
 
-func (p *Packet) TCPLength() int {
+func (p *Packet) PayloadLength() int {
 	if p.ip == nil {
 		return 0
 	}
@@ -383,28 +381,29 @@ type Summary struct {
 }
 
 func (s *Summary) Add(p *Packet) {
+	ip := p.ip
+	tcpw := p.tcp
+	raw := p.Data
+	t := p.Ci.Timestamp
+
 	if s.Packets == 0 {
-		s.FirstPacket = p.Data[:]
-		s.LeftState = tcp.NewState(p.ip.SrcIP())
-		s.RightState = tcp.NewState(p.ip.DstIP())
-	}
-	if p.err != nil {
-		s.Errors[s.Packets] = p.err
-		log.Println(p.err)
-	} else if s.Packets == 0 {
-		s.StartTime = p.Ci.Timestamp
-		s.SrcIP = p.ip.SrcIP()
-		s.DstIP = p.ip.DstIP()
-		s.SrcPort = p.tcp.SrcPort
-		s.DstPort = p.tcp.DstPort
-		s.HopLimit = p.ip.HopLimit()
+		s.FirstPacket = raw[:]
+		// ESCAPE These are escaping to the heap.
+		s.LeftState = tcp.NewState(ip.SrcIP())
+		s.RightState = tcp.NewState(ip.DstIP())
+		s.StartTime = t
+		s.SrcIP = ip.SrcIP()
+		s.DstIP = ip.DstIP()
+		s.SrcPort = tcpw.SrcPort
+		s.DstPort = tcpw.DstPort
+		s.HopLimit = ip.HopLimit()
 	} else {
-		s.LastTime = p.Ci.Timestamp
+		s.LastTime = t
 	}
 
-	s.PayloadBytes += uint64(p.TCPLength())
-	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.TCP(), p.tcp.Options, p.Ci)
-	s.RightState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.TCPLength()), p.TCP(), p.tcp.Options, p.Ci)
+	s.PayloadBytes += uint64(p.PayloadLength())
+	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.PayloadLength()), p.TCP(), p.tcp.Options, p.Ci)
+	s.RightState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.PayloadLength()), p.TCP(), p.tcp.Options, p.Ci)
 	s.Packets++
 }
 

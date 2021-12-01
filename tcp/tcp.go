@@ -8,13 +8,11 @@ import (
 	"log"
 	"math"
 	"net"
-	"os"
 	"time"
 	"unsafe"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/m-lab/go/logx"
 )
 
 // The Model should consume raw IP payloads of type IPProtocolTCP and update the model.
@@ -30,10 +28,13 @@ models for:
 */
 
 var (
-	info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
-	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
-	sparse500    = logx.NewLogEvery(sparseLogger, 500*time.Millisecond)
-	sparse2      = logx.NewLogEvery(sparseLogger, 501*time.Millisecond)
+	// NOTE: These logs are causing a lot of objects to escape the stack.  Removing them
+	// reduces the allocations from 16.4MB to 13.9MB.
+
+	//info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
+	//sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
+	//sparse500    = logx.NewLogEvery(sparseLogger, 500*time.Millisecond)
+	//sparse2      = logx.NewLogEvery(sparseLogger, 501*time.Millisecond)
 
 	ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
 	ErrInvalidDelta          = fmt.Errorf("invalid delta")
@@ -190,7 +191,6 @@ func (o *tcpOption) GetWS() (uint8, error) {
 
 func (o *tcpOption) GetTimestamps() (uint32, uint32, error) {
 	if o.kind != layers.TCPOptionKindTimestamps || o.len != 10 {
-		log.Println(o.len)
 		return 0, 0, ErrBadOption
 	}
 	return o.getUint32(0), o.getUint32(1), nil
@@ -278,7 +278,7 @@ func ParseTCPOptions(data []byte) ([]tcpOption, error) {
 			data = data[1:]
 		default:
 			if len(data) < 2 || len(data) < int(overlay.len) {
-				log.Println("Truncated option field:", overlay.kind, overlay.len)
+				//	log.Println("Truncated option field:", overlay.kind, overlay.len)
 				return options, ErrTruncatedTCPHeader
 			}
 			// Make a persistent copy of the option data.
@@ -304,7 +304,7 @@ func ParseTCPOptions(data []byte) ([]tcpOption, error) {
 				fallthrough
 			default:
 				if len(data) < int(opt.len) {
-					log.Println("Truncated option field:", opt.kind, opt.len)
+					//	log.Println("Truncated option field:", opt.kind, opt.len)
 					return options, ErrTruncatedTCPHeader
 				}
 				options = append(options, opt)
@@ -448,8 +448,8 @@ func diff(clock uint32, previous uint32) (int32, error) {
 	return delta, nil
 }
 
-var badSeq = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
-var badAck = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
+//var badSeq = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
+//var badAck = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
 
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
 // Initializes the tracker if it hasn't been initialized yet.
@@ -529,7 +529,7 @@ func (t *Tracker) Acked() uint64 {
 func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, sw *StatsWrapper) (int, time.Duration) {
 	if !t.initialized {
 		sw.OtherErrors++
-		info.Printf("PKT: %d Ack called before Seq", count)
+		//info.Printf("PKT: %d Ack called before Seq", count)
 	}
 	delta, err := diff(clock, t.sendUNA)
 	if err != nil {
@@ -566,19 +566,19 @@ func (t *Tracker) SendUNA() uint32 {
 func (t *Tracker) checkSack(sb sackBlock) error {
 	// block should ALWAYS have positive width
 	if width, err := diff(sb.Right, sb.Left); err != nil || width <= 0 {
-		sparse500.Println(ErrInvalidSackBlock, err, width, t.Acked())
+		//sparse500.Println(ErrInvalidSackBlock, err, width, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// block Right should ALWAYS be to the left of NextSeq()
 	// If not, we may have missed recording a packet!
 	if overlap, err := diff(t.SendNext(), sb.Right); err != nil || overlap < 0 {
-		sparse500.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
+		//sparse500.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// Left should be to the right of ack
 	if overlap, err := diff(sb.Left, t.sendUNA); err != nil || overlap < 0 {
 		// These often correspond to packets that show up as spurious retransmits in WireShark.
-		sparse500.Println(ErrLateSackBlock, err, overlap, t.Acked())
+		//sparse500.Println(ErrLateSackBlock, err, overlap, t.Acked())
 		return ErrLateSackBlock
 	}
 	return nil
@@ -589,13 +589,13 @@ func (t *Tracker) checkSack(sb sackBlock) error {
 func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 	if !t.initialized {
 		sw.OtherErrors++
-		info.Println(ErrTrackerNotInitialized)
+		//info.Println(ErrTrackerNotInitialized)
 	}
 	sw.Sacks++
 	// Auto gen code
 	if err := t.checkSack(sb); err != nil {
 		sw.BadSacks++
-		sparse500.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
+		//sparse500.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
 	}
 	//t.sacks = append(t.sacks, block)
 	t.sackBytes += uint64(sb.Right - sb.Left)
@@ -736,7 +736,7 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 	// TODO test case for wrong index.
 	optionType := opt.kind
 	if optionType > 15 {
-		info.Printf("TCP Option has illegal option type %d", opt.kind)
+		//info.Printf("TCP Option has illegal option type %d", opt.kind)
 		return
 	}
 	// TODO should some of these be counted in the opposite direction?
@@ -772,7 +772,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		if s.SrcPort != tcp.SrcPort {
 			s.Stats.SrcPortErrors++
 		}
-		window := int64(s.Window) << s.WindowScale
+		//window := int64(s.Window) << s.WindowScale
 		//var inflight int32
 		//info.Printf("Port:%20v packet:%d Seq:%10d Length:%5d SYN:%5v ACK:%5v", tcp.SrcPort, s.SeqTracker.packets, tcp.Seq, tcpLength, tcp.SYN, tcp.ACK)
 		if _, retransmit = s.SeqTracker.Seq(count, pTime, tcp.SeqNum, dataLength, tcp.SYN() || tcp.FIN(), &s.Stats); retransmit {
@@ -781,7 +781,8 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		// TODO handle error here?
 		remaining, err := diff(s.Limit, s.SeqTracker.SendNext())
 		if err != nil {
-			sparse500.Println("remaining diff err", s.Limit, s.SeqTracker.SendNext())
+			//sn := s.SeqTracker.SendNext()
+			//sparse500.Println("remaining diff err", s.Limit, sn)
 		}
 		if !tcp.SYN() {
 			if remaining < 0 {
@@ -790,10 +791,10 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 				// specified in the last ack.  But if pcaps did not capture the last ack, and
 				// that ack increased the window, then this might be a valid send, and an
 				// indication that we missed a packet in the capture.
-				sparse500.Println("Protocol violation, SendNext > Limit:", s.SrcPort, s.SeqTracker.SendNext(), s.Limit, s.SeqTracker.packets)
+				//q	sparse500.Println("Protocol violation, SendNext > Limit:", s.SrcPort, s.SeqTracker.SendNext(), s.Limit, s.SeqTracker.packets)
 				s.Stats.SendNextExceededLimit++
 			} else if remaining < int32(s.MSS) {
-				sparse500.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", window, remaining, s.MSS)
+				//	sparse500.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", window, remaining, s.MSS)
 			}
 		}
 		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
