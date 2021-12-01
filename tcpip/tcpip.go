@@ -185,7 +185,7 @@ func NewIPv6Header(data []byte) (*IPv6Wrapper, []byte, error) {
 
 		// TODO remove this check.
 	} else if len(data) == w.headerLength {
-		return w, []byte{}, nil
+		return w, nil, nil
 	}
 	return w, data[w.headerLength:], err
 }
@@ -402,8 +402,11 @@ func (s *Summary) Add(p *Packet) {
 	}
 
 	s.PayloadBytes += uint64(p.PayloadLength())
-	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.PayloadLength()), p.TCP(), p.tcp.Options, p.Ci)
-	s.RightState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.PayloadLength()), p.TCP(), p.tcp.Options, p.Ci)
+	tcpheader := raw[EthernetHeaderSize+p.ip.HeaderLength():]
+	optData := tcpheader[tcp.TCPHeaderSize : 4*int(tcpw.DataOffset>>4)]
+
+	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.PayloadLength()), p.TCP(), optData, p.Ci)
+	s.RightState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.PayloadLength()), p.TCP(), optData, p.Ci)
 	s.Packets++
 }
 
@@ -442,7 +445,7 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// This computed slice sizing alone changes the throughput in sandbox from about 640
 	// to about 820 MB/sec per instance.  No crashes after 2 hours.  GIT b46b033.
 	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
-	summary.Details = make([]string, 0, pcapSize/pktSize)
+	//summary.Details = make([]string, 0, pcapSize/pktSize)
 
 	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.

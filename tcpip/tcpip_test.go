@@ -269,6 +269,9 @@ func TestPCAPGarbage(t *testing.T) {
 //                                                           100	  18369065 ns/op	25097387 B/op	  843705 allocs/op
 
 // Explicit byte reversal:   BenchmarkGetPackets-8:          100	  13365349 ns/op	17741200 B/op	  453337 allocs/op
+//     														 100	  12855457 ns/op	17030489 B/op	  423784 allocs/op
+// remove log escapes, and handle options differently:
+// 							 BenchmarkGetPackets-8   	     100	  10343073 ns/op	11277722 B/op	  241635 allocs/op
 func BenchmarkGetPackets(b *testing.B) {
 	type src struct {
 		data    []byte

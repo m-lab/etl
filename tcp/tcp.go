@@ -250,7 +250,7 @@ func (o *tcpOption) processSACKs(f func(sackBlock, *StatsWrapper), sw *StatsWrap
 
 type TCPHeaderWrapper struct {
 	TCPHeaderGo
-	Options []tcpOption
+	xOptions []tcpOption
 }
 
 // This skips Nop options, and returns nil data there are no more options.
@@ -313,10 +313,13 @@ func ParseTCPOptions(data []byte) ([]tcpOption, error) {
 		if err != nil {
 			return nil, err
 		}
-		if len(data) == 0 || opt.kind == layers.TCPOptionKindEndList {
+		if opt.kind == layers.TCPOptionKindEndList {
 			break
 		}
 		options = append(options, opt)
+		if len(data) == 0 {
+			break
+		}
 	}
 	return options, nil
 }
@@ -332,7 +335,7 @@ func WrapTCP(data []byte, w *TCPHeaderWrapper) error {
 	}
 	tcp.ToTCPHeaderGo2(&w.TCPHeaderGo)
 	var err error
-	w.Options, err = ParseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
+	//w.Options, err = ParseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
 	return err
 }
 
@@ -715,7 +718,7 @@ func NewState(srcIP net.IP) *State {
 		Stats: StatsWrapper{TcpStats: TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
-func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt *tcpOption) {
+func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt tcpOption) {
 	tsVal, tsEcr, err := opt.GetTimestamps()
 	if err != nil {
 		log.Println(err, "on timestamp option")
@@ -762,7 +765,7 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 	case layers.TCPOptionKindMSS:
 		s.MSS, _ = opt.GetMSS()
 	case layers.TCPOptionKindTimestamps:
-		s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
+		s.handleTimestamp(pTime, retransmit, port == s.SrcPort, *opt)
 
 	case layers.TCPOptionKindWindowScale:
 		s.WindowScale, _ = opt.GetWS()
@@ -770,42 +773,50 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 	}
 }
 
-// // Options2 handles all options, both incoming and outgoing.
-// // The relTime value is used for Timestamp analysis.
-// func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, optData []byte) {
-// 	// TODO test case for wrong index.
+// Options2 handles all options, both incoming and outgoing.
+// The relTime value is used for Timestamp analysis.
+func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, optData []byte) error {
+	// TODO test case for wrong index.
 
-// 	optionType := opt.kind
-// 	if optionType > 15 {
-// 		//info.Printf("TCP Option has illegal option type %d", opt.kind)
-// 		return
-// 	}
-// 	// TODO should some of these be counted in the opposite direction?
-// 	s.Stats.Option(optionType)
+	for {
+		var opt tcpOption
+		var err error
+		optData, opt, err = NextOption(optData)
+		if err != nil {
+			return err
+		}
+		// TODO should some of these be counted in the opposite direction?
+		s.Stats.Option(opt.kind)
 
-// 	switch optionType {
-// 	case layers.TCPOptionKindSACK:
-// 		err := opt.processSACKs(s.SeqTracker.Sack, &s.Stats)
-// 		if err != nil {
-// 			log.Println(err, "on SACK option")
-// 			return
-// 		}
-// 		// for i := range sacks {
-// 		// 	s.SeqTracker.Sack(&sacks[i], &s.Stats)
-// 		// }
+		switch opt.kind {
+		case layers.TCPOptionKindEndList:
+			return nil
+		case layers.TCPOptionKindSACK:
+			err := opt.processSACKs(s.SeqTracker.Sack, &s.Stats)
+			if err != nil {
+				log.Println(err, "on SACK option")
+				return err
+			}
+			// for i := range sacks {
+			// 	s.SeqTracker.Sack(&sacks[i], &s.Stats)
+			// }
 
-// 	case layers.TCPOptionKindMSS:
-// 		s.MSS, _ = opt.GetMSS()
-// 	case layers.TCPOptionKindTimestamps:
-// 		s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
+		case layers.TCPOptionKindMSS:
+			s.MSS, _ = opt.GetMSS()
+		case layers.TCPOptionKindTimestamps:
+			s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
 
-// 	case layers.TCPOptionKindWindowScale:
-// 		s.WindowScale, _ = opt.GetWS()
-// 	default:
-// 	}
-// }
+		case layers.TCPOptionKindWindowScale:
+			s.WindowScale, _ = opt.GetWS()
+		default:
+		}
+		if len(optData) == 0 {
+			return nil
+		}
+	}
+}
 
-func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, options []tcpOption, ci gopacket.CaptureInfo) {
+func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, optData []byte, ci gopacket.CaptureInfo) {
 	dataLength := tcpLength - uint16(tcp.DataOffset)
 	pTime := ci.Timestamp
 	var retransmit bool
@@ -867,10 +878,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		}
 	}
 	// Handle options
-	for i := range options {
-		s.Option(tcp.SrcPort, retransmit, pTime, &options[i])
-	}
-
+	s.Options2(tcp.SrcPort, retransmit, pTime, optData)
 }
 
 func (s State) String() string {
