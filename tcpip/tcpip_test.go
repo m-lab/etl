@@ -311,3 +311,65 @@ func BenchmarkGetPackets(b *testing.B) {
 		}
 	})
 }
+
+// cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
+// Before packet count opt:    128	   8052268 ns/op	 219.25 MB/s	     36522 packets/op	28021501 B/op	   36747 allocs/op
+// After packet count opt:     234	   5896273 ns/op	 299.42 MB/s	     37099 packets/op	11927524 B/op	   37314 allocs/op
+//							   235	   5228191 ns/op	 337.68 MB/s	     37436 packets/op	12051418 B/op	   37652 allocs/op
+//							   236	   5022948 ns/op	 351.48 MB/s	     36786 packets/op	11827143 B/op	   37000 allocs/op
+//   ...                       159	   9528634 ns/op	 185.28 MB/s	     72868 packets/op	 9735622 B/op	  174743 allocs/op
+// Approximately 300 bytes/packet on average.
+// 							   100	  17760632 ns/op	  99.40 MB/s	     36078 packets/op	20975442 B/op	  658780 allocs/op
+//						       100	  17696214 ns/op	  99.77 MB/s	     72157 packets/op	20974294 B/op	  658772 allocs/op
+// Early top level only:     235	   5228191 ns/op	 337.68 MB/s	     37436 packets/op	12051418 B/op	   37652 allocs/op
+//    Approximately 300 bytes/packet on average.
+// Full jitter decoding      100	  18095458 ns/op	  97.56 MB/s	     36078 packets/op	20974779 B/op	  658774 allocs/op
+//     (rebasing)			 100	  22061225 ns/op	  80.03 MB/s	     72157 packets/op	20976420 B/op	  658777 allocs/op
+// Many optimizations        100	  10516581 ns/op	 167.87 MB/s	     36078 packets/op	11279018 B/op	  241638 allocs/op
+func BenchmarkProcessPackets2(b *testing.B) {
+	type tt struct {
+		data           []byte
+		numPkts        int
+		ipPayloadBytes int
+	}
+	tests := []tt{
+		// Approximately 220K packets, so this is about 140nsec/packet, and about 100 bytes/packet allocated,
+		// which is roughly the footprint of the packets themselves.
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797, 239251626},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172, 158096007},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097, 126523401},
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	b.ReportMetric(220000, "packets/op")
+
+	i := 0
+
+	numPkts := 0
+	ops := 0
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			test := tests[i%len(tests)]
+			ops++
+			numPkts += test.numPkts
+			i++
+			summary, err := tcpip.ProcessPackets("foo", "bar", test.data)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if summary.Packets != test.numPkts {
+				b.Errorf("expected %d packets, got %d", test.numPkts, summary.Packets)
+			}
+			if int(summary.PayloadBytes) != test.ipPayloadBytes {
+				b.Fatalf("total = %d, want %d", summary.PayloadBytes, test.ipPayloadBytes)
+			}
+			b.SetBytes(int64(len(test.data)))
+		}
+	})
+	b.Log("total packets", numPkts, "total ops", ops)
+	b.ReportMetric(float64(numPkts/ops), "packets/op")
+}
