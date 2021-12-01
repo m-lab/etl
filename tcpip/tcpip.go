@@ -12,7 +12,6 @@ package tcpip
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -41,16 +40,33 @@ var (
 	ErrUnknownEtherType        = fmt.Errorf("unknown Ethernet type")
 )
 
+// These provide byte swapping when running on LittleEndian systems.
+// Much much faster than binary.BigEndian.Uint...
+
+type BE16 [2]byte
+
+func (b BE16) Uint16() uint16 {
+	swap := [2]byte{b[1], b[0]}
+	return *(*uint16)(unsafe.Pointer(&swap))
+}
+
+type BE32 [4]byte
+
+func (b BE32) Uint32() uint32 {
+	swap := [4]byte{b[3], b[2], b[1], b[0]}
+	return *(*uint32)(unsafe.Pointer(&swap))
+}
+
 /******************************************************************************
 	 Ethernet Header
 ******************************************************************************/
 type EthernetHeader struct {
 	SrcMAC, DstMAC [6]byte
-	etherType      [2]byte // BigEndian
+	etherType      BE16 // BigEndian
 }
 
 func (e *EthernetHeader) EtherType() layers.EthernetType {
-	return layers.EthernetType(binary.BigEndian.Uint16(e.etherType[:]))
+	return layers.EthernetType(e.etherType.Uint16())
 }
 
 var EthernetHeaderSize = int(unsafe.Sizeof(EthernetHeader{}))
@@ -74,14 +90,14 @@ type IP interface {
 type IPv4Header struct {
 	versionIHL    uint8             // Version (4 bits) + Internet header length (4 bits)
 	typeOfService uint8             // Type of service
-	length        [2]byte           // Total length
-	id            [2]byte           // Identification
-	flagsFragOff  [2]byte           // Flags (3 bits) + Fragment offset (13 bits)
+	length        BE16              // Total length
+	id            BE16              // Identification
+	flagsFragOff  BE16              // Flags (3 bits) + Fragment offset (13 bits)
 	hopLimit      uint8             // Time to live
 	protocol      layers.IPProtocol // Protocol of next following bytes, after the options
-	checksum      [2]byte           // Header checksum
-	srcIP         [4]byte           // Source address
-	dstIP         [4]byte           // Destination address
+	checksum      BE16              // Header checksum
+	srcIP         BE32              // Source address
+	dstIP         BE32              // Destination address
 }
 
 var IPv4HeaderSize = int(unsafe.Sizeof(IPv4Header{}))
@@ -92,7 +108,7 @@ func (h *IPv4Header) Version() uint8 {
 
 func (h *IPv4Header) PayloadLength() int {
 	ihl := h.versionIHL & 0x0f
-	return int(binary.BigEndian.Uint16(h.length[:]) - uint16(4*ihl))
+	return int(h.length.Uint16()) - int(ihl*4)
 }
 
 func (h *IPv4Header) SrcIP() net.IP {
@@ -142,8 +158,8 @@ type EHWrapper struct {
 
 // IPv6Header struct for IPv6 header
 type IPv6Header struct {
-	versionTrafficClassFlowLabel [4]byte           // Version (4 bits) + Traffic class (8 bits) + Flow label (20 bits)
-	payloadLength                [2]byte           // Original payload length, NOT the payload size of the captured packet.
+	versionTrafficClassFlowLabel BE32              // Version (4 bits) + Traffic class (8 bits) + Flow label (20 bits)
+	payloadLength                BE16              // Original payload length, NOT the payload size of the captured packet.
 	nextHeader                   layers.IPProtocol // Protocol of next layer/header
 	hopLimit                     uint8             // Hop limit
 	srcIP                        [16]byte
@@ -181,7 +197,7 @@ func (h *IPv6Header) Version() uint8 {
 }
 
 func (h *IPv6Header) PayloadLength() int {
-	return int(binary.BigEndian.Uint16(h.payloadLength[:]))
+	return int(h.payloadLength.Uint16())
 }
 
 func (h *IPv6Header) SrcIP() net.IP {

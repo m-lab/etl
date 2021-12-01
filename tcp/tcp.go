@@ -2,7 +2,6 @@
 package tcp
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -42,18 +41,33 @@ var (
 	ErrTruncatedTCPHeader = fmt.Errorf("truncated TCP header")
 )
 
+type BE16 [2]byte
+
+func (b BE16) Uint16() uint16 {
+	swap := [2]byte{b[1], b[0]}
+	return *(*uint16)(unsafe.Pointer(&swap))
+}
+
+type BE32 [4]byte
+
+func (b BE32) Uint32() uint32 {
+	swap := [4]byte{b[3], b[2], b[1], b[0]}
+	return *(*uint32)(unsafe.Pointer(&swap))
+}
+
 /******************************************************************************
  * TCP Header and state machine
 ******************************************************************************/
 type TCPHeader struct {
-	srcPort, dstPort [2]byte // Source and destination port
-	seqNum           [4]byte // Sequence number
-	ackNum           [4]byte // Acknowledgement number
-	dataOffset       uint8   //  DataOffset: upper 4 bits
-	Flags                    // Flags
-	window           [2]byte // Window
-	checksum         [2]byte // Checksum
-	urgent           [2]byte // Urgent pointer
+	// TODO update these to use BE16 and BE32
+	srcPort, dstPort BE16  // Source and destination port
+	seqNum           BE32  // Sequence number
+	ackNum           BE32  // Acknowledgement number
+	dataOffset       uint8 //  DataOffset: upper 4 bits
+	Flags                  // Flags
+	window           BE16  // Window
+	checksum         BE16  // Checksum
+	urgent           BE16  // Urgent pointer
 }
 
 var TCPHeaderSize = int(unsafe.Sizeof(TCPHeader{}))
@@ -103,19 +117,16 @@ type TCPHeaderGo struct {
 	Urgent           uint16         // Urgent pointer
 }
 
-func (h *TCPHeader) XToTCPHeaderGo(out *TCPHeaderGo) error {
-	p := (*[unsafe.Sizeof(TCPHeader{})]byte)(unsafe.Pointer(&h))
-	return binary.Read(bytes.NewReader(p[:]), binary.BigEndian, &out)
-}
-
-func swap2(dst *uint16, src [2]byte) {
-	dstBytes := (*[2]byte)(unsafe.Pointer(dst))
+// TODO replace these calls with Uint16 and Uint32
+// and see if performance suffers.
+func swap2(dst *uint16, src BE16) {
+	dstBytes := (*BE16)(unsafe.Pointer(dst))
 	dstBytes[0] = src[1]
 	dstBytes[1] = src[0]
 }
 
-func swap4(dst *uint32, src [4]byte) {
-	dstBytes := (*[4]byte)(unsafe.Pointer(dst))
+func swap4(dst *uint32, src BE32) {
+	dstBytes := (*BE32)(unsafe.Pointer(dst))
 	dstBytes[0] = src[3]
 	dstBytes[1] = src[2]
 	dstBytes[2] = src[1]
@@ -622,8 +633,8 @@ func NewState(srcIP net.IP) *State {
 
 func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt layers.TCPOption) {
 	var TSVal, TSEcr uint32
-	pVal := (*[4]byte)(unsafe.Pointer(&TSVal))
-	pEcr := (*[4]byte)(unsafe.Pointer(&TSEcr))
+	pVal := (*BE32)(unsafe.Pointer(&TSVal))
+	pEcr := (*BE32)(unsafe.Pointer(&TSEcr))
 	for i := 0; i < 4; i++ {
 		pVal[i] = opt.OptionData[3-i]
 		pEcr[i] = opt.OptionData[7-i]
