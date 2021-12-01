@@ -152,9 +152,9 @@ func (h *TCPHeader) DataOffset() int {
 }
 
 type tcpOption struct {
-	kind layers.TCPOptionKind
-	len  uint8    // Length of entire option including kind and length.
-	data [38]byte // Overlay of actual binary option fields
+	kind layers.TCPOptionKind // Kind of option
+	len  uint8                // Length of entire option including kind and length.
+	data [38]byte             // Overlay of actual binary option fields, not likely to be full 38 bytes.
 }
 
 // USE WITH CAUTION:  This accesses an unsafe pointer.
@@ -182,7 +182,7 @@ func (o *tcpOption) getTS() (uint32, uint32) {
 }
 
 func (o *tcpOption) getSACK() []sackBlock {
-	blocks := make([]sackBlock, o.len/8)
+	blocks := make([]sackBlock, (o.len-2)/8)
 	for i := 0; i < int(o.len-2); i += 8 {
 		blocks = append(blocks, sackBlock{
 			Left:  o.getUint32(i / 4),
@@ -194,8 +194,7 @@ func (o *tcpOption) getSACK() []sackBlock {
 
 type TCPHeaderWrapper struct {
 	TCPHeaderGo
-	//optionData []byte
-	Options []layers.TCPOption
+	Options []tcpOption
 }
 
 // TODO - this currently uses about 6% of the CPU in the benchmark,
@@ -205,13 +204,13 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 	//copy(w.optionData, data)
 	//data = w.optionData // Just the slice, not the data.
 	if len(data) == 0 {
-		w.Options = make([]layers.TCPOption, 0, 0)
+		w.Options = make([]tcpOption, 0, 0)
 		return nil
 	}
 	// We could alternatively count the non-trivial
 	// options before allocating the slice.
 	// The choice of initial size is based on the tcpip benchmark test.
-	w.Options = make([]layers.TCPOption, 0, 1)
+	w.Options = make([]tcpOption, 0, 1)
 	// TODO - should we omit the empty option padding?
 	for len(data) > 0 {
 		overlay := (*tcpOption)(unsafe.Pointer(&data[0]))
@@ -227,18 +226,17 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 				log.Println("Truncated option field:", data)
 				return ErrTruncatedTCPHeader
 			}
-			// copy to a persistent Option struct
-			// This is fairly expensive!!
-			opt := layers.TCPOption{
-				OptionType:   overlay.kind,
-				OptionLength: overlay.len,
-				OptionData:   make([]byte, overlay.len-2),
-			}
+			// Make a persistent copy of the option data.
 			// This copy is required if we use zerocopy.  Would it
 			// be better to copy all the packet data, and then
 			// just use a slice of that data instead of copying?
-			copy(opt.OptionData, data[2:overlay.len])
-			switch opt.OptionType {
+			opt := tcpOption{
+				kind: overlay.kind,
+				len:  overlay.len,
+			}
+			copy(opt.data[:], data[:overlay.len])
+
+			switch opt.kind {
 			case layers.TCPOptionKindMSS:
 				fallthrough
 			case layers.TCPOptionKindTimestamps:
@@ -250,12 +248,12 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 			case layers.TCPOptionKindSACK:
 				fallthrough
 			default:
-				if len(data) < int(opt.OptionLength) {
+				if len(data) < int(opt.len) {
 					log.Println("Truncated option field:", data)
 					return ErrTruncatedTCPHeader
 				}
 				w.Options = append(w.Options, opt)
-				data = data[opt.OptionLength:]
+				data = data[opt.len:]
 			}
 		}
 	}
@@ -681,11 +679,11 @@ func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing b
 
 // Option handles all options, both incoming and outgoing.
 // The relTime value is used for Timestamp analysis.
-func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, opt layers.TCPOption) {
+func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, opt tcpOption) {
 	// TODO test case for wrong index.
-	optionType := opt.OptionType
+	optionType := opt.kind
 	if optionType > 15 {
-		info.Printf("TCP Option has illegal option type %d", opt.OptionType)
+		info.Printf("TCP Option has illegal option type %d", opt.kind)
 		return
 	}
 	// TODO should some of these be counted in the opposite direction?
@@ -727,7 +725,7 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 	}
 }
 
-func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, options []layers.TCPOption, ci gopacket.CaptureInfo) {
+func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, options []tcpOption, ci gopacket.CaptureInfo) {
 	dataLength := tcpLength - uint16(tcp.DataOffset)
 	pTime := ci.Timestamp
 	var retransmit bool
