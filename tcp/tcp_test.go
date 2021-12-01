@@ -200,23 +200,19 @@ func BenchmarkStateOptions(b *testing.B) {
 	s.SeqTracker.Seq(2, pTime, 1124, 2000, true, &s.Stats)
 	fakeOptions := []byte{
 		layers.TCPOptionKindMSS, 4, 0, 0,
-		layers.TCPOptionKindTimestamps, 14, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+		layers.TCPOptionKindTimestamps, 10, 0, 1, 2, 3, 4, 5, 6, 7,
 		layers.TCPOptionKindSACK, 18, 0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 3, 0, 0, 2, 4,
 	}
 	opts, err := tcp.ParseTCPOptions(fakeOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
-	_ = []layers.TCPOption{
-		{OptionType: layers.TCPOptionKindMSS, OptionLength: 4, OptionData: []byte{0x00, 0x00}},                                   // 5 nsec
-		{OptionType: layers.TCPOptionKindTimestamps, OptionLength: 14, OptionData: []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}}, // 18 nsec
-		{OptionType: layers.TCPOptionKindSACK, OptionLength: 18,
-			OptionData: []byte{0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 3, 0, 0, 2, 4}}, // 500 nsec -> 34 nsec
-	}
+	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		for _, opt := range opts {
 			// Explicit byte reversal improves this from 480 nsec (6 allocs, 120 bytes) to 56 nsec (no allocs) per op.
-			s.Option(port, false, pTime, opt)
+			s.Option(port, false, pTime, &opt)
 		}
 	}
 }

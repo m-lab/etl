@@ -1,4 +1,6 @@
 // Package tcp provides tools to reconstruct tcp state from pcap files.
+// It is structured as a model that consumes packets, and maintains
+// state and statistics about the connection.
 package tcp
 
 import (
@@ -14,6 +16,9 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/m-lab/go/logx"
 )
+
+// The Model should consume raw IP payloads of type IPProtocolTCP and update the model.
+// It might also take a tcpip.IP interface object for access to things like IP addresses???
 
 /*
 models for:
@@ -185,22 +190,62 @@ func (o *tcpOption) GetWS() (uint8, error) {
 
 func (o *tcpOption) GetTimestamps() (uint32, uint32, error) {
 	if o.kind != layers.TCPOptionKindTimestamps || o.len != 10 {
+		log.Println(o.len)
 		return 0, 0, ErrBadOption
 	}
 	return o.getUint32(0), o.getUint32(1), nil
 }
 
-func (o *tcpOption) GetSACKs() ([]sackBlock, error) {
+// This does not cause sackBlock to escape from stack.
+func (o *tcpOption) fillSackBlock(sb *sackBlock, i int) error {
+	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 || i > int(o.len-2)/8 || sb == nil {
+		return ErrBadOption
+	}
+	sb.Left = o.getUint32(2 * i)
+	sb.Right = o.getUint32(2*i + 1)
+	return nil
+}
+
+func (o *tcpOption) getSackBlock(i int) (sb sackBlock, err error) {
+	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 || i > int(o.len-2)/8 {
+		return sb, ErrBadOption
+	}
+	sb.Left = o.getUint32(2 * i)
+	sb.Right = o.getUint32(2*i + 1)
+	return sb, nil
+}
+
+// Obsolete
+func (o *tcpOption) xGetSACKs() ([]sackBlock, error) {
 	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 {
 		return nil, ErrBadOption
 	}
 	numBlocks := (int(o.len) - 2) / 8
 	blocks := make([]sackBlock, numBlocks)
+
 	for i := 0; i < numBlocks; i++ {
-		blocks[i].Left = o.getUint32(i * 2)
-		blocks[i].Right = o.getUint32(i*2 + 1)
+		o.fillSackBlock(&blocks[i], i)
 	}
 	return blocks, nil
+}
+
+func (o *tcpOption) processSACKs(f func(sackBlock, *StatsWrapper), sw *StatsWrapper) error {
+	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 {
+		return ErrBadOption
+	}
+	numBlocks := (int(o.len) - 2) / 8
+	// This alloc seems to cost only 15 nsec/call.
+	// unclear why this isn't on the stack.
+	//sb := sackBlock{} // This is faster than var sb sackBlock, though both do 1 alloc.
+	for i := 0; i < numBlocks; i++ {
+		//err := o.fillSackBlock(&sb, i)
+		sb, err := o.getSackBlock(i)
+		if err != nil {
+			return err
+		}
+		f(sb, sw)
+	}
+	return nil
 }
 
 type TCPHeaderWrapper struct {
@@ -233,7 +278,7 @@ func ParseTCPOptions(data []byte) ([]tcpOption, error) {
 			data = data[1:]
 		default:
 			if len(data) < 2 || len(data) < int(overlay.len) {
-				log.Println("Truncated option field:", data)
+				log.Println("Truncated option field:", overlay.kind, overlay.len)
 				return options, ErrTruncatedTCPHeader
 			}
 			// Make a persistent copy of the option data.
@@ -259,7 +304,7 @@ func ParseTCPOptions(data []byte) ([]tcpOption, error) {
 				fallthrough
 			default:
 				if len(data) < int(opt.len) {
-					log.Println("Truncated option field:", data)
+					log.Println("Truncated option field:", opt.kind, opt.len)
 					return options, ErrTruncatedTCPHeader
 				}
 				options = append(options, opt)
@@ -518,7 +563,7 @@ func (t *Tracker) SendUNA() uint32 {
 }
 
 // Check checks that a sack block is consistent with the current window.
-func (t *Tracker) checkSack(sb *sackBlock) error {
+func (t *Tracker) checkSack(sb sackBlock) error {
 	// block should ALWAYS have positive width
 	if width, err := diff(sb.Right, sb.Left); err != nil || width <= 0 {
 		sparse500.Println(ErrInvalidSackBlock, err, width, t.Acked())
@@ -541,7 +586,7 @@ func (t *Tracker) checkSack(sb *sackBlock) error {
 
 // Sack updates the counter with sack information (from other direction)
 // For some reason, this code causes a lot of runtime.newobject calls.
-func (t *Tracker) Sack(sb *sackBlock, sw *StatsWrapper) {
+func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 	if !t.initialized {
 		sw.OtherErrors++
 		info.Println(ErrTrackerNotInitialized)
@@ -664,7 +709,7 @@ func NewState(srcIP net.IP) *State {
 		Stats: StatsWrapper{TcpStats: TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
-func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt tcpOption) {
+func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt *tcpOption) {
 	tsVal, tsEcr, err := opt.GetTimestamps()
 	if err != nil {
 		log.Println(err, "on timestamp option")
@@ -687,7 +732,7 @@ func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing b
 
 // Option handles all options, both incoming and outgoing.
 // The relTime value is used for Timestamp analysis.
-func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, opt tcpOption) {
+func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, opt *tcpOption) {
 	// TODO test case for wrong index.
 	optionType := opt.kind
 	if optionType > 15 {
@@ -699,14 +744,14 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 
 	switch optionType {
 	case layers.TCPOptionKindSACK:
-		sacks, err := opt.GetSACKs()
+		err := opt.processSACKs(s.SeqTracker.Sack, &s.Stats)
 		if err != nil {
 			log.Println(err, "on SACK option")
 			return
 		}
-		for i := range sacks {
-			s.SeqTracker.Sack(&sacks[i], &s.Stats)
-		}
+		// for i := range sacks {
+		// 	s.SeqTracker.Sack(&sacks[i], &s.Stats)
+		// }
 
 	case layers.TCPOptionKindMSS:
 		s.MSS, _ = opt.GetMSS()
@@ -764,7 +809,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		// Handle all options, including SACKs from other direction
 		// TODO - should some of these be associated with the other direction?
 		for i := 0; i < len(options); i++ {
-			s.Option(tcp.SrcPort, retransmit, pTime, options[i])
+			s.Option(tcp.SrcPort, retransmit, pTime, &options[i])
 		}
 		if s.Window != tcp.Window {
 			s.Stats.WindowChanges++
@@ -780,8 +825,8 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		}
 	}
 	// Handle options
-	for _, opt := range options {
-		s.Option(tcp.SrcPort, retransmit, pTime, opt)
+	for i := range options {
+		s.Option(tcp.SrcPort, retransmit, pTime, &options[i])
 	}
 
 }
