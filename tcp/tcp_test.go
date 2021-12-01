@@ -262,14 +262,14 @@ func TestToTCPHeaderGo(t *testing.T) {
 	}
 }
 
-func BenchmarkToTCPHeaderBinary_Read(b *testing.B) {
-	var in tcp.TCPHeader
-	var out tcp.TCPHeaderGo
-	for i := 0; i < b.N; i++ {
-		_ = in.XToTCPHeaderGo(&out)
-	}
-	log.Println(out)
-}
+// func BenchmarkToTCPHeaderBinary_Read(b *testing.B) {
+// 	var in tcp.TCPHeader
+// 	var out tcp.TCPHeaderGo
+// 	for i := 0; i < b.N; i++ {
+// 		_ = in.XToTCPHeaderGo(&out)
+// 	}
+// 	log.Println(out)
+// }
 
 func BenchmarkToTCPHeaderGo_Swaps(b *testing.B) {
 	// These byte values are taken from a WireShark decoded packet.

@@ -151,48 +151,67 @@ func (h *TCPHeader) DataOffset() int {
 	return 4 * int(h.dataOffset>>4)
 }
 
-/*
-func (h *TCPHeader) SrcPort() layers.TCPPort {
-	var p layers.TCPPort
-	binary.Read(bytes.NewReader(h.srcPort[:]), binary.BigEndian, &p)
-	return p
-}
-
-func (h *TCPHeader) xDstPort() layers.TCPPort {
-	return layers.TCPPort(binary.BigEndian.Uint16(h.dstPort[:]))
-}
-
-
-func (h *TCPHeader) xWindow() uint16 {
-	return binary.BigEndian.Uint16(h.window[:])
-}
-
-func (h *TCPHeader) Seq() uint32 {
-	return binary.BigEndian.Uint32(h.seqNum[:])
-}
-
-func (h *TCPHeader) Ack() uint32 {
-	return binary.BigEndian.Uint32(h.ackNum[:])
-}
-*/
-
 type tcpOption struct {
 	kind layers.TCPOptionKind
-	len  uint8
-	data [38]byte
+	len  uint8    // Length of entire option including kind and length.
+	data [38]byte // Overlay of actual binary option fields
+}
+
+// USE WITH CAUTION:  This accesses an unsafe pointer.
+func (o *tcpOption) getUint32(i int) uint32 {
+	be := (*[10]BE32)(unsafe.Pointer(&o.data[0]))[i]
+	return be.Uint32()
+}
+
+// USE WITH CAUTION:  This accesses an unsafe pointer.
+func (o *tcpOption) getUint16(i int) uint16 {
+	be := (*[20]BE16)(unsafe.Pointer(&o.data[0]))[i]
+	return be.Uint16()
+}
+
+func (o *tcpOption) getMSS() uint16 {
+	return o.getUint16(0)
+}
+
+func (o *tcpOption) getWS() uint8 {
+	return o.data[0]
+}
+
+func (o *tcpOption) getTS() (uint32, uint32) {
+	return o.getUint32(0), o.getUint32(1)
+}
+
+func (o *tcpOption) getSACK() []sackBlock {
+	blocks := make([]sackBlock, o.len/8)
+	for i := 0; i < int(o.len-2); i += 8 {
+		blocks = append(blocks, sackBlock{
+			Left:  o.getUint32(i / 4),
+			Right: o.getUint32(i/4 + 1),
+		})
+	}
+	return blocks
 }
 
 type TCPHeaderWrapper struct {
 	TCPHeaderGo
+	//optionData []byte
 	Options []layers.TCPOption
 }
 
+// TODO - this currently uses about 6% of the CPU in the benchmark,
+// so it might be worth optimizing.  A lot of makeslice().
 func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
+	//w.optionData = make([]byte, len(data))
+	//copy(w.optionData, data)
+	//data = w.optionData // Just the slice, not the data.
 	if len(data) == 0 {
 		w.Options = make([]layers.TCPOption, 0, 0)
 		return nil
 	}
-	w.Options = make([]layers.TCPOption, 0, 2)
+	// We could alternatively count the non-trivial
+	// options before allocating the slice.
+	// The choice of initial size is based on the tcpip benchmark test.
+	w.Options = make([]layers.TCPOption, 0, 1)
 	// TODO - should we omit the empty option padding?
 	for len(data) > 0 {
 		overlay := (*tcpOption)(unsafe.Pointer(&data[0]))
@@ -215,6 +234,9 @@ func (w *TCPHeaderWrapper) parseTCPOptions(data []byte) error {
 				OptionLength: overlay.len,
 				OptionData:   make([]byte, overlay.len-2),
 			}
+			// This copy is required if we use zerocopy.  Would it
+			// be better to copy all the packet data, and then
+			// just use a slice of that data instead of copying?
 			copy(opt.OptionData, data[2:overlay.len])
 			switch opt.OptionType {
 			case layers.TCPOptionKindMSS:
@@ -486,7 +508,7 @@ func (t *Tracker) SendUNA() uint32 {
 }
 
 // Check checks that a sack block is consistent with the current window.
-func (t *Tracker) checkSack(sb sackBlock) error {
+func (t *Tracker) checkSack(sb *sackBlock) error {
 	// block should ALWAYS have positive width
 	if width, err := diff(sb.Right, sb.Left); err != nil || width <= 0 {
 		sparse500.Println(ErrInvalidSackBlock, err, width, t.Acked())
@@ -508,7 +530,8 @@ func (t *Tracker) checkSack(sb sackBlock) error {
 }
 
 // Sack updates the counter with sack information (from other direction)
-func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
+// For some reason, this code causes a lot of runtime.newobject calls.
+func (t *Tracker) Sack(sb *sackBlock, sw *StatsWrapper) {
 	if !t.initialized {
 		sw.OtherErrors++
 		info.Println(ErrTrackerNotInitialized)
@@ -680,7 +703,7 @@ func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, op
 				bl[j] = data[i*8+3-j]
 				bl[j+4] = data[i*8+7-j]
 			}
-			s.SeqTracker.Sack(block, &s.Stats)
+			s.SeqTracker.Sack(&block, &s.Stats)
 		}
 
 	case layers.TCPOptionKindMSS:
