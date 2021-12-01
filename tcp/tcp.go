@@ -809,9 +809,9 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		// Process ACKs and SACKs from the other direction
 		// Handle all options, including SACKs from other direction
 		// TODO - should some of these be associated with the other direction?
-		for i := 0; i < len(options); i++ {
-			s.Option(tcp.SrcPort, retransmit, pTime, &options[i])
-		}
+		// for i := 0; i < len(options); i++ {
+		// 	s.Option(tcp.SrcPort, retransmit, pTime, &options[i])
+		// }
 		if s.Window != tcp.Window {
 			s.Stats.WindowChanges++
 			s.Window = tcp.Window
