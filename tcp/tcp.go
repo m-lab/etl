@@ -489,15 +489,19 @@ func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, s
 		//badSeq.Printf("Bad seq %4X -> %4X\n", t.seq, clock)
 		return inflight, false
 	}
+	// TODO - why isn't this t.lastDataLength?
 	if delta < 0 {
-		// DO NOT update w.seq or w.lastDataLength, as this is a retransmit
+		// DO NOT update w.seq or w.lastDataLength, as this must be a retransmit
 		t.sent += uint64(length)
 		sw.Retransmit(length)
 		return inflight, true
 	}
+	if delta < int32(t.lastDataLength) {
+		log.Println(delta, "<", t.lastDataLength)
+	}
 
 	// Everything below applies only to new data packets, not retransmits
-	if delta != int32(t.lastDataLength) {
+	if delta > int32(t.lastDataLength) {
 		sw.MissingPackets++
 		//sparse500.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
 	}
@@ -808,6 +812,7 @@ func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, 
 				}
 			case layers.TCPOptionKindMSS:
 				s.MSS, _ = opt.GetMSS()
+				log.Println("MSS", s.MSS)
 			case layers.TCPOptionKindWindowScale:
 				s.WindowScale, _ = opt.GetWS()
 			default:
@@ -822,7 +827,10 @@ func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, 
 }
 
 func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, optData []byte, ci gopacket.CaptureInfo) {
-	dataLength := tcpLength - uint16(tcp.DataOffset)
+	dataLength := tcpLength - 4*uint16(tcp.DataOffset>>4)
+	if dataLength > 1500 {
+		log.Println(dataLength)
+	}
 	pTime := ci.Timestamp
 	var retransmit bool
 	if s.SrcIP.Equal(srcIP) {

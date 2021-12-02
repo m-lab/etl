@@ -157,7 +157,7 @@ type EHWrapper struct {
 // IPv6Header struct for IPv6 header
 type IPv6Header struct {
 	versionTrafficClassFlowLabel BE32              // Version (4 bits) + Traffic class (8 bits) + Flow label (20 bits)
-	payloadLength                BE16              // Original payload length, NOT the payload size of the captured packet.
+	payloadLength                BE16              // Original payload length, not including extensions.
 	nextHeader                   layers.IPProtocol // Protocol of next layer/header
 	hopLimit                     uint8             // Hop limit
 	srcIP                        [16]byte
@@ -194,7 +194,7 @@ func (h *IPv6Header) Version() uint8 {
 	return (h.versionTrafficClassFlowLabel[0] >> 4)
 }
 
-func (h *IPv6Header) PayloadLength() int {
+func (h *IPv6Header) xPayloadLength() int {
 	return int(h.payloadLength.Uint16())
 }
 
@@ -220,23 +220,30 @@ func (h *IPv6Header) NextProtocol() layers.IPProtocol {
 	return h.nextHeader
 }
 
-func (h *IPv6Header) HeaderLength() int {
+func (h *IPv6Header) xHeaderLength() int {
 	// BUG - this is WRONG
-	return IPv4HeaderSize
+	panic("Should never call this")
+	return IPv6HeaderSize
 }
 
-func assertV6IP(ip *IPv6Header) {
+func assertV6IP(ip *IPv6Wrapper) {
 	func(IP) {}(ip)
 }
 
 type IPv6Wrapper struct {
 	*IPv6Header
-	ext          []EHWrapper
-	headerLength int
+	ext           []EHWrapper
+	headerLength  int
+	payloadLength int // The remaining payload length, after each extension is account for.
 }
 
+// This is the total header length, including all the extension headers.
 func (w *IPv6Wrapper) HeaderLength() int {
 	return w.headerLength
+}
+
+func (w *IPv6Wrapper) PayloadLength() int {
+	return w.payloadLength
 }
 
 // func (w *IPv6Wrapper) payload() []byte {
@@ -250,9 +257,10 @@ func (w *IPv6Wrapper) HeaderLength() int {
 // data is the remainder of the header data, not including the IPv6 header.
 func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
 	w := IPv6Wrapper{
-		IPv6Header:   ip,
-		ext:          make([]EHWrapper, 0, 0),
-		headerLength: IPv6HeaderSize,
+		IPv6Header:    ip,
+		ext:           make([]EHWrapper, 0, 0),
+		headerLength:  IPv6HeaderSize,
+		payloadLength: int(ip.payloadLength.Uint16()), // The initial payload length, which will be adjusted.
 	}
 	if w.nextHeader == layers.IPProtocolNoNextHeader {
 		return &w, nil
@@ -284,6 +292,7 @@ func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
 			//payload:    data[8+eh.HeaderLength:],
 		})
 		w.headerLength += int(eh.HeaderLength) + 8
+		w.payloadLength -= int(eh.HeaderLength) + 8
 		data = data[8+eh.HeaderLength:]
 		np = eh.NextHeader
 	}
@@ -402,6 +411,11 @@ func (s *Summary) Add(p *Packet) {
 	}
 
 	s.PayloadBytes += uint64(p.PayloadLength())
+	if p.v4 != nil {
+		//log.Println(p.PayloadLength(), *p.v4)
+	} else if p.v6 != nil {
+		log.Println(p.PayloadLength(), *p.v6.IPv6Header)
+	}
 	tcpheader := raw[EthernetHeaderSize+p.ip.HeaderLength():]
 	optData := tcpheader[tcp.TCPHeaderSize : 4*int(tcpw.DataOffset>>4)]
 
