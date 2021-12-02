@@ -611,22 +611,63 @@ func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 	t.sackBytes += uint64(sb.Right - sb.Left)
 }
 
-// JitterTracker TODO
+// JitterTracker
+// TSVal is an incoming (or outgoing) tick value.  It's noise can be used to calculate one way jitter.
+// TSEcho is returned by the remote host.  It's value is used to calculate delay.
+// Only the earliest echo value should be used to compute delay.
+//
 //  Likely need to look for the first occurance, or perhaps the lowest delay occurance, of each TSVal,
 // and the corresponding first occurance of TSEcr.
 type JitterTracker struct {
 	initialized  bool
 	firstTSVal   uint32
 	firstPktTime time.Time
-	tickRate     time.Duration // Interval between ticks.  For server side this is always 1 msec.
+
+	tickRate time.Duration // Interval between ticks.  For server side this is always 1 msec.
+
+	// We should end up with tick lines, possibly converging or diverging.
+	// The actual delay is the gap between the two tick lines.
+	valLR  LinReg
+	echoLR LinReg
 
 	ValCount       int
 	ValOffsetSum   float64
 	ValOffsetSumSq float64
+	SumProdValPkt  float64 // sum of product of ValOffset and PktTimeOffset
 
-	EchoCount       int
-	EchoOffsetSum   float64
-	EchoOffsetSumSq float64
+	EchoCount     int
+	EchoOffsetSum float64
+}
+
+func (t *JitterTracker) ValLR() string {
+	return t.valLR.String()
+}
+
+func (t *JitterTracker) TickInterval() time.Duration {
+	return time.Duration(1000.0 / t.valLR.Slope())
+}
+
+func (t *JitterTracker) EchoLR() string {
+	return t.echoLR.String()
+}
+func (jt *JitterTracker) LRDelay(pktTime time.Time) float64 {
+	if jt.ValCount < 3 || jt.EchoCount < 3 {
+		return 0
+	}
+	dt := pktTime.Sub(jt.firstPktTime)
+	jitter := jt.valLR.Estimate(dt.Seconds())
+	delay := jt.echoLR.Estimate(dt.Seconds())
+	return (delay - jitter) / jt.valLR.Slope() // In seconds.
+}
+
+func (jt *JitterTracker) LRDelay0() time.Duration {
+	if jt.ValCount < 3 || jt.EchoCount < 3 {
+		return 0
+	}
+	t := jt.valLR.MeanX()
+	jitter := jt.valLR.Estimate(t) // This is the mean of Y in ticks.
+	delay := jt.echoLR.Estimate(t) // This is the mean of Y in ticks.
+	return time.Duration(1000000 * float64(jitter-delay) * float64(jt.TickInterval()))
 }
 
 // Adjust attempts to adjust the TSVal and pktTime to interval since the first reported packet.
@@ -646,6 +687,10 @@ func (jt *JitterTracker) Add(tsval uint32, pktTime time.Time) {
 		jt.initialized = true
 		return
 	}
+	dt := pktTime.Sub(jt.firstPktTime)                // actual elapsed time.
+	ticks := tsval - jt.firstTSVal                    // elapsed ticks.
+	jt.valLR.Add(dt.Seconds(), float64(ticks)/1000.0) // Compute as if ticks are in milliseconds.
+
 	t, p := jt.Adjust(tsval, pktTime)
 	offset := t - p
 	jt.ValCount++
@@ -660,11 +705,14 @@ func (jt *JitterTracker) AddEcho(tsecr uint32, pktTime time.Time) {
 	if !jt.initialized {
 		return
 	}
+	dt := pktTime.Sub(jt.firstPktTime)                 // actual elapsed time.
+	ticks := tsecr - jt.firstTSVal                     // elapsed ticks.
+	jt.echoLR.Add(dt.Seconds(), float64(ticks)/1000.0) // Compute as if ticks are in milliseconds.
+
 	t, p := jt.Adjust(tsecr, pktTime)
 	offset := t - p
 	jt.EchoCount++
 	jt.EchoOffsetSum += offset.Seconds()
-	jt.EchoOffsetSumSq += offset.Seconds() * offset.Seconds()
 }
 
 func (jt *JitterTracker) Mean() float64 {
@@ -672,6 +720,13 @@ func (jt *JitterTracker) Mean() float64 {
 		return 0
 	}
 	return jt.ValOffsetSum / float64(jt.ValCount)
+}
+
+func (jt *JitterTracker) LRJitter() float64 {
+	if jt.ValCount == 0 {
+		return 0
+	}
+	return math.Sqrt(jt.valLR.YVar())
 }
 
 func (jt *JitterTracker) Jitter() float64 {
@@ -822,7 +877,7 @@ func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, 
 }
 
 func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, optData []byte, ci gopacket.CaptureInfo) {
-	dataLength := tcpLength - uint16(tcp.DataOffset)
+	dataLength := tcpLength - 4*uint16(tcp.DataOffset>>4)
 	pTime := ci.Timestamp
 	var retransmit bool
 	if s.SrcIP.Equal(srcIP) {
