@@ -231,6 +231,7 @@ func (o *tcpOption) xGetSACKs() ([]sackBlock, error) {
 
 func (o *tcpOption) processSACKs(f func(sackBlock, *StatsWrapper), sw *StatsWrapper) error {
 	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 {
+		log.Println("TCP option is not SACK")
 		return ErrBadOption
 	}
 	numBlocks := (int(o.len) - 2) / 8
@@ -713,11 +714,12 @@ type State struct {
 	Jitter JitterTracker
 }
 
-func NewState(srcIP net.IP) *State {
-	return &State{SrcIP: srcIP, SeqTracker: NewTracker(),
+func NewState(srcIP net.IP, srcPort layers.TCPPort) *State {
+	return &State{SrcIP: srcIP, SrcPort: srcPort, SeqTracker: NewTracker(),
 		Stats: StatsWrapper{TcpStats: TcpStats{OptionCounts: make([]int64, 16)}}}
 }
 
+// TODO - should only handle the earliest response for each value???
 func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt tcpOption) {
 	tsVal, tsEcr, err := opt.GetTimestamps()
 	if err != nil {
@@ -734,14 +736,15 @@ func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing b
 			// 	avgSeconds, float32(t)/1e9, float32(p)/1e9, float32(delta)/1e9, s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
 		}
 	} else if tsEcr != 0 {
+		// TODO - what if !isOutgoing and retransmit?
 		//log.Println(s.SrcPort, "TSEcr", binary.BigEndian.Uint32(opt.OptionData[4:8]))
 		s.Jitter.AddEcho(tsEcr, pktTime)
 	}
 }
 
-// Option handles all options, both incoming and outgoing.
+// ObsoleteOption handles all options, both incoming and outgoing.
 // The relTime value is used for Timestamp analysis.
-func (s *State) Option(port layers.TCPPort, retransmit bool, pTime time.Time, opt *tcpOption) {
+func (s *State) ObsoleteOption(port layers.TCPPort, retransmit bool, pTime time.Time, opt *tcpOption) {
 	// TODO test case for wrong index.
 	optionType := opt.kind
 	if optionType > 15 {
@@ -785,35 +788,37 @@ func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, 
 		if err != nil {
 			return err
 		}
-		// TODO should some of these be counted in the opposite direction?
-		s.Stats.Option(opt.kind)
-
-		switch opt.kind {
-		case layers.TCPOptionKindEndList:
-			return nil
-		case layers.TCPOptionKindSACK:
-			err := opt.processSACKs(s.SeqTracker.Sack, &s.Stats)
-			if err != nil {
-				log.Println(err, "on SACK option")
-				return err
-			}
-			// for i := range sacks {
-			// 	s.SeqTracker.Sack(&sacks[i], &s.Stats)
-			// }
-
-		case layers.TCPOptionKindMSS:
-			s.MSS, _ = opt.GetMSS()
-		case layers.TCPOptionKindTimestamps:
+		if opt.kind == layers.TCPOptionKindEndList {
+			break
+		}
+		// We need to process timestamp going both directions.
+		if opt.kind == layers.TCPOptionKindTimestamps {
 			s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
+		}
+		// All others, we handle only outgoing.
+		if port == s.SrcPort {
+			// Just count (all) the non-trivial options for the matching direction.
+			s.Stats.Option(opt.kind)
 
-		case layers.TCPOptionKindWindowScale:
-			s.WindowScale, _ = opt.GetWS()
-		default:
+			switch opt.kind {
+			case layers.TCPOptionKindSACK:
+				err := opt.processSACKs(s.SeqTracker.Sack, &s.Stats)
+				if err != nil {
+					log.Println(err, "on SACK option")
+				}
+			case layers.TCPOptionKindMSS:
+				s.MSS, _ = opt.GetMSS()
+			case layers.TCPOptionKindWindowScale:
+				s.WindowScale, _ = opt.GetWS()
+			default:
+				// Do nothing for now.
+			}
 		}
 		if len(optData) == 0 {
-			return nil
+			break
 		}
 	}
+	return nil
 }
 
 func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, optData []byte, ci gopacket.CaptureInfo) {

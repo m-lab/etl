@@ -134,9 +134,8 @@ func TestSummary(t *testing.T) {
 		packets                           int
 		leftRetransmits, rightRetransmits int64
 		leftSacks, rightSacks             int64
-		truncated                         int64
 		exceeded                          int64
-		leftTimestamps                    int64
+		leftTimestamps, rightTimestamps   int64
 	}
 	tests := []test{
 		// Some of these have mysteriously changed, so we should determine why.  Perhaps related to retransmits?
@@ -146,14 +145,14 @@ func TestSummary(t *testing.T) {
 		// tcp_test.go:187: test:ipv6: Timestamps = 15, want 22
 		// tcp_test.go:187: test:protocolErrors2: Timestamps = 5178, want 8542
 		// tcp_test.go:187: test:foobar: Timestamps = 49, want 77
-		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap",
-			packets: 336, leftRetransmits: 11, rightRetransmits: 8, truncated: 0, exceeded: 57, leftTimestamps: 336, leftSacks: 55, rightSacks: 55},
-		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 5, leftTimestamps: 15, leftSacks: 0, rightSacks: 0},
-		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz",
-			packets: 5180, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 2890, leftTimestamps: 5178, leftSacks: 0, rightSacks: 0},
-		{name: "foobar", fn: "testfiles/ndt-xkrzj_1632230485_0000000000AE8EE2.pcap.gz",
-			packets: 49, leftRetransmits: 0, rightRetransmits: 0, truncated: 0, exceeded: 22, leftTimestamps: 49, leftSacks: 0, rightSacks: 0},
+		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap", packets: 336,
+			leftRetransmits: 11, rightRetransmits: 8, exceeded: 57, leftSacks: 31, rightSacks: 24, leftTimestamps: 162, rightTimestamps: 174},
+		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz", packets: 15,
+			leftRetransmits: 0, rightRetransmits: 0, exceeded: 5, leftSacks: 0, rightSacks: 0, leftTimestamps: 8, rightTimestamps: 7},
+		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz", packets: 5180,
+			leftRetransmits: 0, rightRetransmits: 0, exceeded: 2890, leftSacks: 0, rightSacks: 0, leftTimestamps: 1814, rightTimestamps: 3364},
+		{name: "foobar", fn: "testfiles/ndt-xkrzj_1632230485_0000000000AE8EE2.pcap.gz", packets: 49,
+			leftRetransmits: 0, rightRetransmits: 0, exceeded: 22, leftSacks: 0, rightSacks: 0, leftTimestamps: 21, rightTimestamps: 28},
 	}
 	for _, tt := range tests {
 		f, err := os.Open(tt.fn)
@@ -165,6 +164,14 @@ func TestSummary(t *testing.T) {
 			t.Fatal(err)
 		}
 		summary, err := ProcessPackets(data)
+		if summary.LeftState.Stats.SrcPortErrors > 0 || summary.LeftState.Stats.DstPortErrors > 0 {
+			t.Fatal("Mismatching ports", summary.SrcPort, summary.LeftState.Stats.SrcPortErrors,
+				summary.DstPort, summary.LeftState.Stats.DstPortErrors)
+		}
+		if summary.RightState.Stats.SrcPortErrors > 0 || summary.LeftState.Stats.DstPortErrors > 0 {
+			t.Fatal("Mismatching ports", summary.SrcPort, summary.RightState.Stats.SrcPortErrors,
+				summary.DstPort, summary.RightState.Stats.DstPortErrors)
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -191,15 +198,19 @@ func TestSummary(t *testing.T) {
 			t.Errorf("test:%s: SendNextExceededLimit = %v, want %v", tt.name, summary.RightState.Stats.SendNextExceededLimit, tt.exceeded)
 		}
 		if summary.LeftState.Stats.OptionCounts[layers.TCPOptionKindTimestamps] != tt.leftTimestamps {
-			t.Errorf("test:%s: Timestamps = %v, want %v", tt.name,
+			t.Errorf("test:%s: Left Timestamps = %v, want %v", tt.name,
 				summary.LeftState.Stats.OptionCounts[layers.TCPOptionKindTimestamps], tt.leftTimestamps)
+		}
+		if summary.RightState.Stats.OptionCounts[layers.TCPOptionKindTimestamps] != tt.rightTimestamps {
+			t.Errorf("test:%s: Right Timestamps = %v, want %v", tt.name,
+				summary.RightState.Stats.OptionCounts[layers.TCPOptionKindTimestamps], tt.rightTimestamps)
 		}
 	}
 }
 
 func BenchmarkStateOptions(b *testing.B) {
 	port := layers.TCPPort(80)
-	s := tcp.NewState(net.IP{})
+	s := tcp.NewState(net.IP{}, port)
 	pTime := time.Now()
 	s.SeqTracker.Seq(0, pTime, 123, 0, true, &s.Stats)
 	s.SeqTracker.Seq(1, pTime, 124, 1000, false, &s.Stats)
@@ -218,7 +229,7 @@ func BenchmarkStateOptions(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, opt := range opts {
 			// Explicit byte reversal improves this from 480 nsec (6 allocs, 120 bytes) to 56 nsec (no allocs) per op.
-			s.Option(port, false, pTime, &opt)
+			s.ObsoleteOption(port, false, pTime, &opt)
 		}
 	}
 }

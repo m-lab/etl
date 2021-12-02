@@ -389,8 +389,8 @@ func (s *Summary) Add(p *Packet) {
 	if s.Packets == 0 {
 		s.FirstPacket = raw[:]
 		// ESCAPE These are escaping to the heap.
-		s.LeftState = tcp.NewState(ip.SrcIP())
-		s.RightState = tcp.NewState(ip.DstIP())
+		s.LeftState = tcp.NewState(ip.SrcIP(), tcpw.SrcPort)
+		s.RightState = tcp.NewState(ip.DstIP(), tcpw.DstPort)
 		s.StartTime = t
 		s.SrcIP = ip.SrcIP()
 		s.DstIP = ip.DstIP()
