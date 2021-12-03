@@ -25,6 +25,7 @@ require (
 	github.com/m-lab/tcp-info v1.5.3
 	github.com/m-lab/traceroute-caller v0.9.2-0.20210921210304-69fc51173486
 	github.com/m-lab/uuid-annotator v0.4.5
+	github.com/montanaflynn/stats v0.6.6
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.31.1 // indirect

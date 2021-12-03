@@ -164,6 +164,9 @@ func TestSummary(t *testing.T) {
 			t.Fatal(err)
 		}
 		summary, err := ProcessPackets(data)
+		rs := summary.RightState
+		ls := summary.LeftState
+
 		if summary.LeftState.Stats.SrcPortErrors > 0 || summary.LeftState.Stats.DstPortErrors > 0 {
 			t.Fatal("Mismatching ports", summary.SrcPort, summary.LeftState.Stats.SrcPortErrors,
 				summary.DstPort, summary.LeftState.Stats.DstPortErrors)
@@ -205,6 +208,12 @@ func TestSummary(t *testing.T) {
 			t.Errorf("test:%s: Right Timestamps = %v, want %v", tt.name,
 				summary.RightState.Stats.OptionCounts[layers.TCPOptionKindTimestamps], tt.rightTimestamps)
 		}
+		t.Log(ls.Jitter.ValLR(), rs.Jitter.ValLR())
+		t.Log(ls.Jitter.EchoLR(), rs.Jitter.EchoLR())
+		t.Errorf("Right: jitter %6.4f(%6.4f)    delay %10v(%9.4f)\n        "+
+			"     Left:  jitter %6.4f(%6.4f)    delay %10v(%9.4f) ",
+			rs.Jitter.LRJitter(), rs.Jitter.Jitter(), rs.Jitter.LRDelay0(), rs.Jitter.Delay(),
+			ls.Jitter.LRJitter(), ls.Jitter.Jitter(), ls.Jitter.LRDelay0(), ls.Jitter.Delay())
 	}
 }
 

@@ -328,19 +328,20 @@ func BenchmarkGetPackets(b *testing.B) {
 // Many optimizations 	     100	  10629111 ns/op	 166.10 MB/s	     36078 packets/op	11279236 B/op	  241639 allocs/op
 func BenchmarkProcessPackets2(b *testing.B) {
 	type tt struct {
-		data           []byte
-		numPkts        int
-		ipPayloadBytes int
+		data                  []byte
+		numPkts               int
+		ipPayloadBytes        int
+		leftSacks, rightSacks int
 	}
 	tests := []tt{
 		// Approximately 220K packets, so this is about 140nsec/packet, and about 100 bytes/packet allocated,
 		// which is roughly the footprint of the packets themselves.
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574},
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003},
-		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294},
-		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797, 239251626},
-		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172, 158096007},
-		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097, 126523401},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz"), 15, 4574, 0, 0},
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz"), 336, 167003, 31, 24}, // retransmits and SACKs
+		{getTestfileForBenchmark(b, "ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz"), 5180, 81408294, 0, 0},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005BA77.pcap.gz"), 40797, 239251626, 70557, 207},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B9EA.pcap.gz"), 146172, 158096007, 7, 195},
+		{getTestfileForBenchmark(b, "ndt-m6znc_1632401351_000000000005B90B.pcap.gz"), 30097, 126523401, 0, 0},
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -366,6 +367,10 @@ func BenchmarkProcessPackets2(b *testing.B) {
 			}
 			if int(summary.PayloadBytes) != test.ipPayloadBytes {
 				b.Fatalf("total = %d, want %d", summary.PayloadBytes, test.ipPayloadBytes)
+			}
+			if summary.LeftState.Stats.Sacks != int64(test.leftSacks) ||
+				summary.RightState.Stats.Sacks != int64(test.rightSacks) {
+				b.Log(test.numPkts, "packets -> SACKs:", summary.LeftState.Stats.Sacks, summary.RightState.Stats.Sacks)
 			}
 			b.SetBytes(int64(len(test.data)))
 		}

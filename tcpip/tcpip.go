@@ -414,7 +414,7 @@ func (s *Summary) Add(p *Packet) {
 	if p.v4 != nil {
 		//log.Println(p.PayloadLength(), *p.v4)
 	} else if p.v6 != nil {
-		log.Println(p.PayloadLength(), *p.v6.IPv6Header)
+		//	log.Println(p.PayloadLength(), *p.v6.IPv6Header)
 	}
 	tcpheader := raw[EthernetHeaderSize+p.ip.HeaderLength():]
 	optData := tcpheader[tcp.TCPHeaderSize : 4*int(tcpw.DataOffset>>4)]
