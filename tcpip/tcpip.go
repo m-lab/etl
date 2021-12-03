@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"time"
 	"unsafe"
 
@@ -23,12 +24,13 @@ import (
 	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/tcp"
+	"github.com/m-lab/go/logx"
 )
 
 var (
-	// info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
-	// sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
-	// sparse20     = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
+	info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
+	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
+	sparse10     = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
 
 	ErrTruncatedPcap           = fmt.Errorf("Truncated PCAP file")
 	ErrNoIPLayer               = fmt.Errorf("no IP layer")
@@ -311,6 +313,7 @@ func (p *Packet) TCP() *tcp.TCPHeaderGo {
 // ci is passed by value, since gopacket NoCopy doesn't preserve the values.
 func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
 	if len(data) < EthernetHeaderSize {
+		//return Packet{err: ErrTruncatedEthernetHeader}, nil
 		return Packet{err: ErrTruncatedEthernetHeader}, ErrTruncatedEthernetHeader
 	}
 	p := Packet{
@@ -447,16 +450,20 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
 	//summary.Details = make([]string, 0, pcapSize/pktSize)
 
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+	for data, ci, err := pcap.ReadPacketData(); err == nil; {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
-		p, err := Wrap(&ci, data)
-		if err != nil {
-			log.Println(archive, fn, err, data)
+		p, werr := Wrap(&ci, data)
+		if werr != nil {
+			sparse10.Println(archive, fn, err, data)
 			summary.Errors[summary.Packets] = err
-			continue
+			continue // BUG
 		}
-		// This now includes some of the TCP state modelling.
-		summary.Add(&p)
+
+		if p.err == nil {
+			// This now includes some of the TCP state modelling.
+			summary.Add(&p)
+		}
+		data, ci, err = pcap.ReadPacketData()
 	}
 
 	if err != nil {

@@ -19,7 +19,7 @@ const (
 	pcapGCSPath  = "gs://archive-measurement-lab/ndt/pcap/2021/07/22/"
 )
 
-func TestPCAPParser_ParseAndInsert(t *testing.T) {
+func xTestPCAPParser_ParseAndInsert(t *testing.T) {
 	ins := newInMemorySink()
 	n := parser.NewPCAPParser(ins, "test", "_suffix", &fakeAnnotator{})
 
