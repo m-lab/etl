@@ -210,10 +210,10 @@ func TestSummary(t *testing.T) {
 		}
 		t.Log(ls.Jitter.ValLR(), rs.Jitter.ValLR())
 		t.Log(ls.Jitter.EchoLR(), rs.Jitter.EchoLR())
-		t.Errorf("Right: jitter %6.4f(%6.4f)    delay %10v(%9.4f)\n        "+
-			"     Left:  jitter %6.4f(%6.4f)    delay %10v(%9.4f) ",
-			rs.Jitter.LRJitter(), rs.Jitter.Jitter(), rs.Jitter.LRDelay0(), rs.Jitter.Delay(),
-			ls.Jitter.LRJitter(), ls.Jitter.Jitter(), ls.Jitter.LRDelay0(), ls.Jitter.Delay())
+		// t.Errorf("Right: jitter %6.4f(%6.4f)    delay %10v(%9.4f)\n        "+
+		// 	"     Left:  jitter %6.4f(%6.4f)    delay %10v(%9.4f) ",
+		// 	rs.Jitter.LRJitter(), rs.Jitter.Jitter(), rs.Jitter.LRDelay0(), rs.Jitter.Delay(),
+		// 	ls.Jitter.LRJitter(), ls.Jitter.Jitter(), ls.Jitter.LRDelay0(), ls.Jitter.Delay())
 	}
 }
 
