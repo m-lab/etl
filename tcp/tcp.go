@@ -434,12 +434,12 @@ type Tracker struct {
 	// This will get very large - one entry per packet.
 	seqTimes map[uint32]seqInfo
 
-	iat *LogHistogram
+	*LogHistogram
 }
 
 func NewTracker() *Tracker {
 	iat, _ := NewHistogram(.0001, 1.0, 4.0)
-	return &Tracker{seqTimes: make(map[uint32]seqInfo, 100), iat: &iat}
+	return &Tracker{seqTimes: make(map[uint32]seqInfo, 100), LogHistogram: &iat}
 }
 
 func (t *Tracker) updateSendUNA(seq uint32, time time.Time) {
@@ -573,7 +573,7 @@ func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, s
 	si, ok := t.seqTimes[clock]
 	if ok {
 		// Only update InterArrivalTime when we find the corresponding sequence number in map.
-		t.iat.Add(pTime.Sub(t.sendUNATime).Seconds())
+		t.LogHistogram.Add(pTime.Sub(t.sendUNATime).Seconds())
 
 		// TODO should we keep the entry but mark it as acked?  Or keep a limited cache?
 		delete(t.seqTimes, clock)
