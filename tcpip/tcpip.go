@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"time"
 	"unsafe"
 
@@ -23,12 +24,13 @@ import (
 	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/tcp"
+	"github.com/m-lab/go/logx"
 )
 
 var (
-	// info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
-	// sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
-	// sparse20     = logx.NewLogEvery(sparseLogger, 50*time.Millisecond)
+	info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
+	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
+	sparse1      = logx.NewLogEvery(sparseLogger, 1000*time.Millisecond)
 
 	ErrTruncatedPcap           = fmt.Errorf("Truncated PCAP file")
 	ErrNoIPLayer               = fmt.Errorf("no IP layer")
@@ -496,6 +498,14 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 		// No packets.
 		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(summary.Packets))
 	}
+
+	// Log jitter stats for 1 pcap file per second
+	ls := summary.LeftState
+	rs := summary.RightState
+	sparse1.Printf("Left: jitter %6.4f(%6.4f)    delay %10v(%9.4f)\n        "+
+		"     Right:  jitter %6.4f(%6.4f)    delay %10v(%9.4f) ",
+		ls.Jitter.LRJitter(), ls.Jitter.Jitter(), ls.Jitter.LRDelay0(), ls.Jitter.Delay(),
+		rs.Jitter.LRJitter(), rs.Jitter.Jitter(), rs.Jitter.LRDelay0(), rs.Jitter.Delay())
 
 	return summary, nil
 }

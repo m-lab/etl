@@ -319,7 +319,7 @@ func BenchmarkGetPackets(b *testing.B) {
 //							   235	   5228191 ns/op	 337.68 MB/s	     37436 packets/op	12051418 B/op	   37652 allocs/op
 //							   236	   5022948 ns/op	 351.48 MB/s	     36786 packets/op	11827143 B/op	   37000 allocs/op
 //   ...                       159	   9528634 ns/op	 185.28 MB/s	     72868 packets/op	 9735622 B/op	  174743 allocs/op
-// Approximately 300 bytes/packet on average.
+// Approximately 700 bytes/packet on average.
 // 							   100	  17760632 ns/op	  99.40 MB/s	     36078 packets/op	20975442 B/op	  658780 allocs/op
 //						       100	  17696214 ns/op	  99.77 MB/s	     72157 packets/op	20974294 B/op	  658772 allocs/op
 // Early top level only:     235	   5228191 ns/op	 337.68 MB/s	     37436 packets/op	12051418 B/op	   37652 allocs/op
@@ -329,6 +329,7 @@ func BenchmarkGetPackets(b *testing.B) {
 // Many optimizations 	     100	  10629111 ns/op	 166.10 MB/s	     36078 packets/op	11279236 B/op	  241639 allocs/op
 // Better jitter compute     100	  11072329 ns/op	 159.45 MB/s	     36078 packets/op	10408367 B/op	  169478 allocs/op
 //                           100	  11393172 ns/op	 154.96 MB/s	     36078 packets/op	 9543012 B/op	  169480 allocs/op
+// Packet.From				 100	  11223040 ns/op	 157.31 MB/s	     36078 packets/op	 8676454 B/op	  133400 allocs/op - 240 bytes/packet
 func BenchmarkProcessPackets2(b *testing.B) {
 	type tt struct {
 		data                  []byte
