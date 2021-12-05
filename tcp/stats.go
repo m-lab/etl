@@ -75,6 +75,7 @@ type LogHistogram struct {
 	binsPerDecade float64 // number of bins per decade
 	count         int
 	logSum        float64
+	logBinSum     float64
 }
 
 func (s *LogHistogram) index(dt float64) int {
@@ -83,7 +84,10 @@ func (s *LogHistogram) index(dt float64) int {
 
 // Add updates the histogram with the given value.
 func (s *LogHistogram) Add(dt float64) {
+	s.logSum += math.Log10(dt)
 	i := s.index(dt)
+	s.logBinSum += s.LogBinValue(i)
+
 	if i < 0 {
 		s.Bins[0]++
 	} else if i >= len(s.Bins) {
@@ -93,27 +97,56 @@ func (s *LogHistogram) Add(dt float64) {
 	}
 }
 
-func (s *LogHistogram) Stats() (float64, float64, float64) {
+func (s *LogHistogram) LogBinValue(i int) float64 {
+	return math.Log10(s.min) * (float64(i) / float64(s.binsPerDecade))
+}
+
+func (s *LogHistogram) BinValue(i int) float64 {
+	return s.min * math.Pow(10.0, (float64(i)/float64(s.binsPerDecade)))
+}
+
+func (s *LogHistogram) Stats(useDelay bool) (float64, float64, float64) {
 	count := 0
 	p05 := 0.0
 	p50 := 0.0
 	p95 := 0.0
 	binVal := s.min
 
-	for _, n := range s.Bins {
-		count += n
-		if p05 == 0 && count > s.count/20 {
-			p05 = binVal
+	if !useDelay {
+		for _, n := range s.Bins {
+			count += n
+			if p05 == 0 && count > s.count/20 {
+				p05 = binVal
+			}
+			if p50 == 0 && count > s.count/2 {
+				p50 = binVal
+			}
+			if p95 == 0 && count > 19*s.count/20 {
+				p95 = binVal
+			}
+			binVal *= math.Pow(10.0, (1 / float64(s.binsPerDecade)))
 		}
-		if p50 == 0 && count > s.count/2 {
-			p50 = binVal
+	} else {
+		total := 0.0
+		for i, n := range s.Bins {
+			total += float64(n) * s.BinValue(i)
 		}
-		if p95 == 0 && count > 19*s.count/20 {
-			p95 = binVal
+		running := 0.0
+		for i, n := range s.Bins {
+			running += float64(n) * s.BinValue(i)
+			if p05 == 0 && running > total/20 {
+				p05 = s.BinValue(i)
+			}
+			if p50 == 0 && running > total/2 {
+				p50 = s.BinValue(i)
+			}
+			if p95 == 0 && running > 19*total/20 {
+				p95 = s.BinValue(i)
+			}
 		}
-		binVal *= math.Pow(10.0, (1 / float64(s.binsPerDecade)))
 	}
 	return p05, p50, p95
+
 }
 
 func NewHistogram(min float64, max float64, binsPerDecade float64) (LogHistogram, error) {
