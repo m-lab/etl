@@ -127,6 +127,10 @@ func (s *LogHistogram) Stats(useDelay bool) (float64, float64, float64) {
 			binVal *= math.Pow(10.0, (1 / float64(s.binsPerDecade)))
 		}
 	} else {
+		// TODO - this really should take real time into account.  Currently
+		// the histogram is scaled in ack packets, instead of time.
+		// Instead, we could increment float64 bins with samples uniform in
+		// time.
 		total := 0.0
 		for i, n := range s.Bins {
 			total += float64(n) * s.BinValue(i)

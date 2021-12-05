@@ -504,7 +504,7 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	rs := summary.RightState
 	l10, l50, l90 := ls.SeqTracker.Stats(true)
 	r10, r50, r90 := rs.SeqTracker.Stats(true)
-	sparse1.Printf("Left: jitter %6.4f(%6.4f)    delay %9.4f(%9.4f)  acks: %6.4f %6.4f %6.4f,   Right:  jitter %6.4f(%6.4f)    delay %9.4f(%9.4f)  acks: %6.4f %6.4f %6.4f",
+	sparse1.Printf("Left: jitter %6.4f(%6.4f)    delay %9.4f(%9.4f)  acks: %6.5f %6.5f %6.5f,   Right:  jitter %6.4f(%6.4f)    delay %9.4f(%9.4f)  acks: %6.5f %6.5f %6.5f",
 		ls.Jitter.LRJitter(), ls.Jitter.Jitter(), ls.Jitter.LRDelay0().Seconds(), ls.Jitter.Delay(),
 		l10, l50, l90,
 		rs.Jitter.LRJitter(), rs.Jitter.Jitter(), rs.Jitter.LRDelay0().Seconds, rs.Jitter.Delay(),
