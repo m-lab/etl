@@ -68,3 +68,37 @@ func (l *LinReg) String() string {
 	return fmt.Sprintf("Y = %9.5f X + %9.5f, %d points, R2 = %8.6f",
 		l.Slope(), l.Y/l.N-l.Slope()*l.X/l.N, int(l.N), l.R2())
 }
+
+type LogHistogram struct {
+	Bins          []int
+	min           float64 // minimum value in the histogram
+	binsPerDecade float64 // number of bins per decade
+}
+
+func (s *LogHistogram) index(dt float64) int {
+	return int(math.Round(s.binsPerDecade * math.Log10(dt/s.min)))
+}
+
+// Add updates the histogram with the given value.
+func (s *LogHistogram) Add(dt float64) {
+	i := s.index(dt)
+	if i < 0 {
+		s.Bins[0]++
+	} else if i >= len(s.Bins) {
+		s.Bins[len(s.Bins)-1]++
+	} else {
+		s.Bins[i]++
+	}
+}
+
+func NewHistogram(min float64, max float64, binsPerDecade float64) (LogHistogram, error) {
+	if min <= 0 || min >= max {
+		return LogHistogram{}, fmt.Errorf("min must be > 0 and < max")
+	}
+	numBins := 1 + int(math.Round(math.Log10(max/min))*binsPerDecade)
+	return LogHistogram{
+		Bins:          make([]int, numBins),
+		min:           min,
+		binsPerDecade: binsPerDecade,
+	}, nil
+}

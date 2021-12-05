@@ -418,11 +418,12 @@ type Tracker struct {
 	seq         uint32    // The last sequence number observed, not counting retransmits
 	synFin      uint32    // zero, one or two, depending on whether SYN and FIN have been sent
 
-	sendUNA  uint32 // greatest observed ack
-	acks     uint32 // number of acks (from other side)
-	onlyAcks uint32 // Number of packets that only have ACKs, no data.
-	acked    uint64 // bytes acked
-	maxGap   int32  // Max observed gap between acked and NextSeq()
+	sendUNA     uint32    // greatest observed ack
+	sendUNATime time.Time // time we saw greatest ack
+	acks        uint32    // number of acks (from other side)
+	onlyAcks    uint32    // Number of packets that only have ACKs, no data.
+	acked       uint64    // bytes acked
+	maxGap      int32     // Max observed gap between acked and NextSeq()
 
 	sent      uint64      // actual bytes sent, including retransmits, but not SYN or FIN
 	sacks     []sackBlock // keeps track of outstanding SACK blocks
@@ -432,10 +433,18 @@ type Tracker struct {
 
 	// This will get very large - one entry per packet.
 	seqTimes map[uint32]seqInfo
+
+	iat *LogHistogram
 }
 
 func NewTracker() *Tracker {
-	return &Tracker{seqTimes: make(map[uint32]seqInfo, 100)}
+	iat, _ := NewHistogram(.0001, 1.0, 4.0)
+	return &Tracker{seqTimes: make(map[uint32]seqInfo, 100), iat: &iat}
+}
+
+func (t *Tracker) updateSendUNA(seq uint32, time time.Time) {
+	t.sendUNA = seq
+	t.sendUNATime = time
 }
 
 func (t *Tracker) Summary() string {
@@ -548,9 +557,8 @@ func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, s
 	delta, err := diff(clock, t.sendUNA)
 	if err != nil {
 		sw.BadDeltas++
-		//badAck.Printf("Bad ack %4X -> %4X\n", t.sendUNA, clock)
 		// TODO should this sometimes update the sendUNA, or always?
-		t.sendUNA = clock // Let's assume we missed many many packets.
+		t.updateSendUNA(clock, pTime)
 		return 0, 0
 	}
 	if delta > 0 {
@@ -560,12 +568,17 @@ func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, s
 	if !withData {
 		t.onlyAcks++
 	}
-	defer func() { t.sendUNA = clock }()
+	defer t.updateSendUNA(clock, pTime)
+
 	si, ok := t.seqTimes[clock]
 	if ok {
+		// Only update InterArrivalTime when we find the corresponding sequence number in map.
+		t.iat.Add(pTime.Sub(t.sendUNATime).Seconds())
+
 		// TODO should we keep the entry but mark it as acked?  Or keep a limited cache?
 		delete(t.seqTimes, clock)
 		return si.count, pTime.Sub(si.pTime)
+
 	} else {
 		//sparse500.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
 		return 0, 0
