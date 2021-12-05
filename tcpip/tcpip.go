@@ -502,10 +502,9 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// Log jitter stats for 1 pcap file per second
 	ls := summary.LeftState
 	rs := summary.RightState
-	sparse1.Printf("Left: jitter %6.4f(%6.4f)    delay %10v(%9.4f)\n        "+
-		"     Right:  jitter %6.4f(%6.4f)    delay %10v(%9.4f) ",
-		ls.Jitter.LRJitter(), ls.Jitter.Jitter(), ls.Jitter.LRDelay0(), ls.Jitter.Delay(),
-		rs.Jitter.LRJitter(), rs.Jitter.Jitter(), rs.Jitter.LRDelay0(), rs.Jitter.Delay())
+	sparse1.Printf("Left: jitter %6.4f(%6.4f)    delay %9.4f(%9.4f)    Right:  jitter %6.4f(%6.4f)    delay %9.4f(%9.4f) ",
+		ls.Jitter.LRJitter(), ls.Jitter.Jitter(), ls.Jitter.LRDelay0().Seconds(), ls.Jitter.Delay(),
+		rs.Jitter.LRJitter(), rs.Jitter.Jitter(), rs.Jitter.LRDelay0().Seconds, rs.Jitter.Delay())
 
 	return summary, nil
 }
