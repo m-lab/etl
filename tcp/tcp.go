@@ -53,12 +53,24 @@ func (b BE16) Uint16() uint16 {
 	swap := [2]byte{b[1], b[0]}
 	return *(*uint16)(unsafe.Pointer(&swap))
 }
+func (b BE16) PutUint16(t *uint16) {
+	tt := (*[2]byte)(unsafe.Pointer(t))
+	*tt = [2]byte{b[1], b[0]}
+}
+func (b BE16) PutTCPPort(t *layers.TCPPort) {
+	tt := (*[2]byte)(unsafe.Pointer(t))
+	*tt = [2]byte{b[1], b[0]}
+}
 
 type BE32 [4]byte
 
 func (b BE32) Uint32() uint32 {
 	swap := [4]byte{b[3], b[2], b[1], b[0]}
 	return *(*uint32)(unsafe.Pointer(&swap))
+}
+func (b BE32) PutUint32(t *uint32) {
+	tt := (*[4]byte)(unsafe.Pointer(t))
+	*tt = [4]byte{b[3], b[2], b[1], b[0]}
 }
 
 /******************************************************************************
@@ -116,44 +128,38 @@ type TCPHeaderGo struct {
 	SrcPort, DstPort layers.TCPPort // Source and destination port
 	SeqNum           uint32         // Sequence number
 	AckNum           uint32         // Acknowledgement number
-	DataOffset       uint8          //  DataOffset: upper 4 bits
+	DataOffset       uint8          // The actual data offset (different from binary tcp field)
 	Flags                           // Flags
 	Window           uint16         // Window
 	Checksum         uint16         // Checksum
 	Urgent           uint16         // Urgent pointer
 }
 
-// TODO replace these calls with Uint16 and Uint32
-// and see if performance suffers.
-func swap2(dst *uint16, src BE16) {
-	dstBytes := (*BE16)(unsafe.Pointer(dst))
-	dstBytes[0] = src[1]
-	dstBytes[1] = src[0]
+// From populates the header from binary TCPHeader data, in bigendian.
+// Works correctly only on LittleEndian architecture machines.
+func (hdr *TCPHeaderGo) From(data []byte) error {
+	if len(data) < TCPHeaderSize {
+		return ErrTruncatedTCPHeader
+	}
+	tcp := (*TCPHeader)(unsafe.Pointer(&data[0]))
+	tcp.srcPort.PutTCPPort(&hdr.SrcPort)
+	tcp.dstPort.PutTCPPort(&hdr.DstPort)
+	tcp.seqNum.PutUint32(&hdr.SeqNum)
+	tcp.ackNum.PutUint32(&hdr.AckNum)
+	hdr.DataOffset = 4 * (tcp.dataOffset >> 4)
+	hdr.Flags = tcp.Flags
+	tcp.window.PutUint16(&hdr.Window)
+	tcp.checksum.PutUint16(&hdr.Checksum)
+	tcp.urgent.PutUint16(&hdr.Urgent)
+
+	if int(hdr.DataOffset) > len(data) {
+		return ErrTruncatedTCPHeader
+	}
+
+	return nil
 }
 
-func swap4(dst *uint32, src BE32) {
-	dstBytes := (*BE32)(unsafe.Pointer(dst))
-	dstBytes[0] = src[3]
-	dstBytes[1] = src[2]
-	dstBytes[2] = src[1]
-	dstBytes[3] = src[0]
-}
-
-// ToTCPHeaderGo is a very fast converter.  encoding/binary takes 350nsec.
-// This function takes 11 nsec.
-func (h *TCPHeader) ToTCPHeaderGo2(out *TCPHeaderGo) {
-	swap2((*uint16)(&out.SrcPort), h.srcPort)
-	swap2((*uint16)(&out.DstPort), h.dstPort)
-	swap4((*uint32)(&out.SeqNum), h.seqNum)
-	swap4((*uint32)(&out.AckNum), h.ackNum)
-	swap2((*uint16)(&out.Window), h.window)
-	swap2((*uint16)(&out.Checksum), h.checksum)
-	swap2((*uint16)(&out.Urgent), h.urgent)
-	out.DataOffset = h.dataOffset
-	out.Flags = h.Flags
-}
-
-func (h *TCPHeader) DataOffset() int {
+func (h *TCPHeader) xDataOffset() int {
 	return 4 * int(h.dataOffset>>4)
 }
 
@@ -215,20 +221,7 @@ func (o *tcpOption) getSackBlock(i int) (sb sackBlock, err error) {
 	return sb, nil
 }
 
-// Obsolete
-func (o *tcpOption) xGetSACKs() ([]sackBlock, error) {
-	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 {
-		return nil, ErrBadOption
-	}
-	numBlocks := (int(o.len) - 2) / 8
-	blocks := make([]sackBlock, numBlocks)
-
-	for i := 0; i < numBlocks; i++ {
-		o.fillSackBlock(&blocks[i], i)
-	}
-	return blocks, nil
-}
-
+// Could we avoid escapes by moving this to a stats object?
 func (o *tcpOption) processSACKs(f func(sackBlock, *StatsWrapper), sw *StatsWrapper) error {
 	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 {
 		log.Println("TCP option is not SACK")
@@ -247,11 +240,6 @@ func (o *tcpOption) processSACKs(f func(sackBlock, *StatsWrapper), sw *StatsWrap
 		f(sb, sw)
 	}
 	return nil
-}
-
-type TCPHeaderWrapper struct {
-	TCPHeaderGo
-	xOptions []tcpOption
 }
 
 // This skips Nop options, and returns nil data there are no more options.
@@ -295,7 +283,7 @@ func NextOption(data []byte) ([]byte, tcpOption, error) {
 
 // TODO - this currently uses about 6% of the CPU in the benchmark,
 // so it might be worth optimizing.  A lot of makeslice().
-func ParseTCPOptions(data []byte) ([]tcpOption, error) {
+func ObsoleteParseTCPOptions(data []byte) ([]tcpOption, error) {
 	//w.optionData = make([]byte, len(data))
 	//copy(w.optionData, data)
 	//data = w.optionData // Just the slice, not the data.
@@ -323,21 +311,6 @@ func ParseTCPOptions(data []byte) ([]tcpOption, error) {
 		}
 	}
 	return options, nil
-}
-
-func WrapTCP(data []byte, w *TCPHeaderWrapper) error {
-	if len(data) < TCPHeaderSize {
-		return ErrTruncatedTCPHeader
-	}
-
-	tcp := (*TCPHeader)(unsafe.Pointer(&data[0]))
-	if tcp.DataOffset() > len(data) {
-		return ErrTruncatedTCPHeader
-	}
-	tcp.ToTCPHeaderGo2(&w.TCPHeaderGo)
-	var err error
-	//w.Options, err = ParseTCPOptions(data[TCPHeaderSize:tcp.DataOffset()])
-	return err
 }
 
 type TcpStats struct {
@@ -816,9 +789,6 @@ func (s *State) ObsoleteOption(port layers.TCPPort, retransmit bool, pTime time.
 			log.Println(err, "on SACK option")
 			return
 		}
-		// for i := range sacks {
-		// 	s.SeqTracker.Sack(&sacks[i], &s.Stats)
-		// }
 
 	case layers.TCPOptionKindMSS:
 		s.MSS, _ = opt.GetMSS()
@@ -832,7 +802,8 @@ func (s *State) ObsoleteOption(port layers.TCPPort, retransmit bool, pTime time.
 }
 
 // Options2 handles all options, both incoming and outgoing.
-// The relTime value is used for Timestamp analysis.
+// It operates on the raw option byte slice, so it's benchmark appears slower,
+// but is actually faster.
 func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, optData []byte) error {
 	// TODO test case for wrong index.
 
@@ -877,7 +848,7 @@ func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, 
 }
 
 func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, optData []byte, ci gopacket.CaptureInfo) {
-	dataLength := tcpLength - 4*uint16(tcp.DataOffset>>4)
+	dataLength := tcpLength - uint16(tcp.DataOffset)
 	pTime := ci.Timestamp
 	var retransmit bool
 	if s.SrcIP.Equal(srcIP) {

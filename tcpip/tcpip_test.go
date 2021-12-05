@@ -195,10 +195,11 @@ func ProcessShortPackets(t *testing.T, data []byte) {
 		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
 	}
 
+	p := tcpip.Packet{}
 	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
 		for i := 0; i < len(data); i++ {
-			tcpip.Wrap(&ci, data[:i])
-			tcpip.Wrap(&ci, data[i:])
+			p.From(&ci, data[:i])
+			p.From(&ci, data[i:])
 		}
 	}
 }
@@ -326,6 +327,8 @@ func BenchmarkGetPackets(b *testing.B) {
 // Full jitter decoding      100	  18095458 ns/op	  97.56 MB/s	     36078 packets/op	20974779 B/op	  658774 allocs/op
 //     (rebasing)			 100	  22061225 ns/op	  80.03 MB/s	     72157 packets/op	20976420 B/op	  658777 allocs/op
 // Many optimizations 	     100	  10629111 ns/op	 166.10 MB/s	     36078 packets/op	11279236 B/op	  241639 allocs/op
+// Better jitter compute     100	  11072329 ns/op	 159.45 MB/s	     36078 packets/op	10408367 B/op	  169478 allocs/op
+//                           100	  11393172 ns/op	 154.96 MB/s	     36078 packets/op	 9543012 B/op	  169480 allocs/op
 func BenchmarkProcessPackets2(b *testing.B) {
 	type tt struct {
 		data                  []byte

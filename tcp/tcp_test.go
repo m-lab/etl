@@ -113,9 +113,10 @@ func ProcessPackets(data []byte) (tcpip.Summary, error) {
 
 	summary.Details = make([]string, 0, 1000)
 
+	p := tcpip.Packet{}
 	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
-		p, err := tcpip.Wrap(&ci, data)
+		err := p.From(&ci, data)
 		if err != nil {
 			summary.Errors[summary.Packets] = err
 			continue
@@ -217,7 +218,8 @@ func TestSummary(t *testing.T) {
 	}
 }
 
-func BenchmarkStateOptions(b *testing.B) {
+//    	 3276956	       360.8 ns/op	     288 B/op	       3 allocs/op
+func BenchmarkState_ObsoleteOptions(b *testing.B) {
 	port := layers.TCPPort(80)
 	s := tcp.NewState(net.IP{}, port)
 	pTime := time.Now()
@@ -229,17 +231,37 @@ func BenchmarkStateOptions(b *testing.B) {
 		layers.TCPOptionKindTimestamps, 10, 0, 1, 2, 3, 4, 5, 6, 7,
 		layers.TCPOptionKindSACK, 18, 0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 3, 0, 0, 2, 4,
 	}
-	opts, err := tcp.ParseTCPOptions(fakeOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
+		opts, err := tcp.ObsoleteParseTCPOptions(fakeOptions)
+		if err != nil {
+			b.Fatal(err)
+		}
 		for _, opt := range opts {
 			// Explicit byte reversal improves this from 480 nsec (6 allocs, 120 bytes) to 56 nsec (no allocs) per op.
 			s.ObsoleteOption(port, false, pTime, &opt)
 		}
+	}
+}
+
+func BenchmarkTCPOptions2(b *testing.B) {
+	port := layers.TCPPort(80)
+	s := tcp.NewState(net.IP{}, port)
+	pTime := time.Now()
+	s.SeqTracker.Seq(0, pTime, 123, 0, true, &s.Stats)
+	s.SeqTracker.Seq(1, pTime, 124, 1000, false, &s.Stats)
+	s.SeqTracker.Seq(2, pTime, 1124, 2000, true, &s.Stats)
+	fakeOptions := []byte{
+		layers.TCPOptionKindMSS, 4, 0, 0,
+		layers.TCPOptionKindTimestamps, 10, 0, 1, 2, 3, 4, 5, 6, 7,
+		layers.TCPOptionKindSACK, 18, 0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 3, 0, 0, 2, 4,
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Explicit byte reversal improves this from 480 nsec (6 allocs, 120 bytes) to 56 nsec (no allocs) per op.
+		s.Options2(port, false, pTime, fakeOptions)
 	}
 }
 
@@ -298,7 +320,7 @@ func BenchmarkStateOptions(b *testing.B) {
 // 	log.Println(out)
 // }
 
-func BenchmarkToTCPHeaderGo_Swaps(b *testing.B) {
+func BenchmarkTCPHeaderGo_From(b *testing.B) {
 	// These byte values are taken from a WireShark decoded packet.
 	hex := "9d 91 01 bb 31 f4 e2 0c 46 f4 b1 ba 80 10 02 a4 29 e1 00 00 01 01 08 0a 0b 62 9d 29 2b b5 a7 0e"
 	hexArray := strings.Split(hex, " ")
@@ -309,28 +331,30 @@ func BenchmarkToTCPHeaderGo_Swaps(b *testing.B) {
 	}
 
 	//hw := tcp.TCPHeaderWrapper{}
-	var in tcp.TCPHeader
+	//var in tcp.TCPHeader
 	var out tcp.TCPHeaderGo
 
-	for i := 0; i < b.N; i++ {
-		in.ToTCPHeaderGo2(&out)
-	}
-}
-
-func BenchmarkWrapTCP(b *testing.B) {
-	// These byte values are taken from a WireShark decoded packet.
-	hex := "9d 91 01 bb 31 f4 e2 0c 46 f4 b1 ba 80 10 02 a4 29 e1 00 00 01 01 08 0a 0b 62 9d 29 2b b5 a7 0e"
-	hexArray := strings.Split(hex, " ")
-	data := make([]byte, len(hexArray))
-	for i, v := range hexArray {
-		b, _ := strconv.ParseInt(v, 16, 16)
-		data[i] = byte(b)
-	}
-
-	hw := tcp.TCPHeaderWrapper{}
 	b.ResetTimer()
-
 	for i := 0; i < b.N; i++ {
-		tcp.WrapTCP(data, &hw)
+		out.From(data)
+		//in.ToTCPHeaderGo2(&out)
 	}
 }
+
+// func BenchmarkWrapTCP(b *testing.B) {
+// 	// These byte values are taken from a WireShark decoded packet.
+// 	hex := "9d 91 01 bb 31 f4 e2 0c 46 f4 b1 ba 80 10 02 a4 29 e1 00 00 01 01 08 0a 0b 62 9d 29 2b b5 a7 0e"
+// 	hexArray := strings.Split(hex, " ")
+// 	data := make([]byte, len(hexArray))
+// 	for i, v := range hexArray {
+// 		b, _ := strconv.ParseInt(v, 16, 16)
+// 		data[i] = byte(b)
+// 	}
+
+// 	hw := tcp.TCPHeaderWrapper{}
+// 	b.ResetTimer()
+
+// 	for i := 0; i < b.N; i++ {
+// 		tcp.WrapTCP(data, &hw)
+// 	}
+// }

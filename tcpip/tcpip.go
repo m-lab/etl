@@ -199,7 +199,7 @@ func (h *IPv6Header) PayloadLength() int {
 }
 
 func (h *IPv6Header) SrcIP() net.IP {
-	ip := make(net.IP, 16)
+	ip := make(net.IP, 16) // This understandably escapes to the heap.
 	copy(ip, h.srcIP[:])
 	return ip
 }
@@ -297,61 +297,64 @@ type Packet struct {
 	Data []byte
 	eth  *EthernetHeader
 	ip   IP
-	v4   *IPv4Header           // Nil unless we're parsing IPv4 packets.
-	v6   *IPv6Wrapper          // Nil unless we're parsing IPv6 packets.
-	tcp  *tcp.TCPHeaderWrapper // This takes up a small amount of space for the options.
+	v4   *IPv4Header  // Nil unless we're parsing IPv4 packets.
+	v6   *IPv6Wrapper // Nil unless we're parsing IPv6 packets.
+	tcp  *tcp.TCPHeaderGo
 	err  error
 }
 
 func (p *Packet) TCP() *tcp.TCPHeaderGo {
-	return &p.tcp.TCPHeaderGo
+	return p.tcp
 }
 
-// Wrap creates a wrapper with partially decoded headers.
-// ci is passed by value, since gopacket NoCopy doesn't preserve the values.
-func Wrap(ci *gopacket.CaptureInfo, data []byte) (Packet, error) {
+func (p *Packet) From(ci *gopacket.CaptureInfo, data []byte) error {
+
 	if len(data) < EthernetHeaderSize {
-		return Packet{err: ErrTruncatedEthernetHeader}, ErrTruncatedEthernetHeader
+		p.err = ErrTruncatedEthernetHeader
+		return p.err
 	}
-	p := Packet{
-		Ci:   *ci, // Make a copy, since gopacket NoCopy doesn't preserve the values.
-		Data: data,
-		eth:  (*EthernetHeader)(unsafe.Pointer(&data[0])),
-	}
+	p.Data = data
+	p.Ci = *ci // make a copy
+	p.eth = (*EthernetHeader)(unsafe.Pointer(&data[0]))
+
 	switch p.eth.EtherType() {
 	case layers.EthernetTypeIPv4:
 		if len(data) < EthernetHeaderSize+IPv4HeaderSize {
-			return Packet{err: ErrTruncatedIPHeader}, ErrTruncatedIPHeader
+			p.err = ErrTruncatedIPHeader
+			return p.err
 		}
 		p.v4 = (*IPv4Header)(unsafe.Pointer(&data[EthernetHeaderSize]))
 		p.ip = p.v4
 	case layers.EthernetTypeIPv6:
 		if len(data) < EthernetHeaderSize+IPv6HeaderSize {
-			return Packet{err: ErrTruncatedIPHeader}, ErrTruncatedIPHeader
+			p.err = ErrTruncatedIPHeader
+			return p.err
 		}
-		var err error
-		p.v6, _, err = NewIPv6Header(data[EthernetHeaderSize:])
-		if err != nil {
-			return Packet{}, err
+		p.v6, _, p.err = NewIPv6Header(data[EthernetHeaderSize:])
+		if p.err != nil {
+			return p.err
 		}
 		p.ip = p.v6
 	default:
-		return Packet{err: ErrUnknownEtherType}, ErrUnknownEtherType
+		p.err = ErrUnknownEtherType
+		return p.err
 	}
 	// TODO needs more work
 	if p.ip != nil {
 		switch p.ip.NextProtocol() {
 		case layers.IPProtocolTCP:
-			p.tcp = &tcp.TCPHeaderWrapper{}
-			err := tcp.WrapTCP(data[EthernetHeaderSize+p.ip.HeaderLength():], p.tcp)
-			if err != nil {
+			if p.tcp == nil {
+				p.tcp = &tcp.TCPHeaderGo{}
+			}
+			p.err = p.tcp.From(data[EthernetHeaderSize+p.ip.HeaderLength():])
+			if p.err != nil {
 				//sparse20.Printf("Error parsing TCP: %v for %v", err, p)
-				return Packet{}, err
+				return p.err
 			}
 		}
 	}
 
-	return p, nil
+	return nil
 }
 
 func (p *Packet) PayloadLength() int {
@@ -386,14 +389,16 @@ func (s *Summary) Add(p *Packet) {
 	raw := p.Data
 	t := p.Ci.Timestamp
 
+	srcIP := ip.SrcIP() // ESCAPE - these reduce escapes to the heap
+	dstIP := ip.DstIP()
 	if s.Packets == 0 {
 		s.FirstPacket = raw[:]
 		// ESCAPE These are escaping to the heap.
-		s.LeftState = tcp.NewState(ip.SrcIP(), tcpw.SrcPort)
-		s.RightState = tcp.NewState(ip.DstIP(), tcpw.DstPort)
+		s.LeftState = tcp.NewState(srcIP, tcpw.SrcPort)
+		s.RightState = tcp.NewState(dstIP, tcpw.DstPort)
 		s.StartTime = t
-		s.SrcIP = ip.SrcIP()
-		s.DstIP = ip.DstIP()
+		s.SrcIP = srcIP
+		s.DstIP = dstIP
 		s.SrcPort = tcpw.SrcPort
 		s.DstPort = tcpw.DstPort
 		s.HopLimit = ip.HopLimit()
@@ -403,10 +408,10 @@ func (s *Summary) Add(p *Packet) {
 
 	s.PayloadBytes += uint64(p.PayloadLength())
 	tcpheader := raw[EthernetHeaderSize+p.ip.HeaderLength():]
-	optData := tcpheader[tcp.TCPHeaderSize : 4*int(tcpw.DataOffset>>4)]
+	optData := tcpheader[tcp.TCPHeaderSize:tcpw.DataOffset]
 
-	s.LeftState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.PayloadLength()), p.TCP(), optData, p.Ci)
-	s.RightState.Update(s.Packets, p.ip.SrcIP(), p.ip.DstIP(), uint16(p.PayloadLength()), p.TCP(), optData, p.Ci)
+	s.LeftState.Update(s.Packets, srcIP, dstIP, uint16(p.PayloadLength()), p.TCP(), optData, p.Ci)
+	s.RightState.Update(s.Packets, srcIP, dstIP, uint16(p.PayloadLength()), p.TCP(), optData, p.Ci)
 	s.Packets++
 }
 
@@ -416,7 +421,16 @@ func (s *Summary) GetIP() (net.IP, net.IP, uint8) {
 	return s.SrcIP, s.DstIP, s.HopLimit
 }
 
+func isGZip(data []byte) bool {
+	return bytes.HasPrefix(data, []byte{0x1F, 0x8B})
+}
+
+func isPlainPCAP(data []byte) bool {
+	return bytes.HasPrefix(data, []byte{0xd4, 0xc3, 0xb2, 0xa1})
+}
+
 func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
+	// ESCAPE maps are escaping to the heap
 	summary := Summary{
 		OptionCounts: make(map[layers.TCPOptionKind]int),
 		Errors:       make(map[int]error, 1),
@@ -433,11 +447,8 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 		pktSize = 1
 	}
 	pcapSize := len(data) // Only if the data is not compressed.
-	// Check magic number?
-	if len(data) < 4 {
-		return summary, ErrTruncatedPcap
-	}
-	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
+
+	if isGZip(data) {
 		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
 		pcapSize *= 8
 	}
@@ -447,9 +458,10 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
 	//summary.Details = make([]string, 0, pcapSize/pktSize)
 
+	p := Packet{}
 	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
-		p, err := Wrap(&ci, data)
+		err := p.From(&ci, data)
 		if err != nil {
 			log.Println(archive, fn, err, data)
 			summary.Errors[summary.Packets] = err
