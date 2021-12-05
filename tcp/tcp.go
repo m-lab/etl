@@ -45,6 +45,7 @@ var (
 	ErrNotTCP             = fmt.Errorf("not a TCP packet")
 	ErrTruncatedTCPHeader = fmt.Errorf("truncated TCP header")
 	ErrBadOption          = fmt.Errorf("bad option")
+	ErrNoMoreOptions      = fmt.Errorf("no more options")
 )
 
 type BE16 [2]byte
@@ -244,7 +245,7 @@ func (o *tcpOption) processSACKs(f func(sackBlock, *StatsWrapper), sw *StatsWrap
 
 // This skips Nop options, and returns nil data there are no more options.
 // This makes a copy of the option data.
-func NextOption(data []byte) ([]byte, tcpOption, error) {
+func xNextOption(data []byte) ([]byte, tcpOption, error) {
 	// For loop to handle Nop options.
 	for len(data) > 0 && data[0] == layers.TCPOptionKindNop {
 		data = data[1:]
@@ -281,6 +282,36 @@ func NextOption(data []byte) ([]byte, tcpOption, error) {
 	}
 }
 
+// This skips Nop options, and returns nil data there are no more options.
+func NextOptionInPlace(data []byte) ([]byte, *tcpOption, error) {
+	// For loop to handle Nop options.
+	for len(data) > 0 && data[0] == layers.TCPOptionKindNop {
+		data = data[1:]
+	}
+	if len(data) == 0 {
+		return nil, nil, ErrNoMoreOptions
+	}
+
+	opt := (*tcpOption)(unsafe.Pointer(&data[0]))
+	if opt.kind > 15 {
+		return nil, opt, ErrBadOption
+	}
+	switch opt.kind {
+	// This won't be a nop, because we already handled those above.
+	case layers.TCPOptionKindEndList:
+		return nil, opt, ErrNoMoreOptions // Technically we are returning one, but effect is the same.
+	default:
+		if len(data) < 2 || int(opt.len) > len(data) {
+			return nil, nil, ErrTruncatedTCPHeader
+		}
+		if opt.len > 40 {
+			return nil, nil, ErrBadOption
+		}
+		// Could also use a byte array copy here.
+		return data[opt.len:], opt, nil
+	}
+}
+
 // TODO - this currently uses about 6% of the CPU in the benchmark,
 // so it might be worth optimizing.  A lot of makeslice().
 func ObsoleteParseTCPOptions(data []byte) ([]tcpOption, error) {
@@ -298,7 +329,7 @@ func ObsoleteParseTCPOptions(data []byte) ([]tcpOption, error) {
 	for {
 		var opt tcpOption
 		var err error
-		data, opt, err = NextOption(data)
+		data, opt, err = xNextOption(data)
 		if err != nil {
 			return nil, err
 		}
@@ -748,7 +779,7 @@ func NewState(srcIP net.IP, srcPort layers.TCPPort) *State {
 }
 
 // TODO - should only handle the earliest response for each value???
-func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt tcpOption) {
+func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt *tcpOption) {
 	tsVal, tsEcr, err := opt.GetTimestamps()
 	if err != nil {
 		log.Println(err, "on timestamp option")
@@ -793,7 +824,7 @@ func (s *State) ObsoleteOption(port layers.TCPPort, retransmit bool, pTime time.
 	case layers.TCPOptionKindMSS:
 		s.MSS, _ = opt.GetMSS()
 	case layers.TCPOptionKindTimestamps:
-		s.handleTimestamp(pTime, retransmit, port == s.SrcPort, *opt)
+		s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
 
 	case layers.TCPOptionKindWindowScale:
 		s.WindowScale, _ = opt.GetWS()
@@ -808,9 +839,9 @@ func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, 
 	// TODO test case for wrong index.
 
 	for {
-		var opt tcpOption
+		var opt *tcpOption
 		var err error
-		optData, opt, err = NextOption(optData)
+		optData, opt, err = NextOptionInPlace(optData)
 		if err != nil {
 			return err
 		}
