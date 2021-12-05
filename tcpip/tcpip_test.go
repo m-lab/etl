@@ -330,6 +330,7 @@ func BenchmarkGetPackets(b *testing.B) {
 // Better jitter compute     100	  11072329 ns/op	 159.45 MB/s	     36078 packets/op	10408367 B/op	  169478 allocs/op
 //                           100	  11393172 ns/op	 154.96 MB/s	     36078 packets/op	 9543012 B/op	  169480 allocs/op
 // Packet.From				 100	  11223040 ns/op	 157.31 MB/s	     36078 packets/op	 8676454 B/op	  133400 allocs/op - 240 bytes/packet
+//							 100	  10483849 ns/op	 168.40 MB/s	     36078 packets/op	 4733919 B/op	   97330 allocs/op
 func BenchmarkProcessPackets2(b *testing.B) {
 	type tt struct {
 		data                  []byte
