@@ -458,10 +458,10 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// This computed slice sizing alone changes the throughput in sandbox from about 640
 	// to about 820 MB/sec per instance.  No crashes after 2 hours.  GIT b46b033.
 	// NOTE that previously, we got about 1.09 GB/sec for just indexing.
-	//summary.Details = make([]string, 0, pcapSize/pktSize)
+	// summary.Details = make([]string, 0, pcapSize/pktSize)
 
 	p := Packet{}
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
+	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
 		err := p.From(&ci, data)
 		if err != nil {
