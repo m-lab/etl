@@ -22,67 +22,6 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
-func TestTracker_Seq(t *testing.T) {
-	stats := &tcp.StatsWrapper{}
-
-	tr := tcp.NewTracker()
-
-	now := tcp.UnixNano(time.Now().UnixNano())
-	tr.Seq(0, now, 1234, 0, true, stats) // SYN, no data
-	tr.Seq(0, now, 1235, 20, false, stats)
-	tr.Seq(0, now, 1255, 10, false, stats)
-	if tr.SendNext() != 1265 {
-		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1265)
-	}
-
-	// Retransmit
-	if _, b := tr.Seq(0, now, 1240, 12, false, stats); !b {
-		t.Errorf("Seq() = %v, want %v", b, true)
-	}
-	// SendNext should be unchanged.
-	if tr.SendNext() != 1265 {
-		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1265)
-	}
-
-	if _, b := tr.Seq(0, now, tr.SendNext(), 10, false, stats); b {
-		t.Errorf("Seq() = %v, want %v", b, false)
-	}
-	if tr.SendNext() != 1275 {
-		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1275)
-	}
-	if stats.RetransmitBytes != 12 {
-		t.Errorf("RetransmitBytes = %v, want %v", stats.RetransmitBytes, 12)
-	}
-	// TODO - the parser should likely detect that the Syn/Ack is late.
-	tr.Ack(0, now, 1234, false, stats)
-	if tr.Acked() != 0 {
-		t.Errorf("Acked() = %v, want %v", tr.Acked(), 0)
-	}
-	tr.Ack(0, now, 1244, false, stats)
-	if tr.Acked() != 10 {
-		t.Errorf("Acked() = %v, want %v", tr.Acked(), 10)
-	}
-
-	tr.Seq(0, now, 5<<28, 0, false, stats)
-	if tr.SendNext() != 1275 {
-		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1275)
-	}
-	if stats.BadDeltas != 1 {
-		t.Errorf("Stats().BadDeltas = %v, want %v", stats.BadDeltas, 1)
-	}
-
-	// Seq that doesn't match previous data length.
-	tr.Seq(0, now, 1300, 0, false, stats)
-	// Seq should advance, but we should also observe an error.
-	if tr.SendNext() != 1300 {
-		t.Errorf("SendNext() = %v, want %v", tr.SendNext(), 1300)
-	}
-	if stats.MissingPackets != 1 {
-		t.Errorf("Stats() = %v, want %v", stats.MissingPackets, 1)
-	}
-
-}
-
 func TestJitter(t *testing.T) {
 	j := tcp.JitterTracker{}
 	rand.Seed(12345)
@@ -218,33 +157,6 @@ func TestSummary(t *testing.T) {
 	}
 }
 
-//    	 3276956	       360.8 ns/op	     288 B/op	       3 allocs/op
-func BenchmarkState_ObsoleteOptions(b *testing.B) {
-	port := layers.TCPPort(80)
-	s := tcp.NewState(net.IP{}, port)
-	pTime := tcp.UnixNano(time.Now().UnixNano())
-	s.SeqTracker.Seq(0, pTime, 123, 0, true, &s.Stats)
-	s.SeqTracker.Seq(1, pTime, 124, 1000, false, &s.Stats)
-	s.SeqTracker.Seq(2, pTime, 1124, 2000, true, &s.Stats)
-	fakeOptions := []byte{
-		layers.TCPOptionKindMSS, 4, 0, 0,
-		layers.TCPOptionKindTimestamps, 10, 0, 1, 2, 3, 4, 5, 6, 7,
-		layers.TCPOptionKindSACK, 18, 0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 2, 3, 0, 0, 2, 4,
-	}
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		opts, err := tcp.ObsoleteParseTCPOptions(fakeOptions)
-		if err != nil {
-			b.Fatal(err)
-		}
-		for _, opt := range opts {
-			// Explicit byte reversal improves this from 480 nsec (6 allocs, 120 bytes) to 56 nsec (no allocs) per op.
-			s.ObsoleteOption(port, false, pTime, &opt)
-		}
-	}
-}
-
 func BenchmarkTCPOptions2(b *testing.B) {
 	port := layers.TCPPort(80)
 	s := tcp.NewState(net.IP{}, port)
@@ -265,61 +177,6 @@ func BenchmarkTCPOptions2(b *testing.B) {
 	}
 }
 
-// func TestToTCPHeaderGo(t *testing.T) {
-// 	// These values are mostly taken from WireShark.
-// 	want := tcp.TCPHeaderGo{
-// 		SrcPort:    40337,
-// 		DstPort:    443,
-// 		SeqNum:     838132236,
-// 		AckNum:     1190441402,
-// 		DataOffset: 128,
-// 		Flags:      0x10,
-// 		Window:     676,
-// 		Checksum:   10721,
-// 		Urgent:     0,
-// 	}
-// 	t.Logf("Want: %#v", want)
-
-// 	// These byte values are taken from a WireShark decoded packet.
-// 	hex := "9d 91 01 bb 31 f4 e2 0c 46 f4 b1 ba 80 10 02 a4 29 e1 00 00 01 01 08 0a 0b 62 9d 29 2b b5 a7 0e"
-// 	hexArray := strings.Split(hex, " ")
-// 	data := make([]byte, len(hexArray))
-// 	for i, v := range hexArray {
-// 		b, _ := strconv.ParseInt(v, 16, 16)
-// 		data[i] = byte(b)
-// 	}
-
-// 	hw := tcp.TCPHeaderWrapper{}
-// 	tcp.WrapTCP(data, &hw)
-// 	if diff := deep.Equal(&hw.TCPHeaderGo, &want); diff != nil {
-// 		t.Error(diff)
-// 	}
-
-// 	if len(hw.Options) != 1 {
-// 		t.Errorf("Options = %v, want 1", len(hw.Options))
-// 	}
-
-// 	tsVal, tsEcn, err := hw.Options[0].GetTimestamps()
-// 	if err != nil {
-// 		t.Fatalf("getTimestamps() = %v", err)
-// 	}
-// 	if tsVal != 191012137 {
-// 		t.Errorf("TimestampValue = %v, want 191012137", tsVal)
-// 	}
-// 	if tsEcn != 733325070 {
-// 		t.Errorf("TimestampECN = %v, want 733325070", tsEcn)
-// 	}
-// }
-
-// func BenchmarkToTCPHeaderBinary_Read(b *testing.B) {
-// 	var in tcp.TCPHeader
-// 	var out tcp.TCPHeaderGo
-// 	for i := 0; i < b.N; i++ {
-// 		_ = in.XToTCPHeaderGo(&out)
-// 	}
-// 	log.Println(out)
-// }
-
 func BenchmarkTCPHeaderGo_From(b *testing.B) {
 	// These byte values are taken from a WireShark decoded packet.
 	hex := "9d 91 01 bb 31 f4 e2 0c 46 f4 b1 ba 80 10 02 a4 29 e1 00 00 01 01 08 0a 0b 62 9d 29 2b b5 a7 0e"
@@ -330,31 +187,10 @@ func BenchmarkTCPHeaderGo_From(b *testing.B) {
 		data[i] = byte(b)
 	}
 
-	//hw := tcp.TCPHeaderWrapper{}
-	//var in tcp.TCPHeader
 	var out tcp.TCPHeaderGo
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		out.From(data)
-		//in.ToTCPHeaderGo2(&out)
 	}
 }
-
-// func BenchmarkWrapTCP(b *testing.B) {
-// 	// These byte values are taken from a WireShark decoded packet.
-// 	hex := "9d 91 01 bb 31 f4 e2 0c 46 f4 b1 ba 80 10 02 a4 29 e1 00 00 01 01 08 0a 0b 62 9d 29 2b b5 a7 0e"
-// 	hexArray := strings.Split(hex, " ")
-// 	data := make([]byte, len(hexArray))
-// 	for i, v := range hexArray {
-// 		b, _ := strconv.ParseInt(v, 16, 16)
-// 		data[i] = byte(b)
-// 	}
-
-// 	hw := tcp.TCPHeaderWrapper{}
-// 	b.ResetTimer()
-
-// 	for i := 0; i < b.N; i++ {
-// 		tcp.WrapTCP(data, &hw)
-// 	}
-// }

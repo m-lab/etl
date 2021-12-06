@@ -34,12 +34,7 @@ var (
 	//sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
 	//sparse500    = logx.NewLogEvery(sparseLogger, 500*time.Millisecond)
 	//sparse2      = logx.NewLogEvery(sparseLogger, 501*time.Millisecond)
-
-	ErrTrackerNotInitialized = fmt.Errorf("tracker not initialized")
-	ErrInvalidDelta          = fmt.Errorf("invalid delta")
-	ErrInvalidSackBlock      = fmt.Errorf("invalid sack block")
-	ErrLateSackBlock         = fmt.Errorf("sack block to left of ack")
-	ErrNoIPLayer             = fmt.Errorf("no IP layer")
+	ErrNoIPLayer = fmt.Errorf("no IP layer")
 
 	ErrNotTCP             = fmt.Errorf("not a TCP packet")
 	ErrTruncatedTCPHeader = fmt.Errorf("truncated TCP header")
@@ -165,10 +160,6 @@ func (hdr *TCPHeaderGo) From(data []byte) error {
 	return nil
 }
 
-func (h *TCPHeader) xDataOffset() int {
-	return 4 * int(h.dataOffset>>4)
-}
-
 type tcpOption struct {
 	kind layers.TCPOptionKind // Kind of option
 	len  uint8                // Length of entire option including kind and length.
@@ -249,45 +240,6 @@ func (o *tcpOption) processSACKs(f func(sackBlock, *StatsWrapper), sw *StatsWrap
 }
 
 // This skips Nop options, and returns nil data there are no more options.
-// This makes a copy of the option data.
-func xNextOption(data []byte) ([]byte, tcpOption, error) {
-	// For loop to handle Nop options.
-	for len(data) > 0 && data[0] == layers.TCPOptionKindNop {
-		data = data[1:]
-	}
-	if len(data) == 0 {
-		return nil, tcpOption{
-			kind: layers.TCPOptionKindEndList,
-			len:  1,
-		}, nil
-	}
-
-	overlay := (*tcpOption)(unsafe.Pointer(&data[0]))
-	if overlay.kind > 15 {
-		return nil, tcpOption{}, ErrBadOption
-	}
-	switch overlay.kind {
-	// This won't be a nop, because we already handled those above.
-	case layers.TCPOptionKindEndList:
-		return nil, tcpOption{kind: layers.TCPOptionKindEndList, len: 1}, nil
-	default:
-		if len(data) < 2 {
-			return nil, tcpOption{}, ErrTruncatedTCPHeader
-		}
-		if int(overlay.len) > len(data) {
-			return nil, tcpOption{}, ErrTruncatedTCPHeader
-		}
-		if overlay.len > 40 {
-			return nil, tcpOption{}, ErrBadOption
-		}
-		// Could also use a byte array copy here.
-		opt := tcpOption{kind: overlay.kind, len: overlay.len}
-		copy(opt.data[:], overlay.data[:overlay.len-2])
-		return data[overlay.len:], opt, nil
-	}
-}
-
-// This skips Nop options, and returns nil data there are no more options.
 func NextOptionInPlace(data []byte) ([]byte, *tcpOption, error) {
 	// For loop to handle Nop options.
 	for len(data) > 0 && data[0] == layers.TCPOptionKindNop {
@@ -317,38 +269,6 @@ func NextOptionInPlace(data []byte) ([]byte, *tcpOption, error) {
 	}
 }
 
-// TODO - this currently uses about 6% of the CPU in the benchmark,
-// so it might be worth optimizing.  A lot of makeslice().
-func ObsoleteParseTCPOptions(data []byte) ([]tcpOption, error) {
-	//w.optionData = make([]byte, len(data))
-	//copy(w.optionData, data)
-	//data = w.optionData // Just the slice, not the data.
-	if len(data) == 0 {
-		return make([]tcpOption, 0, 0), nil
-	}
-	// We could alternatively count the non-trivial
-	// options before allocating the slice.
-	// The choice of initial size is based on the tcpip benchmark test.
-	options := make([]tcpOption, 0, 1)
-
-	for {
-		var opt tcpOption
-		var err error
-		data, opt, err = xNextOption(data)
-		if err != nil {
-			return nil, err
-		}
-		if opt.kind == layers.TCPOptionKindEndList {
-			break
-		}
-		options = append(options, opt)
-		if len(data) == 0 {
-			break
-		}
-	}
-	return options, nil
-}
-
 type TcpStats struct {
 	Packets   int64
 	Truncated int64
@@ -375,27 +295,6 @@ type TcpStats struct {
 
 }
 
-type AlphaFields struct {
-	TruncatedPackets int64    `bigquery:"truncated_packets"`
-	SynPacket        int64    `bigquery:"syn_packet" json:"syn_packet"`
-	SynTime          UnixNano `bigquery:"syn_time" json:"syn_time"`
-	SynAckPacket     int64    `bigquery:"syn_ack_packet" json:"syn_ack_packet"`
-	SynAckTime       UnixNano `bigquery:"syn_ack_time" json:"syn_ack_time"`
-	Packets          int64    `bigquery:"packets" json:"packets"`
-	Sacks            int64    `bigquery:"sacks" json:"sacks"`
-	IPAddrErrors     int64    `bigquery:"ip_addr_errors" json:"ip_addr_errors"` // Number of packets with IP addresses that don't match first IP header at all.
-	WithoutTCPLayer  int64    `bigquery:"no_tcp_layer" json:"no_tcp_layer"`     // Number of packets with no TCP layer.
-
-	LeftStats  TcpStats
-	RightStats TcpStats
-}
-
-// TODO - build a sackblock model, that consolidates new sack blocks into existing state.
-type sackBlock struct {
-	Left  uint32
-	Right uint32
-}
-
 type StatsWrapper struct {
 	TcpStats
 }
@@ -410,228 +309,6 @@ func (sw *StatsWrapper) Option(opt layers.TCPOptionKind) {
 		sw.OptionCounts[opt]++
 	}
 
-}
-
-type seqInfo struct {
-	count int
-	pTime UnixNano
-}
-type Tracker struct {
-	initialized bool
-	startTime   UnixNano // Initial packet time
-	packets     uint32   // Number of calls to Seq function
-	seq         uint32   // The last sequence number observed, not counting retransmits
-	synFin      uint32   // zero, one or two, depending on whether SYN and FIN have been sent
-
-	sendUNA     uint32   // greatest observed ack
-	sendUNATime UnixNano // time we saw greatest ack
-	acks        uint32   // number of acks (from other side)
-	onlyAcks    uint32   // Number of packets that only have ACKs, no data.
-	acked       uint64   // bytes acked
-	maxGap      int32    // Max observed gap between acked and NextSeq()
-
-	sent      uint64      // actual bytes sent, including retransmits, but not SYN or FIN
-	sacks     []sackBlock // keeps track of outstanding SACK blocks
-	sackBytes uint64      // keeps track of total bytes reported missing in SACK blocks
-
-	lastDataLength uint16 // Used to compute NextSeq()
-
-	// This will get very large - one entry per packet.
-	// TODO - investigate using a circular buffer or linked list instead?
-	seqTimes map[uint32]seqInfo
-
-	*LogHistogram
-}
-
-func NewTracker() *Tracker {
-	iat, _ := NewHistogram(.00001, 0.1, 6.0)
-	return &Tracker{seqTimes: make(map[uint32]seqInfo, 100), LogHistogram: &iat}
-}
-
-func (t *Tracker) updateSendUNA(seq uint32, time UnixNano) {
-	t.sendUNA = seq
-	t.sendUNATime = time
-}
-
-func (t *Tracker) Summary() string {
-	return fmt.Sprintf("%5d packets, %5d/%5d acks w/data, %5d max gap\n",
-		t.packets, t.acks-t.onlyAcks, t.acks, t.maxGap)
-}
-
-// SendNext returns the uint32 value of the expected next sequence number.
-func (t *Tracker) SendNext() uint32 {
-	return t.seq + uint32(t.lastDataLength) // wraps at 2^32
-}
-
-// ByteCount returns the number of bytes sent so far, not including retransmits
-func (t *Tracker) ByteCount() uint64 {
-	return t.sent
-}
-
-func diff(clock uint32, previous uint32) (int32, error) {
-	delta := int32(clock - previous)
-	if !(-1<<30 < delta && delta < 1<<30) {
-		//	info.Printf("invalid sequence delta %d->%d (%d)", previous, clock, delta)
-		return delta, ErrInvalidDelta
-	}
-	return delta, nil
-}
-
-//var badSeq = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
-//var badAck = logx.NewLogEvery(sparseLogger, 100*time.Millisecond)
-
-// Seq updates the tracker based on an observed packet with sequence number seq and content size length.
-// Initializes the tracker if it hasn't been initialized yet.
-// Returns the bytes in flight (not including retransmits) and boolean indicator if this is a retransmit
-func (t *Tracker) Seq(count int, pTime UnixNano, clock uint32, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
-	t.packets++ // Some of these may be retransmits.
-
-	if !t.initialized {
-		t.startTime = pTime
-		t.seq = clock
-		t.sendUNA = clock // nothing acked so far
-		t.initialized = true
-	}
-	// Use this unless we are sending new data.
-	// TODO - correct this for sum of sizes of sack block scoreboard.
-	// This does not include retransmits!!
-	// NOTE: This may be greater than the window size if capture missed some packets.
-	inflight, err := diff(t.SendNext(), t.sendUNA)
-	if err != nil {
-		//sparse500.Println("inflight diff error", t.SendNext(), t.sendUNA)
-	}
-
-	// TODO handle errors
-	delta, err := diff(clock, t.seq)
-	if err != nil {
-		sw.BadDeltas++
-		//badSeq.Printf("Bad seq %4X -> %4X\n", t.seq, clock)
-		return inflight, false
-	}
-	if delta < 0 {
-		// DO NOT update w.seq or w.lastDataLength, as this is a retransmit
-		t.sent += uint64(length)
-		sw.Retransmit(length)
-		return inflight, true
-	}
-
-	// Everything below applies only to new data packets, not retransmits
-	if delta != int32(t.lastDataLength) {
-		sw.MissingPackets++
-		//sparse500.Printf("%d: Missing packet?  delta (%d) does not match last data size (%d)\n", t.packets, delta, t.lastDataLength) // VERBOSE
-	}
-
-	if synFin {
-		t.synFin++ // Should we check if this is greater than 2?
-		// Should this include length?
-		t.lastDataLength = 1 + length
-	} else {
-		t.lastDataLength = length
-	}
-
-	t.sent += uint64(length)
-	t.seq = clock
-	t.seqTimes[clock] = seqInfo{count, pTime}
-
-	gap, err := diff(t.seq, t.sendUNA)
-	if err != nil {
-		//sparse2.Println("gap diff error:", t.seq, t.sendUNA)
-	}
-	if gap > t.maxGap {
-		t.maxGap = gap
-	}
-
-	inflight, err = diff(t.SendNext(), t.sendUNA)
-	if err != nil {
-		//sparse2.Println("inflight diff error:", t.SendNext(), t.sendUNA)
-	}
-
-	return inflight, false
-}
-
-func (t *Tracker) Acked() uint64 {
-	return t.acked
-}
-
-// Ack updates the tracker based on an observed ack value.
-// Returns the time observed by the packet capture since the correponding sequence number was sent.
-func (t *Tracker) Ack(count int, pTime UnixNano, clock uint32, withData bool, sw *StatsWrapper) (int, time.Duration) {
-	if !t.initialized {
-		sw.OtherErrors++
-		//info.Printf("PKT: %d Ack called before Seq", count)
-	}
-	delta, err := diff(clock, t.sendUNA)
-	if err != nil {
-		sw.BadDeltas++
-		// TODO should this sometimes update the sendUNA, or always?
-		t.updateSendUNA(clock, pTime)
-		return 0, 0
-	}
-	if delta > 0 {
-		t.acked += uint64(delta)
-		t.acks++
-	}
-	if !withData {
-		t.onlyAcks++
-	}
-	defer t.updateSendUNA(clock, pTime)
-
-	si, ok := t.seqTimes[clock]
-	if ok {
-		// Only update InterArrivalTime when we find the corresponding sequence number in map.
-		t.LogHistogram.Add(pTime.Sub(t.sendUNATime).Seconds())
-
-		// TODO should we keep the entry but mark it as acked?  Or keep a limited cache?
-		delete(t.seqTimes, clock)
-		return si.count, pTime.Sub(si.pTime)
-
-	} else {
-		//sparse500.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
-		return 0, 0
-	}
-}
-
-func (t *Tracker) SendUNA() uint32 {
-	return t.sendUNA
-}
-
-// Check checks that a sack block is consistent with the current window.
-func (t *Tracker) checkSack(sb sackBlock) error {
-	// block should ALWAYS have positive width
-	if width, err := diff(sb.Right, sb.Left); err != nil || width <= 0 {
-		//sparse500.Println(ErrInvalidSackBlock, err, width, t.Acked())
-		return ErrInvalidSackBlock
-	}
-	// block Right should ALWAYS be to the left of NextSeq()
-	// If not, we may have missed recording a packet!
-	if overlap, err := diff(t.SendNext(), sb.Right); err != nil || overlap < 0 {
-		//sparse500.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
-		return ErrInvalidSackBlock
-	}
-	// Left should be to the right of ack
-	if overlap, err := diff(sb.Left, t.sendUNA); err != nil || overlap < 0 {
-		// These often correspond to packets that show up as spurious retransmits in WireShark.
-		//sparse500.Println(ErrLateSackBlock, err, overlap, t.Acked())
-		return ErrLateSackBlock
-	}
-	return nil
-}
-
-// Sack updates the counter with sack information (from other direction)
-// For some reason, this code causes a lot of runtime.newobject calls.
-func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
-	if !t.initialized {
-		sw.OtherErrors++
-		//info.Println(ErrTrackerNotInitialized)
-	}
-	sw.Sacks++
-	// Auto gen code
-	if err := t.checkSack(sb); err != nil {
-		sw.BadSacks++
-		//sparse500.Println(ErrInvalidSackBlock, t.sendUNA, sb, t.SendNext())
-	}
-	//t.sacks = append(t.sacks, block)
-	t.sackBytes += uint64(sb.Right - sb.Left)
 }
 
 // JitterTracker
