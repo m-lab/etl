@@ -69,7 +69,15 @@ func (b BE32) Uint32() uint32 {
 	swap := [4]byte{b[3], b[2], b[1], b[0]}
 	return *(*uint32)(unsafe.Pointer(&swap))
 }
+
 func (b BE32) PutUint32(t *uint32) {
+	tt := (*[4]byte)(unsafe.Pointer(t))
+	*tt = [4]byte{b[3], b[2], b[1], b[0]}
+}
+
+type BE32SN [4]byte
+
+func (b BE32SN) PutUint32(t *SeqNum) {
 	tt := (*[4]byte)(unsafe.Pointer(t))
 	*tt = [4]byte{b[3], b[2], b[1], b[0]}
 }
@@ -79,14 +87,14 @@ func (b BE32) PutUint32(t *uint32) {
 ******************************************************************************/
 type TCPHeader struct {
 	// TODO update these to use BE16 and BE32
-	srcPort, dstPort BE16  // Source and destination port
-	seqNum           BE32  // Sequence number
-	ackNum           BE32  // Acknowledgement number
-	dataOffset       uint8 //  DataOffset: upper 4 bits
-	Flags                  // Flags
-	window           BE16  // Window
-	checksum         BE16  // Checksum
-	urgent           BE16  // Urgent pointer
+	srcPort, dstPort BE16   // Source and destination port
+	seqNum           BE32SN // Sequence number
+	ackNum           BE32SN // Acknowledgement number
+	dataOffset       uint8  //  DataOffset: upper 4 bits
+	Flags                   // Flags
+	window           BE16   // Window
+	checksum         BE16   // Checksum
+	urgent           BE16   // Urgent pointer
 }
 
 var TCPHeaderSize = int(unsafe.Sizeof(TCPHeader{}))
@@ -127,8 +135,8 @@ func (f Flags) CWR() bool {
 
 type TCPHeaderGo struct {
 	SrcPort, DstPort layers.TCPPort // Source and destination port
-	SeqNum           uint32         // Sequence number
-	AckNum           uint32         // Acknowledgement number
+	SeqNum           SeqNum         // Sequence number
+	AckNum           SeqNum         // Acknowledgement number
 	DataOffset       uint8          // The actual data offset (different from binary tcp field)
 	Flags                           // Flags
 	Window           uint16         // Window
@@ -204,8 +212,8 @@ func (o *tcpOption) fillSackBlock(sb *sackBlock, i int) error {
 	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 || i > int(o.len-2)/8 || sb == nil {
 		return ErrBadOption
 	}
-	sb.Left = o.getUint32(2 * i)
-	sb.Right = o.getUint32(2*i + 1)
+	sb.Left = SeqNum(o.getUint32(2 * i))
+	sb.Right = SeqNum(o.getUint32(2*i + 1))
 	return nil
 }
 
@@ -213,8 +221,8 @@ func (o *tcpOption) getSackBlock(i int) (sb sackBlock, err error) {
 	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 || i > int(o.len-2)/8 {
 		return sb, ErrBadOption
 	}
-	sb.Left = o.getUint32(2 * i)
-	sb.Right = o.getUint32(2*i + 1)
+	sb.Left = SeqNum(o.getUint32(2 * i))
+	sb.Right = SeqNum(o.getUint32(2*i + 1))
 	return sb, nil
 }
 
@@ -460,7 +468,7 @@ type State struct {
 
 	MSS    uint16
 	Window uint16
-	Limit  uint32 // The limit on data that can be sent, based on receiver window and ack data.
+	Limit  SeqNum // The limit on data that can be sent, based on receiver window and ack data.
 
 	//lastHeader *layers.TCP
 
@@ -591,7 +599,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 			// TODO
 		}
 		// TODO handle error here?
-		remaining, err := diff(s.Limit, s.SeqTracker.SendNext())
+		remaining, err := s.Limit.diff(s.SeqTracker.SendNext())
 		if err != nil {
 			//sn := s.SeqTracker.SendNext()
 			//sparse500.Println("remaining diff err", s.Limit, sn)
@@ -634,7 +642,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 				//xxx BUG in sent?
 				//	log.Printf("%5d: %2d.%6d %9d %20v Packet: %5d Delay: %8v\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, pn, delay)
 			}
-			s.Limit = s.SeqTracker.sendUNA + uint32(s.Window)<<s.WindowScale
+			s.Limit = s.SeqTracker.sendUNA + SeqNum(s.Window)<<s.WindowScale
 		}
 	}
 	// Handle options

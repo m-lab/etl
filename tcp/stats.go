@@ -78,9 +78,8 @@ type LogHistogram struct {
 	count         int       // total number of samples
 }
 
-// TODO - consider using a binary (or linear) search to find the Index
 func (s *LogHistogram) Index(val float64) int {
-	// always have lower <= target <= upper
+	// invariant: lower <= target <= upper
 	lower := 0
 	upper := len(s.binBounds) - 1
 
@@ -93,12 +92,12 @@ func (s *LogHistogram) Index(val float64) int {
 		}
 	}
 
-	for i := lower; i <= upper; i++ {
-		if val < s.binBounds[i] {
-			return i
+	for ; lower < upper; lower++ {
+		if val < s.binBounds[lower] {
+			break
 		}
 	}
-	return upper // correct?
+	return lower
 }
 
 func (s *LogHistogram) SlowIndex(val float64) int {

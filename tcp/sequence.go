@@ -12,15 +12,25 @@ var (
 	ErrLateSackBlock         = fmt.Errorf("sack block to left of ack")
 )
 
-type seqInfo struct {
-	count int
-	pTime UnixNano // packet capture time
+type SeqNum uint32
+
+func (sn SeqNum) diff(next SeqNum) (int32, error) {
+	delta := int32(sn - next)
+	if !(-1<<30 < delta && delta < 1<<30) {
+		//	info.Printf("invalid sequence delta %d->%d (%d)", previous, clock, delta)
+		return delta, ErrInvalidDelta
+	}
+	return delta, nil
 }
 
 // TODO - build a sackblock model, that consolidates new sack blocks into existing state.
 type sackBlock struct {
-	Left  uint32
-	Right uint32
+	Left, Right SeqNum
+}
+
+type seqInfo struct {
+	count int
+	pTime UnixNano // packet capture time
 }
 
 // TODO estimate the event times at the remote end, using the Timestamp option TSVal and TSecr fields.
@@ -28,10 +38,10 @@ type Tracker struct {
 	initialized bool
 	startTime   UnixNano // Initial packet time
 	packets     uint32   // Number of calls to Seq function
-	seq         uint32   // The last sequence number observed, not counting retransmits
+	seq         SeqNum   // The last sequence number observed, not counting retransmits
 	synFin      uint32   // zero, one or two, depending on whether SYN and FIN have been sent
 
-	sendUNA     uint32   // greatest observed ack
+	sendUNA     SeqNum   // greatest observed ack
 	sendUNATime UnixNano // time we saw greatest ack
 	acks        uint32   // number of acks (from other side)
 	onlyAcks    uint32   // Number of packets that only have ACKs, no data.
@@ -46,17 +56,17 @@ type Tracker struct {
 
 	// This will get very large - one entry per packet.
 	// TODO - investigate using a circular buffer or linked list instead?
-	seqTimes map[uint32]seqInfo
+	seqTimes map[SeqNum]seqInfo
 
 	*LogHistogram
 }
 
 func NewTracker() *Tracker {
 	iat, _ := NewLogHistogram(.00001, 0.1, 6.0)
-	return &Tracker{seqTimes: make(map[uint32]seqInfo, 100), LogHistogram: &iat}
+	return &Tracker{seqTimes: make(map[SeqNum]seqInfo, 100), LogHistogram: &iat}
 }
 
-func (t *Tracker) updateSendUNA(seq uint32, time UnixNano) {
+func (t *Tracker) updateSendUNA(seq SeqNum, time UnixNano) {
 	t.sendUNA = seq
 	t.sendUNATime = time
 }
@@ -67,8 +77,8 @@ func (t *Tracker) Summary() string {
 }
 
 // SendNext returns the uint32 value of the expected next sequence number.
-func (t *Tracker) SendNext() uint32 {
-	return t.seq + uint32(t.lastDataLength) // wraps at 2^32
+func (t *Tracker) SendNext() SeqNum {
+	return t.seq + SeqNum(t.lastDataLength) // wraps at 2^32
 }
 
 // ByteCount returns the number of bytes sent so far, not including retransmits
@@ -91,7 +101,7 @@ func diff(clock uint32, previous uint32) (int32, error) {
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
 // Initializes the tracker if it hasn't been initialized yet.
 // Returns the bytes in flight (not including retransmits) and boolean indicator if this is a retransmit
-func (t *Tracker) Seq(count int, pTime UnixNano, clock uint32, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
+func (t *Tracker) Seq(count int, pTime UnixNano, clock SeqNum, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
 	t.packets++ // Some of these may be retransmits.
 
 	if !t.initialized {
@@ -104,13 +114,13 @@ func (t *Tracker) Seq(count int, pTime UnixNano, clock uint32, length uint16, sy
 	// TODO - correct this for sum of sizes of sack block scoreboard.
 	// This does not include retransmits!!
 	// NOTE: This may be greater than the window size if capture missed some packets.
-	inflight, err := diff(t.SendNext(), t.sendUNA)
+	inflight, err := t.SendNext().diff(t.sendUNA)
 	if err != nil {
 		//sparse500.Println("inflight diff error", t.SendNext(), t.sendUNA)
 	}
 
 	// TODO handle errors
-	delta, err := diff(clock, t.seq)
+	delta, err := clock.diff(t.seq)
 	if err != nil {
 		sw.BadDeltas++
 		//badSeq.Printf("Bad seq %4X -> %4X\n", t.seq, clock)
@@ -141,7 +151,7 @@ func (t *Tracker) Seq(count int, pTime UnixNano, clock uint32, length uint16, sy
 	t.seq = clock
 	t.seqTimes[clock] = seqInfo{count, pTime}
 
-	gap, err := diff(t.seq, t.sendUNA)
+	gap, err := t.seq.diff(t.sendUNA)
 	if err != nil {
 		//sparse2.Println("gap diff error:", t.seq, t.sendUNA)
 	}
@@ -149,7 +159,7 @@ func (t *Tracker) Seq(count int, pTime UnixNano, clock uint32, length uint16, sy
 		t.maxGap = gap
 	}
 
-	inflight, err = diff(t.SendNext(), t.sendUNA)
+	inflight, err = t.SendNext().diff(t.sendUNA)
 	if err != nil {
 		//sparse2.Println("inflight diff error:", t.SendNext(), t.sendUNA)
 	}
@@ -163,12 +173,12 @@ func (t *Tracker) Acked() uint64 {
 
 // Ack updates the tracker based on an observed ack value.
 // Returns the time observed by the packet capture since the correponding sequence number was sent.
-func (t *Tracker) Ack(count int, pTime UnixNano, clock uint32, withData bool, sw *StatsWrapper) (int, time.Duration) {
+func (t *Tracker) Ack(count int, pTime UnixNano, clock SeqNum, withData bool, sw *StatsWrapper) (int, time.Duration) {
 	if !t.initialized {
 		sw.OtherErrors++
 		//info.Printf("PKT: %d Ack called before Seq", count)
 	}
-	delta, err := diff(clock, t.sendUNA)
+	delta, err := clock.diff(t.sendUNA)
 	if err != nil {
 		sw.BadDeltas++
 		// TODO should this sometimes update the sendUNA, or always?
@@ -199,25 +209,25 @@ func (t *Tracker) Ack(count int, pTime UnixNano, clock uint32, withData bool, sw
 	}
 }
 
-func (t *Tracker) SendUNA() uint32 {
+func (t *Tracker) SendUNA() SeqNum {
 	return t.sendUNA
 }
 
 // Check checks that a sack block is consistent with the current window.
 func (t *Tracker) checkSack(sb sackBlock) error {
 	// block should ALWAYS have positive width
-	if width, err := diff(sb.Right, sb.Left); err != nil || width <= 0 {
+	if width, err := sb.Right.diff(sb.Left); err != nil || width <= 0 {
 		//sparse500.Println(ErrInvalidSackBlock, err, width, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// block Right should ALWAYS be to the left of NextSeq()
 	// If not, we may have missed recording a packet!
-	if overlap, err := diff(t.SendNext(), sb.Right); err != nil || overlap < 0 {
+	if overlap, err := t.SendNext().diff(sb.Right); err != nil || overlap < 0 {
 		//sparse500.Println(ErrInvalidSackBlock, err, overlap, t.Acked())
 		return ErrInvalidSackBlock
 	}
 	// Left should be to the right of ack
-	if overlap, err := diff(sb.Left, t.sendUNA); err != nil || overlap < 0 {
+	if overlap, err := sb.Left.diff(t.sendUNA); err != nil || overlap < 0 {
 		// These often correspond to packets that show up as spurious retransmits in WireShark.
 		//sparse500.Println(ErrLateSackBlock, err, overlap, t.Acked())
 		return ErrLateSackBlock
