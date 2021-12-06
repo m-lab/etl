@@ -52,7 +52,7 @@ type Tracker struct {
 }
 
 func NewTracker() *Tracker {
-	iat, _ := NewHistogram(.00001, 0.1, 6.0)
+	iat, _ := NewLogHistogram(.00001, 0.1, 6.0)
 	return &Tracker{seqTimes: make(map[uint32]seqInfo, 100), LogHistogram: &iat}
 }
 
