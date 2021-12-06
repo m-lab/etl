@@ -11,7 +11,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
 
@@ -47,6 +46,12 @@ var (
 	ErrBadOption          = fmt.Errorf("bad option")
 	ErrNoMoreOptions      = fmt.Errorf("no more options")
 )
+
+type UnixNano int64
+
+func (un UnixNano) Sub(other UnixNano) time.Duration {
+	return time.Duration(un - other)
+}
 
 type BE16 [2]byte
 
@@ -371,15 +376,15 @@ type TcpStats struct {
 }
 
 type AlphaFields struct {
-	TruncatedPackets int64     `bigquery:"truncated_packets"`
-	SynPacket        int64     `bigquery:"syn_packet" json:"syn_packet"`
-	SynTime          time.Time `bigquery:"syn_time" json:"syn_time"`
-	SynAckPacket     int64     `bigquery:"syn_ack_packet" json:"syn_ack_packet"`
-	SynAckTime       time.Time `bigquery:"syn_ack_time" json:"syn_ack_time"`
-	Packets          int64     `bigquery:"packets" json:"packets"`
-	Sacks            int64     `bigquery:"sacks" json:"sacks"`
-	IPAddrErrors     int64     `bigquery:"ip_addr_errors" json:"ip_addr_errors"` // Number of packets with IP addresses that don't match first IP header at all.
-	WithoutTCPLayer  int64     `bigquery:"no_tcp_layer" json:"no_tcp_layer"`     // Number of packets with no TCP layer.
+	TruncatedPackets int64    `bigquery:"truncated_packets"`
+	SynPacket        int64    `bigquery:"syn_packet" json:"syn_packet"`
+	SynTime          UnixNano `bigquery:"syn_time" json:"syn_time"`
+	SynAckPacket     int64    `bigquery:"syn_ack_packet" json:"syn_ack_packet"`
+	SynAckTime       UnixNano `bigquery:"syn_ack_time" json:"syn_ack_time"`
+	Packets          int64    `bigquery:"packets" json:"packets"`
+	Sacks            int64    `bigquery:"sacks" json:"sacks"`
+	IPAddrErrors     int64    `bigquery:"ip_addr_errors" json:"ip_addr_errors"` // Number of packets with IP addresses that don't match first IP header at all.
+	WithoutTCPLayer  int64    `bigquery:"no_tcp_layer" json:"no_tcp_layer"`     // Number of packets with no TCP layer.
 
 	LeftStats  TcpStats
 	RightStats TcpStats
@@ -409,21 +414,21 @@ func (sw *StatsWrapper) Option(opt layers.TCPOptionKind) {
 
 type seqInfo struct {
 	count int
-	pTime time.Time // TODO - convert all time.Time to float64 nsecs.
+	pTime UnixNano
 }
 type Tracker struct {
 	initialized bool
-	startTime   time.Time // Initial packet time
-	packets     uint32    // Number of calls to Seq function
-	seq         uint32    // The last sequence number observed, not counting retransmits
-	synFin      uint32    // zero, one or two, depending on whether SYN and FIN have been sent
+	startTime   UnixNano // Initial packet time
+	packets     uint32   // Number of calls to Seq function
+	seq         uint32   // The last sequence number observed, not counting retransmits
+	synFin      uint32   // zero, one or two, depending on whether SYN and FIN have been sent
 
-	sendUNA     uint32    // greatest observed ack
-	sendUNATime time.Time // time we saw greatest ack
-	acks        uint32    // number of acks (from other side)
-	onlyAcks    uint32    // Number of packets that only have ACKs, no data.
-	acked       uint64    // bytes acked
-	maxGap      int32     // Max observed gap between acked and NextSeq()
+	sendUNA     uint32   // greatest observed ack
+	sendUNATime UnixNano // time we saw greatest ack
+	acks        uint32   // number of acks (from other side)
+	onlyAcks    uint32   // Number of packets that only have ACKs, no data.
+	acked       uint64   // bytes acked
+	maxGap      int32    // Max observed gap between acked and NextSeq()
 
 	sent      uint64      // actual bytes sent, including retransmits, but not SYN or FIN
 	sacks     []sackBlock // keeps track of outstanding SACK blocks
@@ -442,7 +447,7 @@ func NewTracker() *Tracker {
 	return &Tracker{seqTimes: make(map[uint32]seqInfo, 100), LogHistogram: &iat}
 }
 
-func (t *Tracker) updateSendUNA(seq uint32, time time.Time) {
+func (t *Tracker) updateSendUNA(seq uint32, time UnixNano) {
 	t.sendUNA = seq
 	t.sendUNATime = time
 }
@@ -477,7 +482,7 @@ func diff(clock uint32, previous uint32) (int32, error) {
 // Seq updates the tracker based on an observed packet with sequence number seq and content size length.
 // Initializes the tracker if it hasn't been initialized yet.
 // Returns the bytes in flight (not including retransmits) and boolean indicator if this is a retransmit
-func (t *Tracker) Seq(count int, pTime time.Time, clock uint32, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
+func (t *Tracker) Seq(count int, pTime UnixNano, clock uint32, length uint16, synFin bool, sw *StatsWrapper) (int32, bool) {
 	t.packets++ // Some of these may be retransmits.
 
 	if !t.initialized {
@@ -549,7 +554,7 @@ func (t *Tracker) Acked() uint64 {
 
 // Ack updates the tracker based on an observed ack value.
 // Returns the time observed by the packet capture since the correponding sequence number was sent.
-func (t *Tracker) Ack(count int, pTime time.Time, clock uint32, withData bool, sw *StatsWrapper) (int, time.Duration) {
+func (t *Tracker) Ack(count int, pTime UnixNano, clock uint32, withData bool, sw *StatsWrapper) (int, time.Duration) {
 	if !t.initialized {
 		sw.OtherErrors++
 		//info.Printf("PKT: %d Ack called before Seq", count)
@@ -638,7 +643,7 @@ func (t *Tracker) Sack(sb sackBlock, sw *StatsWrapper) {
 type JitterTracker struct {
 	initialized  bool
 	firstTSVal   uint32
-	firstPktTime time.Time
+	firstPktTime UnixNano
 
 	tickRate time.Duration // Interval between ticks.  For server side this is always 1 msec.
 
@@ -667,7 +672,7 @@ func (t *JitterTracker) TickInterval() time.Duration {
 func (t *JitterTracker) EchoLR() string {
 	return t.echoLR.String()
 }
-func (jt *JitterTracker) LRDelay(pktTime time.Time) float64 {
+func (jt *JitterTracker) LRDelay(pktTime UnixNano) float64 {
 	if jt.ValCount < 3 || jt.EchoCount < 3 {
 		return 0
 	}
@@ -689,13 +694,13 @@ func (jt *JitterTracker) LRDelay0() time.Duration {
 
 // Adjust attempts to adjust the TSVal and pktTime to interval since the first reported packet.
 // The TSVal is adjusted based on the inferred tick rate.
-func (j *JitterTracker) Adjust(tsval uint32, pktTime time.Time) (time.Duration, time.Duration) {
+func (j *JitterTracker) Adjust(tsval uint32, pktTime UnixNano) (time.Duration, time.Duration) {
 	return time.Duration(tsval-j.firstTSVal) * j.tickRate, pktTime.Sub(j.firstPktTime)
 }
 
 // Add adds a new offset between TSVal and packet capture time to the jitter tracker.
 // offset should be TSVal - packet capture time.
-func (jt *JitterTracker) Add(tsval uint32, pktTime time.Time) {
+func (jt *JitterTracker) Add(tsval uint32, pktTime UnixNano) {
 	if !jt.initialized {
 		jt.tickRate = time.Millisecond
 		jt.firstTSVal = tsval
@@ -718,7 +723,7 @@ func (jt *JitterTracker) Add(tsval uint32, pktTime time.Time) {
 // Add adds a new offset between TSEcr and packet capture time to the jitter tracker.
 // offset should be TSEcr - packet capture time.
 // TODO - deal with TSEcr wrapping
-func (jt *JitterTracker) AddEcho(tsecr uint32, pktTime time.Time) {
+func (jt *JitterTracker) AddEcho(tsecr uint32, pktTime UnixNano) {
 	if !jt.initialized {
 		return
 	}
@@ -765,13 +770,13 @@ func (jt *JitterTracker) Delay() float64 {
 // TODO - add histograms for Ack inter-arrival time.
 type State struct {
 	// These should be static characteristics
-	StartTime   time.Time // Convenience, for computing relative time for all other packets.
+	StartTime   UnixNano // Convenience, for computing relative time for all other packets.
 	SrcIP       net.IP
 	SrcPort     layers.TCPPort // When this port is SrcPort, we update this stat struct.
 	TTL         uint8
 	WindowScale uint8
 
-	LastPacketTimeUsec uint64 // This comes from the IP layer.
+	// LastPacketTimeUsec uint64 // This comes from the IP layer.
 
 	MSS    uint16
 	Window uint16
@@ -792,7 +797,7 @@ func NewState(srcIP net.IP, srcPort layers.TCPPort) *State {
 }
 
 // TODO - should only handle the earliest response for each value???
-func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing bool, opt *tcpOption) {
+func (s *State) handleTimestamp(pktTime UnixNano, retransmit bool, isOutgoing bool, opt *tcpOption) {
 	tsVal, tsEcr, err := opt.GetTimestamps()
 	if err != nil {
 		log.Println(err, "on timestamp option")
@@ -816,7 +821,7 @@ func (s *State) handleTimestamp(pktTime time.Time, retransmit bool, isOutgoing b
 
 // ObsoleteOption handles all options, both incoming and outgoing.
 // The relTime value is used for Timestamp analysis.
-func (s *State) ObsoleteOption(port layers.TCPPort, retransmit bool, pTime time.Time, opt *tcpOption) {
+func (s *State) ObsoleteOption(port layers.TCPPort, retransmit bool, pTime UnixNano, opt *tcpOption) {
 	// TODO test case for wrong index.
 	optionType := opt.kind
 	if optionType > 15 {
@@ -848,7 +853,7 @@ func (s *State) ObsoleteOption(port layers.TCPPort, retransmit bool, pTime time.
 // Options2 handles all options, both incoming and outgoing.
 // It operates on the raw option byte slice, so it's benchmark appears slower,
 // but is actually faster.
-func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, optData []byte) error {
+func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime UnixNano, optData []byte) error {
 	// TODO test case for wrong index.
 
 	for {
@@ -891,9 +896,9 @@ func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime time.Time, 
 	return nil
 }
 
-func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, optData []byte, ci gopacket.CaptureInfo) {
+func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TCPHeaderGo, optData []byte, pTime UnixNano) {
 	dataLength := tcpLength - uint16(tcp.DataOffset)
-	pTime := ci.Timestamp
+	// pTime := ci.Timestamp
 	var retransmit bool
 	if s.SrcIP.Equal(srcIP) {
 		if s.SrcPort != tcp.SrcPort {
@@ -924,7 +929,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 				//	sparse500.Println("Window limited", s.SrcPort, s.SeqTracker.packets, ": ", window, remaining, s.MSS)
 			}
 		}
-		s.LastPacketTimeUsec = uint64(ci.Timestamp.UnixNano() / 1000)
+		// s.LastPacketTimeUsec = uint64(pTime / 1000)
 		if tcp.ECE() {
 			s.Stats.ECECount++
 		}
@@ -957,5 +962,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 }
 
 func (s State) String() string {
-	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d %8d win:%5d sacks:%4d retrans:%4d ece:%4d]", s.SrcIP, s.SrcPort, s.Stats.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(), s.LastPacketTimeUsec%10000000, s.Window, s.Stats.Sacks, s.Stats.RetransmitPackets, s.Stats.ECECount)
+	return fmt.Sprintf("[%v:%5d %d %12d/%10d/%10d  win:%5d sacks:%4d retrans:%4d ece:%4d]",
+		s.SrcIP, s.SrcPort, s.Stats.TTLChanges, s.SeqTracker.SendNext(), s.SeqTracker.seq, s.SeqTracker.Acked(),
+		s.Window, s.Stats.Sacks, s.Stats.RetransmitPackets, s.Stats.ECECount)
 }

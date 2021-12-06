@@ -27,7 +27,7 @@ func TestTracker_Seq(t *testing.T) {
 
 	tr := tcp.NewTracker()
 
-	now := time.Now()
+	now := tcp.UnixNano(time.Now().UnixNano())
 	tr.Seq(0, now, 1234, 0, true, stats) // SYN, no data
 	tr.Seq(0, now, 1235, 20, false, stats)
 	tr.Seq(0, now, 1255, 10, false, stats)
@@ -91,7 +91,7 @@ func TestJitter(t *testing.T) {
 		//t := -5e10 + time.Duration(rand.Int63n(1e7)-5e6)
 		t := t0 + uint32(rand.Intn(7)) - 3
 		t0 += 10
-		j.Add(t, p)
+		j.Add(t, tcp.UnixNano(p.UnixNano()))
 		//j.AddEcho(-5e10 - 10*time.Millisecond)
 	}
 	if j.Jitter() > .005 || j.Jitter() < .001 {
@@ -222,7 +222,7 @@ func TestSummary(t *testing.T) {
 func BenchmarkState_ObsoleteOptions(b *testing.B) {
 	port := layers.TCPPort(80)
 	s := tcp.NewState(net.IP{}, port)
-	pTime := time.Now()
+	pTime := tcp.UnixNano(time.Now().UnixNano())
 	s.SeqTracker.Seq(0, pTime, 123, 0, true, &s.Stats)
 	s.SeqTracker.Seq(1, pTime, 124, 1000, false, &s.Stats)
 	s.SeqTracker.Seq(2, pTime, 1124, 2000, true, &s.Stats)
@@ -248,7 +248,7 @@ func BenchmarkState_ObsoleteOptions(b *testing.B) {
 func BenchmarkTCPOptions2(b *testing.B) {
 	port := layers.TCPPort(80)
 	s := tcp.NewState(net.IP{}, port)
-	pTime := time.Now()
+	pTime := tcp.UnixNano(time.Now().UnixNano())
 	s.SeqTracker.Seq(0, pTime, 123, 0, true, &s.Stats)
 	s.SeqTracker.Seq(1, pTime, 124, 1000, false, &s.Stats)
 	s.SeqTracker.Seq(2, pTime, 1124, 2000, true, &s.Stats)

@@ -295,14 +295,14 @@ func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
 // Packet struct contains the packet data and metadata.
 type Packet struct {
 	// If we use a pointer here, for some reason we get zero value timestamps.
-	Ci   gopacket.CaptureInfo
-	Data []byte
-	eth  *EthernetHeader
-	ip   IP
-	v4   *IPv4Header  // Nil unless we're parsing IPv4 packets.
-	v6   *IPv6Wrapper // Nil unless we're parsing IPv6 packets.
-	tcp  *tcp.TCPHeaderGo
-	err  error
+	pTime tcp.UnixNano
+	Data  []byte
+	eth   *EthernetHeader
+	ip    IP
+	v4    *IPv4Header  // Nil unless we're parsing IPv4 packets.
+	v6    *IPv6Wrapper // Nil unless we're parsing IPv6 packets.
+	tcp   *tcp.TCPHeaderGo
+	err   error
 }
 
 func (p *Packet) TCP() *tcp.TCPHeaderGo {
@@ -316,7 +316,7 @@ func (p *Packet) From(ci *gopacket.CaptureInfo, data []byte) error {
 		return p.err
 	}
 	p.Data = data
-	p.Ci = *ci // make a copy
+	p.pTime = tcp.UnixNano(ci.Timestamp.UnixNano()) // make a copy
 	p.eth = (*EthernetHeader)(unsafe.Pointer(&data[0]))
 
 	switch p.eth.EtherType() {
@@ -367,19 +367,18 @@ func (p *Packet) PayloadLength() int {
 }
 
 type Summary struct {
-	Packets      int
-	FirstPacket  []byte
-	SrcIP        net.IP
-	DstIP        net.IP
-	SrcPort      layers.TCPPort
-	DstPort      layers.TCPPort
-	HopLimit     uint8
-	PayloadBytes uint64
-	StartTime    time.Time
-	LastTime     time.Time
-	OptionCounts map[layers.TCPOptionKind]int
-	Errors       map[int]error
-	Details      []string
+	Packets             int
+	FirstPacket         []byte
+	SrcIP               net.IP
+	DstIP               net.IP
+	SrcPort             layers.TCPPort
+	DstPort             layers.TCPPort
+	HopLimit            uint8
+	PayloadBytes        uint64
+	StartTime, LastTime tcp.UnixNano
+	OptionCounts        map[layers.TCPOptionKind]int
+	Errors              map[int]error
+	Details             []string
 
 	LeftState  *tcp.State
 	RightState *tcp.State
@@ -389,7 +388,6 @@ func (s *Summary) Add(p *Packet) {
 	ip := p.ip
 	tcpw := p.tcp
 	raw := p.Data
-	t := p.Ci.Timestamp
 
 	srcIP := ip.SrcIP() // ESCAPE - these reduce escapes to the heap
 	dstIP := ip.DstIP()
@@ -398,14 +396,14 @@ func (s *Summary) Add(p *Packet) {
 		// ESCAPE These are escaping to the heap.
 		s.LeftState = tcp.NewState(srcIP, tcpw.SrcPort)
 		s.RightState = tcp.NewState(dstIP, tcpw.DstPort)
-		s.StartTime = t
+		s.StartTime = p.pTime
 		s.SrcIP = srcIP
 		s.DstIP = dstIP
 		s.SrcPort = tcpw.SrcPort
 		s.DstPort = tcpw.DstPort
 		s.HopLimit = ip.HopLimit()
 	} else {
-		s.LastTime = t
+		s.LastTime = p.pTime
 	}
 
 	payloadLength := p.PayloadLength() // Optimization because p.Payload was using 2.5% of the CPU time.
@@ -413,8 +411,8 @@ func (s *Summary) Add(p *Packet) {
 	tcpheader := raw[EthernetHeaderSize+p.ip.HeaderLength():]
 	optData := tcpheader[tcp.TCPHeaderSize:tcpw.DataOffset]
 
-	s.LeftState.Update(s.Packets, srcIP, dstIP, uint16(payloadLength), p.TCP(), optData, p.Ci)
-	s.RightState.Update(s.Packets, srcIP, dstIP, uint16(payloadLength), p.TCP(), optData, p.Ci)
+	s.LeftState.Update(s.Packets, srcIP, dstIP, uint16(payloadLength), p.TCP(), optData, p.pTime)
+	s.RightState.Update(s.Packets, srcIP, dstIP, uint16(payloadLength), p.TCP(), optData, p.pTime)
 	s.Packets++
 }
 
