@@ -30,7 +30,53 @@ type sackBlock struct {
 
 type seqInfo struct {
 	count int
+	seq   SeqNum
 	pTime UnixNano // packet capture time
+}
+
+// Ack matcher keeps track of past sequence numbers, and matches them
+// when they are acked.
+type ackMatcher struct {
+	seqs []seqInfo
+}
+
+// When we add seqs, we discard any out of order.
+func (m *ackMatcher) Add(seq SeqNum, pNum int, pTime UnixNano) {
+	if len(m.seqs) > 0 {
+		if diff, err := m.seqs[len(m.seqs)-1].seq.diff(seq); diff > 0 || err != nil {
+			return
+		}
+	}
+	m.seqs = append(m.seqs, seqInfo{seq: seq, count: pNum, pTime: pTime})
+	return
+}
+
+// When an ack comes in, we try to match it, and delete all entries earlier than the ack number.
+func (m *ackMatcher) Match(ack SeqNum) (UnixNano, int, bool) {
+	if len(m.seqs) == 0 {
+		return 0, 0, false
+	}
+	for i := 0; i < len(m.seqs); i++ {
+		seq := m.seqs[i]
+		if diff, err := seq.seq.diff(ack); err != nil {
+			return 0, 0, false
+		} else if diff > 0 {
+			m.seqs = m.seqs[i:]
+		} else if diff == 0 {
+			m.seqs = m.seqs[i+1:]
+			return seq.pTime, seq.count, true
+		}
+	}
+	m.seqs = m.seqs[:0]
+	return 0, 0, false
+
+}
+
+func newMatcher() *ackMatcher {
+	return &ackMatcher{
+		seqs: make([]seqInfo, 0, 100),
+		//seqTimes: make(map[SeqNum]seqInfo, 100),
+	}
 }
 
 // TODO estimate the event times at the remote end, using the Timestamp option TSVal and TSecr fields.
@@ -56,14 +102,14 @@ type Tracker struct {
 
 	// This will get very large - one entry per packet.
 	// TODO - investigate using a circular buffer or linked list instead?
-	seqTimes map[SeqNum]seqInfo
+	seqTimes *ackMatcher
 
 	*LogHistogram
 }
 
 func NewTracker() *Tracker {
 	iat, _ := NewLogHistogram(.00001, 0.1, 6.0)
-	return &Tracker{seqTimes: make(map[SeqNum]seqInfo, 100), LogHistogram: &iat}
+	return &Tracker{seqTimes: newMatcher(), LogHistogram: &iat}
 }
 
 func (t *Tracker) updateSendUNA(seq SeqNum, time UnixNano) {
@@ -149,7 +195,7 @@ func (t *Tracker) Seq(count int, pTime UnixNano, clock SeqNum, length uint16, sy
 
 	t.sent += uint64(length)
 	t.seq = clock
-	t.seqTimes[clock] = seqInfo{count, pTime}
+	t.seqTimes.Add(clock, count, pTime)
 
 	gap, err := t.seq.diff(t.sendUNA)
 	if err != nil {
@@ -194,15 +240,12 @@ func (t *Tracker) Ack(count int, pTime UnixNano, clock SeqNum, withData bool, sw
 	}
 	defer t.updateSendUNA(clock, pTime)
 
-	si, ok := t.seqTimes[clock]
+	seqTime, count, ok := t.seqTimes.Match(clock)
 	if ok {
 		// Only update InterArrivalTime when we find the corresponding sequence number in map.
 		t.LogHistogram.Add(pTime.Sub(t.sendUNATime).Seconds())
 
-		// TODO should we keep the entry but mark it as acked?  Or keep a limited cache?
-		delete(t.seqTimes, clock)
-		return si.count, pTime.Sub(si.pTime)
-
+		return count, pTime.Sub(seqTime)
 	} else {
 		//sparse500.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
 		return 0, 0
