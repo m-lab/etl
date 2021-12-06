@@ -332,6 +332,7 @@ func BenchmarkGetPackets(b *testing.B) {
 // Packet.From				 100	  11223040 ns/op	 157.31 MB/s	     36078 packets/op	 8676454 B/op	  133400 allocs/op - 240 bytes/packet
 //							 100	  10483849 ns/op	 168.40 MB/s	     36078 packets/op	 4733919 B/op	   97330 allocs/op
 //  opts in place			 127	   9179728 ns/op	 192.32 MB/s	     36807 packets/op	 4864737 B/op	   99568 allocs/op
+//  timestamps -> UnixNano   150	   8352165 ns/op	 211.38 MB/s	     37099 packets/op	 3779400 B/op	  100432 allocs/op
 func BenchmarkProcessPackets2(b *testing.B) {
 	type tt struct {
 		data                  []byte

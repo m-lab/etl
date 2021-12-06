@@ -437,6 +437,7 @@ type Tracker struct {
 	lastDataLength uint16 // Used to compute NextSeq()
 
 	// This will get very large - one entry per packet.
+	// TODO - investigate using a circular buffer or linked list instead?
 	seqTimes map[uint32]seqInfo
 
 	*LogHistogram
@@ -649,6 +650,8 @@ type JitterTracker struct {
 
 	// We should end up with tick lines, possibly converging or diverging.
 	// The actual delay is the gap between the two tick lines.
+	// NOTE: We use floating point Unix seconds, which have a precision of about 300 nsec.
+	// So, we lose any precision beyond that.
 	valLR  LinReg
 	echoLR LinReg
 
