@@ -74,7 +74,6 @@ type LogHistogram struct {
 	min           float64 // minimum value in the histogram
 	binsPerDecade float64 // number of bins per decade
 	count         int
-	logSum        float64
 }
 
 func (s *LogHistogram) index(dt float64) int {
@@ -83,7 +82,6 @@ func (s *LogHistogram) index(dt float64) int {
 
 // Add updates the histogram with the given value.
 func (s *LogHistogram) Add(dt float64) {
-	s.logSum += math.Log10(dt)
 	i := s.index(dt)
 
 	if i < 0 {
