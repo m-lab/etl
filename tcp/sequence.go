@@ -61,21 +61,21 @@ func (m *ackMatcher) Match(ack SeqNum) (UnixNano, int, bool) {
 		if diff, err := seq.seq.diff(ack); err != nil {
 			return 0, 0, false
 		} else if diff > 0 {
-			m.seqs = m.seqs[i:]
+			n := copy(m.seqs[:], m.seqs[i:])
+			m.seqs = m.seqs[:n]
 		} else if diff == 0 {
-			m.seqs = m.seqs[i+1:]
+			n := copy(m.seqs[:], m.seqs[i+1:])
+			m.seqs = m.seqs[:n]
 			return seq.pTime, seq.count, true
 		}
 	}
 	m.seqs = m.seqs[:0]
 	return 0, 0, false
-
 }
 
 func newMatcher() *ackMatcher {
 	return &ackMatcher{
-		seqs: make([]seqInfo, 0, 100),
-		//seqTimes: make(map[SeqNum]seqInfo, 100),
+		seqs: make([]seqInfo, 0, 200),
 	}
 }
 
