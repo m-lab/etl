@@ -408,12 +408,13 @@ func (s *Summary) Add(p *Packet) {
 		s.LastTime = t
 	}
 
-	s.PayloadBytes += uint64(p.PayloadLength())
+	payloadLength := p.PayloadLength() // Optimization because p.Payload was using 2.5% of the CPU time.
+	s.PayloadBytes += uint64(payloadLength)
 	tcpheader := raw[EthernetHeaderSize+p.ip.HeaderLength():]
 	optData := tcpheader[tcp.TCPHeaderSize:tcpw.DataOffset]
 
-	s.LeftState.Update(s.Packets, srcIP, dstIP, uint16(p.PayloadLength()), p.TCP(), optData, p.Ci)
-	s.RightState.Update(s.Packets, srcIP, dstIP, uint16(p.PayloadLength()), p.TCP(), optData, p.Ci)
+	s.LeftState.Update(s.Packets, srcIP, dstIP, uint16(payloadLength), p.TCP(), optData, p.Ci)
+	s.RightState.Update(s.Packets, srcIP, dstIP, uint16(payloadLength), p.TCP(), optData, p.Ci)
 	s.Packets++
 }
 

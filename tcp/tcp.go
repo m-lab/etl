@@ -409,7 +409,7 @@ func (sw *StatsWrapper) Option(opt layers.TCPOptionKind) {
 
 type seqInfo struct {
 	count int
-	pTime time.Time
+	pTime time.Time // TODO - convert all time.Time to float64 nsecs.
 }
 type Tracker struct {
 	initialized bool
