@@ -219,7 +219,7 @@ func BenchmarkTCPSummary(b *testing.B) {
 	}
 	for i := range tests {
 		var err error
-		data, err := os.ReadFile(tests[i].fn)
+		data, err := ioutil.ReadFile(tests[i].fn)
 		if err != nil {
 			b.Fatal(err)
 		}
