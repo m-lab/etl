@@ -79,8 +79,8 @@ var EthernetHeaderSize = int(unsafe.Sizeof(EthernetHeader{}))
 type IP interface {
 	Version() uint8
 	PayloadLength() int
-	SrcIP() net.IP
-	DstIP() net.IP
+	SrcIP(net.IP) net.IP
+	DstIP(net.IP) net.IP
 	NextProtocol() layers.IPProtocol
 	HopLimit() uint8
 	HeaderLength() int
@@ -111,16 +111,20 @@ func (h *IPv4Header) PayloadLength() int {
 	return int(h.length.Uint16()) - int(ihl*4)
 }
 
-func (h *IPv4Header) SrcIP() net.IP {
-	ip := make(net.IP, 4)
-	copy(ip, h.srcIP[:])
+func (h *IPv4Header) SrcIP(ip net.IP) net.IP {
+	if ip == nil {
+		ip = make(net.IP, 4)
+	}
+	ip = append(ip[:0], h.srcIP[:]...)
 	return ip
 }
 
 // DstIP returns the destination IP address of the packet.
-func (h *IPv4Header) DstIP() net.IP {
-	ip := make(net.IP, 4)
-	copy(ip, h.dstIP[:])
+func (h *IPv4Header) DstIP(ip net.IP) net.IP {
+	if ip == nil {
+		ip = make(net.IP, 4)
+	}
+	ip = append(ip[:0], h.dstIP[:]...)
 	return ip
 }
 
@@ -200,16 +204,20 @@ func (h *IPv6Header) PayloadLength() int {
 	return int(h.payloadLength.Uint16())
 }
 
-func (h *IPv6Header) SrcIP() net.IP {
-	ip := make(net.IP, 16) // This understandably escapes to the heap.
-	copy(ip, h.srcIP[:])
+func (h *IPv6Header) SrcIP(ip net.IP) net.IP {
+	if ip == nil {
+		ip = make(net.IP, 16)
+	}
+	ip = append(ip[:0], h.srcIP[:]...)
 	return ip
 }
 
 // DstIP returns the destination IP address of the packet.
-func (h *IPv6Header) DstIP() net.IP {
-	ip := make(net.IP, 16)
-	copy(ip, h.dstIP[:])
+func (h *IPv6Header) DstIP(ip net.IP) net.IP {
+	if ip == nil {
+		ip = make(net.IP, 16)
+	}
+	ip = append(ip[:0], h.dstIP[:]...)
 	return ip
 }
 
@@ -388,9 +396,12 @@ func (s *Summary) Add(p *Packet) {
 	ip := p.ip
 	tcpw := p.tcp
 	raw := p.Data
+	var bSrc, bDst [16]byte
+	//srcIP := make(net.IP, 16)
+	//dstIP := make(net.IP, 16)
 
-	srcIP := ip.SrcIP() // ESCAPE - these reduce escapes to the heap
-	dstIP := ip.DstIP()
+	srcIP := ip.SrcIP(bSrc[:]) // ESCAPE - these reduce escapes to the heap
+	dstIP := ip.DstIP(bDst[:])
 	if s.Packets == 0 {
 		s.FirstPacket = raw[:]
 		// ESCAPE These are escaping to the heap.
