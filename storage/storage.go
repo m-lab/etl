@@ -300,6 +300,8 @@ func NewTestSource(client stiface.Client, dp etl.DataPath, label string) (etl.Te
 
 // GetStorageClient provides a storage reader client.
 // This contacts the backend server, so should be used infrequently.
+// TODO Pass in a WithHTTPClient option to avoid this, and use
+// it to CloseIdleConnections() ??
 func GetStorageClient(writeAccess bool) (stiface.Client, error) {
 	var scope string
 	if writeAccess {

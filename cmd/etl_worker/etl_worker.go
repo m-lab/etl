@@ -330,6 +330,8 @@ func outputBucket() string {
 }
 
 func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
+	// TODO pass in an http.Client, and CloseIdleConnections when
+	// the factory is closed?
 	c, err := storage.GetStorageClient(false)
 	if err != nil {
 		return nil // TODO add an error?
