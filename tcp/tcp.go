@@ -480,8 +480,10 @@ type State struct {
 }
 
 func NewState(srcIP net.IP, srcPort layers.TCPPort) *State {
-	return &State{SrcIP: srcIP, SrcPort: srcPort, SeqTracker: NewTracker(),
+	state := State{SrcPort: srcPort, SeqTracker: NewTracker(),
 		Stats: StatsWrapper{TcpStats: TcpStats{OptionCounts: make([]int64, 16)}}}
+	state.SrcIP = append(state.SrcIP, srcIP[:]...)
+	return &state
 }
 
 // TODO - should only handle the earliest response for each value???
