@@ -44,7 +44,7 @@ type ackMatcher struct {
 // When we add seqs, we discard any out of order.
 func (m *ackMatcher) Add(seq SeqNum, pNum int, pTime UnixNano) {
 	if len(m.seqs) > 0 {
-		if diff, err := m.seqs[len(m.seqs)-1].seq.diff(seq); diff > 0 || err != nil {
+		if diff, err := seq.diff(m.seqs[len(m.seqs)-1].seq); diff <= 0 || err != nil {
 			return
 		}
 	}
@@ -69,10 +69,12 @@ func (m *ackMatcher) Match(ack SeqNum) (UnixNano, int, bool) {
 		if diff, err := seq.seq.diff(ack); err != nil {
 			return 0, 0, false
 		} else if diff > 0 {
+			// If new ack is after this seq, then remove all earlier seqs.
 			m.seqs = m.seqs[i:]
 			return 0, 0, false
 		} else if diff == 0 {
-			m.seqs = m.seqs[i+1:]
+			// If new ack is same as this seq, then remove all earlier seqs.
+			m.seqs = m.seqs[i:]
 			return seq.pTime, seq.count, true
 		}
 	}
@@ -81,8 +83,7 @@ func (m *ackMatcher) Match(ack SeqNum) (UnixNano, int, bool) {
 }
 
 func newMatcher() *ackMatcher {
-
-	back := make([]seqInfo, 0, 100)
+	back := make([]seqInfo, 0, 200)
 	return &ackMatcher{
 		seqs:    back,
 		backing: back,

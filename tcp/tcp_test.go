@@ -93,6 +93,8 @@ func TestSummary(t *testing.T) {
 			leftRetransmits: 0, rightRetransmits: 0, exceeded: 2880, leftSacks: 0, rightSacks: 0, leftTimestamps: 1814, rightTimestamps: 3364},
 		{name: "foobar", fn: "testfiles/ndt-xkrzj_1632230485_0000000000AE8EE2.pcap.gz", packets: 49,
 			leftRetransmits: 0, rightRetransmits: 0, exceeded: 0, leftSacks: 0, rightSacks: 0, leftTimestamps: 21, rightTimestamps: 28},
+		{name: "big", fn: "testfiles/ndt-4dh2l_1591894023_00000000003638D0.pcap.gz", packets: 210322,
+			leftRetransmits: 29, rightRetransmits: 0, exceeded: 0, leftSacks: 0, rightSacks: 478, leftTimestamps: 140938, rightTimestamps: 69384},
 	}
 	for _, tt := range tests {
 		f, err := os.Open(tt.fn)
@@ -104,6 +106,9 @@ func TestSummary(t *testing.T) {
 			t.Fatal(err)
 		}
 		summary, err := ProcessPackets(data)
+		if err != nil {
+			t.Fatal(err)
+		}
 		rs := summary.RightState
 		ls := summary.LeftState
 
@@ -192,5 +197,37 @@ func BenchmarkTCPHeaderGo_From(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		out.From(data)
+	}
+}
+
+// cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
+// BenchmarkTCPSummary-8   	       7	 161298078 ns/op	22228477 B/op	  653324 allocs/op
+func BenchmarkTCPSummary(b *testing.B) {
+	type test struct {
+		name    string
+		fn      string
+		packets int
+		data    []byte
+	}
+	tests := []test{
+		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz", packets: 5180},
+		{name: "big", fn: "testfiles/ndt-4dh2l_1591894023_00000000003638D0.pcap.gz", packets: 210322},
+	}
+	for i := range tests {
+		var err error
+		tests[i].data, err = os.ReadFile(tests[i].fn)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, tt := range tests {
+			_, err := ProcessPackets(tt.data)
+			if err != nil {
+				b.Fatal(err, len(tt.data))
+			}
+		}
 	}
 }
