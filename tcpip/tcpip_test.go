@@ -137,8 +137,8 @@ func TestIPLayer(t *testing.T) {
 			t.Errorf("%s: expected %d packets, got %d", tt.name, tt.packets, summary.Packets)
 		}
 
-		if !summary.SrcIP.Equal(net.ParseIP(tt.srcIP)) {
-			t.Errorf("%s: srcIP = %s, want %s", tt.name, summary.SrcIP, tt.srcIP)
+		if !summary.LeftState.SrcIP.Equal(net.ParseIP(tt.srcIP)) {
+			t.Errorf("%s: srcIP = %s, want %s", tt.name, summary.LeftState.SrcIP, tt.srcIP)
 		}
 		if summary.SrcPort != tt.srcPort {
 			t.Errorf("%s: srcPort = %d, want %d", tt.name, summary.SrcPort, tt.srcPort)
