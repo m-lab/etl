@@ -234,7 +234,7 @@ func BenchmarkTCPSummary(b *testing.B) {
 		}
 	}
 
-	f, err := os.OpenFile("profile.cpu", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	f, err := os.OpenFile("../profile.cpu", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		b.Fatal(err)
 	}

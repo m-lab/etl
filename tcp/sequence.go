@@ -63,7 +63,7 @@ type Tracker struct {
 
 func NewTracker() *Tracker {
 	iat, _ := NewLogHistogram(.00001, 0.1, 6.0)
-	return &Tracker{seqTimes: make(map[SeqNum]seqInfo, 100), LogHistogram: &iat}
+	return &Tracker{seqTimes: make(map[SeqNum]seqInfo, 300), LogHistogram: &iat}
 }
 
 func (t *Tracker) updateSendUNA(seq SeqNum, time UnixNano) {

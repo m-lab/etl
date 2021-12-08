@@ -8,10 +8,12 @@ import (
 	"log"
 	"math"
 	"net"
+	"os"
 	"time"
 	"unsafe"
 
 	"github.com/google/gopacket/layers"
+	"github.com/m-lab/go/logx"
 )
 
 // The Model should consume raw IP payloads of type IPProtocolTCP and update the model.
@@ -27,13 +29,10 @@ models for:
 */
 
 var (
-	// NOTE: These logs are causing a lot of objects to escape the stack.  Removing them
-	// reduces the allocations from 16.4MB to 13.9MB.
+	info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
+	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
+	sparse2      = logx.NewLogEvery(sparseLogger, 500*time.Millisecond)
 
-	//info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
-	//sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
-	//sparse500    = logx.NewLogEvery(sparseLogger, 500*time.Millisecond)
-	//sparse2      = logx.NewLogEvery(sparseLogger, 501*time.Millisecond)
 	ErrNoIPLayer = fmt.Errorf("no IP layer")
 
 	ErrNotTCP             = fmt.Errorf("not a TCP packet")
@@ -490,7 +489,7 @@ func NewState(srcIP net.IP, srcPort layers.TCPPort) *State {
 func (s *State) handleTimestamp(pktTime UnixNano, retransmit bool, isOutgoing bool, opt *tcpOption) {
 	tsVal, tsEcr, err := opt.GetTimestamps()
 	if err != nil {
-		log.Println(err, "on timestamp option")
+		sparse2.Println(err, "on timestamp option")
 	}
 	if isOutgoing && !retransmit {
 		if tsVal != 0 {

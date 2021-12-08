@@ -377,8 +377,6 @@ func (p *Packet) PayloadLength() int {
 type Summary struct {
 	Packets             int
 	FirstPacket         []byte
-	SrcIP               net.IP
-	DstIP               net.IP
 	SrcPort             layers.TCPPort
 	DstPort             layers.TCPPort
 	HopLimit            uint8
@@ -390,47 +388,44 @@ type Summary struct {
 
 	LeftState  *tcp.State
 	RightState *tcp.State
+
+	srcIP net.IP // Scratch space to avoid allocations.
+	dstIP net.IP
 }
 
 func (s *Summary) Add(p *Packet) {
 	ip := p.ip
 	tcpw := p.tcp
 	raw := p.Data
-	var bSrc, bDst [16]byte
-	//srcIP := make(net.IP, 16)
-	//dstIP := make(net.IP, 16)
 
-	srcIP := ip.SrcIP(bSrc[:]) // ESCAPE - these reduce escapes to the heap
-	dstIP := ip.DstIP(bDst[:])
+	s.srcIP = ip.SrcIP(s.srcIP) // ESCAPE - these reduce escapes to the heap
+	s.dstIP = ip.DstIP(s.dstIP)
 	if s.Packets == 0 {
 		s.FirstPacket = raw[:]
 		// ESCAPE These are escaping to the heap.
-		s.LeftState = tcp.NewState(srcIP, tcpw.SrcPort)
-		s.RightState = tcp.NewState(dstIP, tcpw.DstPort)
+		s.LeftState = tcp.NewState(s.srcIP, tcpw.SrcPort)
+		s.RightState = tcp.NewState(s.dstIP, tcpw.DstPort)
 		s.StartTime = p.pTime
-		s.SrcIP = srcIP
-		s.DstIP = dstIP
 		s.SrcPort = tcpw.SrcPort
 		s.DstPort = tcpw.DstPort
 		s.HopLimit = ip.HopLimit()
-	} else {
-		s.LastTime = p.pTime
 	}
 
+	s.LastTime = p.pTime
 	payloadLength := p.PayloadLength() // Optimization because p.Payload was using 2.5% of the CPU time.
 	s.PayloadBytes += uint64(payloadLength)
 	tcpheader := raw[EthernetHeaderSize+p.ip.HeaderLength():]
 	optData := tcpheader[tcp.TCPHeaderSize:tcpw.DataOffset]
 
-	s.LeftState.Update(s.Packets, srcIP, dstIP, uint16(payloadLength), p.TCP(), optData, p.pTime)
-	s.RightState.Update(s.Packets, srcIP, dstIP, uint16(payloadLength), p.TCP(), optData, p.pTime)
+	s.LeftState.Update(s.Packets, s.srcIP, s.dstIP, uint16(payloadLength), p.TCP(), optData, p.pTime)
+	s.RightState.Update(s.Packets, s.srcIP, s.dstIP, uint16(payloadLength), p.TCP(), optData, p.pTime)
 	s.Packets++
 }
 
 // GetIP decodes the IP layers and returns some basic information.
 // It is a bit slow and does memory allocation.
 func (s *Summary) GetIP() (net.IP, net.IP, uint8) {
-	return s.SrcIP, s.DstIP, s.HopLimit
+	return s.LeftState.SrcIP, s.RightState.SrcIP, s.HopLimit
 }
 
 func isGZip(data []byte) bool {
