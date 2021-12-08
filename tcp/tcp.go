@@ -201,6 +201,7 @@ func (o *tcpOption) GetWS() (uint8, error) {
 
 func (o *tcpOption) GetTimestamps() (uint32, uint32, error) {
 	if o.kind != layers.TCPOptionKindTimestamps || o.len != 10 {
+		sparse2.Println("Bad timestamp", o.len) // ESCAPE to heap
 		return 0, 0, ErrBadOption
 	}
 	return o.getUint32(0), o.getUint32(1), nil
@@ -489,6 +490,8 @@ func NewState(srcIP net.IP, srcPort layers.TCPPort) *State {
 func (s *State) handleTimestamp(pktTime UnixNano, retransmit bool, isOutgoing bool, opt *tcpOption) {
 	tsVal, tsEcr, err := opt.GetTimestamps()
 	if err != nil {
+		// TODO - there are a lot of these on some dates.
+		// Should add a metric.
 		sparse2.Println(err, "on timestamp option")
 	}
 	if isOutgoing && !retransmit {
