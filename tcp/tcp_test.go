@@ -70,6 +70,7 @@ func ProcessPackets(data []byte) (tcpip.Summary, error) {
 
 // TestSummary exercises a lot of code.  It only checks
 // some basic stats, which are assumed to be correct, but not inspected.
+// TODO - we should add analysis to identify the problems with ndt-m6znc_1632401351_000000000005B9EA.pcap.gz
 func TestSummary(t *testing.T) {
 	type test struct {
 		name                              string
@@ -89,15 +90,20 @@ func TestSummary(t *testing.T) {
 		// tcp_test.go:187: test:protocolErrors2: Timestamps = 5178, want 8542
 		// tcp_test.go:187: test:foobar: Timestamps = 49, want 77
 		{name: "retransmits", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DFE.pcap", packets: 336,
-			leftRetransmits: 11, rightRetransmits: 8, exceeded: 0, leftSacks: 31, rightSacks: 24, leftTimestamps: 162, rightTimestamps: 174},
+			leftRetransmits: 11, rightRetransmits: 8, exceeded: 0, leftSacks: 24, rightSacks: 31, leftTimestamps: 162, rightTimestamps: 174},
 		{name: "ipv6", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz", packets: 15,
 			leftRetransmits: 0, rightRetransmits: 0, exceeded: 0, leftSacks: 0, rightSacks: 0, leftTimestamps: 8, rightTimestamps: 7},
-		{name: "protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz", packets: 5180,
-			leftRetransmits: 0, rightRetransmits: 0, exceeded: 2880, leftSacks: 0, rightSacks: 0, leftTimestamps: 1814, rightTimestamps: 3364},
+		{name: "NOT-protocolErrors2", fn: "testfiles/ndt-nnwk2_1611335823_00000000000C2DA9.pcap.gz", packets: 5180,
+			leftRetransmits: 0, rightRetransmits: 0, exceeded: 0, leftSacks: 0, rightSacks: 0, leftTimestamps: 1814, rightTimestamps: 3364},
 		{name: "foobar", fn: "testfiles/ndt-xkrzj_1632230485_0000000000AE8EE2.pcap.gz", packets: 49,
 			leftRetransmits: 0, rightRetransmits: 0, exceeded: 0, leftSacks: 0, rightSacks: 0, leftTimestamps: 21, rightTimestamps: 28},
 		{name: "big", fn: "testfiles/ndt-4dh2l_1591894023_00000000003638D0.pcap.gz", packets: 210322,
-			leftRetransmits: 29, rightRetransmits: 0, exceeded: 0, leftSacks: 0, rightSacks: 478, leftTimestamps: 140938, rightTimestamps: 69384},
+			leftRetransmits: 29, rightRetransmits: 0, exceeded: 0, leftSacks: 478, rightSacks: 0, leftTimestamps: 140938, rightTimestamps: 69384},
+
+		// This contains an ACK that is observed about 200 usec before the corresponding packet is observed.
+		// 367	1.017318000	2001:668:1f:1c::203	2600:1700:42d0:67b0:71e7:d89:1d89:9484	TCP	86	443	[TCP ACKed unseen segment] 443 → 49319 [ACK] Seq=13116 Ack=262516 Win=327296 Len=0 TSval=3783599016 TSecr=1746186507
+		{name: "more retrans", fn: "testfiles/ndt-m6znc_1632401351_000000000005B9EA.pcap.gz", packets: 146172,
+			leftRetransmits: 175, rightRetransmits: 238, exceeded: 0, leftSacks: 195, rightSacks: 7, leftTimestamps: 96459, rightTimestamps: 49477},
 	}
 	for _, tt := range tests {
 		f, err := os.Open(tt.fn)

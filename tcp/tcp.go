@@ -405,7 +405,6 @@ func (jt *JitterTracker) Add(tsval uint32, pktTime UnixNano) {
 		jt.tickRate = time.Millisecond
 		jt.firstTSVal = tsval
 		jt.firstPktTime = pktTime
-		//log.Println("Jitter init")
 		jt.initialized = true
 		return
 	}
@@ -509,48 +508,10 @@ func (s *State) handleTimestamp(pktTime UnixNano, retransmit bool, isOutgoing bo
 	if isOutgoing && !retransmit {
 		if tsVal != 0 {
 			s.Jitter.Add(tsVal, pktTime)
-			//log.Println(s.SrcPort, "TSVal", binary.BigEndian.Uint32(opt.OptionData[0:4]))
-			// t, p := s.Jitter.Adjust(TSVal, pktTime)
-			// delta := t - p
-			// avgSeconds := s.Jitter.Mean()
-			// log.Printf("%20v Avg: %10.4f T: %6.3f P: %6.3f Delta: %6.3f RTT: %8.4f Jitter: %8.4f at %v\n", s.SrcPort,
-			// 	avgSeconds, float32(t)/1e9, float32(p)/1e9, float32(delta)/1e9, s.Jitter.Delay(), s.Jitter.Jitter(), pktTime)
 		}
 	} else if tsEcr != 0 {
 		// TODO - what if !isOutgoing and retransmit?
-		//log.Println(s.SrcPort, "TSEcr", binary.BigEndian.Uint32(opt.OptionData[4:8]))
 		s.Jitter.AddEcho(tsEcr, pktTime)
-	}
-}
-
-// ObsoleteOption handles all options, both incoming and outgoing.
-// The relTime value is used for Timestamp analysis.
-func (s *State) ObsoleteOption(port layers.TCPPort, retransmit bool, pTime UnixNano, opt *tcpOption) {
-	// TODO test case for wrong index.
-	optionType := opt.kind
-	if optionType > 15 {
-		//info.Printf("TCP Option has illegal option type %d", opt.kind)
-		return
-	}
-	// TODO should some of these be counted in the opposite direction?
-	s.Stats.Option(optionType)
-
-	switch optionType {
-	case layers.TCPOptionKindSACK:
-		err := opt.processSACKs(s.SeqTracker.Sack, &s.Stats)
-		if err != nil {
-			log.Println(err, "on SACK option")
-			return
-		}
-
-	case layers.TCPOptionKindMSS:
-		s.MSS, _ = opt.GetMSS()
-	case layers.TCPOptionKindTimestamps:
-		s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
-
-	case layers.TCPOptionKindWindowScale:
-		s.WindowScale, _ = opt.GetWS()
-	default:
 	}
 }
 
@@ -574,16 +535,14 @@ func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime UnixNano, o
 		if opt.kind == layers.TCPOptionKindTimestamps {
 			s.handleTimestamp(pTime, retransmit, port == s.SrcPort, opt)
 		}
-		// All others, we handle only outgoing.
-		if port == s.SrcPort {
-			// Just count (all) the non-trivial options for the matching direction.
-			s.Stats.Option(opt.kind)
-
+		// All others, we handle only incoming.
+		if port != s.SrcPort {
 			switch opt.kind {
+			// Shouldn't this be handled for the incoming direction?
 			case layers.TCPOptionKindSACK:
 				err := opt.processSACKs(s.SeqTracker.Sack, &s.Stats)
 				if err != nil {
-					log.Println(err, "on SACK option")
+					sparse2.Println(err, "on SACK option")
 				}
 			case layers.TCPOptionKindMSS:
 				s.MSS, _ = opt.GetMSS()
@@ -592,6 +551,9 @@ func (s *State) Options2(port layers.TCPPort, retransmit bool, pTime UnixNano, o
 			default:
 				// Do nothing for now.
 			}
+		} else {
+			// Just count (all) the non-trivial options for the matching direction.
+			s.Stats.Option(opt.kind)
 		}
 		if len(optData) == 0 {
 			break
@@ -623,6 +585,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		if !tcp.SYN() {
 			if remaining < 0 {
 				// TODO: This is currently triggering more often than expected.
+				//   - Resolved - it was due to processing the wrong direction.
 				// The stack should not send data beyond the window limit, which would have been
 				// specified in the last ack.  But if pcaps did not capture the last ack, and
 				// that ack increased the window, then this might be a valid send, and an
@@ -642,16 +605,11 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		if s.SrcPort != tcp.DstPort {
 			s.Stats.DstPortErrors++
 		}
-		// Process ACKs and SACKs from the other direction
-		// Handle all options, including SACKs from other direction
-		// TODO - should some of these be associated with the other direction?
-		// for i := 0; i < len(options); i++ {
-		// 	s.Option(tcp.SrcPort, retransmit, pTime, &options[i])
-		// }
 		if s.Window != tcp.Window {
 			s.Stats.WindowChanges++
 			s.Window = tcp.Window
 		}
+		// Process ACKs from the other direction
 		if tcp.ACK() {
 			_, delay := s.SeqTracker.Ack(count, pTime, tcp.AckNum, dataLength > 0, &s.Stats) // TODO
 			if delay > 0 {
