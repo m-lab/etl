@@ -199,6 +199,8 @@ func (o *tcpOption) GetWS() (uint8, error) {
 	return o.data[0], nil
 }
 
+// GetTimestamp returns the timestamp option.
+// Input should be a slice of length TCPOptionTimestampSize.
 func (o *tcpOption) GetTimestamps() (uint32, uint32, error) {
 	if o.kind != layers.TCPOptionKindTimestamps || o.len != 10 {
 		sparse2.Println("Bad timestamp", o.len) // ESCAPE to heap
@@ -227,11 +229,8 @@ func (o *tcpOption) getSackBlock(i int) (sb sackBlock, err error) {
 }
 
 // Could we avoid escapes by moving this to a stats object?
+// Option should have already been validated.
 func (o *tcpOption) processSACKs(f func(sackBlock, *StatsWrapper), sw *StatsWrapper) error {
-	if o.kind != layers.TCPOptionKindSACK || (o.len-2)%8 != 0 {
-		log.Println("TCP option is not SACK")
-		return ErrBadOption
-	}
 	numBlocks := (int(o.len) - 2) / 8
 	// This alloc seems to cost only 15 nsec/call.
 	// unclear why this isn't on the stack.
@@ -247,34 +246,47 @@ func (o *tcpOption) processSACKs(f func(sackBlock, *StatsWrapper), sw *StatsWrap
 	return nil
 }
 
+func validate(opt *tcpOption) bool {
+	if opt.len > 40 {
+		return false
+	}
+	switch opt.kind {
+	case layers.TCPOptionKindEndList, layers.TCPOptionKindNop:
+		return opt.len == 1
+	case layers.TCPOptionKindMSS:
+		return opt.len == 4
+	case layers.TCPOptionKindWindowScale:
+		return opt.len == 3
+	case layers.TCPOptionKindSACKPermitted:
+		return opt.len == 2
+	case layers.TCPOptionKindSACK:
+		return opt.len >= 2 && (opt.len-2)%8 == 0
+	case layers.TCPOptionKindTimestamps:
+		return opt.len == 10
+	default:
+		return false // obsolete or invalid
+	}
+}
+
 // This skips Nop options, and returns nil data there are no more options.
 func NextOptionInPlace(data []byte) ([]byte, *tcpOption, error) {
 	// For loop to handle Nop options.
 	for len(data) > 0 && data[0] == layers.TCPOptionKindNop {
 		data = data[1:]
 	}
-	if len(data) == 0 {
+	if len(data) == 0 || data[0] == layers.TCPOptionKindEndList {
 		return nil, nil, ErrNoMoreOptions
 	}
 
 	opt := (*tcpOption)(unsafe.Pointer(&data[0]))
-	if opt.kind > 15 {
-		return nil, opt, ErrBadOption
+	if len(data) < 2 || int(opt.len) > len(data) {
+		return nil, nil, ErrTruncatedTCPHeader
 	}
-	switch opt.kind {
-	// This won't be a nop, because we already handled those above.
-	case layers.TCPOptionKindEndList:
-		return nil, opt, ErrNoMoreOptions // Technically we are returning one, but effect is the same.
-	default:
-		if len(data) < 2 || int(opt.len) > len(data) {
-			return nil, nil, ErrTruncatedTCPHeader
-		}
-		if opt.len > 40 {
-			return nil, nil, ErrBadOption
-		}
-		// Could also use a byte array copy here.
-		return data[opt.len:], opt, nil
+	if !validate(opt) {
+		return nil, nil, ErrBadOption
 	}
+	// Could also use a byte array copy here.
+	return data[opt.len:], opt, nil
 }
 
 type TcpStats struct {
