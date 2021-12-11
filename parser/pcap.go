@@ -3,7 +3,6 @@ package parser
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,14 +10,12 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/etl/tcpip"
 	"github.com/m-lab/go/logx"
 )
 
@@ -29,87 +26,6 @@ var (
 
 	ErrNoIPLayer = fmt.Errorf("no IP layer")
 )
-
-// Packet struct contains the packet data and metadata.
-type Packet struct {
-	// If we use a pointer here, for some reason we get zero value timestamps.
-	Ci   gopacket.CaptureInfo
-	Data []byte
-	Err  error
-}
-
-// GetIP decodes the IP layers and returns some basic information.
-// It is a bit slow and does memory allocation.
-func (p *Packet) GetIP() (net.IP, net.IP, uint8, uint16, error) {
-	// Decode a packet.
-	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
-		Lazy:                     true,
-		NoCopy:                   true,
-		SkipDecodeRecovery:       true,
-		DecodeStreamsAsDatagrams: false,
-	})
-
-	if ipLayer := pkt.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv4)
-		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
-		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
-	} else if ipLayer := pkt.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv6)
-		// In IPv6, the Length field is the payload length.
-		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
-	} else {
-		return nil, nil, 0, 0, ErrNoIPLayer
-	}
-}
-
-func GetPackets(data []byte) ([]Packet, error) {
-	pcap, err := pcapgo.NewReader(strings.NewReader(string(data)))
-	if err != nil {
-		log.Print(err)
-		return nil, err
-	}
-
-	// TODO: len(data)/18 provides much better estimate of number of packets.
-	// len(data)/18 was determined by looking at bytes/packet in a few pcaps files.
-	// The number seems too small, but perhaps the data is still compressed at this point.
-	// However, it seems to cause mysterious crashes in sandbox, so
-	// reverting to /1500 for now.
-	packets := make([]Packet, 0, len(data)/1500)
-
-	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ReadPacketData() {
-		packets = append(packets, Packet{Ci: ci, Data: data, Err: err})
-	}
-
-	if err != nil {
-		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
-		metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
-		return packets, err
-	} else if len(packets) > 0 {
-		srcIP, _, _, _, err := packets[0].GetIP()
-		// TODO - eventually we should identify key local ports, like 443 and 3001.
-		if err != nil {
-			metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
-			metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(len(packets)))
-		} else {
-			start := packets[0].Ci.Timestamp
-			end := packets[len(packets)-1].Ci.Timestamp
-			duration := end.Sub(start)
-			// TODO add TCP layer, so we can label the stats based on local port value.
-			if len(srcIP) == 4 {
-				metrics.PcapPacketCount.WithLabelValues("ipv4").Observe(float64(len(packets)))
-				metrics.PcapConnectionDuration.WithLabelValues("ipv4").Observe(duration.Seconds())
-			} else {
-				metrics.PcapPacketCount.WithLabelValues("ipv6").Observe(float64(len(packets)))
-				metrics.PcapConnectionDuration.WithLabelValues("ipv6").Observe(duration.Seconds())
-			}
-		}
-	} else {
-		// No packets.
-		metrics.PcapPacketCount.WithLabelValues("unknown").Observe(float64(len(packets)))
-	}
-
-	return packets, nil
-}
 
 //=====================================================================================
 //                       PCAP Parser
@@ -172,7 +88,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 
 	// Parse top level PCAP data and update metrics.
 	// TODO - add schema fields here.
-	_, _ = GetPackets(rawContent)
+	_, _ = tcpip.ProcessPackets(row.Parser.ArchiveURL, testName, rawContent)
 
 	// Insert the row.
 	if err := p.Put(&row); err != nil {
