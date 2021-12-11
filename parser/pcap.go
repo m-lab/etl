@@ -87,8 +87,24 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	row.ID = p.GetUUID(testName)
 
 	// Parse top level PCAP data and update metrics.
-	// TODO - add schema fields here.
-	_, _ = tcpip.ProcessPackets(row.Parser.ArchiveURL, testName, rawContent)
+	summary, err := tcpip.ProcessPackets(row.Parser.ArchiveURL, testName, rawContent)
+	server := summary.Server()
+	client := summary.Client()
+
+	if err != nil {
+		// TODO Add metric for PCAP parsing errors
+	} else if server.SrcIP != nil && client.SrcIP != nil {
+		row.A = schema.PCAPSummary{
+			PacketsSent:     server.Packets,
+			PacketsReceived: client.Packets,
+			StartTime:       summary.StartTime,
+			EndTime:         summary.LastTime,
+		}
+		row.Raw = schema.PCAPRaw{
+			ServerIP: server.SrcIP.String(),
+			ClientIP: client.SrcIP.String(),
+		}
+	}
 
 	// Insert the row.
 	if err := p.Put(&row); err != nil {
