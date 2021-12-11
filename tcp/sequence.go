@@ -29,8 +29,9 @@ type sackBlock struct {
 }
 
 type seqInfo struct {
-	count int
-	pTime UnixNano // packet capture time
+	xcount int
+	acks   int      // number of acks observed for this sequence number
+	pTime  UnixNano // original packet capture time
 }
 
 // TODO estimate the event times at the remote end, using the Timestamp option TSVal and TSecr fields.
@@ -57,6 +58,7 @@ type Tracker struct {
 	// This will get very large - one entry per packet.
 	// TODO - investigate using a circular buffer or linked list instead?
 	seqTimes map[SeqNum]seqInfo
+	unseen   uint32 // Number of acks that were seen before seeing corresponding sequence number.
 
 	*LogHistogram
 }
@@ -149,7 +151,7 @@ func (t *Tracker) Seq(count int, pTime UnixNano, clock SeqNum, length uint16, sy
 
 	t.sent += uint64(length)
 	t.seq = clock
-	t.seqTimes[clock] = seqInfo{count, pTime}
+	t.seqTimes[clock] = seqInfo{pTime: pTime}
 
 	gap, err := t.seq.diff(t.sendUNA)
 	if err != nil {
@@ -173,7 +175,7 @@ func (t *Tracker) Acked() uint64 {
 
 // Ack updates the tracker based on an observed ack value.
 // Returns the time observed by the packet capture since the correponding sequence number was sent.
-func (t *Tracker) Ack(count int, pTime UnixNano, clock SeqNum, withData bool, sw *StatsWrapper) (int, time.Duration) {
+func (t *Tracker) Ack(count int, pTime UnixNano, clock SeqNum, withData bool, sw *StatsWrapper) time.Duration {
 	if !t.initialized {
 		sw.OtherErrors++
 		//info.Printf("PKT: %d Ack called before Seq", count)
@@ -183,7 +185,7 @@ func (t *Tracker) Ack(count int, pTime UnixNano, clock SeqNum, withData bool, sw
 		sw.BadDeltas++
 		// TODO should this sometimes update the sendUNA, or always?
 		t.updateSendUNA(clock, pTime)
-		return 0, 0
+		return 0
 	}
 	if delta > 0 {
 		t.acked += uint64(delta)
@@ -200,12 +202,18 @@ func (t *Tracker) Ack(count int, pTime UnixNano, clock SeqNum, withData bool, sw
 		t.LogHistogram.Add(pTime.Sub(t.sendUNATime).Seconds())
 
 		// TODO should we keep the entry but mark it as acked?  Or keep a limited cache?
-		delete(t.seqTimes, clock)
-		return si.count, pTime.Sub(si.pTime)
+		//delete(t.seqTimes, clock)
+		si.acks++
+		if si.acks > 1 {
+			sw.DuplicateAcks++
+		}
+		t.seqTimes[clock] = si
+		return pTime.Sub(si.pTime)
 
 	} else {
+		sw.UnseenSegments++
 		//sparse500.Printf("Ack out of order? %7d (%7d) %7d..%7d", t.sendUNA, clock, t.seq, t.SendNext())
-		return 0, 0
+		return 0
 	}
 }
 

@@ -308,6 +308,8 @@ type TcpStats struct {
 	BadDeltas             int64 // Number of seqs and acks that were more than 1<<30 off from previous value.
 	MissingPackets        int64 // Observations of packet sequence numbers that didn't match previous payload length.
 	SendNextExceededLimit int64 // Number of times SendNext() returned a value that exceeded the receiver window limit.
+	UnseenSegments        int64 // Number of acks seen before the corresponding sequence number.
+	DuplicateAcks         int64 // Number of duplicate acks.
 	TTLChanges            int64 // Observed number of TTL values that don't match first IP header.
 	SrcPortErrors         int64 // Observed number of source ports that don't match first IP header.
 	DstPortErrors         int64 // Observed number of dest ports that don't match tcp.DstPort
@@ -465,6 +467,14 @@ func (jt *JitterTracker) Delay() float64 {
 	return jt.ValOffsetSum/float64(jt.ValCount) - jt.EchoOffsetSum/float64(jt.EchoCount)
 }
 
+type LocalRemote int
+
+const (
+	Unknown LocalRemote = iota
+	Local
+	Remote
+)
+
 // State keeps track of the TCP State of one side of a connection.
 // TODO - add histograms for Ack inter-arrival time.
 type State struct {
@@ -475,8 +485,9 @@ type State struct {
 	TTL         uint8
 	WindowScale uint8
 
-	// LastPacketTimeUsec uint64 // This comes from the IP layer.
+	Side LocalRemote // Local or Remote side of connection.
 
+	// These are dynamic characteristics.
 	MSS    uint16
 	Window uint16
 	Limit  SeqNum // The limit on data that can be sent, based on receiver window and ack data.
@@ -611,7 +622,7 @@ func (s *State) Update(count int, srcIP, dstIP net.IP, tcpLength uint16, tcp *TC
 		}
 		// Process ACKs from the other direction
 		if tcp.ACK() {
-			_, delay := s.SeqTracker.Ack(count, pTime, tcp.AckNum, dataLength > 0, &s.Stats) // TODO
+			delay := s.SeqTracker.Ack(count, pTime, tcp.AckNum, dataLength > 0, &s.Stats) // TODO
 			if delay > 0 {
 				//xxx BUG in sent?
 				//	log.Printf("%5d: %2d.%6d %9d %20v Packet: %5d Delay: %8v\n", count, pTime.Second(), pTime.Nanosecond()/1000, s.SeqTracker.sent, s.SrcPort, pn, delay)

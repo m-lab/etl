@@ -22,9 +22,11 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
+	"github.com/m-lab/annotation-service/site"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/tcp"
 	"github.com/m-lab/go/logx"
+	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 var (
@@ -401,7 +403,9 @@ func (s *Summary) Add(p *Packet) {
 	s.srcIP = ip.SrcIP(s.srcIP) // ESCAPE - these reduce escapes to the heap
 	s.dstIP = ip.DstIP(s.dstIP)
 	if s.Packets == 0 {
-		s.FirstPacket = raw[:]
+		s.FirstPacket = make([]byte, 0, len(raw))
+		s.FirstPacket = append(s.FirstPacket, raw...)
+
 		// ESCAPE These are escaping to the heap.
 		s.LeftState = tcp.NewState(s.srcIP, tcpw.SrcPort)
 		s.RightState = tcp.NewState(s.dstIP, tcpw.DstPort)
@@ -409,6 +413,22 @@ func (s *Summary) Add(p *Packet) {
 		s.SrcPort = tcpw.SrcPort
 		s.DstPort = tcpw.DstPort
 		s.HopLimit = ip.HopLimit()
+
+		// Determine which is server side.
+		// This could be defered until we actually care about which side is which.
+		srcAnno := annotator.ServerAnnotations{}
+		dstAnno := annotator.ServerAnnotations{}
+		site.Annotate(s.srcIP.String(), &srcAnno) // Exactly one of these should succeed.
+		site.Annotate(s.dstIP.String(), &dstAnno)
+		if srcAnno.Site != "" && dstAnno.Site == "" {
+			s.LeftState.Side, s.RightState.Side = tcp.Local, tcp.Remote
+		} else if srcAnno.Site == "" && dstAnno.Site != "" {
+			s.LeftState.Side, s.RightState.Side = tcp.Remote, tcp.Local
+		} else {
+			// We don't recognize either IP address, so we can't tell which side is local.
+			// We may be able to infer later based on observed ACK delays.
+			s.LeftState.Side, s.RightState.Side = tcp.Unknown, tcp.Unknown
+		}
 	}
 
 	s.LastTime = p.pTime

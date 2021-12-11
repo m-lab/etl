@@ -101,7 +101,7 @@ func TestSummary(t *testing.T) {
 			leftRetransmits: 29, rightRetransmits: 0, exceeded: 0, leftSacks: 478, rightSacks: 0, leftTimestamps: 140938, rightTimestamps: 69384},
 
 		// This contains an ACK that is observed about 200 usec before the corresponding packet is observed.
-		// 367	1.017318000	2001:668:1f:1c::203	2600:1700:42d0:67b0:71e7:d89:1d89:9484	TCP	86	443	[TCP ACKed unseen segment] 443 → 49319 [ACK] Seq=13116 Ack=262516 Win=327296 Len=0 TSval=3783599016 TSecr=1746186507
+		// packet 367	1.017318000	2001:668:1f:1c::203	2600:1700:42d0:67b0:71e7:d89:1d89:9484	TCP	86	443	[TCP ACKed unseen segment] 443 → 49319 [ACK] Seq=13116 Ack=262516 Win=327296 Len=0 TSval=3783599016 TSecr=1746186507
 		{name: "more retrans", fn: "testfiles/ndt-m6znc_1632401351_000000000005B9EA.pcap.gz", packets: 146172,
 			leftRetransmits: 175, rightRetransmits: 238, exceeded: 0, leftSacks: 195, rightSacks: 7, leftTimestamps: 96459, rightTimestamps: 49477},
 	}
@@ -161,6 +161,18 @@ func TestSummary(t *testing.T) {
 		if summary.RightState.Stats.OptionCounts[layers.TCPOptionKindTimestamps] != tt.rightTimestamps {
 			t.Errorf("test:%s: Right Timestamps = %v, want %v", tt.name,
 				summary.RightState.Stats.OptionCounts[layers.TCPOptionKindTimestamps], tt.rightTimestamps)
+		}
+		if summary.LeftState.Stats.DuplicateAcks != 0 {
+			t.Errorf("test:%s: Left.DuplicateAcks = %v, want 0", tt.name, summary.LeftState.Stats.DuplicateAcks)
+		}
+		if summary.RightState.Stats.DuplicateAcks != 0 {
+			t.Errorf("test:%s: Right.DuplicateAcks = %v, want 0", tt.name, summary.RightState.Stats.DuplicateAcks)
+		}
+		if summary.LeftState.Stats.UnseenSegments != 0 {
+			t.Errorf("test:%s: Left.UnseenSegments = %v, want 0", tt.name, summary.LeftState.Stats.UnseenSegments)
+		}
+		if summary.RightState.Stats.UnseenSegments != 0 {
+			t.Errorf("test:%s: Right.UnseenSegments = %v, want 0", tt.name, summary.RightState.Stats.UnseenSegments)
 		}
 		t.Log(ls.Jitter.ValLR(), rs.Jitter.ValLR())
 		t.Log(ls.Jitter.EchoLR(), rs.Jitter.EchoLR())
