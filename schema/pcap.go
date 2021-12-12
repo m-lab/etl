@@ -30,6 +30,7 @@ type PCAPRaw struct {
 // PCAPExperimental is used for the exp field, and contains proposed
 // summary data that is not yet solid enough to put into the 'a' field.
 type PCAPExperimental struct {
+	// Can't have an empty record, but we will use this later.
 	// MinRTT float64
 }
 
@@ -40,9 +41,9 @@ type PCAPRow struct {
 	Date   civil.Date `bigquery:"date" json:"date"`
 
 	// For now, these are omitempty, but in future they should be unconditional.
-	A   PCAPSummary      `bigquery:"a" json:"a,omitempty"`
-	Raw PCAPRaw          `bigquery:"raw" json:"raw,omitempty"`
-	Exp PCAPExperimental `bigquery:"exp" json:"exp,omitempty"`
+	A   PCAPSummary `bigquery:"a" json:"a,omitempty"`
+	Raw PCAPRaw     `bigquery:"raw" json:"raw,omitempty"`
+	//	Exp PCAPExperimental `bigquery:"exp" json:"exp,omitempty"`
 
 	// NOT part of struct schema. Included only to provide a fake annotator interface.
 	row.NullAnnotator `bigquery:"-"`
