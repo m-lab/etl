@@ -48,22 +48,18 @@ type Errorer interface {
 	Errorf(string, ...interface{})
 	Fatal(...interface{})
 	Fatalf(string, ...interface{})
+	Log(...interface{})
 }
 
 func parse(t Errorer, data []byte) int {
-	pr, err := headers.PCAPReader(data)
+	pr, err := headers.NewPCAPReader(data)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	pkt := headers.Packet{}
-	snapLen := int(pr.SnapLen())
-	if snapLen > len(pkt.Data) {
-		t.Fatalf("SnapLen %d is too large", snapLen)
-	}
 	packets := 0
-
-	for _, err = pr.NextPacket(&pkt); true; _, err = pr.NextPacket(&pkt) {
+	for err = pr.Next(&pkt); true; err = pr.Next(&pkt) {
 		if err == io.EOF {
 			break
 		}
@@ -139,6 +135,7 @@ func TestPCAPReader(t *testing.T) {
 
 // goos: darwin goarch: amd64 pkg: github.com/m-lab/etl/tcpip cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
 // BenchmarkPCAPHeaders-8   	     352	   3513927 ns/op	 502.42 MB/s	     36809 packets/op	   56441 B/op	     204 allocs/op
+// BenchmarkPCAPHeaders-8   	     378	   3075351 ns/op	 574.07 MB/s	     37099 packets/op	   56329 B/op	     203 allocs/op
 func BenchmarkPCAPHeaders(b *testing.B) {
 	type tt struct {
 		data                  []byte

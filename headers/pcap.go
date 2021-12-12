@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"fmt"
 	"io"
 	"unsafe"
 )
@@ -41,8 +42,9 @@ func toInt(b []byte, be bool) int {
 }
 
 const (
-	magicMicroseconds = 0xA1B23C4D
-	magicNanoseconds  = 0x1A2B3C4D
+	magicMicroseconds        = 0xA1B2C3D4
+	magicMicrosecondsSwapped = 0xD4C3B2A1
+	magicNanoseconds         = 0xA1B23C4D
 )
 
 //                            1                   2                   3
@@ -74,31 +76,27 @@ func (p PCAP) IsValid() bool {
 	return p.MagicNumber == magicMicroseconds || p.MagicNumber == magicNanoseconds
 }
 
-func (p PCAP) IsBE() bool {
+func (p PCAP) IsByteSwapped() bool {
 	return !(p.MagicNumber == magicMicroseconds || p.MagicNumber == magicNanoseconds)
 }
 
 func (p PCAP) isMicroseconds() bool {
-	return p.MagicNumber.Value(p.IsBE()) == magicMicroseconds
+	return p.MagicNumber == magicMicroseconds || p.MagicNumber == magicMicrosecondsSwapped
 }
 
-func PCAPHeader(r io.Reader) (PCAP, error) {
-	var pcap PCAP
-	buf := (*[unsafe.Sizeof(pcap)]byte)(unsafe.Pointer(&pcap))[:unsafe.Sizeof(pcap)]
-	n, err := r.Read(buf[:])
+func (pr *PCAPReader) parseHeader() error {
+	buf := (*[unsafe.Sizeof(pr.header)]byte)(unsafe.Pointer(&pr.header))[:unsafe.Sizeof(pr.header)]
+	_, err := io.ReadFull(pr.r, buf[:])
 	if err != nil {
-		return pcap, err
+		return err
 	}
-	if n != int(unsafe.Sizeof(pcap)) {
-		return pcap, io.ErrUnexpectedEOF
+	if !pr.header.IsValid() {
+		return errors.New("invalid magic number")
 	}
-	if !pcap.IsValid() {
-		return pcap, errors.New("invalid magic number")
-	}
-	return pcap, nil
+	return nil
 }
 
-type PacketReader struct {
+type PCAPReader struct {
 	header  PCAP
 	snapLen int
 	r       io.Reader
@@ -106,15 +104,15 @@ type PacketReader struct {
 	isBE    bool
 }
 
-func (pr *PacketReader) SnapLen() int {
+func (pr *PCAPReader) SnapLen() int {
 	return pr.snapLen
 }
 
-func PCAPReader(data []byte) (*PacketReader, error) {
+func NewPCAPReader(data []byte) (*PCAPReader, error) {
 	if len(data) < 4 {
 		return nil, io.ErrUnexpectedEOF
 	}
-	pr := PacketReader{isGzip: true}
+	pr := PCAPReader{isGzip: true}
 	var err error
 
 	pr.r, err = gzip.NewReader(bytes.NewReader(data))
@@ -124,14 +122,14 @@ func PCAPReader(data []byte) (*PacketReader, error) {
 		err = nil
 	}
 
-	pr.header, err = PCAPHeader(pr.r)
+	err = pr.parseHeader()
 	if err != nil {
 		return nil, err
 	}
 	if !pr.header.IsValid() {
 		return nil, errors.New("invalid magic number")
 	}
-	pr.isBE = pr.header.IsBE()
+	pr.isBE = pr.header.IsByteSwapped()
 	pr.snapLen = int(pr.header.SnapLen.Value(pr.isBE))
 	return &pr, nil
 }
@@ -154,49 +152,76 @@ func PCAPReader(data []byte) (*PacketReader, error) {
 //       +---------------------------------------------------------------+
 
 type Packet struct {
-	TimestampSeconds  uint32
-	TimestampMicrosec uint32
-	CapturedLen       uint32
-	OriginalLen       uint32
-	Data              [200]byte // Backing data is generally not full 200 bytes.
+	TimestampSeconds uint32
+	TimestampNanosec uint32 // May start as Microseconds, but converted.
+	CapturedLen      uint32
+	OriginalLen      uint32
+	data             [200]byte // Backing data is generally not full 200 bytes.
+}
+
+// Data returns the captured packet data.
+func (p *Packet) Data() []byte {
+	return p.data[:p.CapturedLen]
 }
 
 func (p Packet) UnixNano() int64 {
-	return int64(p.TimestampSeconds)*1e9 + int64(p.TimestampMicrosec)*1e3
+	return int64(p.TimestampSeconds)*1e9 + int64(p.TimestampNanosec)
 }
 
-// NextPacket reads the next packet from the reader into the provided Packet.
+func (p Packet) IsValidIP() bool {
+	if p.CapturedLen > p.OriginalLen {
+		return false
+	}
+	if p.CapturedLen < 20 {
+		return false
+	}
+	if p.data[12] != 0x08 || p.data[13] != 0x00 {
+		if p.data[12] != 0x86 || p.data[13] != 0xdd {
+			return false
+		}
+	}
+	return true
+}
+
+// Next reads the next packet from the reader into the provided Packet.
 // It returns the byte slice containing the packet data, or an error.
 // The byte slice is backed by the Data field of the provided Packet.
-func (pr *PacketReader) NextPacket(p *Packet) ([]byte, error) {
+func (pr *PCAPReader) Next(p *Packet) error {
 	if p == nil {
-		return nil, errors.New("nil packet")
+		return errors.New("nil packet")
 	}
 	if pr.snapLen > 200 {
-		return nil, ErrCaptureTooLarge
+		return ErrCaptureTooLarge
 	}
 
 	pBytes := (*[unsafe.Sizeof(*p)]byte)(unsafe.Pointer(p))[:unsafe.Sizeof(*p)]
 
-	n, err := io.ReadAtLeast(pr.r, pBytes[0:16], 16) // Read the first 16 bytes.
+	_, err := io.ReadFull(pr.r, pBytes[0:16]) // Read the first 16 bytes.
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if pr.isBE {
 		p.TimestampSeconds = uint32(toInt(pBytes[0:4], true))
-		p.TimestampMicrosec = uint32(toInt(pBytes[4:8], true))
+		p.TimestampNanosec = uint32(toInt(pBytes[4:8], true))
 		p.CapturedLen = uint32(toInt(pBytes[8:12], true))
 		p.OriginalLen = uint32(toInt(pBytes[12:16], true))
 	}
 
-	if int(p.CapturedLen) > pr.snapLen || int(p.CapturedLen) > len(p.Data) {
-		return nil, ErrCaptureTooLarge
+	if pr.header.isMicroseconds() {
+		p.TimestampNanosec *= 1000
 	}
 
-	n, err = io.ReadAtLeast(pr.r, p.Data[:p.CapturedLen], int(p.CapturedLen))
-	if n != int(p.CapturedLen) {
-		return nil, io.ErrUnexpectedEOF
+	if int(p.CapturedLen) > pr.snapLen || int(p.CapturedLen) > len(p.data) {
+		return ErrCaptureTooLarge
 	}
-	return p.Data[:p.CapturedLen], nil
+
+	_, err = io.ReadFull(pr.r, p.data[:p.CapturedLen])
+	if err != nil {
+		return err
+	}
+	if !p.IsValidIP() {
+		return fmt.Errorf("invalid IP packet")
+	}
+	return nil
 }
