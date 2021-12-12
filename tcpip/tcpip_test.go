@@ -1,7 +1,6 @@
 package tcpip_test
 
 import (
-	"bytes"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,8 +13,8 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/annotation-service/site"
+	"github.com/m-lab/etl/headers"
 	"github.com/m-lab/etl/tcpip"
 )
 
@@ -125,7 +124,7 @@ func TestIPLayer(t *testing.T) {
 }
 
 func ProcessShortPackets(t *testing.T, data []byte) {
-	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
+	pr, err := headers.PCAPReader(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,10 +138,11 @@ func ProcessShortPackets(t *testing.T, data []byte) {
 	}
 
 	p := tcpip.Packet{}
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
+	hp := headers.Packet{}
+	for data, err := pr.NextPacket(&hp); err == nil; data, err = pr.NextPacket(&hp) {
 		for i := 0; i < len(data); i++ {
-			p.From(&ci, data[:i])
-			p.From(&ci, data[i:])
+			p.From(hp, data[:i])
+			p.From(hp, data[i:])
 		}
 	}
 }

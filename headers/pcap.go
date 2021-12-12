@@ -161,6 +161,10 @@ type Packet struct {
 	Data              [200]byte // Backing data is generally not full 200 bytes.
 }
 
+func (p Packet) UnixNano() int64 {
+	return int64(p.TimestampSeconds)*1e9 + int64(p.TimestampMicrosec)*1e3
+}
+
 // NextPacket reads the next packet from the reader into the provided Packet.
 // It returns the byte slice containing the packet data, or an error.
 // The byte slice is backed by the Data field of the provided Packet.

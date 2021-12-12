@@ -11,7 +11,6 @@ package tcpip
 // and the unsafe pointer eligible for collection.
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"net"
@@ -19,11 +18,10 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
 
 	"github.com/m-lab/annotation-service/site"
+	"github.com/m-lab/etl/headers"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/logx"
 	"github.com/m-lab/uuid-annotator/annotator"
@@ -313,14 +311,14 @@ type Packet struct {
 	err   error
 }
 
-func (p *Packet) From(ci *gopacket.CaptureInfo, data []byte) error {
+func (p *Packet) From(hp headers.Packet, data []byte) error {
 
 	if len(data) < EthernetHeaderSize {
 		p.err = ErrTruncatedEthernetHeader
 		return p.err
 	}
 	p.Data = data
-	p.pTime = UnixNano(ci.Timestamp.UnixNano()) // make a copy
+	p.pTime = UnixNano(hp.UnixNano()) // make a copy
 	p.eth = (*EthernetHeader)(unsafe.Pointer(&data[0]))
 
 	switch p.eth.EtherType() {
@@ -451,16 +449,17 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// ESCAPE maps are escaping to the heap
 	summary := Summary{}
 
-	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
+	pr, err := headers.PCAPReader(data)
 	if err != nil {
 		log.Print(err)
 		return summary, err
 	}
 
 	p := Packet{}
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
+	hp := headers.Packet{}
+	for data, err := pr.NextPacket(&hp); err == nil; data, err = pr.NextPacket(&hp) {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
-		err := p.From(&ci, data)
+		err := p.From(hp, data)
 		if err != nil {
 			sparse1.Println(archive, fn, err, data)
 			continue
