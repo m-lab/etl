@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
-	"fmt"
 	"io"
 	"unsafe"
 )
@@ -137,74 +136,45 @@ func PCAPReader(data []byte) (*PCAP, io.Reader, error) {
 //       /                                                               /
 //       +---------------------------------------------------------------+
 
-// type packetMicros struct {
-// 	TimestampSeconds  file32
-// 	TimestampMicrosec file32
-// 	CapturedLen       file32
-// 	OriginalLen       file32
-// 	Data              [200]byte // Backing data is generally not full 200 bytes.
-// }
-
-// type packetNanos struct {
-// 	TimestampSeconds  file32
-// 	TimestampNanosecs file32
-// 	CapturedLen       file32 // The number of bytes captured into Data field.
-// 	OriginalLen       file32
-// 	Data              [200]byte // Backing data is generally not full 200 bytes.
-// }
-
-// func (p packetMicros) byteSlice() []byte {
-// 	buf := (unsafe.Pointer(&p))
-// 	bp := (*[unsafe.Sizeof(p)]byte)(buf)
-// 	return bp[:]
-// }
+type Packet struct {
+	TimestampSeconds  uint32
+	TimestampMicrosec uint32
+	CapturedLen       uint32
+	OriginalLen       uint32
+	Data              [200]byte // Backing data is generally not full 200 bytes.
+}
 
 // NextPacket reads the next packet from the reader into the dst slice, and
 // returns the slice.  Allocates additional space if needed, or if passed nil.
-func NextPacket(r io.Reader, dst []byte, be bool) ([]byte, error) {
-	if dst == nil {
-		dst = make([]byte, 0, 16) // Initially, just need the first 4 words.
+func NextPacket(r io.Reader, p *Packet, be bool, snapLen int) error {
+	if p == nil {
+		return errors.New("nil packet")
+	}
+	if snapLen > 200 {
+		return ErrCaptureTooLarge
 	}
 
-	dst = dst[0:16]
+	pBytes := (*[unsafe.Sizeof(*p)]byte)(unsafe.Pointer(p))[:unsafe.Sizeof(*p)]
 
-	n, err := io.ReadAtLeast(r, dst[0:16], 16) // Read the first 16 bytes.
+	n, err := io.ReadAtLeast(r, pBytes[0:16], 16) // Read the first 16 bytes.
 	if err != nil {
-		if n == 0 {
-			return nil, io.EOF
-		}
-		return nil, err
-	}
-	if n != 16 {
-		return nil, io.ErrUnexpectedEOF
-	}
-	length := toInt(dst[8:12], be) // The captured length.
-
-	if length > 216 {
-		return nil, ErrCaptureTooLarge
+		return err
 	}
 
-	if cap(dst) < 16+length { // Need more space.
-		tmp := dst
-		dst = make([]byte, 16+length)
-		n := copy(dst, tmp)
-		if n != 16 {
-			return nil, fmt.Errorf("unexpected copy length: %d", n)
-		}
-		if cap(dst) < length+16 {
-			return nil, ErrCaptureTooLarge
-		}
+	if be {
+		p.TimestampSeconds = uint32(toInt(pBytes[0:4], true))
+		p.TimestampMicrosec = uint32(toInt(pBytes[4:8], true))
+		p.CapturedLen = uint32(toInt(pBytes[8:12], true))
+		p.OriginalLen = uint32(toInt(pBytes[12:16], true))
 	}
-	dst = dst[0 : 16+length]
-	if len(dst) != 16+length {
-		return nil, fmt.Errorf("unexpected length: %d", len(dst))
+
+	if int(p.CapturedLen) > snapLen {
+		return ErrCaptureTooLarge
 	}
-	n, err = io.ReadAtLeast(r, dst[16:16+length], length)
-	if err == io.EOF {
-		return dst, nil
+
+	n, err = io.ReadAtLeast(r, p.Data[:p.CapturedLen], int(p.CapturedLen))
+	if n != int(p.CapturedLen) {
+		return io.ErrUnexpectedEOF
 	}
-	if err != nil {
-		return nil, err
-	}
-	return dst, nil
+	return nil
 }

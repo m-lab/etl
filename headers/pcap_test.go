@@ -43,13 +43,54 @@ func getTestfile(t *testing.T, name string) []byte {
 	return data
 }
 
-func TestIPLayer(t *testing.T) {
+type Errorer interface {
+	Error(...interface{})
+	Errorf(string, ...interface{})
+	Fatal(...interface{})
+	Fatalf(string, ...interface{})
+}
+
+func parse(t Errorer, data []byte) int {
+	header, r, err := headers.PCAPReader(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !header.IsValid() {
+		t.Fatalf("Invalid header %08x %04x %04x", header.MagicNumber, header.VersionMajor, header.VersionMinor)
+	}
+
+	pkt := headers.Packet{}
+	snapLen := int(header.SnapLen.Value(header.IsBE()))
+	if snapLen > len(pkt.Data) {
+		t.Fatalf("SnapLen %d is too large", header.SnapLen)
+	}
+	packets := 0
+	be := header.IsBE()
+
+	for err = headers.NextPacket(r, &pkt, be, snapLen); true; err = headers.NextPacket(r, &pkt, be, snapLen) {
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Error(err)
+			break
+		}
+		if packets == 0 {
+			// TODO - handle the timestamp
+		}
+		packets++
+	}
+
+	return packets
+}
+
+func TestPCAPReader(t *testing.T) {
 	site.MustLoad(time.Minute)
 
 	type test struct {
 		name             string
 		fn               string
-		packets          int64
+		packets          int
 		duration         time.Duration
 		srcIP, dstIP     string
 		srcPort, dstPort layers.TCPPort
@@ -77,32 +118,10 @@ func TestIPLayer(t *testing.T) {
 	for i := range tests {
 		test := &tests[i]
 		data := getTestfile(t, test.fn)
-		header, r, err := headers.PCAPReader(data)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !header.IsValid() {
-			t.Fatalf("Invalid header %08x %04x %04x", header.MagicNumber, header.VersionMajor, header.VersionMinor)
-		}
-		if header.SnapLen.Value(header.IsBE()) > 216 {
-			t.Fatalf("SnapLen %d is too large", header.SnapLen)
-		}
-		packets := 0
-		be := header.IsBE()
-		dst := make([]byte, header.SnapLen)
-		for dst, err = headers.NextPacket(r, dst, be); true; dst, err = headers.NextPacket(r, dst, be) {
-			if dst != nil {
-				packets++
-			}
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				t.Error(err)
-				break
-			}
-		}
-		if packets != int(test.packets) {
+
+		packets := parse(t, data)
+
+		if packets != test.packets {
 			t.Errorf("%s: expected %d packets, got %d", test.fn, test.packets, packets)
 		}
 	}
@@ -123,8 +142,7 @@ func TestIPLayer(t *testing.T) {
 // }
 
 // goos: darwin goarch: amd64 pkg: github.com/m-lab/etl/tcpip cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
-// BenchmarkProcessPackets2-8   	     219	   5546192 ns/op	 318.32 MB/s	     36616 packets/op	 2146663 B/op	   98347 allocs/op
-
+// BenchmarkPCAPHeaders-8   	     352	   3513927 ns/op	 502.42 MB/s	     36809 packets/op	   56441 B/op	     204 allocs/op
 func BenchmarkPCAPHeaders(b *testing.B) {
 	type tt struct {
 		data                  []byte
@@ -146,13 +164,12 @@ func BenchmarkPCAPHeaders(b *testing.B) {
 	for i := range tests {
 		tests[i].data = getTestfileForBenchmark(b, tests[i].fn)
 	}
+
 	b.ReportAllocs()
 	b.ResetTimer()
-
 	b.ReportMetric(220000, "packets/op")
 
 	i := 0
-
 	numPkts := 0
 	ops := 0
 	b.RunParallel(func(pb *testing.PB) {
@@ -162,25 +179,8 @@ func BenchmarkPCAPHeaders(b *testing.B) {
 			numPkts += test.numPkts
 			i++
 
-			header, r, err := headers.PCAPReader(test.data)
-			if err != nil {
-				b.Fatal(err)
-			}
-			if !header.IsValid() {
-				b.Fatalf("Invalid header %08x %04x %04x", header.MagicNumber, header.VersionMajor, header.VersionMinor)
-			}
-			if header.SnapLen.Value(header.IsBE()) > 216 {
-				b.Fatalf("SnapLen %d is too large", header.SnapLen)
-			}
-			packets := 0
-			be := header.IsBE()
-			dst := make([]byte, header.SnapLen)
-			for dst, err := headers.NextPacket(r, dst, be); err == nil; dst, err = headers.NextPacket(r, dst, be) {
-				if err != nil {
-					b.Fatal(err)
-				}
-				packets++
-			}
+			packets := parse(b, test.data)
+
 			if packets != test.numPkts {
 				b.Errorf("%s: expected %d packets, got %d", test.fn, test.numPkts, packets)
 			}
