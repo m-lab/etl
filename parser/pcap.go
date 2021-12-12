@@ -97,8 +97,8 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 		row.A = schema.PCAPSummary{
 			PacketsSent:     server.Packets,
 			PacketsReceived: client.Packets,
-			StartTime:       summary.StartTime,
-			EndTime:         summary.LastTime,
+			StartTime:       time.Unix(0, int64(summary.StartTime)),
+			EndTime:         time.Unix(0, int64(summary.LastTime)),
 		}
 		row.Raw = schema.PCAPRaw{
 			ServerIP: server.SrcIP.String(),
