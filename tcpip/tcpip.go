@@ -42,6 +42,12 @@ var (
 	ErrUnknownEtherType        = fmt.Errorf("unknown Ethernet type")
 )
 
+type UnixNano int64
+
+func (t UnixNano) Sub(other UnixNano) time.Duration {
+	return time.Duration(t - other)
+}
+
 // These provide byte swapping when running on LittleEndian systems.
 // Much much faster than binary.BigEndian.Uint...
 
@@ -81,8 +87,8 @@ var EthernetHeaderSize = int(unsafe.Sizeof(EthernetHeader{}))
 type IP interface {
 	Version() uint8
 	PayloadLength() int
-	SrcIP() net.IP // These should return persistent byte slice.
-	DstIP() net.IP
+	SrcIP(net.IP) net.IP
+	DstIP(net.IP) net.IP
 	NextProtocol() layers.IPProtocol
 	HopLimit() uint8
 	HeaderLength() int
@@ -113,16 +119,20 @@ func (h *IPv4Header) PayloadLength() int {
 	return int(h.length.Uint16()) - int(ihl*4)
 }
 
-func (h *IPv4Header) SrcIP() net.IP {
-	ip := make(net.IP, 4)
-	copy(ip, h.srcIP[:])
+func (h *IPv4Header) SrcIP(ip net.IP) net.IP {
+	if ip == nil {
+		ip = make(net.IP, 4)
+	}
+	ip = append(ip[:0], h.srcIP[:]...)
 	return ip
 }
 
 // DstIP returns the destination IP address of the packet.
-func (h *IPv4Header) DstIP() net.IP {
-	ip := make(net.IP, 4)
-	copy(ip, h.dstIP[:])
+func (h *IPv4Header) DstIP(ip net.IP) net.IP {
+	if ip == nil {
+		ip = make(net.IP, 4)
+	}
+	ip = append(ip[:0], h.dstIP[:]...)
 	return ip
 }
 
@@ -170,8 +180,7 @@ type IPv6Header struct {
 
 var IPv6HeaderSize = int(unsafe.Sizeof(IPv6Header{}))
 
-// NewIPv6Header creates a new IPv6 header, and returns the header and remaining bytes.
-func NewIPv6Header(data []byte) (*IPv6Wrapper, []byte, error) {
+func MakeIPv6Header(data []byte) (*IPv6Header, []byte, error) {
 	if len(data) < int(unsafe.Sizeof(IPv6Header{})) {
 		return nil, nil, ErrTruncatedIPHeader
 	}
@@ -179,19 +188,28 @@ func NewIPv6Header(data []byte) (*IPv6Wrapper, []byte, error) {
 	if h.Version() != 6 {
 		return nil, nil, fmt.Errorf("IPv6 packet with version %d", h.Version())
 	}
-	// Wrap the header, compute, the extension headers.
-	w, err := h.Wrap(data[IPv6HeaderSize:])
+	return h, data[IPv6HeaderSize:], nil
+}
+
+// FromData creates a new IPv6 header, and returns the header and remaining bytes.
+func (w *IPv6Wrapper) FromData(data []byte) (rem []byte, err error) {
+	var h *IPv6Header
+	h, _, err = MakeIPv6Header(data)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	}
+	err = w.Populate(h, data)
+	if err != nil {
+		return nil, err
 	}
 	if len(data) < w.headerLength {
-		return nil, nil, ErrTruncatedIPHeader
+		return nil, ErrTruncatedIPHeader
 
 		// TODO remove this check.
 	} else if len(data) == w.headerLength {
-		return w, nil, nil
+		return nil, nil
 	}
-	return w, data[w.headerLength:], err
+	return data[w.headerLength:], err
 }
 
 func (h *IPv6Header) Version() uint8 {
@@ -202,16 +220,20 @@ func (h *IPv6Header) PayloadLength() int {
 	return int(h.payloadLength.Uint16())
 }
 
-func (h *IPv6Header) SrcIP() net.IP {
-	ip := make(net.IP, 16) // This understandably escapes to the heap.
-	copy(ip, h.srcIP[:])
+func (h *IPv6Header) SrcIP(ip net.IP) net.IP {
+	if ip == nil {
+		ip = make(net.IP, 16)
+	}
+	ip = append(ip[:0], h.srcIP[:]...)
 	return ip
 }
 
 // DstIP returns the destination IP address of the packet.
-func (h *IPv6Header) DstIP() net.IP {
-	ip := make(net.IP, 16)
-	copy(ip, h.dstIP[:])
+func (h *IPv6Header) DstIP(ip net.IP) net.IP {
+	if ip == nil {
+		ip = make(net.IP, 16)
+	}
+	ip = append(ip[:0], h.dstIP[:]...)
 	return ip
 }
 
@@ -243,9 +265,54 @@ func (w *IPv6Wrapper) HeaderLength() int {
 	return w.headerLength
 }
 
+func (w *IPv6Wrapper) Populate(ip *IPv6Header, data []byte) error {
+	if w == nil {
+		return fmt.Errorf("nil IPv6Wrapper")
+	}
+	w.IPv6Header = ip
+	if w.ext == nil {
+		w.ext = make([]EHWrapper, 0, 0)
+	}
+	w.ext = w.ext[:0]
+
+	if w.nextHeader == layers.IPProtocolNoNextHeader {
+		return nil
+	}
+
+	for np := w.NextProtocol(); np != layers.IPProtocolNoNextHeader; {
+		switch np {
+		case layers.IPProtocolNoNextHeader:
+			return nil
+		case layers.IPProtocolIPv6HopByHop:
+		case layers.IPProtocolTCP:
+			return nil
+		default:
+			log.Println("IPv6 header type", np)
+		}
+
+		if len(data) < 8 {
+			return ErrTruncatedIPHeader
+		}
+
+		eh := (*ExtensionHeader)(unsafe.Pointer(&data[0]))
+		if len(data) < int(8+eh.HeaderLength) {
+			return ErrTruncatedIPHeader
+		}
+		w.ext = append(w.ext, EHWrapper{
+			HeaderType: np,
+			eh:         eh,
+			data:       data[2 : 8+eh.HeaderLength],
+		})
+		w.headerLength += int(eh.HeaderLength) + 8
+		data = data[8+eh.HeaderLength:]
+		np = eh.NextHeader
+	}
+	return ErrTruncatedIPHeader
+}
+
 // Wrap creates a wrapper with extension headers.
 // data is the remainder of the header data, not including the IPv6 header.
-func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
+func (ip *IPv6Header) xWrap(data []byte) (*IPv6Wrapper, error) {
 	w := IPv6Wrapper{
 		IPv6Header:   ip,
 		ext:          make([]EHWrapper, 0, 0),
@@ -290,46 +357,49 @@ func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
 // Packet struct contains the packet data and metadata.
 type Packet struct {
 	// If we use a pointer here, for some reason we get zero value timestamps.
-	Ci   gopacket.CaptureInfo
-	Data []byte
-	eth  *EthernetHeader
-	ip   IP
-	v4   *IPv4Header  // Nil unless we're parsing IPv4 packets.
-	v6   *IPv6Wrapper // Nil unless we're parsing IPv6 packets.
-	err  error
+	pTime UnixNano
+	Data  []byte
+	eth   *EthernetHeader
+	ip    IP
+	v4    *IPv4Header  // Nil unless we're parsing IPv4 packets.
+	v6    *IPv6Wrapper // Nil unless we're parsing IPv6 packets.
+	//	err   error
 }
 
-func (p *Packet) From(ci *gopacket.CaptureInfo, data []byte) error {
+func (p *Packet) From(ci *gopacket.CaptureInfo, data []byte) (err error) {
 
 	if len(data) < EthernetHeaderSize {
-		p.err = ErrTruncatedEthernetHeader
-		return p.err
+		err = ErrTruncatedEthernetHeader
+		return
 	}
 	p.Data = data
-	p.Ci = *ci // make a copy
+	p.pTime = UnixNano(ci.Timestamp.UnixNano()) // make a copy
 	p.eth = (*EthernetHeader)(unsafe.Pointer(&data[0]))
 
 	switch p.eth.EtherType() {
 	case layers.EthernetTypeIPv4:
 		if len(data) < EthernetHeaderSize+IPv4HeaderSize {
-			p.err = ErrTruncatedIPHeader
-			return p.err
+			err = ErrTruncatedIPHeader
+			return
 		}
 		p.v4 = (*IPv4Header)(unsafe.Pointer(&data[EthernetHeaderSize]))
 		p.ip = p.v4
 	case layers.EthernetTypeIPv6:
 		if len(data) < EthernetHeaderSize+IPv6HeaderSize {
-			p.err = ErrTruncatedIPHeader
-			return p.err
+			err = ErrTruncatedIPHeader
+			return
 		}
-		p.v6, _, p.err = NewIPv6Header(data[EthernetHeaderSize:])
-		if p.err != nil {
-			return p.err
+		if p.v6 == nil {
+			p.v6 = &IPv6Wrapper{}
+		}
+		_, err = p.v6.FromData(data[EthernetHeaderSize:])
+		if err != nil {
+			return
 		}
 		p.ip = p.v6
 	default:
-		p.err = ErrUnknownEtherType
-		return p.err
+		err = ErrUnknownEtherType
+		return
 	}
 	if p.ip != nil {
 		switch p.ip.NextProtocol() {
@@ -359,13 +429,15 @@ type Summary struct {
 
 	HopLimit  uint8
 	Packets   int
-	StartTime time.Time
-	LastTime  time.Time
+	StartTime UnixNano
+	LastTime  UnixNano
 
 	Left, Right Stats
 
 	// These eventually point to the server and client stats.
 	server, client *Stats
+
+	srcIP, dstIP net.IP
 }
 
 func (s *Summary) Client() Stats {
@@ -384,35 +456,31 @@ func (s *Summary) Server() Stats {
 
 func (s *Summary) Add(p *Packet) {
 	ip := p.ip
-	t := p.Ci.Timestamp
 
-	srcIP := ip.SrcIP() // ESCAPE - these reduce escapes to the heap
-	dstIP := ip.DstIP()
+	s.srcIP = ip.SrcIP(s.srcIP) // ESCAPE - these reduce escapes to the heap
+	s.dstIP = ip.DstIP(s.dstIP)
 	if !s.init {
-		s.StartTime = t
+		s.StartTime = p.pTime
 		s.HopLimit = ip.HopLimit()
 
-		s.Left.SrcIP = srcIP
-		s.Right.SrcIP = dstIP
+		s.Left.SrcIP = append([]byte{}, s.srcIP[:]...)
+		s.Right.SrcIP = append([]byte{}, s.dstIP[:]...)
 
 		s.init = true
 	}
 
-	s.LastTime = t
+	s.LastTime = p.pTime
 
-	s.Packets++
-	if srcIP.Equal(s.Left.SrcIP) {
+	if s.srcIP.Equal(s.Left.SrcIP) {
 		s.Left.Packets++
 		s.Left.Bytes += p.PayloadLength()
-	} else if srcIP.Equal(s.Right.SrcIP) {
+	} else if s.srcIP.Equal(s.Right.SrcIP) {
 		s.Right.Packets++
 		s.Right.Bytes += p.PayloadLength()
 	} else {
+		// TODO
 	}
-
-	// payloadLength := p.PayloadLength() // Optimization because p.Payload was using 2.5% of the CPU time.
-	// s.PayloadBytes += uint64(payloadLength)
-	// s.Packets++
+	s.Packets++
 }
 
 func (s *Summary) Finish() bool {
