@@ -98,25 +98,42 @@ func PCAPHeader(r io.Reader) (PCAP, error) {
 	return pcap, nil
 }
 
-func PCAPReader(data []byte) (*PCAP, io.Reader, error) {
+type PacketReader struct {
+	header  PCAP
+	snapLen int
+	r       io.Reader
+	isGzip  bool
+	isBE    bool
+}
+
+func (pr *PacketReader) SnapLen() int {
+	return pr.snapLen
+}
+
+func PCAPReader(data []byte) (*PacketReader, error) {
 	if len(data) < 4 {
-		return nil, nil, io.ErrUnexpectedEOF
+		return nil, io.ErrUnexpectedEOF
 	}
-	var r io.Reader
-	r, err := gzip.NewReader(bytes.NewReader(data))
+	pr := PacketReader{isGzip: true}
+	var err error
+
+	pr.r, err = gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
-		r = bytes.NewReader(data)
+		pr.r = bytes.NewReader(data)
+		pr.isGzip = false
 		err = nil
 	}
 
-	pcap, err := PCAPHeader(r)
+	pr.header, err = PCAPHeader(pr.r)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	if !pcap.IsValid() {
-		return nil, nil, errors.New("invalid magic number")
+	if !pr.header.IsValid() {
+		return nil, errors.New("invalid magic number")
 	}
-	return &pcap, r, nil
+	pr.isBE = pr.header.IsBE()
+	pr.snapLen = int(pr.header.SnapLen.Value(pr.isBE))
+	return &pr, nil
 }
 
 //                           1                   2                   3
@@ -144,37 +161,38 @@ type Packet struct {
 	Data              [200]byte // Backing data is generally not full 200 bytes.
 }
 
-// NextPacket reads the next packet from the reader into the dst slice, and
-// returns the slice.  Allocates additional space if needed, or if passed nil.
-func NextPacket(r io.Reader, p *Packet, be bool, snapLen int) error {
+// NextPacket reads the next packet from the reader into the provided Packet.
+// It returns the byte slice containing the packet data, or an error.
+// The byte slice is backed by the Data field of the provided Packet.
+func (pr *PacketReader) NextPacket(p *Packet) ([]byte, error) {
 	if p == nil {
-		return errors.New("nil packet")
+		return nil, errors.New("nil packet")
 	}
-	if snapLen > 200 {
-		return ErrCaptureTooLarge
+	if pr.snapLen > 200 {
+		return nil, ErrCaptureTooLarge
 	}
 
 	pBytes := (*[unsafe.Sizeof(*p)]byte)(unsafe.Pointer(p))[:unsafe.Sizeof(*p)]
 
-	n, err := io.ReadAtLeast(r, pBytes[0:16], 16) // Read the first 16 bytes.
+	n, err := io.ReadAtLeast(pr.r, pBytes[0:16], 16) // Read the first 16 bytes.
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if be {
+	if pr.isBE {
 		p.TimestampSeconds = uint32(toInt(pBytes[0:4], true))
 		p.TimestampMicrosec = uint32(toInt(pBytes[4:8], true))
 		p.CapturedLen = uint32(toInt(pBytes[8:12], true))
 		p.OriginalLen = uint32(toInt(pBytes[12:16], true))
 	}
 
-	if int(p.CapturedLen) > snapLen {
-		return ErrCaptureTooLarge
+	if int(p.CapturedLen) > pr.snapLen || int(p.CapturedLen) > len(p.Data) {
+		return nil, ErrCaptureTooLarge
 	}
 
-	n, err = io.ReadAtLeast(r, p.Data[:p.CapturedLen], int(p.CapturedLen))
+	n, err = io.ReadAtLeast(pr.r, p.Data[:p.CapturedLen], int(p.CapturedLen))
 	if n != int(p.CapturedLen) {
-		return io.ErrUnexpectedEOF
+		return nil, io.ErrUnexpectedEOF
 	}
-	return nil
+	return p.Data[:p.CapturedLen], nil
 }

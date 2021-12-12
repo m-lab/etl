@@ -51,23 +51,19 @@ type Errorer interface {
 }
 
 func parse(t Errorer, data []byte) int {
-	header, r, err := headers.PCAPReader(data)
+	pr, err := headers.PCAPReader(data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !header.IsValid() {
-		t.Fatalf("Invalid header %08x %04x %04x", header.MagicNumber, header.VersionMajor, header.VersionMinor)
-	}
 
 	pkt := headers.Packet{}
-	snapLen := int(header.SnapLen.Value(header.IsBE()))
+	snapLen := int(pr.SnapLen())
 	if snapLen > len(pkt.Data) {
-		t.Fatalf("SnapLen %d is too large", header.SnapLen)
+		t.Fatalf("SnapLen %d is too large", snapLen)
 	}
 	packets := 0
-	be := header.IsBE()
 
-	for err = headers.NextPacket(r, &pkt, be, snapLen); true; err = headers.NextPacket(r, &pkt, be, snapLen) {
+	for _, err = pr.NextPacket(&pkt); true; _, err = pr.NextPacket(&pkt) {
 		if err == io.EOF {
 			break
 		}
