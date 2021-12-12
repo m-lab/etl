@@ -186,7 +186,8 @@ func TestPCAPGarbage(t *testing.T) {
 
 // goos: darwin goarch: amd64 pkg: github.com/m-lab/etl/tcpip cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
 // BenchmarkProcessPackets2-8   	     219	   5546192 ns/op	 318.32 MB/s	     36616 packets/op	 2146663 B/op	   98347 allocs/op
-
+// BenchmarkProcessPackets2-8   	     261	   4763381 ns/op	 370.63 MB/s	     36694 packets/op	 1259030 B/op	   25171 allocs/op
+// BenchmarkProcessPackets2-8   	     312	   3910415 ns/op	 451.48 MB/s	     37099 packets/op	   61150 B/op	     216 allocs/op // reuse ipv6 wrapper
 func BenchmarkProcessPackets2(b *testing.B) {
 	type tt struct {
 		data                  []byte
