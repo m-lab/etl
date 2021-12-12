@@ -311,8 +311,8 @@ type Packet struct {
 	err   error
 }
 
-func (p *Packet) From(hp headers.Packet, data []byte) error {
-
+func (p *Packet) From(hp headers.Packet) error {
+	data := hp.Data()
 	if len(data) < EthernetHeaderSize {
 		p.err = ErrTruncatedEthernetHeader
 		return p.err
@@ -409,6 +409,16 @@ func (s *Summary) Add(p *Packet) {
 		s.Right.SrcIP = append([]byte{}, s.dstIP[:]...)
 
 		s.init = true
+	} else {
+		if p.pTime.Sub(s.LastTime) > time.Second {
+			// TODO make this a metric.
+			sparse1.Printf("Time jump %08X %v", p.pTime, p.pTime.Sub(s.LastTime))
+		}
+
+		if p.pTime.Sub(s.LastTime) < 0 {
+			// TODO make this a metric.
+			sparse1.Printf("Time travel %08X %v", p.pTime, p.pTime.Sub(s.LastTime))
+		}
 	}
 
 	s.LastTime = p.pTime
@@ -449,7 +459,7 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// ESCAPE maps are escaping to the heap
 	summary := Summary{}
 
-	pr, err := headers.PCAPReader(data)
+	pr, err := headers.NewPCAPReader(data)
 	if err != nil {
 		log.Print(err)
 		return summary, err
@@ -457,9 +467,9 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 
 	p := Packet{}
 	hp := headers.Packet{}
-	for data, err := pr.NextPacket(&hp); err == nil; data, err = pr.NextPacket(&hp) {
+	for err := pr.Next(&hp); err == nil; err = pr.Next(&hp) {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
-		err := p.From(hp, data)
+		err := p.From(hp)
 		if err != nil {
 			sparse1.Println(archive, fn, err, data)
 			continue
