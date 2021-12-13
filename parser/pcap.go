@@ -100,10 +100,6 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 			StartTime:       time.Unix(0, int64(summary.StartTime)),
 			EndTime:         time.Unix(0, int64(summary.LastTime)),
 		}
-		row.Raw = schema.PCAPRaw{
-			ServerIP: server.SrcIP.String(),
-			ClientIP: client.SrcIP.String(),
-		}
 	}
 
 	// Insert the row.
