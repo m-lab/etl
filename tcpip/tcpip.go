@@ -361,14 +361,14 @@ type Packet struct {
 	ip    IP
 	v4    *IPv4Header  // Nil unless we're parsing IPv4 packets.
 	v6    *IPv6Wrapper // Nil unless we're parsing IPv6 packets.
-	err   error
+	//	err   error
 }
 
-func (p *Packet) From(hp *headers.Packet) error {
+func (p *Packet) From(hp *headers.Packet) (err error) {
 	data := hp.Data()
 	if len(data) < EthernetHeaderSize {
-		p.err = ErrTruncatedEthernetHeader
-		return p.err
+		err = ErrTruncatedEthernetHeader
+		return
 	}
 	p.Data = data
 	p.pTime = UnixNano(hp.UnixNano()) // make a copy
@@ -377,27 +377,27 @@ func (p *Packet) From(hp *headers.Packet) error {
 	switch p.eth.EtherType() {
 	case layers.EthernetTypeIPv4:
 		if len(data) < EthernetHeaderSize+IPv4HeaderSize {
-			p.err = ErrTruncatedIPHeader
-			return p.err
+			err = ErrTruncatedIPHeader
+			return
 		}
 		p.v4 = (*IPv4Header)(unsafe.Pointer(&data[EthernetHeaderSize]))
 		p.ip = p.v4
 	case layers.EthernetTypeIPv6:
 		if len(data) < EthernetHeaderSize+IPv6HeaderSize {
-			p.err = ErrTruncatedIPHeader
-			return p.err
+			err = ErrTruncatedIPHeader
+			return
 		}
 		if p.v6 == nil {
 			p.v6 = &IPv6Wrapper{}
 		}
-		_, p.err = p.v6.FromData(data[EthernetHeaderSize:])
-		if p.err != nil {
-			return p.err
+		_, err = p.v6.FromData(data[EthernetHeaderSize:])
+		if err != nil {
+			return
 		}
 		p.ip = p.v6
 	default:
-		p.err = ErrUnknownEtherType
-		return p.err
+		err = ErrUnknownEtherType
+		return
 	}
 	if p.ip != nil {
 		switch p.ip.NextProtocol() {
