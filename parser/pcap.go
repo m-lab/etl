@@ -12,6 +12,7 @@ import (
 	"cloud.google.com/go/civil"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
+	"github.com/m-lab/etl/headers"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
@@ -92,6 +93,14 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	client := summary.Client()
 
 	if err != nil {
+		switch err {
+		case headers.ErrNotIP:
+			metrics.ErrorCount.WithLabelValues(p.TableName(), "pcap", "not IP").Inc()
+		case headers.ErrCaptureTooLarge:
+			metrics.ErrorCount.WithLabelValues(p.TableName(), "pcap", "capture too large").Inc()
+		default:
+			metrics.ErrorCount.WithLabelValues(p.TableName(), "pcap", "unknown").Inc()
+		}
 		// TODO Add metric for PCAP parsing errors
 	} else if server.SrcIP != nil && client.SrcIP != nil {
 		row.A = schema.PCAPSummary{
