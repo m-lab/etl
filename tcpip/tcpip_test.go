@@ -1,21 +1,16 @@
 package tcpip_test
 
 import (
-	"bytes"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"path"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/annotation-service/site"
-	"github.com/m-lab/etl/headers"
 	"github.com/m-lab/etl/tcpip"
 )
 
@@ -97,58 +92,6 @@ func TestIPLayer(t *testing.T) {
 		}
 
 		t.Logf("%+v\n", summary)
-	}
-}
-
-func ProcessShortPackets(t *testing.T, data []byte) {
-	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	p := headers.Packet{}
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
-		for i := 0; i < len(data); i++ {
-			p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), data[:i])
-			p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), data[i:])
-		}
-	}
-}
-
-func TestShortData(t *testing.T) {
-	type test struct {
-		name             string
-		fn               string
-		packets          int64
-		duration         time.Duration
-		srcIP, dstIP     string
-		srcPort, dstPort layers.TCPPort
-		TTL              uint8
-		totalPayload     int
-	}
-	tests := []test{
-		{name: "retransmits", fn: "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",
-			packets: 336, duration: 15409174000, srcIP: "173.49.19.128", srcPort: 40337, dstPort: 443},
-		{name: "ipv6", fn: "ndt-nnwk2_1611335823_00000000000C2DA8.pcap.gz",
-			packets: 15, duration: 134434000, srcIP: "2a0d:5600:24:a71::1d", srcPort: 1894, dstPort: 443},
-	}
-	for _, tt := range tests {
-		data := getTestfile(t, tt.fn)
-		ProcessShortPackets(t, data)
-	}
-}
-
-func TestPCAPGarbage(t *testing.T) {
-	data := []byte{0xd4, 0xc3, 0xb2, 0xa1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
-	_, err := tcpip.ProcessPackets("none", "garbage", data)
-	if err != io.ErrUnexpectedEOF {
-		t.Fatal(err)
-	}
-
-	data = append(data, data...)
-	_, err = tcpip.ProcessPackets("none", "garbage", data)
-	if err == nil || !strings.Contains(err.Error(), "Unknown major") {
-		t.Fatal(err)
 	}
 }
 
