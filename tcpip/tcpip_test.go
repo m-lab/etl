@@ -140,8 +140,8 @@ func ProcessShortPackets(t *testing.T, data []byte) {
 	hp := headers.Packet{}
 	for err := pr.Next(&hp); err == nil; err = pr.Next(&hp) {
 		for i := 0; i < len(data); i++ {
-			p.From(hp)
-			p.From(hp)
+			p.From(&hp)
+			p.From(&hp)
 		}
 	}
 }
@@ -186,7 +186,8 @@ func TestPCAPGarbage(t *testing.T) {
 // goos: darwin goarch: amd64 pkg: github.com/m-lab/etl/tcpip cpu: Intel(R) Core(TM) i7-7920HQ CPU @ 3.10GHz
 // BenchmarkProcessPackets2-8   	     219	   5546192 ns/op	 318.32 MB/s	     36616 packets/op	 2146663 B/op	   98347 allocs/op
 // BenchmarkProcessPackets2-8   	     261	   4763381 ns/op	 370.63 MB/s	     36694 packets/op	 1259030 B/op	   25171 allocs/op
-
+// BenchmarkProcessPackets2-8		     259	   4584302 ns/op	 385.11 MB/s	     36956 packets/op	 1263822 B/op	   25379 allocs/op
+// BenchmarkProcessPackets2-8   	     332	   3775577 ns/op	 467.60 MB/s	     36877 packets/op	   57447 B/op	     249 allocs/op // reusing IPv6 wrapper.
 func BenchmarkProcessPackets2(b *testing.B) {
 	type tt struct {
 		data                  []byte

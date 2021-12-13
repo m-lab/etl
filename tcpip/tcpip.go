@@ -178,8 +178,7 @@ type IPv6Header struct {
 
 var IPv6HeaderSize = int(unsafe.Sizeof(IPv6Header{}))
 
-// NewIPv6Header creates a new IPv6 header, and returns the header and remaining bytes.
-func NewIPv6Header(data []byte) (*IPv6Wrapper, []byte, error) {
+func MakeIPv6Header(data []byte) (*IPv6Header, []byte, error) {
 	if len(data) < int(unsafe.Sizeof(IPv6Header{})) {
 		return nil, nil, ErrTruncatedIPHeader
 	}
@@ -187,19 +186,28 @@ func NewIPv6Header(data []byte) (*IPv6Wrapper, []byte, error) {
 	if h.Version() != 6 {
 		return nil, nil, fmt.Errorf("IPv6 packet with version %d", h.Version())
 	}
-	// Wrap the header, compute, the extension headers.
-	w, err := h.Wrap(data[IPv6HeaderSize:])
+	return h, data[IPv6HeaderSize:], nil
+}
+
+// FromData creates a new IPv6 header, and returns the header and remaining bytes.
+func (w *IPv6Wrapper) FromData(data []byte) (rem []byte, err error) {
+	var h *IPv6Header
+	h, _, err = MakeIPv6Header(data)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	}
+	err = w.Populate(h, data)
+	if err != nil {
+		return nil, err
 	}
 	if len(data) < w.headerLength {
-		return nil, nil, ErrTruncatedIPHeader
+		return nil, ErrTruncatedIPHeader
 
 		// TODO remove this check.
 	} else if len(data) == w.headerLength {
-		return w, nil, nil
+		return nil, nil
 	}
-	return w, data[w.headerLength:], err
+	return data[w.headerLength:], err
 }
 
 func (h *IPv6Header) Version() uint8 {
@@ -255,9 +263,54 @@ func (w *IPv6Wrapper) HeaderLength() int {
 	return w.headerLength
 }
 
+func (w *IPv6Wrapper) Populate(ip *IPv6Header, data []byte) error {
+	if w == nil {
+		return fmt.Errorf("nil IPv6Wrapper")
+	}
+	w.IPv6Header = ip
+	if w.ext == nil {
+		w.ext = make([]EHWrapper, 0, 0)
+	}
+	w.ext = w.ext[:0]
+
+	if w.nextHeader == layers.IPProtocolNoNextHeader {
+		return nil
+	}
+
+	for np := w.NextProtocol(); np != layers.IPProtocolNoNextHeader; {
+		switch np {
+		case layers.IPProtocolNoNextHeader:
+			return nil
+		case layers.IPProtocolIPv6HopByHop:
+		case layers.IPProtocolTCP:
+			return nil
+		default:
+			log.Println("IPv6 header type", np)
+		}
+
+		if len(data) < 8 {
+			return ErrTruncatedIPHeader
+		}
+
+		eh := (*ExtensionHeader)(unsafe.Pointer(&data[0]))
+		if len(data) < int(8+eh.HeaderLength) {
+			return ErrTruncatedIPHeader
+		}
+		w.ext = append(w.ext, EHWrapper{
+			HeaderType: np,
+			eh:         eh,
+			data:       data[2 : 8+eh.HeaderLength],
+		})
+		w.headerLength += int(eh.HeaderLength) + 8
+		data = data[8+eh.HeaderLength:]
+		np = eh.NextHeader
+	}
+	return ErrTruncatedIPHeader
+}
+
 // Wrap creates a wrapper with extension headers.
 // data is the remainder of the header data, not including the IPv6 header.
-func (ip *IPv6Header) Wrap(data []byte) (*IPv6Wrapper, error) {
+func (ip *IPv6Header) xWrap(data []byte) (*IPv6Wrapper, error) {
 	w := IPv6Wrapper{
 		IPv6Header:   ip,
 		ext:          make([]EHWrapper, 0, 0),
@@ -311,7 +364,7 @@ type Packet struct {
 	err   error
 }
 
-func (p *Packet) From(hp headers.Packet) error {
+func (p *Packet) From(hp *headers.Packet) error {
 	data := hp.Data()
 	if len(data) < EthernetHeaderSize {
 		p.err = ErrTruncatedEthernetHeader
@@ -334,7 +387,10 @@ func (p *Packet) From(hp headers.Packet) error {
 			p.err = ErrTruncatedIPHeader
 			return p.err
 		}
-		p.v6, _, p.err = NewIPv6Header(data[EthernetHeaderSize:])
+		if p.v6 == nil {
+			p.v6 = &IPv6Wrapper{}
+		}
+		_, p.err = p.v6.FromData(data[EthernetHeaderSize:])
 		if p.err != nil {
 			return p.err
 		}
@@ -469,7 +525,7 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	hp := headers.Packet{}
 	for err := pr.Next(&hp); err == nil; err = pr.Next(&hp) {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
-		err := p.From(hp)
+		err := p.From(&hp)
 		if err != nil {
 			sparse1.Println(archive, fn, err, data)
 			continue
