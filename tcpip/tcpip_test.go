@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/m-lab/annotation-service/site"
+	"github.com/m-lab/etl/headers"
 	"github.com/m-lab/etl/tcpip"
 )
 
@@ -45,30 +45,6 @@ func getTestfile(t *testing.T, name string) []byte {
 		t.Fatal(err)
 	}
 	return data
-}
-
-// SlowGetIP decodes the IP layers and returns some basic information.
-// It is a bit slow and does memory allocation.
-func SlowGetIP(p *tcpip.Packet) (net.IP, net.IP, uint8, uint16, error) {
-	// Decode a packet.
-	pkt := gopacket.NewPacket(p.Data, layers.LayerTypeEthernet, gopacket.DecodeOptions{
-		Lazy:                     true,
-		NoCopy:                   true,
-		SkipDecodeRecovery:       true,
-		DecodeStreamsAsDatagrams: false,
-	})
-
-	if ipLayer := pkt.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv4)
-		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
-		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
-	} else if ipLayer := pkt.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv6)
-		// In IPv6, the Length field is the payload length.
-		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
-	} else {
-		return nil, nil, 0, 0, tcpip.ErrNoIPLayer
-	}
 }
 
 func TestIPLayer(t *testing.T) {
@@ -130,19 +106,11 @@ func ProcessShortPackets(t *testing.T, data []byte) {
 		t.Fatal(err)
 	}
 
-	// Check magic number?
-	if len(data) < 4 {
-		//	return summary, ErrTruncatedPcap
-	}
-	if data[0] != 0xd4 && data[1] != 0xc3 && data[2] != 0xb2 && data[3] != 0xa1 {
-		// For compressed data, the 8x factor is based on testing with a few large gzipped files.
-	}
-
-	p := tcpip.Packet{}
+	p := headers.Packet{}
 	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
 		for i := 0; i < len(data); i++ {
-			p.From(&ci, data[:i])
-			p.From(&ci, data[i:])
+			p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), data[:i])
+			p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), data[i:])
 		}
 	}
 }
