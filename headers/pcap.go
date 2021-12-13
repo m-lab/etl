@@ -12,6 +12,7 @@ import (
 
 var (
 	ErrCaptureTooLarge = errors.New("capture too large")
+	ErrNotIP           = fmt.Errorf("invalid IP packet")
 )
 
 // These are used to decode the pcap file, and behave differently
@@ -186,7 +187,7 @@ func (p Packet) IsValidIP() bool {
 // Next reads the next packet from the reader into the provided Packet.
 // It returns the byte slice containing the packet data, or an error.
 // The byte slice is backed by the Data field of the provided Packet.
-func (pr *PCAPReader) Next(p *Packet) error {
+func (pr *PCAPReader) Next(p *Packet) (err error) {
 	if p == nil {
 		return errors.New("nil packet")
 	}
@@ -196,9 +197,9 @@ func (pr *PCAPReader) Next(p *Packet) error {
 
 	pBytes := (*[unsafe.Sizeof(*p)]byte)(unsafe.Pointer(p))[:unsafe.Sizeof(*p)]
 
-	_, err := io.ReadFull(pr.r, pBytes[0:16]) // Read the first 16 bytes.
+	_, err = io.ReadFull(pr.r, pBytes[0:16]) // Read the first 16 bytes.
 	if err != nil {
-		return err
+		return
 	}
 
 	if pr.isBE {
@@ -213,15 +214,17 @@ func (pr *PCAPReader) Next(p *Packet) error {
 	}
 
 	if int(p.CapturedLen) > pr.snapLen || int(p.CapturedLen) > len(p.data) {
-		return ErrCaptureTooLarge
+		err = ErrCaptureTooLarge
+		return
 	}
 
 	_, err = io.ReadFull(pr.r, p.data[:p.CapturedLen])
 	if err != nil {
-		return err
+		return
 	}
 	if !p.IsValidIP() {
-		return fmt.Errorf("invalid IP packet")
+		err = ErrNotIP
+		return
 	}
 	return nil
 }
