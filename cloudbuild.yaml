@@ -80,6 +80,7 @@ steps:
       "-t", "gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG",
       "-f", "cmd/etl_worker/Dockerfile.k8s", "."
   ]
+  waitFor: ['-']
 
 - name: gcr.io/cloud-builders/docker
   id: "Push the docker container to gcr.io"
@@ -87,7 +88,7 @@ steps:
     "push", "gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG"
   ]
 
-- name: etl-testing
+- name: update-table-schemas
   id: "Update table schemas before deploying parsers"
   entrypoint: bash
   args: [
@@ -95,6 +96,7 @@ steps:
   ]
   env:
   - GCLOUD_PROJECT=$PROJECT_ID
+  waitFor: ["Run all etl unit tests"]
 
 # UNIVERSAL PARSER: Run apply-cluster.sh
 - name: gcr.io/cloud-builders/kubectl
