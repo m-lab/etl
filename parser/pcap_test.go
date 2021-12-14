@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
@@ -53,16 +54,24 @@ func TestPCAPParser_ParseAndInsert(t *testing.T) {
 		GitCommit:  "12345678",
 	}
 
+	expectedA := schema.PCAPSummary{}
+
+	expectedA.StartTime, err = time.Parse("2006-01-02 15:04:05.00000 -0700", "2021-07-20 20:00:01.18105 -0400")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedA.EndTime, err = time.Parse("2006-01-02 15:04:05.000000 -0700", "2021-07-20 20:00:11.798528 -0400")
+
 	expectedPCAPRow := schema.PCAPRow{
 		ID:     "ndt-4c6fb_1625899199_000000000121C1A0",
 		Parser: expectedParseInfo,
 		Date:   date,
+		A:      expectedA,
 	}
 
 	if diff := deep.Equal(row, &expectedPCAPRow); diff != nil {
 		t.Errorf("PCAPParser.ParseAndInsert() different row: %s", strings.Join(diff, "\n"))
 	}
-
 }
 
 func TestPCAPParser_IsParsable(t *testing.T) {
