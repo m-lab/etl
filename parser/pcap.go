@@ -92,8 +92,14 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	client := summary.Client()
 
 	if err != nil {
-		// TODO Add metric for PCAP parsing errors
-	} else if server.SrcIP != nil && client.SrcIP != nil {
+		metrics.ErrorCount.WithLabelValues(p.TableName(), "parsing", "error").Inc()
+	} else if server.SrcIP == nil || client.SrcIP == nil {
+		metrics.WarningCount.WithLabelValues(p.TableName(), "parsing", "ip_layer_error").Inc()
+		row.A = schema.PCAPSummary{
+			StartTime: time.Unix(0, int64(summary.StartTime)),
+			EndTime:   time.Unix(0, int64(summary.LastTime)),
+		}
+	} else {
 		row.A = schema.PCAPSummary{
 			PacketsSent:     server.Packets,
 			PacketsReceived: client.Packets,
