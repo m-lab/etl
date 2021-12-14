@@ -75,6 +75,7 @@ type EthernetHeader struct {
 	etherType      BE16 // BigEndian
 }
 
+// EtherType returns the EtherType field of the packet.
 func (e *EthernetHeader) EtherType() layers.EthernetType {
 	return layers.EthernetType(e.etherType.Uint16())
 }
@@ -123,24 +124,24 @@ func (h *IPv4Header) PayloadLength() int {
 	return int(h.length.Uint16()) - int(ihl*4)
 }
 
+// Overwrite the destination IP with the source IP, allocating if needed.
+func replace(dst net.IP, src ...byte) net.IP {
+	if dst != nil {
+		dst = dst[:0]
+	}
+	return append(dst, src...)
+}
+
 // SrcIP returns the source IP address of the packet.
 // It uses the provided backing parameter to avoid allocations.
-func (h *IPv4Header) SrcIP(ip net.IP) net.IP {
-	if ip == nil {
-		ip = make(net.IP, 4)
-	}
-	ip = append(ip[:0], h.srcIP[:]...)
-	return ip
+func (h *IPv4Header) SrcIP(backing net.IP) net.IP {
+	return replace(backing, h.srcIP[:]...)
 }
 
 // DstIP returns the destination IP address of the packet.
 // It uses the provided backing parameter to avoid allocations.
 func (h *IPv4Header) DstIP(backing net.IP) net.IP {
-	if backing == nil {
-		backing = make(net.IP, 4)
-	}
-	backing = append(backing[:0], h.dstIP[:]...)
-	return backing
+	return replace(backing, h.dstIP[:]...)
 }
 
 // NextProtocol returns the next protocol in the stack.
@@ -170,8 +171,6 @@ type EHWrapper struct {
 	HeaderType layers.IPProtocol // Type of THIS header, not the next header.
 	eh         *ExtensionHeader
 	data       []byte // All the options and padding, including the first 6 bytes.
-	// TODO - this does not need to be stored, but it is convenient for now.
-	//	payload []byte // Any additional data remaining after the extension header.
 }
 
 // IPv6Header struct for IPv6 header
@@ -222,21 +221,13 @@ func (h *IPv6Header) PayloadLength() int {
 	return int(h.payloadLength.Uint16())
 }
 
-func (h *IPv6Header) SrcIP(ip net.IP) net.IP {
-	if ip == nil {
-		ip = make(net.IP, 16)
-	}
-	ip = append(ip[:0], h.srcIP[:]...)
-	return ip
+func (h *IPv6Header) SrcIP(backing net.IP) net.IP {
+	return replace(backing, h.srcIP[:]...)
 }
 
 // DstIP returns the destination IP address of the packet.
-func (h *IPv6Header) DstIP(ip net.IP) net.IP {
-	if ip == nil {
-		ip = make(net.IP, 16)
-	}
-	ip = append(ip[:0], h.dstIP[:]...)
-	return ip
+func (h *IPv6Header) DstIP(backing net.IP) net.IP {
+	return replace(backing, h.dstIP[:]...)
 }
 
 func (h *IPv6Header) HopLimit() uint8 {
@@ -273,8 +264,8 @@ func (w *IPv6Wrapper) handleExtensionHeaders(rawWire []byte) error {
 	if w == nil {
 		return fmt.Errorf("nil IPv6Wrapper")
 	}
-	if w.ext == nil {
-		w.ext = make([]EHWrapper, 0, 0)
+	if w.ext != nil {
+		w.ext = make([]EHWrapper, 0)
 	}
 	w.ext = w.ext[:0]
 
@@ -282,7 +273,8 @@ func (w *IPv6Wrapper) handleExtensionHeaders(rawWire []byte) error {
 		return nil
 	}
 
-	for np := w.NextProtocol(); np != layers.IPProtocolNoNextHeader; {
+	np := w.NextProtocol()
+	for {
 		switch np {
 		case layers.IPProtocolNoNextHeader:
 			return nil
@@ -290,18 +282,18 @@ func (w *IPv6Wrapper) handleExtensionHeaders(rawWire []byte) error {
 		case layers.IPProtocolTCP:
 			return nil
 		default:
-			metrics.WarningCount.WithLabelValues("pcap", "ipv6", "unsupported_header_type").Inc()
-			sparse1.Println("Other IPv6 header type", np)
+			metrics.WarningCount.WithLabelValues("pcap", "ipv6", "unsupported_extension_type").Inc()
+			sparse1.Println("Other IPv6 extension type", np)
 		}
 
 		if len(rawWire) < 8 {
-			metrics.ErrorCount.WithLabelValues("pcap", "ipv6", "truncated_header").Inc()
+			metrics.ErrorCount.WithLabelValues("pcap", "ipv6", "truncated_extension").Inc()
 			return ErrTruncatedIPHeader
 		}
 
 		eh := (*ExtensionHeader)(unsafe.Pointer(&rawWire[0]))
 		if len(rawWire) < int(8+eh.HeaderLength) {
-			metrics.ErrorCount.WithLabelValues("pcap", "ipv6", "truncated_header").Inc()
+			metrics.ErrorCount.WithLabelValues("pcap", "ipv6", "truncated_extension").Inc()
 			return ErrTruncatedIPHeader
 		}
 		w.ext = append(w.ext, EHWrapper{
@@ -313,9 +305,6 @@ func (w *IPv6Wrapper) handleExtensionHeaders(rawWire []byte) error {
 		rawWire = rawWire[8+eh.HeaderLength:]
 		np = eh.NextHeader
 	}
-
-	metrics.ErrorCount.WithLabelValues("pcap", "ipv6", "truncated_header").Inc()
-	return ErrTruncatedIPHeader
 }
 
 // Packet struct contains the packet data and metadata.
@@ -336,30 +325,30 @@ func (p *Packet) RawForTest() []byte {
 	return p.sharedBacking
 }
 
-// Overlay updates THIS packet object to overlay the underlying packet data.
-//  It avoids copying and allocation as much as possible.
-func (p *Packet) Overlay(pTime UnixNano, data []byte) (err error) {
+// Overlay updates THIS packet object to overlay the underlying packet data,
+// passed in wire format.  It avoids copying and allocation as much as possible.
+func (p *Packet) Overlay(pTime UnixNano, wire []byte) (err error) {
 
-	if len(data) < EthernetHeaderSize {
+	if len(wire) < EthernetHeaderSize {
 		metrics.ErrorCount.WithLabelValues("pcap", "ethernet", "truncated_header").Inc()
 		err = ErrTruncatedEthernetHeader
 		return
 	}
-	p.sharedBacking = data
+	p.sharedBacking = wire
 	p.PktTime = pTime
-	p.eth = (*EthernetHeader)(unsafe.Pointer(&data[0]))
+	p.eth = (*EthernetHeader)(unsafe.Pointer(&wire[0]))
 
 	switch p.eth.EtherType() {
 	case layers.EthernetTypeIPv4:
-		if len(data) < EthernetHeaderSize+IPv4HeaderSize {
+		if len(wire) < EthernetHeaderSize+IPv4HeaderSize {
 			metrics.ErrorCount.WithLabelValues("pcap", "ipv4", "truncated_header").Inc()
 			err = ErrTruncatedIPHeader
 			return
 		}
-		p.v4 = (*IPv4Header)(unsafe.Pointer(&data[EthernetHeaderSize]))
+		p.v4 = (*IPv4Header)(unsafe.Pointer(&wire[EthernetHeaderSize]))
 		p.IP = p.v4
 	case layers.EthernetTypeIPv6:
-		if len(data) < EthernetHeaderSize+IPv6HeaderSize {
+		if len(wire) < EthernetHeaderSize+IPv6HeaderSize {
 			metrics.ErrorCount.WithLabelValues("pcap", "ipv6", "truncated_header").Inc()
 			err = ErrTruncatedIPHeader
 			return
@@ -368,7 +357,7 @@ func (p *Packet) Overlay(pTime UnixNano, data []byte) (err error) {
 			// This allocation should only happen once.
 			p.v6 = &IPv6Wrapper{}
 		}
-		_, err = p.v6.Overlay(data[EthernetHeaderSize:])
+		_, err = p.v6.Overlay(wire[EthernetHeaderSize:])
 		if err != nil {
 			return
 		}
