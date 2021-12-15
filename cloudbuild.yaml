@@ -31,6 +31,7 @@ options:
   env:
   - PROJECT_ID=$PROJECT_ID
   - GIT_COMMIT=$COMMIT_SHA
+  machineType: 'N1_HIGHCPU_8'
 
 steps:
 # Make all git tags available.
@@ -80,6 +81,7 @@ steps:
       "-t", "gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG",
       "-f", "cmd/etl_worker/Dockerfile.k8s", "."
   ]
+  waitFor: ['Unshallow git clone']
 
 - name: gcr.io/cloud-builders/docker
   id: "Push the docker container to gcr.io"
