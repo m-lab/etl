@@ -114,6 +114,7 @@ func (s *Summary) Finish() bool {
 		s.client = &s.Left
 		return true
 	}
+	sparse1.Printf("no site identified for %v / %v", s.Left.SrcIP, s.Right.SrcIP)
 	return false
 }
 
@@ -121,28 +122,24 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	// ESCAPE maps are escaping to the heap
 	summary := Summary{}
 
-	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
-	if err != nil {
-		log.Print(err)
-		return summary, err
+	pcap, rdrErr := pcapgo.NewReader(bytes.NewReader(data))
+	if rdrErr != nil {
+		log.Print(rdrErr)
+		return summary, rdrErr
 	}
 
 	p := headers.Packet{}
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
+	for pData, ci, pktErr := pcap.ReadPacketData(); pktErr == nil; pData, ci, pktErr = pcap.ZeroCopyReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
-		err := p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), data)
-		if err != nil {
-			sparse1.Println(archive, fn, err, data)
+		overlayErr := p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), pData)
+		if overlayErr != nil {
+			sparse1.Println(archive, fn, overlayErr, pData)
 			continue
 		}
 		summary.Add(&p)
 	}
 
-	if err != nil {
-		metrics.WarningCount.WithLabelValues("pcap", "ip_layer_failure").Inc()
-		metrics.PcapPacketCount.WithLabelValues("IP error").Observe(float64(summary.Packets))
-		return summary, err
-	} else if summary.Finish() {
+	if summary.Finish() {
 		serverIP := summary.Server().SrcIP
 		// TODO - eventually we should identify key local ports, like 443 and 3001.
 		duration := summary.LastTime.Sub(summary.StartTime)

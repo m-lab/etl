@@ -94,7 +94,8 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(p.TableName(), "parsing", "error").Inc()
 	} else if server.SrcIP == nil || client.SrcIP == nil {
-		metrics.WarningCount.WithLabelValues(p.TableName(), "parsing", "ip_layer_error").Inc()
+		// Seeing about 1 of these in 10K traces.
+		metrics.WarningCount.WithLabelValues(p.TableName(), "parsing", "server unidentified").Inc()
 		row.A = schema.PCAPSummary{
 			StartTime: time.Unix(0, int64(summary.StartTime)),
 			EndTime:   time.Unix(0, int64(summary.LastTime)),
