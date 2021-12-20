@@ -1,9 +1,3 @@
-id:
-  Description: A unique id for the test, in this case identical to a.UUID.
-date:
-  Description: The date of the test, for partitioning.
-raw:
-  Description: Fields from the raw data.
 a:
   Description: Fields summarizing or derived from the raw data.
 a.UUID:
@@ -26,9 +20,6 @@ a.LossRate:
 GitShortCommit:
   Description: GitShortCommit is the Git commit (short form) of the running
     server code that produced this measurement.
-Version:
-  Description: Version is the symbolic version (if any) of the running server
-    code.
 ServerIP:
   Description: The IP address assigned to the M-Lab server that conducted the measurement.
 ServerPort:
