@@ -226,12 +226,12 @@ func updateStandardTables(project string) int {
 		errCount++
 	}
 
-	if err := CreateOrUpdatePCAPRow(project, "tmp_ndt", "pcap"); err != nil {
+	/*if err := CreateOrUpdatePCAPRow(project, "tmp_ndt", "pcap"); err != nil {
 		errCount++
 	}
 	if err := CreateOrUpdatePCAPRow(project, "raw_ndt", "pcap"); err != nil {
 		errCount++
-	}
+	}*/
 
 	if err := CreateOrUpdateHopAnnotation1Row(project, "tmp_ndt", "hopannotation1"); err != nil {
 		errCount++
@@ -380,13 +380,15 @@ func main() {
 			errCount++
 		}
 
-	case "pcap":
-		if err := CreateOrUpdatePCAPRow(*project, "tmp_ndt", "pcap"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdatePCAPRow(*project, "raw_ndt", "pcap"); err != nil {
-			errCount++
-		}
+		/*
+			case "pcap":
+				if err := CreateOrUpdatePCAPRow(*project, "tmp_ndt", "pcap"); err != nil {
+					errCount++
+				}
+				if err := CreateOrUpdatePCAPRow(*project, "raw_ndt", "pcap"); err != nil {
+					errCount++
+				}
+		*/
 
 	case "hopannotation1":
 		if err := CreateOrUpdateHopAnnotation1Row(*project, "tmp_ndt", "hopannotation1"); err != nil {
