@@ -180,15 +180,15 @@ var (
 		[]string{"rsync_host_module", "day_of_week"},
 	)
 
-	// TaskCount counts the number of tasks processed by the pipeline.
+	// TaskTotal counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_task_count{table, package, status}
+	//   etl_task_total{table, package, status}
 	// Example usage:
-	//   metrics.TaskCount.WithLabelValues("ndt", "Task", "ok").Inc()
-	TaskCount = promauto.NewCounterVec(
+	//   metrics.TaskTotal.WithLabelValues("ndt", "Task", "ok").Inc()
+	TaskTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "etl_task_count",
+			Name: "etl_task_total",
 			Help: "Number of tasks/archive files processed.",
 		},
 		// table/datatype, and Status
