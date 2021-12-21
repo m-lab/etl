@@ -76,6 +76,10 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Dec()
+	if len(test) == 0 {
+		// TODO: what should we do with this?
+		return nil
+	}
 
 	// An older version of the NDT result struct used a JSON object (Go map) to
 	// store ClientMetadata. Results in that format will fail to parse. This step
