@@ -99,7 +99,7 @@ func TestMetrics(t *testing.T) {
 	metrics.PTPollutedCount.WithLabelValues("x")
 	metrics.PTTestCount.WithLabelValues("x")
 	metrics.RowSizeHistogram.WithLabelValues("x")
-	metrics.TaskCount.WithLabelValues("x", "x")
+	metrics.TaskTotal.WithLabelValues("x", "x")
 	metrics.TestCount.WithLabelValues("x", "x", "x")
 	metrics.WarningCount.WithLabelValues("x", "x", "x")
 	metrics.WorkerCount.WithLabelValues("x")

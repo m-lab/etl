@@ -157,7 +157,7 @@ OUTER:
 		loopErr = tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if loopErr != nil {
-			metrics.TaskCount.WithLabelValues(
+			metrics.TaskTotal.WithLabelValues(
 				tt.Type(), "ParseAndInsertError").Inc()
 			log.Printf("ERROR %v", loopErr)
 			// TODO(dev) Handle this error properly!

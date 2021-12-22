@@ -213,7 +213,7 @@ func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
-		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
+		metrics.TaskTotal.WithLabelValues("unknown", "TooManyRequests").Inc()
 		rwr.WriteHeader(http.StatusTooManyRequests)
 		fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
 		return
@@ -269,7 +269,7 @@ func subworker(rawFileName string, executionCount, retryCount int, age time.Dura
 	// This handles base64 encoding, and requires a gs:// prefix.
 	fn, err := etl.GetFilename(rawFileName)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
+		metrics.TaskTotal.WithLabelValues("unknown", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)
 		return http.StatusBadRequest, `{"message": "Invalid filename."}`
 	}
@@ -302,7 +302,7 @@ func (r *runnable) Run(ctx context.Context) error {
 	dp, err := etl.ValidateTestPath(path)
 	if err != nil {
 		log.Printf("Invalid filename: %v\n", err)
-		metrics.TaskCount.WithLabelValues(string(etl.INVALID), "BadRequest").Inc()
+		metrics.TaskTotal.WithLabelValues(string(etl.INVALID), "BadRequest").Inc()
 		return err
 	}
 

@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package worker_test
@@ -131,14 +132,14 @@ func TestProcessTask(t *testing.T) {
 	metrics.FileCount.Collect(c)
 	checkCounter(t, c, 1)
 
-	metrics.TaskCount.Collect(c)
+	metrics.TaskTotal.Collect(c)
 	checkCounter(t, c, 1)
 
 	metrics.TestCount.Collect(c)
 	checkCounter(t, c, 1)
 
 	metrics.FileCount.Reset()
-	metrics.TaskCount.Reset()
+	metrics.TaskTotal.Reset()
 	metrics.TestCount.Reset()
 }
 
@@ -211,7 +212,7 @@ func TestNilUploader(t *testing.T) {
 	}
 
 	metrics.FileCount.Reset()
-	metrics.TaskCount.Reset()
+	metrics.TaskTotal.Reset()
 	metrics.TestCount.Reset()
 }
 
@@ -244,7 +245,7 @@ func TestProcessGKETask(t *testing.T) {
 	metrics.FileCount.Collect(c)
 	checkCounter(t, c, 488)
 
-	metrics.TaskCount.Collect(c)
+	metrics.TaskTotal.Collect(c)
 	checkCounter(t, c, 1)
 
 	metrics.TestCount.Collect(c)
@@ -254,6 +255,6 @@ func TestProcessGKETask(t *testing.T) {
 		t.Error("Expected 478 tests, got", up.Total)
 	}
 	metrics.FileCount.Reset()
-	metrics.TaskCount.Reset()
+	metrics.TaskTotal.Reset()
 	metrics.TestCount.Reset()
 }
