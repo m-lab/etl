@@ -45,5 +45,7 @@ gcloud --project=${PROJECT_ID} \
        }
     }' | \
     while read service version ; do 
-        echo gcloud app versions delete --service $service $version
+        echo "Deleting $service $version"
+        gcloud --project=${PROJECT_ID} \
+            app versions delete --service $service $version
     done
