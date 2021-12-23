@@ -140,3 +140,9 @@ steps:
   args: [
     'bash', '-c', 'cd cmd/etl_worker && gcloud --project=$PROJECT_ID app deploy --promote app-batch.yaml'
   ]
+
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Delete non-serving appengine versions"
+  args: [
+    'bash', '-c', './delete-appengine.sh'
+  ]
