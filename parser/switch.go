@@ -155,24 +155,13 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 		// Insert the row.
 		err := p.Base.Put(row)
 		if err != nil {
-			return err
-		}
-		if err != nil {
-			switch t := err.(type) {
-			case bigquery.PutMultiError:
-				// TODO improve error handling??
-				metrics.TestCount.WithLabelValues(
-					p.TableName(), "disco", "insert-multi").Inc()
-				log.Printf("%v\n", t[0].Error())
-			default:
-				metrics.TestCount.WithLabelValues(
-					p.TableName(), "disco", "insert-other").Inc()
-			}
-			// TODO(dev) Should accumulate errors, instead of aborting?
+			metrics.TestCount.WithLabelValues(
+				p.TableName(), string(etl.SW), "put").Inc()
+			log.Printf("%v\n", t[0].Error())
 			return err
 		}
 		// Count successful inserts.
-		metrics.TestCount.WithLabelValues(p.TableName(), "disco", "ok").Inc()
+		metrics.TestCount.WithLabelValues(p.TableName(), string(etl.SW), "ok").Inc()
 	}
 
 	// Measure the distribution of records per file.
