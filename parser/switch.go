@@ -3,7 +3,6 @@ package parser
 import (
 	"bytes"
 	"encoding/json"
-	"log"
 	"strings"
 	"time"
 
@@ -157,7 +156,6 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
 				p.TableName(), string(etl.SW), "put").Inc()
-			log.Printf("%v\n", t[0].Error())
 			return err
 		}
 		// Count successful inserts.
