@@ -264,6 +264,8 @@ github.com/m-lab/access v0.0.9/go.mod h1:gZ7YN3SeMTZYeRv5EFaLdG+XVI/F/X4njM1G1Bf
 github.com/m-lab/annotation-service v0.0.0-20210504151333-138bdf572368/go.mod h1:bW5A2AmUqyh6kGbmu4X8fYK2pRcfTvTjAXW/+4VQZUA=
 github.com/m-lab/annotation-service v0.0.0-20210713124633-fa227b3d5b2f h1:dLJUar7697xXCEzAFcjiq0btzRnCpmfl/To2pva8s2w=
 github.com/m-lab/annotation-service v0.0.0-20210713124633-fa227b3d5b2f/go.mod h1:bW5A2AmUqyh6kGbmu4X8fYK2pRcfTvTjAXW/+4VQZUA=
+github.com/m-lab/disco v0.1.10 h1:Xdi43LQnM8MqbXo0GXGHjjjvDww+RJZBhiKjyMZKjn0=
+github.com/m-lab/disco v0.1.10/go.mod h1:lFZcSwh2TNk4C/lJ6XrUKAdP9+Yx2bTVtevHkCoIam4=
 github.com/m-lab/etl-gardener v0.0.0-20210910143655-d4bda5bfc75d h1:mYSngF3WVqRx99gCBRhrWbrSnRyr6iS/s9ZSH7RUohc=
 github.com/m-lab/etl-gardener v0.0.0-20210910143655-d4bda5bfc75d/go.mod h1:4hAG+N9lfh+vQ+FEcMFad0SOP74VJi5yeWk7ioHkvs0=
 github.com/m-lab/go v0.1.44/go.mod h1:+C0ZBlRKsF7wIbqHRtiL8bqD6cOwlZXDTK/KQ7Iv434=
