@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# delete-appengine.sh deletes all service versions after the 9 most recently
-# deployed versions with zero traffic split. This script is meant to run as a
-# late step of the cloudbuild deployment. Running this regularly will keep the
-# number of versions around 10 per service (for rollbacks) and below 210
-# globally (the hard limit imposed by AppEngine).
+# delete-appengine-services.sh deletes all service versions after the 9 most
+# recently deployed versions with zero traffic split. This script is meant to
+# run as a late step of the cloudbuild deployment. Running this regularly will
+# keep the number of versions around 10 per service (for rollbacks) and below
+# 210 globally (the hard limit imposed by AppEngine).
 
 # Example: Below is example output from `gcloud app versions list`. The
 # 'TRAFFIC_SPLIT' determines whether any traffic is directed to this service.
@@ -31,6 +31,9 @@
 # default                 20210420t212953  0.00           2021-04-20T17:30:45-04:00  SERVING
 # default                 20210420t174553  0.00           2021-04-20T13:46:37-04:00  SERVING
 # default                 20210409t180654  0.00           2021-04-09T14:07:38-04:00  SERVING
+
+# Do not prompt user for feedback.
+gcloud config set core/disable_prompts true
 
 # Delete service versions after the most recent 9 with a zero traffic split.
 # NOTE: any service version with a non-zero traffic split is never deleted.
