@@ -117,6 +117,10 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 						Filename:   testName,
 						GitCommit:  GitCommit(),
 					},
+					A: &schema.SwitchSummary{
+						Machine: tmp.Hostname,
+						Switch:  tmp.Experiment,
+					},
 					Raw: &schema.RawData{
 						Metrics: []*schema.SwitchStats{},
 					},
@@ -136,8 +140,9 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 				Sample:     []schema.Sample{sample},
 			}
 			row.Raw.Metrics = append(row.Raw.Metrics, model)
+			// Parse the sample to extract the summary.
+			parseSample(tmp.Metric, &sample, row)
 		}
-
 	}
 
 	for _, row := range timestampToRow {
@@ -155,7 +160,7 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 		err := p.Base.Put(row)
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
-				p.TableName(), string(etl.SW), "put").Inc()
+				p.TableName(), string(etl.SW), "put-error").Inc()
 			return err
 		}
 		// Count successful inserts.
@@ -167,6 +172,65 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 		p.TableName()).Observe(float64(rowCount))
 
 	return nil
+}
+
+// parseSample reads the raw Sample and fills the corresponding
+// fields in the SwitchRow.
+func parseSample(metric string, sample *schema.Sample, row *schema.SwitchRow) {
+	switch metric {
+	case "switch.octets.uplink.tx":
+		row.A.SwitchOctetsUplinkTx = uint64(sample.Value)
+		row.A.SwitchOctetsUplinkTxCounter = uint64(sample.Counter)
+	case "switch.octets.uplink.rx":
+		row.A.SwitchOctetsUplinkRx = uint64(sample.Value)
+		row.A.SwitchOctetsUplinkRxCounter = uint64(sample.Counter)
+	// The rx/tx switch local octets counters and deltas have not been
+	// collected correctly by DISCOv2. Setting these to zero for now until a
+	// solution to deal with the missing data is worked out.
+	// See: https://github.com/m-lab/disco/issues/20
+	case "switch.octets.local.tx":
+		row.A.SwitchOctetsLocalTx = 0
+		row.A.SwitchOctetsLocalTxCounter = 0
+	case "switch.octets.local.rx":
+		row.A.SwitchOctetsLocalRx = 0
+		row.A.SwitchOctetsLocalRxCounter = 0
+	case "switch.unicast.uplink.tx":
+		row.A.SwitchUnicastUplinkTx = uint64(sample.Value)
+		row.A.SwitchUnicastUplinkTxCounter = uint64(sample.Counter)
+	case "switch.unicast.uplink.rx":
+		row.A.SwitchUnicastUplinkRx = uint64(sample.Value)
+		row.A.SwitchUnicastUplinkRxCounter = uint64(sample.Counter)
+	case "switch.unicast.local.tx":
+		row.A.SwitchUnicastLocalTx = uint64(sample.Value)
+		row.A.SwitchUnicastLocalTxCounter = uint64(sample.Counter)
+	case "switch.unicast.local.rx":
+		row.A.SwitchUnicastLocalRx = uint64(sample.Value)
+		row.A.SwitchUnicastLocalRxCounter = uint64(sample.Counter)
+	case "switch.errors.uplink.tx":
+		row.A.SwitchErrorsUplinkTx = uint64(sample.Value)
+		row.A.SwitchErrorsUplinkTxCounter = uint64(sample.Counter)
+	case "switch.errors.uplink.rx":
+		row.A.SwitchErrorsUplinkRx = uint64(sample.Value)
+		row.A.SwitchErrorsUplinkRxCounter = uint64(sample.Counter)
+	case "switch.errors.local.tx":
+		row.A.SwitchErrorsLocalTx = uint64(sample.Value)
+		row.A.SwitchErrorsLocalTxCounter = uint64(sample.Counter)
+	case "switch.errors.local.rx":
+		row.A.SwitchErrorsLocalRx = uint64(sample.Value)
+		row.A.SwitchErrorsLocalRxCounter = uint64(sample.Counter)
+	case "switch.discards.uplink.tx":
+		row.A.SwitchDiscardsUplinkTx = uint64(sample.Value)
+		row.A.SwitchDiscardsUplinkTxCounter = uint64(sample.Counter)
+	case "switch.discards.uplink.rx":
+		row.A.SwitchDiscardsUplinkRx = uint64(sample.Value)
+		row.A.SwitchDiscardsUplinkRxCounter = uint64(sample.Counter)
+	case "switch.discards.local.tx":
+		row.A.SwitchDiscardsLocalTx = uint64(sample.Value)
+		row.A.SwitchDiscardsLocalTxCounter = uint64(sample.Counter)
+	case "switch.discards.local.rx":
+		row.A.SwitchDiscardsLocalRx = uint64(sample.Value)
+		row.A.SwitchDiscardsLocalRxCounter = uint64(sample.Counter)
+	}
 }
 
 // NB: These functions are also required to complete the etl.Parser interface

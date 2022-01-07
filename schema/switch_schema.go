@@ -14,7 +14,7 @@ import (
 type SwitchRow struct {
 	// Parser contains metadata about the parsing of this row.
 	Parser ParseInfo `bigquery:"parser"`
-	// Date is the mtime of the archive being parsed.
+	// Date is the collection timestamp of the samples.
 	Date time.Time `bigquery:"date"`
 	// A is the SwitchSummary containing the parsed metrics.
 	A *SwitchSummary
@@ -33,20 +33,41 @@ type SwitchSummary struct {
 	// Switch is the switch's hostname.
 	Switch string
 
-	// Timestamp is the collection timestamp.
-	Timestamp time.Time
-
 	// The following fields are parsed from the raw data.
-	SwitchOctetsUplinkRx  uint64
-	SwitchOctetsUplinkTx  uint64
-	SwitchOctetsLocalRx   uint64
-	SwitchOctetsLocalTx   uint64
-	SwitchUnicastUplinkRx uint64
-	SwitchUnicastUplinkTx uint64
-	SwitchUnicastLocalRx  uint64
-	SwitchUnicastLocalTx  uint64
-	SwitchErrorsUplinkRx  uint64
-	SwitchErrorsUplinkTx  uint64
+	// Note: Counters are only available in DISCOv2 data. For DISCOv1, only
+	// deltas are stored in the raw files, so the counters are set to 0.
+	SwitchOctetsUplinkRxCounter   uint64
+	SwitchOctetsUplinkRx          uint64
+	SwitchOctetsUplinkTxCounter   uint64
+	SwitchOctetsUplinkTx          uint64
+	SwitchOctetsLocalRxCounter    uint64
+	SwitchOctetsLocalRx           uint64
+	SwitchOctetsLocalTxCounter    uint64
+	SwitchOctetsLocalTx           uint64
+	SwitchUnicastUplinkRxCounter  uint64
+	SwitchUnicastUplinkRx         uint64
+	SwitchUnicastUplinkTxCounter  uint64
+	SwitchUnicastUplinkTx         uint64
+	SwitchUnicastLocalRxCounter   uint64
+	SwitchUnicastLocalRx          uint64
+	SwitchUnicastLocalTxCounter   uint64
+	SwitchUnicastLocalTx          uint64
+	SwitchErrorsUplinkRxCounter   uint64
+	SwitchErrorsUplinkRx          uint64
+	SwitchErrorsUplinkTxCounter   uint64
+	SwitchErrorsUplinkTx          uint64
+	SwitchErrorsLocalRxCounter    uint64
+	SwitchErrorsLocalRx           uint64
+	SwitchErrorsLocalTxCounter    uint64
+	SwitchErrorsLocalTx           uint64
+	SwitchDiscardsUplinkRxCounter uint64
+	SwitchDiscardsUplinkRx        uint64
+	SwitchDiscardsUplinkTxCounter uint64
+	SwitchDiscardsUplinkTx        uint64
+	SwitchDiscardsLocalRxCounter  uint64
+	SwitchDiscardsLocalRx         uint64
+	SwitchDiscardsLocalTxCounter  uint64
+	SwitchDiscardsLocalTx         uint64
 }
 
 // RawData wraps a slice of Sample objects.
