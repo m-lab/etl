@@ -101,9 +101,9 @@ func CreateOrUpdateAnnotationRow(project string, dataset string, table string) e
 }
 
 func CreateOrUpdateSwitchStats(project string, dataset string, table string) error {
-	row := schema.SwitchStats{}
+	row := schema.SwitchRow{}
 	schema, err := row.Schema()
-	rtx.Must(err, "SwitchStats.Schema")
+	rtx.Must(err, "SwitchRow.Schema")
 	return CreateOrUpdate(schema, project, dataset, table, "")
 }
 
