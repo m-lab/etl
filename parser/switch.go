@@ -201,13 +201,13 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 	// by DISCOv2, so we set them to zero until we can fix that.
 	if metric == "switch.octets.local.tx" ||
 		metric == "switch.octets.local.rx" {
-		valField.SetUint(0)
-		counterField.SetUint(0)
+		valField.SetInt(0)
+		counterField.SetInt(0)
 		return
 	}
 
-	valField.SetUint(uint64(sample.Value))
-	counterField.SetUint(uint64(sample.Counter))
+	valField.SetInt(int64(sample.Value))
+	counterField.SetInt(sample.Counter)
 }
 
 // NB: These functions are also required to complete the etl.Parser interface

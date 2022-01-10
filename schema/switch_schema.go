@@ -36,38 +36,38 @@ type SwitchSummary struct {
 	// The following fields are parsed from the raw data.
 	// Note: Counters are only available in DISCOv2 data. For DISCOv1, only
 	// deltas are stored in the raw files, so the counters are set to 0.
-	SwitchOctetsUplinkRxCounter   uint64
-	SwitchOctetsUplinkRx          uint64
-	SwitchOctetsUplinkTxCounter   uint64
-	SwitchOctetsUplinkTx          uint64
-	SwitchOctetsLocalRxCounter    uint64
-	SwitchOctetsLocalRx           uint64
-	SwitchOctetsLocalTxCounter    uint64
-	SwitchOctetsLocalTx           uint64
-	SwitchUnicastUplinkRxCounter  uint64
-	SwitchUnicastUplinkRx         uint64
-	SwitchUnicastUplinkTxCounter  uint64
-	SwitchUnicastUplinkTx         uint64
-	SwitchUnicastLocalRxCounter   uint64
-	SwitchUnicastLocalRx          uint64
-	SwitchUnicastLocalTxCounter   uint64
-	SwitchUnicastLocalTx          uint64
-	SwitchErrorsUplinkRxCounter   uint64
-	SwitchErrorsUplinkRx          uint64
-	SwitchErrorsUplinkTxCounter   uint64
-	SwitchErrorsUplinkTx          uint64
-	SwitchErrorsLocalRxCounter    uint64
-	SwitchErrorsLocalRx           uint64
-	SwitchErrorsLocalTxCounter    uint64
-	SwitchErrorsLocalTx           uint64
-	SwitchDiscardsUplinkRxCounter uint64
-	SwitchDiscardsUplinkRx        uint64
-	SwitchDiscardsUplinkTxCounter uint64
-	SwitchDiscardsUplinkTx        uint64
-	SwitchDiscardsLocalRxCounter  uint64
-	SwitchDiscardsLocalRx         uint64
-	SwitchDiscardsLocalTxCounter  uint64
-	SwitchDiscardsLocalTx         uint64
+	SwitchOctetsUplinkRxCounter   int64
+	SwitchOctetsUplinkRx          int64
+	SwitchOctetsUplinkTxCounter   int64
+	SwitchOctetsUplinkTx          int64
+	SwitchOctetsLocalRxCounter    int64
+	SwitchOctetsLocalRx           int64
+	SwitchOctetsLocalTxCounter    int64
+	SwitchOctetsLocalTx           int64
+	SwitchUnicastUplinkRxCounter  int64
+	SwitchUnicastUplinkRx         int64
+	SwitchUnicastUplinkTxCounter  int64
+	SwitchUnicastUplinkTx         int64
+	SwitchUnicastLocalRxCounter   int64
+	SwitchUnicastLocalRx          int64
+	SwitchUnicastLocalTxCounter   int64
+	SwitchUnicastLocalTx          int64
+	SwitchErrorsUplinkRxCounter   int64
+	SwitchErrorsUplinkRx          int64
+	SwitchErrorsUplinkTxCounter   int64
+	SwitchErrorsUplinkTx          int64
+	SwitchErrorsLocalRxCounter    int64
+	SwitchErrorsLocalRx           int64
+	SwitchErrorsLocalTxCounter    int64
+	SwitchErrorsLocalTx           int64
+	SwitchDiscardsUplinkRxCounter int64
+	SwitchDiscardsUplinkRx        int64
+	SwitchDiscardsUplinkTxCounter int64
+	SwitchDiscardsUplinkTx        int64
+	SwitchDiscardsLocalRxCounter  int64
+	SwitchDiscardsLocalRx         int64
+	SwitchDiscardsLocalTxCounter  int64
+	SwitchDiscardsLocalTx         int64
 }
 
 // RawData wraps a slice of SwitchStats objects.
