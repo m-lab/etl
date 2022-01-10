@@ -3,16 +3,21 @@ package parser
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"reflect"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/iancoleman/strcase"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 )
+
+var InvalidMetricName = errors.New("invalid metric name")
 
 //=====================================================================================
 //                       Switch Datatype Parser
@@ -67,8 +72,8 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 	timestampToRow := make(map[int64]*schema.SwitchRow)
 
 	for dec.More() {
-		// Unmarshal the raw JSON into DISCOv2's Model.
-		// This can also hold DISCOv1 data. (XXX: is it true?)
+		// Unmarshal the raw JSON into a SwitchStats.
+		// This can hold both DISCOv1 and DISCOv2 data.
 		tmp := &schema.SwitchStats{}
 		err := dec.Decode(tmp)
 		if err != nil {
@@ -140,8 +145,8 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 				Sample:     []schema.Sample{sample},
 			}
 			row.Raw.Metrics = append(row.Raw.Metrics, model)
-			// Parse the sample to extract the summary.
-			parseSample(tmp.Metric, &sample, row)
+			// Read the sample to extract the summary.
+			getSummaryFromSample(tmp.Metric, &sample, row)
 		}
 	}
 
@@ -174,63 +179,36 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 	return nil
 }
 
-// parseSample reads the raw Sample and fills the corresponding
+// getSummaryFromSample reads the raw Sample and fills the corresponding
 // fields in the SwitchRow.
-func parseSample(metric string, sample *schema.Sample, row *schema.SwitchRow) {
-	switch metric {
-	case "switch.octets.uplink.tx":
-		row.A.SwitchOctetsUplinkTx = uint64(sample.Value)
-		row.A.SwitchOctetsUplinkTxCounter = uint64(sample.Counter)
-	case "switch.octets.uplink.rx":
-		row.A.SwitchOctetsUplinkRx = uint64(sample.Value)
-		row.A.SwitchOctetsUplinkRxCounter = uint64(sample.Counter)
-	// The rx/tx switch local octets counters and deltas have not been
-	// collected correctly by DISCOv2. Setting these to zero for now until a
-	// solution to deal with the missing data is worked out.
-	// See: https://github.com/m-lab/disco/issues/20
-	case "switch.octets.local.tx":
-		row.A.SwitchOctetsLocalTx = 0
-		row.A.SwitchOctetsLocalTxCounter = 0
-	case "switch.octets.local.rx":
-		row.A.SwitchOctetsLocalRx = 0
-		row.A.SwitchOctetsLocalRxCounter = 0
-	case "switch.unicast.uplink.tx":
-		row.A.SwitchUnicastUplinkTx = uint64(sample.Value)
-		row.A.SwitchUnicastUplinkTxCounter = uint64(sample.Counter)
-	case "switch.unicast.uplink.rx":
-		row.A.SwitchUnicastUplinkRx = uint64(sample.Value)
-		row.A.SwitchUnicastUplinkRxCounter = uint64(sample.Counter)
-	case "switch.unicast.local.tx":
-		row.A.SwitchUnicastLocalTx = uint64(sample.Value)
-		row.A.SwitchUnicastLocalTxCounter = uint64(sample.Counter)
-	case "switch.unicast.local.rx":
-		row.A.SwitchUnicastLocalRx = uint64(sample.Value)
-		row.A.SwitchUnicastLocalRxCounter = uint64(sample.Counter)
-	case "switch.errors.uplink.tx":
-		row.A.SwitchErrorsUplinkTx = uint64(sample.Value)
-		row.A.SwitchErrorsUplinkTxCounter = uint64(sample.Counter)
-	case "switch.errors.uplink.rx":
-		row.A.SwitchErrorsUplinkRx = uint64(sample.Value)
-		row.A.SwitchErrorsUplinkRxCounter = uint64(sample.Counter)
-	case "switch.errors.local.tx":
-		row.A.SwitchErrorsLocalTx = uint64(sample.Value)
-		row.A.SwitchErrorsLocalTxCounter = uint64(sample.Counter)
-	case "switch.errors.local.rx":
-		row.A.SwitchErrorsLocalRx = uint64(sample.Value)
-		row.A.SwitchErrorsLocalRxCounter = uint64(sample.Counter)
-	case "switch.discards.uplink.tx":
-		row.A.SwitchDiscardsUplinkTx = uint64(sample.Value)
-		row.A.SwitchDiscardsUplinkTxCounter = uint64(sample.Counter)
-	case "switch.discards.uplink.rx":
-		row.A.SwitchDiscardsUplinkRx = uint64(sample.Value)
-		row.A.SwitchDiscardsUplinkRxCounter = uint64(sample.Counter)
-	case "switch.discards.local.tx":
-		row.A.SwitchDiscardsLocalTx = uint64(sample.Value)
-		row.A.SwitchDiscardsLocalTxCounter = uint64(sample.Counter)
-	case "switch.discards.local.rx":
-		row.A.SwitchDiscardsLocalRx = uint64(sample.Value)
-		row.A.SwitchDiscardsLocalRxCounter = uint64(sample.Counter)
+func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.SwitchRow) error {
+	// Convert the metric name to its corresponding CamelCase field name.
+	val := strcase.ToCamel(metric)
+	counter := val + "Counter"
+
+	// Use the "reflect" package to dinamically access the fields of the
+	// summary struct. This is a bit hacky, but it works better than a lengthy
+	// switch statement.
+	v := reflect.ValueOf(row.A).Elem()
+	valField := v.FieldByName(val)
+	counterField := v.FieldByName(counter)
+	if !valField.IsValid() || !counterField.IsValid() {
+		return InvalidMetricName
 	}
+
+	// Set the fields' values from the sample.
+	// Note: the octets.local.tx/rx values were not collected correctly
+	// by DISCOv2, so we set them to zero until we can fix that.
+	if metric == "switch.octets.local.tx" ||
+		metric == "switch.octets.local.rx" {
+		valField.SetUint(0)
+		counterField.SetUint(0)
+		return nil
+	}
+
+	valField.SetUint(uint64(sample.Value))
+	counterField.SetUint(uint64(sample.Counter))
+	return nil
 }
 
 // NB: These functions are also required to complete the etl.Parser interface

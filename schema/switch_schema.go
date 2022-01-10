@@ -70,10 +70,7 @@ type SwitchSummary struct {
 	SwitchDiscardsLocalTx         uint64
 }
 
-// RawData wraps a slice of Sample objects.
-// Only the raw data directly used in this row is included. Since the JSONL
-// files contain multiple timestamps per file, we filter out the timestamps
-// that are not used in this row. This prevents data duplication in BQ.
+// RawData wraps a slice of SwitchStats objects.
 type RawData struct {
 	Metrics []*SwitchStats
 }
