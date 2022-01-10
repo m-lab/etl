@@ -181,7 +181,7 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 
 // getSummaryFromSample reads the raw Sample and fills the corresponding
 // fields in the SwitchRow.
-func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.SwitchRow) error {
+func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.SwitchRow) {
 	// Convert the metric name to its corresponding CamelCase field name.
 	val := strcase.ToCamel(metric)
 	counter := val + "Counter"
@@ -193,7 +193,7 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 	valField := v.FieldByName(val)
 	counterField := v.FieldByName(counter)
 	if !valField.IsValid() || !counterField.IsValid() {
-		return InvalidMetricName
+		return
 	}
 
 	// Set the fields' values from the sample.
@@ -203,12 +203,11 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 		metric == "switch.octets.local.rx" {
 		valField.SetUint(0)
 		counterField.SetUint(0)
-		return nil
+		return
 	}
 
 	valField.SetUint(uint64(sample.Value))
 	counterField.SetUint(uint64(sample.Counter))
-	return nil
 }
 
 // NB: These functions are also required to complete the etl.Parser interface
