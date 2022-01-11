@@ -19,7 +19,7 @@ type SwitchRow struct {
 	// Date is the collection timestamp of the samples.
 	Date time.Time `bigquery:"date"`
 	// A is the SwitchSummary containing the parsed metrics.
-	A *SwitchSummary
+	A *SwitchSummary `bigquery:"a"`
 	// Raw is the raw data from the DISCO export file.
 	Raw *RawData `json:",omitempty" bigquery:"raw"`
 
