@@ -104,7 +104,7 @@ func CreateOrUpdateSwitchRow(project string, dataset string, table string) error
 	row := schema.SwitchRow{}
 	schema, err := row.Schema()
 	rtx.Must(err, "SwitchRow.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
 func CreateOrUpdatePCAPRow(project string, dataset string, table string) error {
@@ -311,12 +311,6 @@ func updateLegacyTables(project string) int {
 	if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
 		errCount++
 	}
-	// if err := CreateOrUpdateSwitchStats(project, "base_tables", "switch"); err != nil {
-	// 	errCount++
-	// }
-	// if err := CreateOrUpdateSwitchStats(project, "batch", "switch"); err != nil {
-	// 	errCount++
-	// }
 	return errCount
 }
 
