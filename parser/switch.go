@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -115,6 +116,8 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 			var ok bool
 			if row, ok = timestampToRow[sample.Timestamp]; !ok {
 				row = &schema.SwitchRow{
+					ID:   fmt.Sprintf("%s%d", tmp.Hostname, sample.Timestamp),
+					Date: time.Unix(sample.Timestamp, 0),
 					Parser: schema.ParseInfo{
 						Version:    Version(),
 						Time:       time.Now(),
@@ -132,9 +135,6 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 				}
 				timestampToRow[sample.Timestamp] = row
 			}
-
-			// Set the SwitchRow's timestamp from the sample's timestamp.
-			row.Date = time.Unix(sample.Timestamp, 0)
 
 			// Create a Model containing only this sample and append it to
 			// the current SwitchRow's Raw.Metrics field.

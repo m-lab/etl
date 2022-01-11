@@ -12,6 +12,8 @@ import (
 // SwitchRow represents a single row of Switch data, taken from the raw DISCO
 // exported file.
 type SwitchRow struct {
+	// ID is the unique ID for this SwitchRow.
+	ID string `bigquery:"id"`
 	// Parser contains metadata about the parsing of this row.
 	Parser ParseInfo `bigquery:"parser"`
 	// Date is the collection timestamp of the samples.
@@ -36,38 +38,46 @@ type SwitchSummary struct {
 	// The following fields are parsed from the raw data.
 	// Note: Counters are only available in DISCOv2 data. For DISCOv1, only
 	// deltas are stored in the raw files, so the counters are set to 0.
-	SwitchOctetsUplinkRxCounter   int64
-	SwitchOctetsUplinkRx          int64
-	SwitchOctetsUplinkTxCounter   int64
-	SwitchOctetsUplinkTx          int64
-	SwitchOctetsLocalRxCounter    int64
-	SwitchOctetsLocalRx           int64
-	SwitchOctetsLocalTxCounter    int64
-	SwitchOctetsLocalTx           int64
-	SwitchUnicastUplinkRxCounter  int64
-	SwitchUnicastUplinkRx         int64
-	SwitchUnicastUplinkTxCounter  int64
-	SwitchUnicastUplinkTx         int64
-	SwitchUnicastLocalRxCounter   int64
-	SwitchUnicastLocalRx          int64
-	SwitchUnicastLocalTxCounter   int64
-	SwitchUnicastLocalTx          int64
-	SwitchErrorsUplinkRxCounter   int64
-	SwitchErrorsUplinkRx          int64
-	SwitchErrorsUplinkTxCounter   int64
-	SwitchErrorsUplinkTx          int64
-	SwitchErrorsLocalRxCounter    int64
-	SwitchErrorsLocalRx           int64
-	SwitchErrorsLocalTxCounter    int64
-	SwitchErrorsLocalTx           int64
-	SwitchDiscardsUplinkRxCounter int64
-	SwitchDiscardsUplinkRx        int64
-	SwitchDiscardsUplinkTxCounter int64
-	SwitchDiscardsUplinkTx        int64
-	SwitchDiscardsLocalRxCounter  int64
-	SwitchDiscardsLocalRx         int64
-	SwitchDiscardsLocalTxCounter  int64
-	SwitchDiscardsLocalTx         int64
+	SwitchOctetsUplinkRxCounter    int64
+	SwitchOctetsUplinkRx           int64
+	SwitchOctetsUplinkTxCounter    int64
+	SwitchOctetsUplinkTx           int64
+	SwitchOctetsLocalRxCounter     int64
+	SwitchOctetsLocalRx            int64
+	SwitchOctetsLocalTxCounter     int64
+	SwitchOctetsLocalTx            int64
+	SwitchUnicastUplinkRxCounter   int64
+	SwitchUnicastUplinkRx          int64
+	SwitchUnicastUplinkTxCounter   int64
+	SwitchUnicastUplinkTx          int64
+	SwitchUnicastLocalRxCounter    int64
+	SwitchUnicastLocalRx           int64
+	SwitchUnicastLocalTxCounter    int64
+	SwitchUnicastLocalTx           int64
+	SwitchBroadcastUplinkRxCounter int64
+	SwitchBroadcastUplinkRx        int64
+	SwitchBroadcastUplinkTxCounter int64
+	SwitchBroadcastUplinkTx        int64
+	SwitchBroadcastLocalRxCounter  int64
+	SwitchBroadcastLocalRx         int64
+	SwitchBroadcastLocalTxCounter  int64
+	SwitchBroadcastLocalTx         int64
+	SwitchErrorsUplinkRxCounter    int64
+	SwitchErrorsUplinkRx           int64
+	SwitchErrorsUplinkTxCounter    int64
+	SwitchErrorsUplinkTx           int64
+	SwitchErrorsLocalRxCounter     int64
+	SwitchErrorsLocalRx            int64
+	SwitchErrorsLocalTxCounter     int64
+	SwitchErrorsLocalTx            int64
+	SwitchDiscardsUplinkRxCounter  int64
+	SwitchDiscardsUplinkRx         int64
+	SwitchDiscardsUplinkTxCounter  int64
+	SwitchDiscardsUplinkTx         int64
+	SwitchDiscardsLocalRxCounter   int64
+	SwitchDiscardsLocalRx          int64
+	SwitchDiscardsLocalTxCounter   int64
+	SwitchDiscardsLocalTx          int64
 }
 
 // RawData wraps a slice of SwitchStats objects.
