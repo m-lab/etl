@@ -21,7 +21,7 @@ import (
 
 var (
 	machineNameRegex = regexp.MustCompile(`mlab[0-9]`)
-	siteNameRegex    = regexp.MustCompile("s1-([a-z]{3}[0-9t]{2})")
+	siteNameRegex    = regexp.MustCompile(`s1[\-\.]([a-z]{3}[0-9t]{2})`)
 )
 
 //=====================================================================================
