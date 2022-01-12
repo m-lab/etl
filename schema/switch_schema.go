@@ -1,12 +1,13 @@
 package schema
 
 import (
+	"time"
+
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
-
-	"time"
 )
 
 // SwitchRow represents a single row of Switch data, taken from the raw DISCO
@@ -16,8 +17,8 @@ type SwitchRow struct {
 	ID string `bigquery:"id"`
 	// Parser contains metadata about the parsing of this row.
 	Parser ParseInfo `bigquery:"parser"`
-	// Date is the collection timestamp of the samples.
-	Date time.Time `bigquery:"date"`
+	// Date is the archive's creation date.
+	Date civil.Date `bigquery:"date"`
 	// A is the SwitchSummary containing the parsed metrics.
 	A *SwitchSummary `bigquery:"a"`
 	// Raw is the raw data from the DISCO export file.
@@ -29,11 +30,14 @@ type SwitchRow struct {
 
 // SwitchSummary contains the parsed metrics, plus the machine/switch pair.
 type SwitchSummary struct {
-	// Machine is the hostname of the machine that collected the metrics.
+	// Machine is the short name of the machine that collected the metrics.
 	Machine string
 
-	// Switch is the switch's hostname.
-	Switch string
+	// Site is the M-Lab site name.
+	Site string
+
+	// CollectionTime is the time the metrics were collected.
+	CollectionTime time.Time
 
 	// The following fields are parsed from the raw data.
 	// Note: Counters are only available in DISCOv2 data. For DISCOv1, only

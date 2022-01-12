@@ -3,13 +3,14 @@ package parser
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 	"github.com/iancoleman/strcase"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
@@ -18,7 +19,10 @@ import (
 	"github.com/m-lab/etl/schema"
 )
 
-var InvalidMetricName = errors.New("invalid metric name")
+var (
+	machineNameRegex = regexp.MustCompile(`mlab[0-9]`)
+	siteNameRegex    = regexp.MustCompile("s1-([a-z]{3}[0-9t]{2})")
+)
 
 //=====================================================================================
 //                       Switch Datatype Parser
@@ -115,9 +119,19 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 			var row *schema.SwitchRow
 			var ok bool
 			if row, ok = timestampToRow[sample.Timestamp]; !ok {
+				// Extract machine name and site name.
+				machine := machineNameRegex.FindString(tmp.Hostname)
+				siteMatches := siteNameRegex.FindStringSubmatch(tmp.Experiment)
+				if machine == "" || len(siteMatches) < 2 {
+					fmt.Printf("Wrong machine or site name: %s %s\n", tmp.Hostname, tmp.Experiment)
+					continue
+				}
+				site := siteMatches[1]
+
+				// Create the row.
 				row = &schema.SwitchRow{
 					ID:   fmt.Sprintf("%s%d", tmp.Hostname, sample.Timestamp),
-					Date: time.Unix(sample.Timestamp, 0),
+					Date: fileMetadata["date"].(civil.Date),
 					Parser: schema.ParseInfo{
 						Version:    Version(),
 						Time:       time.Now(),
@@ -126,8 +140,9 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 						GitCommit:  GitCommit(),
 					},
 					A: &schema.SwitchSummary{
-						Machine: tmp.Hostname,
-						Switch:  tmp.Experiment,
+						Machine:        machine,
+						Site:           site,
+						CollectionTime: time.Unix(sample.Timestamp, 0),
 					},
 					Raw: &schema.RawData{
 						Metrics: []*schema.SwitchStats{},
