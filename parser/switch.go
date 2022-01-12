@@ -113,7 +113,8 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 			}
 		}
 
-		// Iterate over the samples in the JSON.
+		// Iterate over the samples in the JSON. Keep together metrics
+		// with the same timestamp in a single SwitchRow.
 		for _, sample := range tmp.Sample {
 			// If a row for this timestamp does not exist already, create one.
 			var row *schema.SwitchRow
@@ -165,6 +166,8 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 		}
 	}
 
+	// Write all the rows created so far, i.e. all the rows containing the
+	// samples in the current archive.
 	for _, row := range timestampToRow {
 		rowCount++
 
