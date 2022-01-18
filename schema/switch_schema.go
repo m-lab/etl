@@ -28,6 +28,19 @@ type SwitchRow struct {
 	row.NullAnnotator `bigquery:"-"`
 }
 
+// Size returns the number of bytes in the SwitchRow object using
+// BigQuery's datatypes.
+func (row *SwitchRow) Size() int {
+	return 2 + len(row.ID) +
+		2 + len(row.Parser.Version) +
+		2 + len(row.Parser.ArchiveURL) +
+		2 + len(row.Parser.Filename) +
+		2 + len(row.Parser.GitCommit) +
+		8 + 8 +
+		row.A.Size() +
+		row.Raw.Size()
+}
+
 // SwitchSummary contains the parsed metrics, plus the machine/switch pair.
 type SwitchSummary struct {
 	// Machine is the short name of the machine that collected the metrics.
@@ -84,12 +97,23 @@ type SwitchSummary struct {
 	SwitchDiscardsLocalTx          int64
 }
 
+// Size returns the number of bytes in the SwitchSummary object using
+// BigQuery's datatypes.
+func (summary *SwitchSummary) Size() int {
+	// STRING is 2 bytes + len(string).
+	// TIMESTAMP is 8 bytes.
+	// INT64 is 8 bytes.
+	// 40 metrics * 8 bytes = 320 bytes.
+	return (2 + len(summary.Machine) +
+		2 + len(summary.Site) + 8 + 320)
+}
+
 // RawData wraps a slice of SwitchStats objects.
 type RawData struct {
 	Metrics []*SwitchStats
 }
 
-// Estimate the size of the RawData BQ row in bytes.
+// Estimate the size of the RawData object in bytes using BigQuery's datatypes.
 // Note: This assumes all the SwitchStats objects in the RawData have the
 // same number of samples. This is generally true within a single DISCO file.
 func (r *RawData) Size() int {
@@ -139,6 +163,15 @@ type Sample struct {
 	Counter   int64   `json:"counter" bigquery:"counter"`
 }
 
+// Size returns the number of bytes in the Sample object using BigQuery's
+// datatypes.
+func (s *Sample) Size() int {
+	// TIMESTAMP is 8 bytes.
+	// FLOAT64 is 8 bytes.
+	// INT64 is 8 bytes.
+	return (8 + 8 + 8)
+}
+
 // SwitchStats represents a row of data taken from the raw DISCO export file.
 type SwitchStats struct {
 	Metric     string   `json:"metric" bigquery:"metric"`
@@ -147,8 +180,18 @@ type SwitchStats struct {
 	Sample     []Sample `json:"sample" bigquery:"sample"`
 }
 
-// Size estimates the number of bytes in the SwitchStats object.
+// Size estimates the number of bytes in the SwitchStats object using
+// BigQuery's datatypes.
 func (row *SwitchStats) Size() int {
-	return (24*len(row.Sample) + len(row.Metric) + len(row.Hostname) +
-		len(row.Experiment))
+	// STRING is 2 bytes + len(string).
+	var sampleSize int
+	if len(row.Sample) == 0 {
+		sampleSize = 0
+	} else {
+		sampleSize = row.Sample[0].Size() * len(row.Sample)
+	}
+	return 2 + len(row.Metric) +
+		2 + len(row.Hostname) +
+		2 + len(row.Experiment) +
+		sampleSize
 }

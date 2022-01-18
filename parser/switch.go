@@ -175,9 +175,8 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 		metrics.DeltaNumFieldsHistogram.WithLabelValues(
 			p.TableName()).Observe(float64(len(row.Raw.Metrics)))
 
-		// TODO: estimate row size.
-		// metrics.RowSizeHistogram.WithLabelValues(
-		// 	p.TableName()).Observe(float64(row.Size()))
+		metrics.RowSizeHistogram.WithLabelValues(
+			p.TableName()).Observe(float64(row.Size()))
 
 		// Insert the row.
 		err := p.Base.Put(row)
