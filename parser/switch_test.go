@@ -69,7 +69,4 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 		t.Fatal("Expected 390 accepted rows, got", n.Accepted())
 	}
 	n.Flush()
-
-	//row := sink.data[0].(*schema.SwitchRow)
-
 }
