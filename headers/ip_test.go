@@ -5,16 +5,16 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net"
 	"os"
 	"path"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
+
+	nano "github.com/m-lab/etl/internal/nano"
 
 	"github.com/m-lab/etl/headers"
 )
@@ -23,6 +23,12 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+//lint:ignore U1000 unused
+func assertV6isIP(ip *headers.IPv6Header) {
+	func(headers.IP) {}(ip)
+}
+
+//lint:ignore U1000 unused
 func assertV4isIP(ip *headers.IPv4Header) {
 	func(headers.IP) {}(ip)
 }
@@ -51,30 +57,6 @@ func getTestfile(t *testing.T, name string) []byte {
 	return data
 }
 
-// SlowGetIP decodes the IP layers and returns some basic information.
-// It is a bit slow and does memory allocation.
-func SlowGetIP(p *headers.Packet) (net.IP, net.IP, uint8, uint16, error) {
-	// Decode a packet.
-	pkt := gopacket.NewPacket(p.RawForTest(), layers.LayerTypeEthernet, gopacket.DecodeOptions{
-		Lazy:                     true,
-		NoCopy:                   true,
-		SkipDecodeRecovery:       true,
-		DecodeStreamsAsDatagrams: false,
-	})
-
-	if ipLayer := pkt.Layer(layers.LayerTypeIPv4); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv4)
-		// For IPv4, the TTL length is the ip.Length adjusted for the header length.
-		return ip.SrcIP, ip.DstIP, ip.TTL, ip.Length - uint16(4*ip.IHL), nil
-	} else if ipLayer := pkt.Layer(layers.LayerTypeIPv6); ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv6)
-		// In IPv6, the Length field is the payload length.
-		return ip.SrcIP, ip.DstIP, ip.HopLimit, ip.Length, nil
-	} else {
-		return nil, nil, 0, 0, headers.ErrNoIPLayer
-	}
-}
-
 func ProcessPackets(data []byte) (int, error) {
 	pcap, err := pcapgo.NewReader(bytes.NewReader(data))
 	if err != nil {
@@ -83,8 +65,8 @@ func ProcessPackets(data []byte) (int, error) {
 
 	p := headers.Packet{}
 	count := 0
-	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
-		err := p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), data)
+	for data, ci, err := pcap.ZeroCopyReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
+		err := p.Overlay(nano.UnixNano(ci.Timestamp.UnixNano()), data)
 		if err != nil {
 			return count, err
 		}
@@ -103,8 +85,8 @@ func ProcessShortPackets(t *testing.T, data []byte) {
 	p := headers.Packet{}
 	for data, ci, err := pcap.ReadPacketData(); err == nil; data, ci, err = pcap.ZeroCopyReadPacketData() {
 		for i := 0; i < len(data); i++ {
-			p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), data[:i])
-			p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), data[i:])
+			p.Overlay(nano.UnixNano(ci.Timestamp.UnixNano()), data[:i])
+			p.Overlay(nano.UnixNano(ci.Timestamp.UnixNano()), data[i:])
 		}
 	}
 }
@@ -115,10 +97,9 @@ func TestShortData(t *testing.T) {
 		fn               string
 		packets          int64
 		duration         time.Duration
-		srcIP, dstIP     string
+		srcIP            string
 		srcPort, dstPort layers.TCPPort
 		TTL              uint8
-		totalPayload     int
 	}
 	tests := []test{
 		{name: "retransmits", fn: "ndt-nnwk2_1611335823_00000000000C2DFE.pcap.gz",

@@ -20,10 +20,12 @@ import (
 	"github.com/google/gopacket/pcapgo"
 
 	"github.com/m-lab/annotation-service/site"
-	"github.com/m-lab/etl/headers"
-	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/logx"
 	"github.com/m-lab/uuid-annotator/annotator"
+
+	"github.com/m-lab/etl/headers"
+	nano "github.com/m-lab/etl/internal/nano"
+	"github.com/m-lab/etl/metrics"
 )
 
 var (
@@ -43,8 +45,8 @@ type Summary struct {
 
 	HopLimit  uint8
 	Packets   int
-	StartTime headers.UnixNano
-	LastTime  headers.UnixNano
+	StartTime nano.UnixNano
+	LastTime  nano.UnixNano
 
 	Left, Right Stats
 
@@ -131,7 +133,7 @@ func ProcessPackets(archive, fn string, data []byte) (Summary, error) {
 	p := headers.Packet{}
 	for pData, ci, pktErr := pcap.ReadPacketData(); pktErr == nil; pData, ci, pktErr = pcap.ZeroCopyReadPacketData() {
 		// Pass ci by pointer, but Wrap will make a copy, since gopacket NoCopy doesn't preserve the values.
-		overlayErr := p.Overlay(headers.UnixNano(ci.Timestamp.UnixNano()), pData)
+		overlayErr := p.Overlay(nano.UnixNano(ci.Timestamp.UnixNano()), pData)
 		if overlayErr != nil {
 			sparse1.Println(archive, fn, overlayErr, pData)
 			continue

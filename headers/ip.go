@@ -12,75 +12,22 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/go/logx"
+
+	be "github.com/m-lab/etl/internal/bigendian"
+	nano "github.com/m-lab/etl/internal/nano"
+	"github.com/m-lab/etl/metrics"
 )
 
 var (
-	info         = log.New(os.Stdout, "info: ", log.LstdFlags|log.Lshortfile)
 	sparseLogger = log.New(os.Stdout, "sparse: ", log.LstdFlags|log.Lshortfile)
 	sparse1      = logx.NewLogEvery(sparseLogger, 1000*time.Millisecond)
 
-	ErrTruncatedPcap = fmt.Errorf("Truncated PCAP file")
-
-	ErrUnknownEtherType        = fmt.Errorf("unknown Ethernet type")
-	ErrTruncatedEthernetHeader = fmt.Errorf("truncated Ethernet header")
+	ErrTruncatedPcap = fmt.Errorf("truncated PCAP file")
 
 	ErrNoIPLayer         = fmt.Errorf("no IP layer")
 	ErrTruncatedIPHeader = fmt.Errorf("truncated IP header")
 )
-
-//=============================================================================
-
-// UnixNano is a Unix timestamp in nanoseconds.
-// It provided more efficient basic time operations.
-type UnixNano int64
-
-// Sub returns the difference between two unix times.
-func (t UnixNano) Sub(other UnixNano) time.Duration {
-	return time.Duration(t - other)
-}
-
-//=============================================================================
-
-// These provide byte swapping from BigEndian to LittleEndian.
-// Much much faster than binary.BigEndian.UintNN.
-// NOTE: If this code is used on a BigEndian machine, the unit tests will fail.
-
-// BE16 is a 16-bit big-endian value.
-type BE16 [2]byte
-
-// Uint16 returns the 16-bit value in LitteEndian.
-func (b BE16) Uint16() uint16 {
-	swap := [2]byte{b[1], b[0]}
-	return *(*uint16)(unsafe.Pointer(&swap))
-}
-
-// BE32 is a 32-bit big-endian value.
-type BE32 [4]byte
-
-// Uint32 returns the 32-bit value in LitteEndian.
-func (b BE32) Uint32() uint32 {
-	swap := [4]byte{b[3], b[2], b[1], b[0]}
-	return *(*uint32)(unsafe.Pointer(&swap))
-}
-
-/*******************************************************************************
-	 						Ethernet Header handling
-*******************************************************************************/
-
-// EthernetHeader struct for the Ethernet Header, in wire format.
-type EthernetHeader struct {
-	SrcMAC, DstMAC [6]byte
-	etherType      BE16 // BigEndian
-}
-
-// EtherType returns the EtherType field of the packet.
-func (e *EthernetHeader) EtherType() layers.EthernetType {
-	return layers.EthernetType(e.etherType.Uint16())
-}
-
-var EthernetHeaderSize = int(unsafe.Sizeof(EthernetHeader{}))
 
 /******************************************************************************
  * 								IP Header handling
@@ -103,14 +50,14 @@ type IP interface {
 type IPv4Header struct {
 	versionIHL    uint8             // Version (4 bits) + Internet header length (4 bits)
 	typeOfService uint8             // Type of service
-	length        BE16              // Total length
-	id            BE16              // Identification
-	flagsFragOff  BE16              // Flags (3 bits) + Fragment offset (13 bits)
+	length        be.BE16           // Total length
+	id            be.BE16           // Identification
+	flagsFragOff  be.BE16           // Flags (3 bits) + Fragment offset (13 bits)
 	hopLimit      uint8             // Time to live
 	protocol      layers.IPProtocol // Protocol of next following bytes, after the options
-	checksum      BE16              // Header checksum
-	srcIP         BE32              // Source address
-	dstIP         BE32              // Destination address
+	checksum      be.BE16           // Header checksum
+	srcIP         be.BE32           // Source address
+	dstIP         be.BE32           // Destination address
 }
 
 var IPv4HeaderSize = int(unsafe.Sizeof(IPv4Header{}))
@@ -175,8 +122,8 @@ type EHWrapper struct {
 
 // IPv6Header struct for IPv6 header
 type IPv6Header struct {
-	versionTrafficClassFlowLabel BE32              // Version (4 bits) + Traffic class (8 bits) + Flow label (20 bits)
-	payloadLength                BE16              // Original payload length, NOT the payload size of the captured packet.
+	versionTrafficClassFlowLabel be.BE32           // Version (4 bits) + Traffic class (8 bits) + Flow label (20 bits)
+	payloadLength                be.BE16           // Original payload length, NOT the payload size of the captured packet.
 	nextHeader                   layers.IPProtocol // Protocol of next layer/header
 	hopLimit                     uint8             // Hop limit
 	srcIP                        [16]byte
@@ -244,10 +191,6 @@ func (h *IPv6Header) HeaderLength() int {
 	return IPv4HeaderSize
 }
 
-func assertV6IP(ip *IPv6Header) {
-	func(IP) {}(ip)
-}
-
 type IPv6Wrapper struct {
 	*IPv6Header
 	ext          []EHWrapper
@@ -311,7 +254,7 @@ func (w *IPv6Wrapper) handleExtensionHeaders(rawWire []byte) error {
 // Since it is intended primary to access IP and TCP, those interfaces
 // are exposes as embedded fields.
 type Packet struct {
-	PktTime UnixNano
+	PktTime nano.UnixNano
 	eth     *EthernetHeader // Pointer to the Ethernet header, if available.
 	IP                      // Access to the IP header, if available.
 	v4      *IPv4Header     // DO NOT USE.  Use ip field instead.
@@ -325,9 +268,9 @@ func (p *Packet) RawForTest() []byte {
 	return p.sharedBacking
 }
 
-// Overlay updates THIS packet object to overlay the underlying packet data,
+// Overlay updates THIS Packet object to overlay the underlying packet data,
 // passed in wire format.  It avoids copying and allocation as much as possible.
-func (p *Packet) Overlay(pTime UnixNano, wire []byte) (err error) {
+func (p *Packet) Overlay(pTime nano.UnixNano, wire []byte) (err error) {
 
 	if len(wire) < EthernetHeaderSize {
 		metrics.ErrorCount.WithLabelValues("pcap", "ethernet", "truncated_header").Inc()
