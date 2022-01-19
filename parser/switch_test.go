@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"path"
 	"sort"
-	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -129,9 +128,9 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	}
 	// Check that the ID has the right prefix. Since the order of the rows
 	// isn't predictable, we can't verify the timestamp.
-	if !strings.HasPrefix(firstRow.ID, "mlab3-svg01-") {
-		t.Errorf("Expected row ID to start with %s, got %s",
-			"mlab3-svg01-", firstRow.ID)
+	if firstRow.ID == "mlab3-svg01-1463072400" {
+		t.Errorf("Expected row ID to be %s, got %s",
+			"mlab3-svg01-1463072400", firstRow.ID)
 	}
 	// Check that there are 24 metrics in the row's raw.metrics field.
 	if len(firstRow.Raw.Metrics) != 24 {
