@@ -131,7 +131,7 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 
 				// Create the row.
 				row = &schema.SwitchRow{
-					ID:   fmt.Sprintf("%s%d", tmp.Hostname, sample.Timestamp),
+					ID:   fmt.Sprintf("%s-%s-%d", machine, site, sample.Timestamp),
 					Date: fileMetadata["date"].(civil.Date),
 					Parser: schema.ParseInfo{
 						Version:    Version(),
@@ -200,13 +200,13 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 // fields in the SwitchRow.
 func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.SwitchRow) {
 	// Convert the metric name to its corresponding CamelCase field name.
-	val := strcase.ToCamel(metric)
-	counter := val + "Counter"
+	delta := strcase.ToCamel(metric)
+	counter := delta + "Counter"
 
 	// Use the "reflect" package to dinamically access the fields of the
 	// summary struct.
 	v := reflect.ValueOf(row.A).Elem()
-	valField := v.FieldByName(val)
+	valField := v.FieldByName(delta)
 	counterField := v.FieldByName(counter)
 	if !valField.IsValid() || !counterField.IsValid() {
 		return
