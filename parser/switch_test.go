@@ -62,7 +62,7 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	}
 	// Check that there are 16 metrics in the row's raw.metrics field.
 	if len(firstRow.Raw.Metrics) != 16 {
-		t.Errorf("Expected 30 metrics, got %d", len(firstRow.Raw.Metrics))
+		t.Errorf("Expected 16 metrics, got %d", len(firstRow.Raw.Metrics))
 	}
 	// Check that local octets are correctly set to zero for this archive.
 	if firstRow.A.SwitchOctetsLocalRx != 0 ||
@@ -120,7 +120,8 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	if len(firstRow.Raw.Metrics) != 24 {
 		t.Errorf("Expected 24 metrics, got %d", len(firstRow.Raw.Metrics))
 	}
-	// Check that local octets are non-zero for this archive.
+	// Check that local octets are non-zero for this archive. DISCOv1 did not
+	// include counters.
 	if firstRow.A.SwitchOctetsLocalRx == 0 ||
 		firstRow.A.SwitchOctetsLocalTx == 0 {
 		t.Errorf("Expected local octets to be non-zero, got %d %d",
