@@ -203,7 +203,7 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 	delta := strcase.ToCamel(metric)
 	counter := delta + "Counter"
 
-	// Use the "reflect" package to dinamically access the fields of the
+	// Use the "reflect" package to dynamically access the fields of the
 	// summary struct.
 	v := reflect.ValueOf(row.A).Elem()
 	valField := v.FieldByName(delta)
