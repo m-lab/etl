@@ -215,9 +215,9 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 	// Use the "reflect" package to dynamically access the fields of the
 	// summary struct.
 	v := reflect.ValueOf(row.A).Elem()
-	valField := v.FieldByName(delta)
+	deltaField := v.FieldByName(delta)
 	counterField := v.FieldByName(counter)
-	if !valField.IsValid() || !counterField.IsValid() {
+	if !deltaField.IsValid() || !counterField.IsValid() {
 		return
 	}
 
@@ -229,7 +229,7 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 		metric == "switch.octets.local.rx") &&
 		archiveDate.After(discoV2DeploymentDate) &&
 		archiveDate.Before(discoV2FixDate) {
-		valField.SetInt(0)
+		deltaField.SetInt(0)
 		counterField.SetInt(0)
 		return
 	}
@@ -237,7 +237,7 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 	// In DISCOv1 archives, the Value and Counter fields are floats.
 	// schema.Sample and schema.Counter are floats to accommodate for those,
 	// but we want the stored values to be truncated to int.
-	valField.SetInt(int64(sample.Value))
+	deltaField.SetInt(int64(sample.Value))
 	counterField.SetInt(sample.Counter)
 }
 
