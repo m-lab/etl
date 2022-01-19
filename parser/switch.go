@@ -22,6 +22,10 @@ import (
 var (
 	machineNameRegex = regexp.MustCompile(`mlab[0-9]`)
 	siteNameRegex    = regexp.MustCompile(`s1[\-\.]([a-z]{3}[0-9t]{2})`)
+	// discoV2DeploymentDate is the date when DISCOv2 was released
+	discoV2DeploymentDate = civil.DateOf(time.Date(2020, time.September, 9, 0, 0, 0, 0, time.UTC))
+	// discoV2FixDate is the date when octets.local.rx/tx were fixed.
+	discoV2FixDate = civil.DateOf(time.Date(2022, time.January, 19, 0, 0, 0, 0, time.UTC))
 )
 
 //=====================================================================================
@@ -76,10 +80,14 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 	// different timestamps. This map groups samples in rows by timestamp.
 	timestampToRow := make(map[int64]*schema.SwitchRow)
 
+	// The archive date is the date when the archive was created. Used to fix
+	// DISCOv2 octets.local.tx/rx values.
+	archiveDate := fileMetadata["date"].(civil.Date)
+
 	for dec.More() {
 		// Unmarshal the raw JSON into a SwitchStats.
 		// This can hold both DISCOv1 and DISCOv2 data.
-		tmp := &schema.SwitchStats{}
+		tmp := &schema.RawSwitchStats{}
 		err := dec.Decode(tmp)
 		if err != nil {
 			metrics.TestCount.WithLabelValues(
@@ -132,7 +140,7 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 				// Create the row.
 				row = &schema.SwitchRow{
 					ID:   fmt.Sprintf("%s-%s-%d", machine, site, sample.Timestamp),
-					Date: fileMetadata["date"].(civil.Date),
+					Date: archiveDate,
 					Parser: schema.ParseInfo{
 						Version:    Version(),
 						Time:       time.Now(),
@@ -146,7 +154,7 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 						CollectionTime: time.Unix(sample.Timestamp, 0),
 					},
 					Raw: &schema.RawData{
-						Metrics: []*schema.SwitchStats{},
+						Metrics: []*schema.RawSwitchStats{},
 					},
 				}
 				timestampToRow[sample.Timestamp] = row
@@ -154,7 +162,7 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 
 			// Create a Model containing only this sample and append it to
 			// the current SwitchRow's Raw.Metrics field.
-			model := &schema.SwitchStats{
+			model := &schema.RawSwitchStats{
 				Experiment: tmp.Experiment,
 				Hostname:   tmp.Hostname,
 				Metric:     tmp.Metric,
@@ -162,7 +170,7 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 			}
 			row.Raw.Metrics = append(row.Raw.Metrics, model)
 			// Read the sample to extract the summary.
-			getSummaryFromSample(tmp.Metric, &sample, row)
+			getSummaryFromSample(tmp.Metric, &sample, row, archiveDate)
 		}
 	}
 
@@ -198,7 +206,8 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 
 // getSummaryFromSample reads the raw Sample and fills the corresponding
 // fields in the SwitchRow.
-func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.SwitchRow) {
+func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.SwitchRow,
+	archiveDate civil.Date) {
 	// Convert the metric name to its corresponding CamelCase field name.
 	delta := strcase.ToCamel(metric)
 	counter := delta + "Counter"
@@ -214,9 +223,12 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 
 	// Set the fields' values from the sample.
 	// Note: the octets.local.tx/rx values were not collected correctly
-	// by DISCOv2, so we set them to zero until we can fix that.
-	if metric == "switch.octets.local.tx" ||
-		metric == "switch.octets.local.rx" {
+	// by DISCOv2 for a few months, so we set them to zero until we can fix
+	// that. Data collected before/after those months is valid.
+	if (metric == "switch.octets.local.tx" ||
+		metric == "switch.octets.local.rx") &&
+		archiveDate.After(discoV2DeploymentDate) &&
+		archiveDate.Before(discoV2FixDate) {
 		valField.SetInt(0)
 		counterField.SetInt(0)
 		return

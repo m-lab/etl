@@ -110,7 +110,7 @@ func (summary *SwitchSummary) Size() int {
 
 // RawData wraps a slice of SwitchStats objects.
 type RawData struct {
-	Metrics []*SwitchStats
+	Metrics []*RawSwitchStats
 }
 
 // Estimate the size of the RawData object in bytes using BigQuery's datatypes.
@@ -152,7 +152,7 @@ func (row *SwitchRow) Schema() (bigquery.Schema, error) {
 
 // Sample is an individual measurement taken by DISCO.
 // NOTE: the types of the fields in this struct differ from the types used
-// natively by the structs in DISCOv2. In DiSCOv2 Value is a uint64, but must
+// natively by the structs in DISCOv2. In DISCOv2 Value is a uint64, but must
 // be a float here because DISCOv1 outputs floats. float64 should be able to
 // accommodate both types of input values safely. For Counter, DISCOv2 uses a
 // uint64, but BigQuery does not support the notion of unsigned integers, so we
@@ -172,8 +172,8 @@ func (s *Sample) Size() int {
 	return (8 + 8 + 8)
 }
 
-// SwitchStats represents a row of data taken from the raw DISCO export file.
-type SwitchStats struct {
+// RawSwitchStats represents a row of data taken from the raw DISCO export file.
+type RawSwitchStats struct {
 	Metric     string   `json:"metric" bigquery:"metric"`
 	Hostname   string   `json:"hostname" bigquery:"hostname"`
 	Experiment string   `json:"experiment" bigquery:"experiment"`
@@ -182,7 +182,7 @@ type SwitchStats struct {
 
 // Size estimates the number of bytes in the SwitchStats object using
 // BigQuery's datatypes.
-func (row *SwitchStats) Size() int {
+func (row *RawSwitchStats) Size() int {
 	// STRING is 2 bytes + len(string).
 	var sampleSize int
 	if len(row.Sample) == 0 {
