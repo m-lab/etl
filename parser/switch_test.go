@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"io/ioutil"
 	"path"
+	"sort"
 	"strings"
 	"testing"
 
@@ -47,18 +48,20 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	}
 	n.Flush()
 
-	// Verify that the data was parsed correctly.
+	// Verify that the data was parsed correctly after sorting the output.
+	sort.Slice(sink.data, func(i, j int) bool {
+		return sink.data[i].(*schema.SwitchRow).ID < sink.data[j].(*schema.SwitchRow).ID
+	})
 	firstRow := sink.data[0].(*schema.SwitchRow)
 	expected := civil.Date{Year: 2021, Month: 12, Day: 14}
 	if firstRow.Date != expected {
 		t.Errorf("Expected row to have date %v, got %v", expected,
 			firstRow.Date)
 	}
-	// Check that the ID has the right prefix. Since the order of the rows
-	// isn't predictable, we can't verify the timestamp.
-	if !strings.HasPrefix(firstRow.ID, "mlab2-dfw07-") {
-		t.Errorf("Expected row ID to start with %s, got %s",
-			"mlab2-dfw07-", firstRow.ID)
+	// Check that the ID is the one we expect
+	if firstRow.ID != "mlab2-dfw07-1639449420" {
+		t.Errorf("Expected row ID to be %s, got %s",
+			"mlab2-dfw07-1639449420", firstRow.ID)
 	}
 	// Check that there are 16 metrics in the row's raw.metrics field.
 	if len(firstRow.Raw.Metrics) != 16 {
@@ -70,6 +73,17 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 		firstRow.A.SwitchOctetsLocalTx != 0 ||
 		firstRow.A.SwitchOctetsLocalTxCounter != 0 {
 		t.Errorf("Expected local octets to be zero, got %v", firstRow.A)
+	}
+	// Check that the switch discards are correctly set in the summary.
+	if firstRow.A.SwitchDiscardsLocalRx != 1 ||
+		firstRow.A.SwitchDiscardsLocalRxCounter != 2 ||
+		firstRow.A.SwitchDiscardsLocalTx != 1 ||
+		firstRow.A.SwitchDiscardsLocalTxCounter != 2 ||
+		firstRow.A.SwitchDiscardsUplinkRx != 1 ||
+		firstRow.A.SwitchDiscardsUplinkRxCounter != 2 ||
+		firstRow.A.SwitchDiscardsUplinkTx != 1 ||
+		firstRow.A.SwitchDiscardsUplinkTxCounter != 2 {
+		t.Errorf("Wrong switch discards in DISCOv2 row, got %v", firstRow.A)
 	}
 
 	// Test DISCOv1 format.
@@ -103,7 +117,10 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	}
 	n.Flush()
 
-	// Verify that the data was parsed correctly.
+	// Verify that the data was parsed correctly after sorting the output.
+	sort.Slice(sink.data, func(i, j int) bool {
+		return sink.data[i].(*schema.SwitchRow).ID < sink.data[j].(*schema.SwitchRow).ID
+	})
 	firstRow = sink.data[0].(*schema.SwitchRow)
 	expected = civil.Date{Year: 2016, Month: 05, Day: 12}
 	if firstRow.Date != expected {
@@ -126,5 +143,13 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 		firstRow.A.SwitchOctetsLocalTx == 0 {
 		t.Errorf("Expected local octets to be non-zero, got %d %d",
 			firstRow.A.SwitchOctetsLocalRx, firstRow.A.SwitchOctetsLocalTx)
+	}
+	// Check that the switch discards are correctly set in the summary.
+	// Note: DISCOv1 did not include counters.
+	if firstRow.A.SwitchDiscardsLocalRx != 1 ||
+		firstRow.A.SwitchDiscardsLocalTx != 1 ||
+		firstRow.A.SwitchDiscardsUplinkRx != 1 ||
+		firstRow.A.SwitchDiscardsUplinkTx != 1 {
+		t.Errorf("Wrong switch discards in DISCOv1 row, got %v", firstRow.A)
 	}
 }
