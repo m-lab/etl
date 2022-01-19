@@ -204,8 +204,7 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 	counter := val + "Counter"
 
 	// Use the "reflect" package to dinamically access the fields of the
-	// summary struct. This is a bit hacky, but it works better than a lengthy
-	// switch statement.
+	// summary struct.
 	v := reflect.ValueOf(row.A).Elem()
 	valField := v.FieldByName(val)
 	counterField := v.FieldByName(counter)
@@ -223,6 +222,9 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 		return
 	}
 
+	// In DISCOv1 archives, the Value and Counter fields are floats.
+	// schema.Sample and schema.Counter are floats to accommodate for those,
+	// but we want the stored values to be truncated to int.
 	valField.SetInt(int64(sample.Value))
 	counterField.SetInt(sample.Counter)
 }
