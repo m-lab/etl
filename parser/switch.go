@@ -236,7 +236,8 @@ func getSummaryFromSample(metric string, sample *schema.Sample, row *schema.Swit
 
 	// In DISCOv1 archives, the Value and Counter fields are floats.
 	// schema.Sample and schema.Counter are floats to accommodate for those,
-	// but we want the stored values to be truncated to int.
+	// but we want the stored values to be truncated to int. This involves
+	// potential loss of information, even if the values and counter are bytes.
 	deltaField.SetInt(int64(sample.Value))
 	counterField.SetInt(sample.Counter)
 }
