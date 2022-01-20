@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -174,9 +175,20 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 		}
 	}
 
+	// Sort the rows by timestamp. This is necessary because the rows are
+	// added to a map, whose order would be randomized otherwise.
+	timestamps := make([]int64, 0, len(timestampToRow))
+	for k := range timestampToRow {
+		timestamps = append(timestamps, k)
+	}
+	sort.Slice(timestamps, func(i, j int) bool {
+		return timestamps[i] < timestamps[j]
+	})
+
 	// Write all the rows created so far, i.e. all the rows containing the
 	// samples in the current archive.
-	for _, row := range timestampToRow {
+	for _, ts := range timestamps {
+		row := timestampToRow[ts]
 		rowCount++
 
 		// Count the number of samples per record.

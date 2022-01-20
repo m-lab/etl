@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"io/ioutil"
 	"path"
-	"sort"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -47,10 +46,7 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	}
 	n.Flush()
 
-	// Verify that the data was parsed correctly after sorting the output.
-	sort.Slice(sink.data, func(i, j int) bool {
-		return sink.data[i].(*schema.SwitchRow).ID < sink.data[j].(*schema.SwitchRow).ID
-	})
+	// Verify that the data was parsed correctly.
 	firstRow := sink.data[0].(*schema.SwitchRow)
 	expected := civil.Date{Year: 2021, Month: 12, Day: 14}
 	if firstRow.Date != expected {
@@ -116,10 +112,7 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	}
 	n.Flush()
 
-	// Verify that the data was parsed correctly after sorting the output.
-	sort.Slice(sink.data, func(i, j int) bool {
-		return sink.data[i].(*schema.SwitchRow).ID < sink.data[j].(*schema.SwitchRow).ID
-	})
+	// Verify that the data was parsed correctly.
 	firstRow = sink.data[0].(*schema.SwitchRow)
 	expected = civil.Date{Year: 2016, Month: 05, Day: 12}
 	if firstRow.Date != expected {
