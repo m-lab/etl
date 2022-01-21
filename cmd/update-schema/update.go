@@ -100,11 +100,11 @@ func CreateOrUpdateAnnotationRow(project string, dataset string, table string) e
 	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
-func CreateOrUpdateSwitchStats(project string, dataset string, table string) error {
-	row := schema.SwitchStats{}
+func CreateOrUpdateSwitchRow(project string, dataset string, table string) error {
+	row := schema.SwitchRow{}
 	schema, err := row.Schema()
-	rtx.Must(err, "SwitchStats.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "")
+	rtx.Must(err, "SwitchRow.Schema")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
 func CreateOrUpdatePCAPRow(project string, dataset string, table string) error {
@@ -269,6 +269,13 @@ func updateStandardTables(project string) int {
 		errCount++
 	}
 
+	if err := CreateOrUpdateSwitchRow(project, "tmp_utilization", "switch"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateSwitchRow(project, "raw_utilization", "switch"); err != nil {
+		errCount++
+	}
+
 	return errCount
 }
 
@@ -302,12 +309,6 @@ func updateLegacyTables(project string) int {
 		errCount++
 	}
 	if err := CreateOrUpdateNDT5ResultRow(project, "batch", "ndt5"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateSwitchStats(project, "base_tables", "switch"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateSwitchStats(project, "batch", "switch"); err != nil {
 		errCount++
 	}
 	return errCount
@@ -403,10 +404,10 @@ func main() {
 		}
 
 	case "switch":
-		if err := CreateOrUpdateSwitchStats(*project, "base_tables", "switch"); err != nil {
+		if err := CreateOrUpdateSwitchRow(*project, "tmp_utilization", "switch"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateSwitchStats(*project, "batch", "switch"); err != nil {
+		if err := CreateOrUpdateSwitchRow(*project, "raw_utilization", "switch"); err != nil {
 			errCount++
 		}
 
