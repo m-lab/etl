@@ -251,8 +251,8 @@ func TestProcessGKETask(t *testing.T) {
 	metrics.TestCount.Collect(c)
 	checkCounter(t, c, 478)
 
-	if up.Total != 514 {
-		t.Error("Expected 514 tests, got", up.Total)
+	if up.Total != 512 {
+		t.Error("Expected 512 tests, got", up.Total)
 	}
 	metrics.FileCount.Reset()
 	metrics.TaskTotal.Reset()
