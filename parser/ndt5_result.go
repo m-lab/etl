@@ -164,8 +164,6 @@ func (dp *NDT5ResultParser) newResult(test []byte, parser schema.ParseInfo, date
 	}
 	err := json.Unmarshal(test, &result.Raw)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(
-			dp.TableName(), "ndt5_result", "Decode").Inc()
 		return nil, err
 	}
 	return result, nil
