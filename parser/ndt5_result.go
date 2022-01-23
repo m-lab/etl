@@ -73,7 +73,6 @@ func (dp *NDT5ResultParser) IsParsable(testName string, data []byte) (string, bo
 
 // ParseAndInsert decodes the data.NDT5Result JSON and inserts it into BQ.
 func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Dec()
 
@@ -84,52 +83,68 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// to 2019-08-26 (v0.12). For these tests the ClientMetadata will be empty.
 	var re = regexp.MustCompile(`,"ClientMetadata":{[^}]+}`)
 	test = []byte(re.ReplaceAllString(string(test), ``))
-
-	row := schema.NDT5ResultRowV2{
-		ID: testName[:len(testName)-len(".json")],
-		Parser: schema.ParseInfo{
-			Version:    Version(),
-			Time:       time.Now(),
-			ArchiveURL: meta["filename"].(string),
-			Filename:   testName,
-			GitCommit:  GitCommit(),
-		},
-		Date: meta["date"].(civil.Date),
-	}
 	if len(test) == 0 {
-		// This is an empty test. We record the empty row, but otherwise skip remaining steps.
-		return nil //  dp.Base.Put(&row)
+		// This is an empty test.
+		// NOTE: We may wish to record these for full e2e accounting.
+		return nil
 	}
 
-	err := json.Unmarshal(test, &row.Raw)
+	parser := schema.ParseInfo{
+		Version:    Version(),
+		Time:       time.Now(),
+		ArchiveURL: meta["filename"].(string),
+		Filename:   testName,
+		GitCommit:  GitCommit(),
+	}
+	date := meta["date"].(civil.Date)
+
+	// Since ndt5 rows can include both download (S2C) and upload (C2S)
+	// measurements (or neither), check and write independent rows for either
+	// direction. This approach results in one row for upload, one row for
+	// download just like the ndt7 data. The `Raw.Control` structure will be
+	// shared when there are upload and download measurements on the same test.
+
+	// S2C
+	result, err := dp.newResult(test, parser, date)
 	if err != nil {
-		log.Println(err)
 		metrics.TestCount.WithLabelValues(
 			dp.TableName(), "ndt5_result", "Decode").Inc()
 		return err
 	}
-	// Since ndt5 rows can include both upload and download measurements, prefer download measurements when both are present.
-	if row.Raw.S2C != nil {
-		row.A = &schema.NDT5Summary{
-			UUID:               row.ID,
-			TestTime:           row.Raw.S2C.StartTime,
-			MeanThroughputMbps: row.Raw.S2C.MeanThroughputMbps,
-			CongestionControl:  "cubic",
-			MinRTT:             float64(row.Raw.S2C.MinRTT) / float64(time.Millisecond),
+	if result.Raw.S2C != nil {
+		if err := dp.readS2CRow(result); err != nil {
+			return err
 		}
-		// NOTE: the TCPInfo structure was introduced in v0.18.0. Measurements
-		// from earlier versions will not have values in the TCPInfo struct here.
-		if row.Raw.S2C.TCPInfo != nil && row.Raw.S2C.TCPInfo.BytesSent > 0 {
-			row.A.LossRate = float64(row.Raw.S2C.TCPInfo.BytesRetrans) / float64(row.Raw.S2C.TCPInfo.BytesSent)
+		if err = dp.Base.Put(result); err != nil {
+			return err
 		}
-	} else if row.Raw.C2S != nil {
-		row.A = &schema.NDT5Summary{
-			UUID:               row.ID,
-			TestTime:           row.Raw.C2S.StartTime,
-			MeanThroughputMbps: row.Raw.C2S.MeanThroughputMbps,
-			CongestionControl:  "unknown",
-			MinRTT:             -1, // unknown.
-			LossRate:           -1, // unknown.
+	}
+
+	// C2S
+	result, err = dp.newResult(test, parser, date)
+	if err != nil {
+		metrics.TestCount.WithLabelValues(
+			dp.TableName(), "ndt5_result", "Decode").Inc()
+		return err
+	}
+	if result.Raw.C2S != nil {
+		if err := dp.readC2SRow(result); err != nil {
+			return err
+		}
+		if err = dp.Base.Put(result); err != nil {
+			return err
+		}
+	}
+
+	// Neither C2S nor S2C
+	//
+	// NOTE: we do not re-read the result structure for this condition b/c if
+	// neither of the above apply, then the last result was unused.
+	if result.Raw.C2S == nil && result.Raw.S2C == nil {
+		result.ID = result.Raw.Control.UUID
+		result.A = &schema.NDT5Summary{} // empty.
+		if err = dp.Base.Put(result); err != nil {
+			return err
 		}
 	}
 
@@ -137,12 +152,58 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	metrics.RowSizeHistogram.WithLabelValues(
 		dp.TableName()).Observe(float64(len(test)))
 
-	if err = dp.Base.Put(&row); err != nil {
-		return err
-	}
-
 	// Count successful inserts.
 	metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
+	return nil
+}
+
+func (dp *NDT5ResultParser) newResult(test []byte, parser schema.ParseInfo, date civil.Date) (*schema.NDT5ResultRowV2, error) {
+	result := &schema.NDT5ResultRowV2{
+		Parser: parser,
+		Date:   date,
+	}
+	err := json.Unmarshal(test, &result.Raw)
+	if err != nil {
+		metrics.TestCount.WithLabelValues(
+			dp.TableName(), "ndt5_result", "Decode").Inc()
+		return nil, err
+	}
+	return result, nil
+}
+
+func (dp *NDT5ResultParser) readS2CRow(row *schema.NDT5ResultRowV2) error {
+	// Record S2C result.
+	s2c := row.Raw.S2C
+	row.ID = s2c.UUID
+	row.A = &schema.NDT5Summary{
+		UUID:               s2c.UUID,
+		TestTime:           s2c.StartTime,
+		MeanThroughputMbps: s2c.MeanThroughputMbps,
+		CongestionControl:  "cubic",
+		MinRTT:             float64(s2c.MinRTT) / float64(time.Millisecond),
+	}
+	// NOTE: the TCPInfo structure was introduced in v0.18.0. Measurements
+	// from earlier versions will not have values in the TCPInfo struct here.
+	if s2c.TCPInfo != nil && s2c.TCPInfo.BytesSent > 0 {
+		row.A.LossRate = float64(s2c.TCPInfo.BytesRetrans) / float64(s2c.TCPInfo.BytesSent)
+	}
+	row.Raw.C2S = nil
+	return nil
+}
+
+func (dp *NDT5ResultParser) readC2SRow(row *schema.NDT5ResultRowV2) error {
+	// Record C2S result.
+	c2s := row.Raw.C2S
+	row.ID = c2s.UUID
+	row.A = &schema.NDT5Summary{
+		UUID:               c2s.UUID,
+		TestTime:           c2s.StartTime,
+		MeanThroughputMbps: c2s.MeanThroughputMbps,
+		CongestionControl:  "unknown",
+		MinRTT:             -1, // unknown.
+		LossRate:           -1, // unknown.
+	}
+	row.Raw.S2C = nil
 	return nil
 }
 
