@@ -111,7 +111,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 			dp.TableName(), "ndt5_result", "Decode").Inc()
 		return err
 	}
-	if result.Raw.S2C != nil {
+	if result.Raw.S2C != nil && result.Raw.S2C.UUID != "" {
 		if err := dp.readS2CRow(result); err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 			dp.TableName(), "ndt5_result", "Decode").Inc()
 		return err
 	}
-	if result.Raw.C2S != nil {
+	if result.Raw.C2S != nil && result.Raw.C2S.UUID != "" {
 		if err := dp.readC2SRow(result); err != nil {
 			return err
 		}
@@ -142,7 +142,11 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// neither of the above apply, then the last result was unused.
 	if result.Raw.C2S == nil && result.Raw.S2C == nil {
 		result.ID = result.Raw.Control.UUID
-		result.A = &schema.NDT5Summary{} // empty.
+		result.A = &schema.NDT5Summary{
+			UUID:     result.ID,
+			TestTime: result.Raw.StartTime,
+			// Other fields are unspecified.
+		}
 		if err = dp.Base.Put(result); err != nil {
 			return err
 		}
