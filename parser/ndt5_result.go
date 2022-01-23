@@ -137,9 +137,12 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	}
 
 	// Neither C2S nor S2C
-	//
-	// NOTE: we do not re-read the result structure for this condition b/c if
-	// neither of the above apply, then the last result was unused.
+	result, err = dp.newResult(test, parser, date)
+	if err != nil {
+		metrics.TestCount.WithLabelValues(
+			dp.TableName(), "ndt5_result", "Decode").Inc()
+		return err
+	}
 	if result.Raw.C2S == nil && result.Raw.S2C == nil {
 		result.ID = result.Raw.Control.UUID
 		result.A = &schema.NDT5Summary{
