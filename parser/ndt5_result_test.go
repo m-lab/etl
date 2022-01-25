@@ -17,6 +17,7 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 		name           string
 		testName       string
 		expectMetadata bool
+		emptySummary   bool
 		wantErr        bool
 	}{
 		{
@@ -28,6 +29,11 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 			name:           "success-without-metadata",
 			testName:       `ndt-vscqp_1565987984_000000000001A1C2.json`,
 			expectMetadata: false,
+		},
+		{
+			name:         "success-empty-s2c-and-c2s",
+			testName:     `ndt-x5dms_1589313593_0000000000024063.json`,
+			emptySummary: true,
 		},
 	}
 	for _, tt := range tests {
@@ -50,6 +56,12 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 
 			if err := n.ParseAndInsert(meta, tt.testName, resultData); (err != nil) != tt.wantErr {
 				t.Errorf("NDT5ResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.emptySummary {
+				if n.Accepted() != 1 {
+					t.Fatal("Failed to insert measurement with no c2s or s2c data.", ins)
+				}
+				return
 			}
 			if n.Accepted() != 2 {
 				t.Fatal("Failed to insert snaplog data.", ins)
