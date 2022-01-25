@@ -107,12 +107,11 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// S2C
 	result, err := dp.newResult(test, parser, date)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(
-			dp.TableName(), "ndt5_result", "Decode").Inc()
+		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
 		return err
 	}
 	if result.Raw.S2C != nil && result.Raw.S2C.UUID != "" {
-		if err := dp.readS2CRow(result); err != nil {
+		if err := dp.prepareS2CRow(result); err != nil {
 			return err
 		}
 		if err = dp.Base.Put(result); err != nil {
@@ -123,12 +122,11 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// C2S
 	result, err = dp.newResult(test, parser, date)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(
-			dp.TableName(), "ndt5_result", "Decode").Inc()
+		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
 		return err
 	}
 	if result.Raw.C2S != nil && result.Raw.C2S.UUID != "" {
-		if err := dp.readC2SRow(result); err != nil {
+		if err := dp.prepareC2SRow(result); err != nil {
 			return err
 		}
 		if err = dp.Base.Put(result); err != nil {
@@ -139,17 +137,12 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// Neither C2S nor S2C
 	result, err = dp.newResult(test, parser, date)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(
-			dp.TableName(), "ndt5_result", "Decode").Inc()
+		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
 		return err
 	}
 	if result.Raw.C2S == nil && result.Raw.S2C == nil {
 		result.ID = result.Raw.Control.UUID
-		result.A = &schema.NDT5Summary{
-			UUID:     result.ID,
-			TestTime: result.Raw.StartTime,
-			// Other fields are unspecified.
-		}
+		result.A = nil // nothing to summarize.
 		if err = dp.Base.Put(result); err != nil {
 			return err
 		}
@@ -176,7 +169,7 @@ func (dp *NDT5ResultParser) newResult(test []byte, parser schema.ParseInfo, date
 	return result, nil
 }
 
-func (dp *NDT5ResultParser) readS2CRow(row *schema.NDT5ResultRowV2) error {
+func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) error {
 	// Record S2C result.
 	s2c := row.Raw.S2C
 	row.ID = s2c.UUID
@@ -196,7 +189,7 @@ func (dp *NDT5ResultParser) readS2CRow(row *schema.NDT5ResultRowV2) error {
 	return nil
 }
 
-func (dp *NDT5ResultParser) readC2SRow(row *schema.NDT5ResultRowV2) error {
+func (dp *NDT5ResultParser) prepareC2SRow(row *schema.NDT5ResultRowV2) error {
 	// Record C2S result.
 	c2s := row.Raw.C2S
 	row.ID = c2s.UUID
