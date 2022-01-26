@@ -86,6 +86,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	if len(test) == 0 {
 		// This is an empty test.
 		// NOTE: We may wish to record these for full e2e accounting.
+		metrics.RowSizeHistogram.WithLabelValues(dp.TableName()).Observe(float64(len(test)))
 		return nil
 	}
 
@@ -111,9 +112,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		return err
 	}
 	if result.Raw.S2C != nil && result.Raw.S2C.UUID != "" {
-		if err := dp.prepareS2CRow(result); err != nil {
-			return err
-		}
+		dp.prepareS2CRow(result)
 		if err = dp.Base.Put(result); err != nil {
 			return err
 		}
@@ -126,9 +125,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		return err
 	}
 	if result.Raw.C2S != nil && result.Raw.C2S.UUID != "" {
-		if err := dp.prepareC2SRow(result); err != nil {
-			return err
-		}
+		dp.prepareC2SRow(result)
 		if err = dp.Base.Put(result); err != nil {
 			return err
 		}
@@ -149,8 +146,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	}
 
 	// Estimate the row size based on the input JSON size.
-	metrics.RowSizeHistogram.WithLabelValues(
-		dp.TableName()).Observe(float64(len(test)))
+	metrics.RowSizeHistogram.WithLabelValues(dp.TableName()).Observe(float64(len(test)))
 
 	// Count successful inserts.
 	metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
@@ -169,7 +165,7 @@ func (dp *NDT5ResultParser) newResult(test []byte, parser schema.ParseInfo, date
 	return result, nil
 }
 
-func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) error {
+func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) {
 	// Record S2C result.
 	s2c := row.Raw.S2C
 	row.ID = s2c.UUID
@@ -186,10 +182,9 @@ func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) error {
 		row.A.LossRate = float64(s2c.TCPInfo.BytesRetrans) / float64(s2c.TCPInfo.BytesSent)
 	}
 	row.Raw.C2S = nil
-	return nil
 }
 
-func (dp *NDT5ResultParser) prepareC2SRow(row *schema.NDT5ResultRowV2) error {
+func (dp *NDT5ResultParser) prepareC2SRow(row *schema.NDT5ResultRowV2) {
 	// Record C2S result.
 	c2s := row.Raw.C2S
 	row.ID = c2s.UUID
@@ -202,7 +197,6 @@ func (dp *NDT5ResultParser) prepareC2SRow(row *schema.NDT5ResultRowV2) error {
 		LossRate:           -1, // unknown.
 	}
 	row.Raw.S2C = nil
-	return nil
 }
 
 // NB: These functions are also required to complete the etl.Parser interface.
