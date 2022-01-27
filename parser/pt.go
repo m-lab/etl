@@ -400,9 +400,12 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 			source := schema.HopIP{
 				IP: server_IP,
 			}
-			// How can we create a proper HopID for this hop when it doesn't have a
-			// Hostname? Using two IPs in this scenario, but we will not be
-			// able to join this hop with the rest of the traceroute data.
+			// For hopannotation1 hopIDs, the format convention is
+			// Timestamp_IP_Hostname. However, the Hops initialized above
+			// don't have a Hostname defined, only an IP.
+			// We will use the IP as the Hostname for the hopID.
+			// The same convention will have to be adopted in the paris1
+			// parser, so its hops can be joined with the synthetic ones.
 			hopID := GetHopID(float64(logTime.UTC().Unix()), source.IP, source.IP)
 			source.HopAnnotation1 = &hopannotation.HopAnnotation1{
 				ID:        hopID,
