@@ -400,7 +400,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 			source := schema.HopIP{
 				IP: server_IP,
 			}
-			// For hopannotation1 hopIDs, the format convention is
+			// For hopannotation1 hopIDs, the formatting convention is
 			// Timestamp_IP_Hostname. However, the Hops initialized above
 			// don't have a Hostname defined, only an IP.
 			// We will use the IP as the Hostname for the hopID.
