@@ -374,7 +374,8 @@ func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
-func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string) []schema.ScamperHop {
+func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string,
+	logTime time.Time) []schema.ScamperHop {
 	var results []schema.ScamperHop
 	if len(allNodes) == 0 {
 		return nil
@@ -399,6 +400,14 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 			source := schema.HopIP{
 				IP: server_IP,
 			}
+			// How can we create a proper HopID for this hop when it doesn't have a
+			// Hostname? Using two IPs in this scenario, but we will not be
+			// able to join this hop with the rest of the traceroute data.
+			hopID := GetHopID(float64(logTime.UTC().Unix()), source.IP, source.IP)
+			source.HopAnnotation1 = &hopannotation.HopAnnotation1{
+				ID:        hopID,
+				Timestamp: logTime,
+			}
 			oneHop := schema.ScamperHop{
 				Source: source,
 				Links:  links,
@@ -409,6 +418,11 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 			source := schema.HopIP{
 				IP:       allNodes[i].parent_ip,
 				Hostname: allNodes[i].parent_hostname,
+			}
+			hopID := GetHopID(float64(logTime.UTC().Unix()), source.Hostname, source.IP)
+			source.HopAnnotation1 = &hopannotation.HopAnnotation1{
+				ID:        hopID,
+				Timestamp: logTime,
 			}
 			oneHop := schema.ScamperHop{
 				Source: source,
@@ -912,7 +926,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 	}
 
 	// Generate Hops from allNodes
-	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName)
+	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName, logTime)
 
 	source := schema.ServerInfo{
 		IP: serverIP,

@@ -363,6 +363,10 @@ func TestParse(t *testing.T) {
 			City:        "",
 			CountryCode: "",
 			Hostname:    "sr05-te1-8.nuq04.net.google.com",
+			HopAnnotation1: &hopannotation.HopAnnotation1{
+				ID:        "20170320_sr05-te1-8.nuq04.net.google.com_64.233.174.109",
+				Timestamp: cachedTest.LogTime,
+			},
 		},
 		Linkc: 0,
 		Links: []schema.HopLink{
