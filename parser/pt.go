@@ -401,7 +401,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 				IP: server_IP,
 			}
 			// For hopannotation1 hopIDs, the formatting convention is
-			// Timestamp_IP_Hostname. However, the Hops initialized above
+			// <yyyymmdd>_<hostname>_<ip>. However, the Hops initialized above
 			// don't have a Hostname defined, only an IP.
 			// We will use the IP as the Hostname for the hopID.
 			// The same convention will have to be adopted in the paris1
