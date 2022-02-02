@@ -598,12 +598,12 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return nil
 	}
 
+	// ArchiveURL must already be valid, so error is safe to ignore.
+	dp, _ := etl.ValidateTestPath(pt.taskFileName)
 	// Process the jsonl output of Scamper binary.
 	if strings.HasSuffix(testName, ".jsonl") {
 		ptTest, err := ParseJSONL(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
-			// ArchiveURL must already be valid, so error is safe to ignore.
-			dp, _ := etl.ValidateTestPath(pt.taskFileName)
 			ptTest.ServerX.Site = dp.Site
 			ptTest.ServerX.Machine = dp.Host
 
@@ -622,7 +622,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 
 	// Process the legacy Paris Traceroute txt output
-	cachedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
+	cachedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName(), dp)
 	if err != nil {
 		// These are happening at a high rate, so demote them to warnings until we can fix them.
 		metrics.WarningCount.WithLabelValues(
@@ -797,7 +797,8 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte, tableName string) (cachedPTData, error) {
+func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte,
+	tableName string, dp etl.DataPath) (cachedPTData, error) {
 	//log.Printf("%s", testName)
 	metrics.WorkerState.WithLabelValues(tableName, "pt-parse").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "pt-parse").Dec()
@@ -922,9 +923,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 		metrics.PTBitsAwayFromDestV6.WithLabelValues(iataCode).Observe(float64(bitsDiff))
 	}
 
-	dp, _ := etl.ValidateTestPath(fileName)
 	machine := fmt.Sprintf("%s-%s", dp.Host, dp.Site)
-
 	// Generate Hops from allNodes
 	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName, logTime, machine)
 
