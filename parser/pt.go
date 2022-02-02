@@ -400,11 +400,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 			source := schema.HopIP{
 				IP: server_IP,
 			}
-			hopID := GetHopID(float64(logTime.UTC().Unix()), machine, source.IP)
-			source.HopAnnotation1 = &hopannotation.HopAnnotation1{
-				ID:        hopID,
-				Timestamp: logTime,
-			}
+			source.HopAnnotation1 = getParisHopAnnotation(logTime, machine, source.IP)
 			oneHop := schema.ScamperHop{
 				Source: source,
 				Links:  links,
@@ -416,11 +412,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 				IP:       allNodes[i].parent_ip,
 				Hostname: allNodes[i].parent_hostname,
 			}
-			hopID := GetHopID(float64(logTime.UTC().Unix()), machine, source.IP)
-			source.HopAnnotation1 = &hopannotation.HopAnnotation1{
-				ID:        hopID,
-				Timestamp: logTime,
-			}
+			source.HopAnnotation1 = getParisHopAnnotation(logTime, machine, source.IP)
 			oneHop := schema.ScamperHop{
 				Source: source,
 				Links:  links,
@@ -429,6 +421,16 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 		}
 	}
 	return results
+}
+
+// getParisHopAnnotation() returns returns a new `*hopannotation.HopAnnotation1` to use
+// as a synthetic annotation for paris-traceroute hops.
+func getParisHopAnnotation(logTime time.Time, machine string, IP string) *hopannotation.HopAnnotation1 {
+	hopID := GetHopID(float64(logTime.UTC().Unix()), machine, IP)
+	return &hopannotation.HopAnnotation1{
+		ID:        hopID,
+		Timestamp: logTime,
+	}
 }
 
 // This function was designed for hops with multiple flows. When the source IP are duplicate flows, but the destination IP is
