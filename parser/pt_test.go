@@ -390,8 +390,8 @@ func TestParse(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(cachedTest.Hops[0], expected_hop) {
-		fmt.Printf("Here is expected    : %v\n", expected_hop.Source)
-		fmt.Printf("Here is what is real: %v\n", cachedTest.Hops[0].Source)
+		fmt.Printf("Here is expected    : %v\n", expected_hop)
+		fmt.Printf("Here is what is real: %v\n", cachedTest.Hops[0])
 		t.Fatalf("Wrong results for PT hops!")
 	}
 }
