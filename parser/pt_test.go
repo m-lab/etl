@@ -630,7 +630,8 @@ func TestParseEmpty(t *testing.T) {
 		fmt.Println("cannot load test data")
 		return
 	}
-	_, parseErr := parser.Parse(nil, "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily", etl.DataPath{})
+	_, parseErr := parser.Parse(nil, "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily",
+		etl.DataPath{})
 	if parseErr == nil {
 		t.Fatal(parseErr)
 	}
