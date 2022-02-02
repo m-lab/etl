@@ -375,7 +375,7 @@ func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
 func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string,
-	logTime time.Time) []schema.ScamperHop {
+	logTime time.Time, hostname string) []schema.ScamperHop {
 	var results []schema.ScamperHop
 	if len(allNodes) == 0 {
 		return nil
@@ -400,13 +400,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 			source := schema.HopIP{
 				IP: server_IP,
 			}
-			// For hopannotation1 hopIDs, the formatting convention is
-			// <yyyymmdd>_<hostname>_<ip>. However, the Hops initialized above
-			// don't have a Hostname defined, only an IP.
-			// We will use the IP as the Hostname for the hopID.
-			// The same convention will have to be adopted in the paris1
-			// parser, so its hops can be joined with the synthetic ones.
-			hopID := GetHopID(float64(logTime.UTC().Unix()), source.IP, source.IP)
+			hopID := GetHopID(float64(logTime.UTC().Unix()), hostname, source.IP)
 			source.HopAnnotation1 = &hopannotation.HopAnnotation1{
 				ID:        hopID,
 				Timestamp: logTime,
@@ -422,7 +416,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 				IP:       allNodes[i].parent_ip,
 				Hostname: allNodes[i].parent_hostname,
 			}
-			hopID := GetHopID(float64(logTime.UTC().Unix()), source.Hostname, source.IP)
+			hopID := GetHopID(float64(logTime.UTC().Unix()), hostname, source.IP)
 			source.HopAnnotation1 = &hopannotation.HopAnnotation1{
 				ID:        hopID,
 				Timestamp: logTime,
@@ -928,8 +922,9 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 		metrics.PTBitsAwayFromDestV6.WithLabelValues(iataCode).Observe(float64(bitsDiff))
 	}
 
+	hostname := etl.GetHostname(fileName)
 	// Generate Hops from allNodes
-	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName, logTime)
+	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName, logTime, hostname)
 
 	source := schema.ServerInfo{
 		IP: serverIP,

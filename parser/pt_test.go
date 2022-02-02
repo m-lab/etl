@@ -340,7 +340,10 @@ func TestParseJSONL(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	cachedTest, err := parser.Parse(nil, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
+	metadata := map[string]bigquery.Value{
+		"filename": "gs://archive-measurement-lab/paris-traceroute/2017/03/20/20170320T000000Z-mlab1-lax05-paris-traceroute-0000.tgz",
+	}
+	cachedTest, err := parser.Parse(metadata, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -364,7 +367,7 @@ func TestParse(t *testing.T) {
 			CountryCode: "",
 			Hostname:    "sr05-te1-8.nuq04.net.google.com",
 			HopAnnotation1: &hopannotation.HopAnnotation1{
-				ID:        "20170320_sr05-te1-8.nuq04.net.google.com_64.233.174.109",
+				ID:        "20170320_mlab1-lax05_64.233.174.109",
 				Timestamp: cachedTest.LogTime,
 			},
 		},
@@ -387,8 +390,8 @@ func TestParse(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(cachedTest.Hops[0], expected_hop) {
-		fmt.Printf("Here is expected    : %v\n", expected_hop)
-		fmt.Printf("Here is what is real: %v\n", cachedTest.Hops[0])
+		fmt.Printf("Here is expected    : %v\n", expected_hop.Source)
+		fmt.Printf("Here is what is real: %v\n", cachedTest.Hops[0].Source)
 		t.Fatalf("Wrong results for PT hops!")
 	}
 }
