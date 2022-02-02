@@ -200,19 +200,6 @@ func GetIATACode(rawFilename string) string {
 	return parts[2][0:3]
 }
 
-// GetHostname extracts the Host + Site portion of the filename.
-// For example, for 20170129T000000Z-mlab1-lax05-paris-traceroute-0000.tgz,
-// it returns mlab1-lax05.
-func GetHostname(rawFilename string) string {
-	exp := regexp.MustCompile(mlabNSiteNN)
-	hostname := exp.FindString(rawFilename)
-	if hostname == "" {
-		log.Printf("Unable to extract Hostname from %s", rawFilename)
-		return ""
-	}
-	return strings.Trim(hostname, "-")
-}
-
 // GetIntFromIPv4 converts an IPv4 address to equivalent uint32.
 func GetIntFromIPv4(p4 net.IP) uint {
 	return uint(p4[0])<<24 + uint(p4[1])<<16 + uint(p4[2])<<8 + uint(p4[3])

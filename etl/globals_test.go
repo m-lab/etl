@@ -215,33 +215,6 @@ func TestGetMetroName(t *testing.T) {
 
 }
 
-func TestGetHostname(t *testing.T) {
-	tests := []struct {
-		filename string
-		want string
-	}{
-		{
-			filename: "gs://archive-measurement-lab/paris-traceroute/2016/01/29/20160129T000000Z-mlab1-acc02-paris-traceroute-0000.tgz",
-			want: "mlab1-acc02",
-		},
-		{
-			filename: "foo",
-			want: "",
-		},
-		{
-			filename: "",
-			want: "",
-		},
-	}
-
-	for _, test := range tests {
-		got := etl.GetHostname(test.filename)
-		if got != test.want {
-			t.Errorf("GetHostname() got = %s, want = %s", got, test.want)
-		}
-	}
-}
-
 func TestCalculateIPDistance(t *testing.T) {
 	diff1, ip_type := etl.NumberBitsDifferent("192.168.3.4", "192.168.3.1")
 	if diff1 != 3 || ip_type != 4 {
