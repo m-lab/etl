@@ -12,6 +12,7 @@ import (
 	"github.com/go-test/deep"
 	"github.com/m-lab/annotation-service/api"
 	v2 "github.com/m-lab/annotation-service/api/v2"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/traceroute-caller/hopannotation"
@@ -242,7 +243,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 		fmt.Println("cannot load test data")
 		return
 	}
-	cachedTest, err := parser.Parse(nil, "testdata/PT/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily")
+	cachedTest, err := parser.Parse(nil, "testdata/PT/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily", etl.DataPath{})
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -340,7 +341,9 @@ func TestParseJSONL(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	cachedTest, err := parser.Parse(nil, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData, "pt-daily")
+	dp, _ := etl.ValidateTestPath("gs://archive-measurement-lab/paris-traceroute/2017/03/20/20170320T000000Z-mlab1-lax05-paris-traceroute-0000.tgz")
+	cachedTest, err := parser.Parse(nil, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData,
+		"pt-daily", dp)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -363,6 +366,10 @@ func TestParse(t *testing.T) {
 			City:        "",
 			CountryCode: "",
 			Hostname:    "sr05-te1-8.nuq04.net.google.com",
+			HopAnnotation1: &hopannotation.HopAnnotation1{
+				ID:        "20170320_mlab1-lax05_64.233.174.109",
+				Timestamp: cachedTest.LogTime,
+			},
 		},
 		Linkc: 0,
 		Links: []schema.HopLink{
@@ -623,7 +630,8 @@ func TestParseEmpty(t *testing.T) {
 		fmt.Println("cannot load test data")
 		return
 	}
-	_, parseErr := parser.Parse(nil, "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily")
+	_, parseErr := parser.Parse(nil, "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily",
+		etl.DataPath{})
 	if parseErr == nil {
 		t.Fatal(parseErr)
 	}

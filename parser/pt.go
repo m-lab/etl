@@ -374,7 +374,8 @@ func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
-func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string) []schema.ScamperHop {
+func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string,
+	logTime time.Time, machine string) []schema.ScamperHop {
 	var results []schema.ScamperHop
 	if len(allNodes) == 0 {
 		return nil
@@ -399,6 +400,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 			source := schema.HopIP{
 				IP: server_IP,
 			}
+			source.HopAnnotation1 = getParisHopAnnotation(logTime, machine, source.IP)
 			oneHop := schema.ScamperHop{
 				Source: source,
 				Links:  links,
@@ -410,6 +412,7 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 				IP:       allNodes[i].parent_ip,
 				Hostname: allNodes[i].parent_hostname,
 			}
+			source.HopAnnotation1 = getParisHopAnnotation(logTime, machine, source.IP)
 			oneHop := schema.ScamperHop{
 				Source: source,
 				Links:  links,
@@ -418,6 +421,16 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 		}
 	}
 	return results
+}
+
+// getParisHopAnnotation() returns returns a new `*hopannotation.HopAnnotation1` to use
+// as a synthetic annotation for paris-traceroute hops.
+func getParisHopAnnotation(logTime time.Time, machine string, IP string) *hopannotation.HopAnnotation1 {
+	hopID := GetHopID(float64(logTime.UTC().Unix()), machine, IP)
+	return &hopannotation.HopAnnotation1{
+		ID:        hopID,
+		Timestamp: logTime,
+	}
 }
 
 // This function was designed for hops with multiple flows. When the source IP are duplicate flows, but the destination IP is
@@ -587,12 +600,12 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return nil
 	}
 
+	// ArchiveURL must already be valid, so error is safe to ignore.
+	dp, _ := etl.ValidateTestPath(pt.taskFileName)
 	// Process the jsonl output of Scamper binary.
 	if strings.HasSuffix(testName, ".jsonl") {
 		ptTest, err := ParseJSONL(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
-			// ArchiveURL must already be valid, so error is safe to ignore.
-			dp, _ := etl.ValidateTestPath(pt.taskFileName)
 			ptTest.ServerX.Site = dp.Site
 			ptTest.ServerX.Machine = dp.Host
 
@@ -611,7 +624,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	}
 
 	// Process the legacy Paris Traceroute txt output
-	cachedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName())
+	cachedTest, err := Parse(meta, testName, testId, rawContent, pt.TableName(), dp)
 	if err != nil {
 		// These are happening at a high rate, so demote them to warnings until we can fix them.
 		metrics.WarningCount.WithLabelValues(
@@ -786,7 +799,8 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 
 // Parse the raw test file into hops ParisTracerouteHop.
 // TODO(dev): dedup the hops that are identical.
-func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte, tableName string) (cachedPTData, error) {
+func Parse(meta map[string]bigquery.Value, testName string, testId string, rawContent []byte,
+	tableName string, dp etl.DataPath) (cachedPTData, error) {
 	//log.Printf("%s", testName)
 	metrics.WorkerState.WithLabelValues(tableName, "pt-parse").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "pt-parse").Dec()
@@ -911,8 +925,9 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 		metrics.PTBitsAwayFromDestV6.WithLabelValues(iataCode).Observe(float64(bitsDiff))
 	}
 
+	machine := fmt.Sprintf("%s-%s", dp.Host, dp.Site)
 	// Generate Hops from allNodes
-	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName)
+	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName, logTime, machine)
 
 	source := schema.ServerInfo{
 		IP: serverIP,
