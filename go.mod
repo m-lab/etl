@@ -17,7 +17,6 @@ require (
 	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/google-cloud-go-testing v0.0.0-20210719221736-1c9a4c676720
-	github.com/iancoleman/strcase v0.2.0
 	github.com/kr/pretty v0.2.1
 	github.com/m-lab/annotation-service v0.0.0-20210713124633-fa227b3d5b2f
 	github.com/m-lab/etl-gardener v0.0.0-20210910143655-d4bda5bfc75d
