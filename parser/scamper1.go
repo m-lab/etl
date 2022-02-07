@@ -108,7 +108,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 
 	scamperOutput, err := parser.ParseTraceroute(rawContent)
 	if err != nil {
-		return fmt.Errorf("failed to parse scamper1 file: %v", err)
+		return fmt.Errorf("failed to parse scamper1 file ArchiveURL: %s, Filename: %s, Error: %v", fileMetadata["filename"].(string), testName, err)
 	}
 
 	bqScamperOutput := schema.BQScamperOutput{
