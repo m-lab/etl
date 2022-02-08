@@ -1,6 +1,7 @@
 package parser_test
 
 import (
+	"errors"
 	"io/ioutil"
 	"path"
 	"strings"
@@ -46,6 +47,54 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 	expectedRow.Parser.Time = row.Parser.Time
 	if diff := deep.Equal(row, &expectedRow); diff != nil {
 		t.Errorf("failed to extract correct row from file: different rows - %s", strings.Join(diff, "\n"))
+	}
+}
+
+func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
+	tests := []struct {
+		name string
+		date civil.Date
+		want error
+	}{
+		{
+			name: "legacy-date",
+			date: civil.Date{
+				Year:  2021,
+				Month: time.September,
+				Day:   8,
+			},
+			want: nil,
+		},
+		{
+			name: "scamper1-date",
+			date: civil.Date{
+				Year:  2021,
+				Month: time.September,
+				Day:   10,
+			},
+			want: errors.New("failed to parse scamper1 file: badformat.jsonl, error: invalid traceroute file"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ins := newInMemorySink()
+			n := parser.NewScamper1Parser(ins, "test", "_suffix", &fakeAnnotator{})
+
+			file := "badformat.jsonl"
+			data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))
+			rtx.Must(err, "failed to load test file")
+
+			meta := map[string]bigquery.Value{
+				"filename": file,
+				"date":     tt.date,
+			}
+
+			err = n.ParseAndInsert(meta, file, data)
+			if (err == nil && tt.want != nil) || (err != nil && tt.want == nil) {
+				t.Errorf("Scamper1Parser.ParseAndInsert() error = %v, want = %v", err, tt.want)
+			}
+		})
 	}
 }
 

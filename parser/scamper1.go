@@ -23,6 +23,12 @@ const (
 	scamper1 = "scamper1"
 )
 
+var legacyScamperEnd = civil.Date{
+	Year:  2021,
+	Month: time.September,
+	Day:   9,
+}
+
 // Scamper1Parser handles parsing for the scamper1 datatype.
 type Scamper1Parser struct {
 	*row.Base
@@ -108,7 +114,11 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 
 	scamperOutput, err := parser.ParseTraceroute(rawContent)
 	if err != nil {
-		return fmt.Errorf("failed to parse scamper1 file: %v", err)
+		date := fileMetadata["date"].(civil.Date)
+		if legacyScamperEnd.Before(date) {
+			return fmt.Errorf("failed to parse scamper1 file: %s, error: %v", testName, err)
+		}
+		return nil
 	}
 
 	bqScamperOutput := schema.BQScamperOutput{
