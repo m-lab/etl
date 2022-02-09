@@ -24,6 +24,7 @@ var (
 	ErrAnnotationError = errors.New("Annotation error")
 	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
 	ErrRowNotPointer   = errors.New("Row should be a pointer type")
+	ErrIsInvalid       = errors.New("invalid input file")
 )
 
 // RowBuffer provides all basic functionality generally needed for buffering, annotating, and inserting

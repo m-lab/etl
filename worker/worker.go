@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -224,7 +225,9 @@ func DoGKETask(tsk *task.Task, path etl.DataPath) etl.ProcessingError {
 		date.Weekday().String()).Add(float64(files))
 
 	if err != nil {
-		metrics.TaskTotal.WithLabelValues(path.DataType, "TaskError").Inc()
+		if !errors.Is(err, parser.ErrIsInvalid) {
+			metrics.TaskTotal.WithLabelValues(path.DataType, "TaskError").Inc()
+		}
 		log.Printf("Error Processing Tests:  %v", err)
 		return factory.NewError(
 			path.DataType, "TaskError", http.StatusInternalServerError, err)

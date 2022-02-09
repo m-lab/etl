@@ -63,7 +63,7 @@ func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
 				Month: time.September,
 				Day:   8,
 			},
-			want: nil,
+			want: parser.ErrIsInvalid,
 		},
 		{
 			name: "scamper1-date",
@@ -91,7 +91,7 @@ func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
 			}
 
 			err = n.ParseAndInsert(meta, file, data)
-			if (err == nil && tt.want != nil) || (err != nil && tt.want == nil) {
+			if err.Error() != tt.want.Error() {
 				t.Errorf("Scamper1Parser.ParseAndInsert() error = %v, want = %v", err, tt.want)
 			}
 		})

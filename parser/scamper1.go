@@ -118,7 +118,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 		if legacyScamperEnd.Before(date) {
 			return fmt.Errorf("failed to parse scamper1 file: %s, error: %v", testName, err)
 		}
-		return nil
+		return ErrIsInvalid
 	}
 
 	bqScamperOutput := schema.BQScamperOutput{
