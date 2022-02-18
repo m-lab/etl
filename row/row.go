@@ -85,19 +85,16 @@ func (as *ActiveStats) Inc() {
 }
 
 // Done updates the pending to failed or committed.
-func (as *ActiveStats) Done(n int, err error) {
+func (as *ActiveStats) Done(rows int, done int, err error) {
 	as.lock.Lock()
 	defer as.lock.Unlock()
-	as.Pending -= n
+	as.Pending -= done
 	if as.Pending < 0 {
 		log.Println("BROKEN: negative Pending")
 	}
-	if err != nil {
-		as.Failed += n
-	} else {
-		as.Committed += n
-	}
-	logx.Debug.Printf("Done %d->%d %v\n", as.Pending+n, as.Pending, err)
+	as.Failed += rows - done
+	as.Committed += done
+	logx.Debug.Printf("Done %d->%d %v\n", as.Pending+done, as.Pending, err)
 }
 
 // HasStats can provide stats
@@ -328,12 +325,9 @@ func (pb *Base) commit(rows []interface{}) error {
 	// TODO do we need these to be done in order.
 	// This is synchronous, blocking, and thread safe.
 	done, err := pb.sink.Commit(rows, pb.label)
-	if done > 0 {
-		pb.stats.Done(done, nil)
-	}
+	pb.stats.Done(len(rows), done, nil)
 	if err != nil {
 		log.Println(pb.label, err)
-		pb.stats.Done(len(rows)-done, err)
 	}
 	return err
 }
