@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -116,9 +115,17 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	if err != nil {
 		date := fileMetadata["date"].(civil.Date)
 		if legacyScamperEnd.Before(date) {
-			return fmt.Errorf("failed to parse scamper1 file: %s, error: %v", testName, err)
+			return ErrIsInvalid{
+				File:     testName,
+				Err:      err,
+				IsLegacy: false,
+			}
 		}
-		return ErrIsInvalid
+		return ErrIsInvalid{
+			File:     testName,
+			Err:      err,
+			IsLegacy: true,
+		}
 	}
 
 	bqScamperOutput := schema.BQScamperOutput{

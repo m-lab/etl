@@ -52,9 +52,9 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 
 func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
 	tests := []struct {
-		name string
-		date civil.Date
-		want error
+		name    string
+		date    civil.Date
+		wantErr parser.ErrIsInvalid
 	}{
 		{
 			name: "legacy-date",
@@ -63,7 +63,11 @@ func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
 				Month: time.September,
 				Day:   8,
 			},
-			want: parser.ErrIsInvalid,
+			wantErr: parser.ErrIsInvalid{
+				File:     "badformat.jsonl",
+				Err:      errors.New("invalid traceroute file"),
+				IsLegacy: true,
+			},
 		},
 		{
 			name: "scamper1-date",
@@ -72,7 +76,11 @@ func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
 				Month: time.September,
 				Day:   10,
 			},
-			want: errors.New("failed to parse scamper1 file: badformat.jsonl, error: invalid traceroute file"),
+			wantErr: parser.ErrIsInvalid{
+				File:     "badformat.jsonl",
+				Err:      errors.New("invalid traceroute file"),
+				IsLegacy: false,
+			},
 		},
 	}
 
@@ -91,8 +99,10 @@ func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
 			}
 
 			err = n.ParseAndInsert(meta, file, data)
-			if err.Error() != tt.want.Error() {
-				t.Errorf("Scamper1Parser.ParseAndInsert() error = %v, want = %v", err, tt.want)
+			invalidErr := parser.ErrIsInvalid{}
+
+			if !errors.As(err, &invalidErr) || invalidErr.IsLegacy != tt.wantErr.IsLegacy {
+				t.Errorf("Scamper1Parser.ParseAndInsert() = %v, want = %v", err, tt.wantErr)
 			}
 		})
 	}
