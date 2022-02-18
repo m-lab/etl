@@ -57,7 +57,7 @@ var (
 	}
 
 	maxActiveTasks = flag.Int64("max_active", 1, "Maximum number of active tasks")
-	gardenerHost   = flag.String("gardener_host", "", "Gardener host for jobs")
+	gardenerAddr   = flag.String("gardener_addr", ":8080", "Use this address for the gardener jobs service")
 
 	servicePort     = flag.String("service_port", ":8080", "The main (private) service port")
 	shutdownTimeout = flag.Duration("shutdown_timeout", 1*time.Minute, "Graceful shutdown time allowance")
@@ -354,7 +354,7 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 }
 
 func mustGardenerAPI(ctx context.Context, jobServer string) *active.GardenerAPI {
-	rawBase := fmt.Sprintf("http://%s:8080", jobServer)
+	rawBase := fmt.Sprintf("http://%s", jobServer)
 	base, err := url.Parse(rawBase)
 	rtx.Must(err, "Invalid jobServer: "+rawBase)
 
@@ -425,14 +425,14 @@ func main() {
 	etl.BigqueryDataset = *bigqueryDataset
 	etl.BatchAnnotatorURL = annotatorURL.String() + "/batch_annotate"
 
-	if len(*gardenerHost) > 0 {
-		log.Println("Using", *gardenerHost)
+	if len(*gardenerAddr) > 0 {
+		log.Println("Using", *gardenerAddr)
 		minPollingInterval := 10 * time.Second
-		gardenerAPI = mustGardenerAPI(mainCtx, *gardenerHost)
+		gardenerAPI = mustGardenerAPI(mainCtx, *gardenerAddr)
 		// Note that this does not currently track duration metric.
 		go gardenerAPI.Poll(mainCtx, toRunnable, (int)(*maxActiveTasks), minPollingInterval)
 	} else {
-		log.Println("GARDENER_HOST not specified or empty.  Running in passive mode.")
+		log.Println("GARDENER_ADDR not specified or empty.  Running in passive mode.")
 	}
 
 	mux := http.NewServeMux()
