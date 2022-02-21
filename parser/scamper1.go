@@ -108,6 +108,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 
 	scamperOutput, err := parser.ParseTraceroute(rawContent)
 	if err != nil {
+		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
 		return fmt.Errorf("failed to parse scamper1 file: %s, error: %w", testName, err)
 	}
 
