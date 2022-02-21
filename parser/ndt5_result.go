@@ -100,7 +100,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		err := dec.Decode(&stats.Result)
 		if err != nil {
 			log.Println(err)
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				dp.TableName(), "ndt5_result", "Decode").Inc()
 			return err
 		}
@@ -116,7 +116,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 			return err
 		}
 		// Count successful inserts.
-		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
+		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
 	}
 
 	return nil

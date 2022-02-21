@@ -180,7 +180,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	}
 
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(p.TableName(), "pcap", "ok").Inc()
+	metrics.TestTotal.WithLabelValues(p.TableName(), "pcap", "ok").Inc()
 
 	return nil
 }

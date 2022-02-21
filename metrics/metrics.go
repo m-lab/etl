@@ -195,16 +195,16 @@ var (
 		[]string{"table", "status"},
 	)
 
-	// TestCount counts the number of tests successfully processed by the parsers.
+	// TestTotal counts the number of tests successfully processed by the parsers.
 	//
 	// Provides metrics:
-	//   etl_test_count{table, filetype, status}
+	//   etl_test_total{table, filetype, status}
 	// Example usage:
-	// metrics.TestCount.WithLabelValues(
+	// metrics.TestTotal.WithLabelValues(
 	//	tt.Inserter.TableBase(), "s2c", "ok").Inc()
-	TestCount = promauto.NewCounterVec(
+	TestTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "etl_test_count",
+			Name: "etl_test_total",
 			Help: "Number of tests processed.",
 		},
 		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/

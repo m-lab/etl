@@ -116,7 +116,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	if err != nil {
 		date := fileMetadata["date"].(civil.Date)
 		if legacyScamperEnd.Before(date) {
-			metrics.TestCount.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
+			metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
 		}
 		return fmt.Errorf("failed to parse scamper1 file: %s, error: %w", testName, err)
 	}
@@ -149,7 +149,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	}
 
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(p.TableName(), scamper1, "ok").Inc()
+	metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, "ok").Inc()
 
 	return nil
 }
