@@ -140,7 +140,7 @@ func TestProcessTask(t *testing.T) {
 
 	metrics.FileCount.Reset()
 	metrics.TaskTotal.Reset()
-	metric.TestTotal.Reset()
+	metrics.TestTotal.Reset()
 }
 
 // This is also the annotator, so it just returns itself.
