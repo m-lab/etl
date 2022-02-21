@@ -1,7 +1,6 @@
 package parser_test
 
 import (
-	"errors"
 	"io/ioutil"
 	"path"
 	"strings"
@@ -51,60 +50,21 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 }
 
 func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
-	tests := []struct {
-		name    string
-		date    civil.Date
-		wantErr parser.ErrIsInvalid
-	}{
-		{
-			name: "legacy-date",
-			date: civil.Date{
-				Year:  2021,
-				Month: time.September,
-				Day:   8,
-			},
-			wantErr: parser.ErrIsInvalid{
-				File:     "badformat.jsonl",
-				Err:      errors.New("invalid traceroute file"),
-				IsLegacy: true,
-			},
-		},
-		{
-			name: "scamper1-date",
-			date: civil.Date{
-				Year:  2021,
-				Month: time.September,
-				Day:   10,
-			},
-			wantErr: parser.ErrIsInvalid{
-				File:     "badformat.jsonl",
-				Err:      errors.New("invalid traceroute file"),
-				IsLegacy: false,
-			},
-		},
+	ins := newInMemorySink()
+	n := parser.NewScamper1Parser(ins, "test", "_suffix", &fakeAnnotator{})
+
+	file := "badformat.jsonl"
+	data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))
+	rtx.Must(err, "failed to load test file")
+
+	meta := map[string]bigquery.Value{
+		"filename": file,
+		"date":     civil.Date{Year: 2021, Month: 9, Day: 8},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ins := newInMemorySink()
-			n := parser.NewScamper1Parser(ins, "test", "_suffix", &fakeAnnotator{})
-
-			file := "badformat.jsonl"
-			data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))
-			rtx.Must(err, "failed to load test file")
-
-			meta := map[string]bigquery.Value{
-				"filename": file,
-				"date":     tt.date,
-			}
-
-			err = n.ParseAndInsert(meta, file, data)
-			invalidErr := parser.ErrIsInvalid{}
-
-			if !errors.As(err, &invalidErr) || invalidErr.IsLegacy != tt.wantErr.IsLegacy {
-				t.Errorf("Scamper1Parser.ParseAndInsert() = %v, want = %v", err, tt.wantErr)
-			}
-		})
+	err = n.ParseAndInsert(meta, file, data)
+	if err == nil {
+		t.Errorf("Scamper1Parser.ParseAndInsertError() = nil, want = true")
 	}
 }
 

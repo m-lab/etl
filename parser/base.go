@@ -6,7 +6,6 @@ package parser
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"reflect"
 	"time"
@@ -26,18 +25,6 @@ var (
 	ErrNotAnnotatable  = errors.New("object does not implement Annotatable")
 	ErrRowNotPointer   = errors.New("Row should be a pointer type")
 )
-
-// ErrIsInvalid is a custom error type for invalid input files.
-type ErrIsInvalid struct {
-	File     string
-	Err      error
-	IsLegacy bool
-}
-
-// Error returns the error message as a string.
-func (e ErrIsInvalid) Error() string {
-	return fmt.Sprintf("failed to parse invalid input file: %s, error: %v", e.File, e.Err)
-}
 
 // RowBuffer provides all basic functionality generally needed for buffering, annotating, and inserting
 // rows that implement Annotatable.
