@@ -66,7 +66,7 @@ func (p *HopAnnotation1Parser) ParseAndInsert(fileMetadata map[string]bigquery.V
 	raw := hopannotation.HopAnnotation1{}
 	err := json.Unmarshal(rawContent, &raw)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(p.TableName(), "hopannotation1", "decode-location-error").Inc()
+		metrics.TestTotal.WithLabelValues(p.TableName(), "hopannotation1", "decode-location-error").Inc()
 		return err
 	}
 
@@ -88,7 +88,7 @@ func (p *HopAnnotation1Parser) ParseAndInsert(fileMetadata map[string]bigquery.V
 		return err
 	}
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(p.TableName(), "hopannotation1", "ok").Inc()
+	metrics.TestTotal.WithLabelValues(p.TableName(), "hopannotation1", "ok").Inc()
 
 	return nil
 }

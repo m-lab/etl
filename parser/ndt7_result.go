@@ -89,7 +89,7 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	err := json.Unmarshal(test, &row.Raw)
 	if err != nil {
 		log.Println(meta["filename"].(string), testName, err)
-		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt7_result", "Unmarshal").Inc()
+		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt7_result", "Unmarshal").Inc()
 		return err
 	}
 
@@ -132,7 +132,7 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 		return err
 	}
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(dp.TableName(), "ndt7_result", "ok").Inc()
+	metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt7_result", "ok").Inc()
 	return nil
 }
 

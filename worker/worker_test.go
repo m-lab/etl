@@ -135,12 +135,12 @@ func TestProcessTask(t *testing.T) {
 	metrics.TaskTotal.Collect(c)
 	checkCounter(t, c, 1)
 
-	metrics.TestCount.Collect(c)
+	metrics.TestTotal.Collect(c)
 	checkCounter(t, c, 1)
 
 	metrics.FileCount.Reset()
 	metrics.TaskTotal.Reset()
-	metrics.TestCount.Reset()
+	metrics.TestTotal.Reset()
 }
 
 // This is also the annotator, so it just returns itself.
@@ -213,7 +213,7 @@ func TestNilUploader(t *testing.T) {
 
 	metrics.FileCount.Reset()
 	metrics.TaskTotal.Reset()
-	metrics.TestCount.Reset()
+	metrics.TestTotal.Reset()
 }
 
 func TestProcessGKETask(t *testing.T) {
@@ -248,7 +248,7 @@ func TestProcessGKETask(t *testing.T) {
 	metrics.TaskTotal.Collect(c)
 	checkCounter(t, c, 1)
 
-	metrics.TestCount.Collect(c)
+	metrics.TestTotal.Collect(c)
 	checkCounter(t, c, 478)
 
 	if up.Total != 478 {
@@ -256,5 +256,5 @@ func TestProcessGKETask(t *testing.T) {
 	}
 	metrics.FileCount.Reset()
 	metrics.TaskTotal.Reset()
-	metrics.TestCount.Reset()
+	metrics.TestTotal.Reset()
 }

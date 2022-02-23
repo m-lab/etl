@@ -364,7 +364,7 @@ func (pb *Base) Put(row Annotatable) error {
 			// row.
 			// When using GCS output, this may result in a corrupted json file.
 			// In that event, the test count may become meaningless.
-			metrics.TestCount.WithLabelValues(pb.label, pb.label, "error").Inc()
+			metrics.TestTotal.WithLabelValues(pb.label, pb.label, "error").Inc()
 			metrics.ErrorCount.WithLabelValues(
 				pb.label, "", "put error").Inc()
 			return err

@@ -105,7 +105,7 @@ OUTER:
 				log.Printf("ERROR filename:%s testname:%s files:%d, duration:%v err:%v",
 					tt.meta["filename"], testname, files,
 					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
-				metrics.TestCount.WithLabelValues(
+				metrics.TestTotal.WithLabelValues(
 					tt.Type(), "unknown", "oversize file").Inc()
 				continue OUTER
 			default:
@@ -123,7 +123,7 @@ OUTER:
 					tt.meta["filename"], testname, files,
 					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
 
-				metrics.TestCount.WithLabelValues(
+				metrics.TestTotal.WithLabelValues(
 					tt.Type(), "unknown", "unrecovered").Inc()
 				// Since we don't understand these errors, safest thing to do is
 				// stop processing the tar file (and task).

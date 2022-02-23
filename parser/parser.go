@@ -173,7 +173,7 @@ type NullParser struct {
 }
 
 func (np *NullParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	metrics.TestCount.WithLabelValues("table", "null", "ok").Inc()
+	metrics.TestTotal.WithLabelValues("table", "null", "ok").Inc()
 	return nil
 }
 func (np *NullParser) TableName() string {

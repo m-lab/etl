@@ -92,7 +92,7 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	err := json.Unmarshal(test, &raw)
 	if err != nil {
 		log.Println(err)
-		metrics.TestCount.WithLabelValues(ap.TableName(), "annotation", "decode-location-error").Inc()
+		metrics.TestTotal.WithLabelValues(ap.TableName(), "annotation", "decode-location-error").Inc()
 		return err
 	}
 
@@ -118,7 +118,7 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	}
 
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(ap.TableName(), "annotation", "ok").Inc()
+	metrics.TestTotal.WithLabelValues(ap.TableName(), "annotation", "ok").Inc()
 	return nil
 }
 

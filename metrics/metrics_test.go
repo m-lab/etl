@@ -100,7 +100,7 @@ func TestMetrics(t *testing.T) {
 	metrics.PTTestCount.WithLabelValues("x")
 	metrics.RowSizeHistogram.WithLabelValues("x")
 	metrics.TaskTotal.WithLabelValues("x", "x")
-	metrics.TestCount.WithLabelValues("x", "x", "x")
+	metrics.TestTotal.WithLabelValues("x", "x", "x")
 	metrics.WarningCount.WithLabelValues("x", "x", "x")
 	metrics.WorkerCount.WithLabelValues("x")
 	metrics.WorkerState.WithLabelValues("x", "x")

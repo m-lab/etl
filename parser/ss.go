@@ -262,27 +262,27 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		}
 		ssValue, err := ParseOneLine(oneLine, varNames)
 		if err != nil {
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				ss.TableName(), "ss", "corrupted content").Inc()
 			continue
 		}
 		err = web100.ValidateIP(ssValue["LocalAddress"])
 		if err != nil {
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				ss.TableName(), "ss", "Invalid server IP").Inc()
 			log.Printf("Invalid server IP address: %s with error: %s\n", ssValue["LocalAddress"], err)
 			continue
 		}
 		err = web100.ValidateIP(ssValue["RemAddress"])
 		if err != nil {
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				ss.TableName(), "ss", "Invalid client IP").Inc()
 			log.Printf("Invalid client IP address: %s with error: %s", ssValue["RemAddress"], err)
 			continue
 		}
 		ssTest, err := PackDataIntoSchema(ssValue, logTime, testName)
 		if err != nil {
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				ss.TableName(), "ss", "corrupted data").Inc()
 			log.Printf("cannot pack data into sidestream schema: %v\n", err)
 			continue
@@ -310,12 +310,12 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				ss.TableName(), "ss", "insert-err").Inc()
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				ss.TableName(), "ss", "insert-err").Inc()
 			log.Printf("insert-err: %v\n", err)
 			continue
 		}
-		metrics.TestCount.WithLabelValues(ss.TableName(), "ss", "ok").Inc()
+		metrics.TestTotal.WithLabelValues(ss.TableName(), "ss", "ok").Inc()
 	}
 	return nil
 }

@@ -119,7 +119,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 		var err error
 		rawContent, err = gozstd.Decompress(nil, rawContent)
 		if err != nil {
-			metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "zstd error").Inc()
+			metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "zstd error").Inc()
 			return err
 		}
 	}
@@ -156,7 +156,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 	if err != io.EOF {
 		log.Println(err)
 		log.Println(string(rawContent))
-		metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "decode error").Inc()
+		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "decode error").Inc()
 		metrics.ErrorCount.WithLabelValues(
 			p.TableName(), "", "decode error").Inc()
 		return err
@@ -164,7 +164,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 
 	if len(snaps) < 1 {
 		// For now, we don't save rows with no snapshots.
-		metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "no-snaps").Inc()
+		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "no-snaps").Inc()
 		metrics.WarningCount.WithLabelValues(
 			p.TableName(), "", "no-snaps").Inc()
 		return nil
@@ -201,7 +201,7 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 	if err := p.Put(&row); err != nil {
 		return err
 	}
-	metrics.TestCount.WithLabelValues(p.TableName(), "tcpinfo", "ok").Inc()
+	metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "ok").Inc()
 	return nil
 }
 

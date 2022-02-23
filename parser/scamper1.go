@@ -108,7 +108,8 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 
 	scamperOutput, err := parser.ParseTraceroute(rawContent)
 	if err != nil {
-		return fmt.Errorf("failed to parse scamper1 file: %v", err)
+		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
+		return fmt.Errorf("failed to parse scamper1 file: %s, error: %w", testName, err)
 	}
 
 	bqScamperOutput := schema.BQScamperOutput{
@@ -139,7 +140,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	}
 
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(p.TableName(), scamper1, "ok").Inc()
+	metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, "ok").Inc()
 
 	return nil
 }

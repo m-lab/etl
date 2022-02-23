@@ -159,7 +159,7 @@ func ParsePT(testName string, rawContent []byte, tableName string, taskFilename 
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
 		log.Println(err)
 		return schema.PTTest{}, errors.New("corrupted json content")
@@ -211,7 +211,7 @@ func ParseJSONL(testName string, rawContent []byte, tableName string, taskFilena
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
 		return schema.PTTest{}, errors.New("empty UUID")
 	}
@@ -224,7 +224,7 @@ func ParseJSONL(testName string, rawContent []byte, tableName string, taskFilena
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
 		return schema.PTTest{}, err
 	}
@@ -242,7 +242,7 @@ func ParseJSONL(testName string, rawContent []byte, tableName string, taskFilena
 			// fail and return here.
 			metrics.ErrorCount.WithLabelValues(
 				tableName, "pt", "corrupted json content").Inc()
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				tableName, "pt", "corrupted json content").Inc()
 			return schema.PTTest{}, err
 		}
@@ -289,7 +289,7 @@ func ParseJSONL(testName string, rawContent []byte, tableName string, taskFilena
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			tableName, "pt", "corrupted json content").Inc()
 		return schema.PTTest{}, err
 	}
@@ -629,7 +629,7 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		// These are happening at a high rate, so demote them to warnings until we can fix them.
 		metrics.WarningCount.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			pt.TableName(), "pt", "corrupted content").Inc()
 		log.Printf("%v %s", err, testName)
 		return err
@@ -846,7 +846,7 @@ func Parse(meta map[string]bigquery.Value, testName string, testId string, rawCo
 			if err != nil {
 				log.Printf("%s %s", oneLine, testName)
 				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
-				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
+				metrics.TestTotal.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				return cachedPTData{}, err
 			}
 		} else {
