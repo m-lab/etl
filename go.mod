@@ -28,8 +28,6 @@ require (
 	github.com/m-lab/uuid-annotator v0.4.5
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.31.1 // indirect
-	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/valyala/gozstd v1.13.0
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
