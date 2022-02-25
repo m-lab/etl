@@ -1,2 +1,148 @@
 raw.Tracelb.Nodes.HopID:
   Description: Daily unique identifier to join traceroute datasets with Hop Annotations.
+# Descriptions of the following fields are provided in toplevel.yaml.
+#id:
+#parser:
+#parser.Version:
+#parser.Time:
+#parser.ArchiveURL:
+#date:
+#raw:
+parser.Filename:
+  Description:
+parser.Priority:
+  Description:
+parser.GitCommit:
+  Description:
+raw.Metadata:
+  Description:
+raw.Metadata.UUID:
+  Description:
+raw.Metadata.TracerouteCallerVersion:
+  Description: The version of traceroute-caller.
+raw.Metadata.CachedResult:
+  Description: Traceroute data was found in the cache.
+raw.Metadata.CachedUUID:
+  Description: UUID of the cached traceroute data.
+raw.CycleStart:
+  Description:
+raw.CycleStart.Type:
+  Description: The string cycle-start.
+raw.CycleStart.list_name:
+  Description:
+raw.CycleStart.ID:
+  Description:
+raw.CycleStart.Hostname:
+  Description: The hostname of the machine running the traceroute.
+raw.CycleStart.start_time:
+  Description: When traceroute started in Unix epoch.
+raw.Tracelb:
+  Description:
+raw.Tracelb.type:
+  Description: The string tracelb.
+raw.Tracelb.version:
+  Description: The version of tracelb.
+raw.Tracelb.userid:
+  Description:
+raw.Tracelb.method:
+  Description: The trace method use by tracelb (icmp-echo).
+raw.Tracelb.src:
+  Description: Source address.
+raw.Tracelb.dst:
+  Description: Destination address.
+raw.Tracelb.start:
+  Description:
+raw.Tracelb.start.Sec:
+  Description: Start time in seconds.
+raw.Tracelb.start.Usec:
+  Description: Start time in microseconds.
+raw.Tracelb.probe_size:
+  Description: Size of the probe to send.
+raw.Tracelb.firsthop:
+  Description: Where to start probing.
+raw.Tracelb.attempts:
+  Description: Number of attempts per probe.
+raw.Tracelb.confidence:
+  Description: Confidence level to attain.
+raw.Tracelb.tos:
+  Description: Type-of-service byte to use.
+raw.Tracelb.gaplimit:
+  Description: Max consecutive unresp. hops.
+raw.Tracelb.wait_timeout:
+  Description: Seconds to wait before timeout.
+raw.Tracelb.wait_probe:
+  Description: min. inter-probe time per TTL.
+raw.Tracelb.probec:
+  Description: Count of probes sent, including retries.
+raw.Tracelb.probec_max:
+  Description: Max number of probes to send.
+raw.Tracelb.nodec:
+  Description: Node count.
+raw.Tracelb.linkc:
+  Description: Link count.
+raw.Tracelb.nodes:
+  Description:
+raw.Tracelb.nodes.hop_id:
+  Description:
+raw.Tracelb.nodes.addr:
+  Description:
+raw.Tracelb.nodes.name:
+  Description:
+raw.Tracelb.nodes.q_ttl:
+  Description:
+raw.Tracelb.nodes.linkc:
+  Description:
+raw.Tracelb.nodes.links:
+  Description:
+raw.Tracelb.nodes.links.Links:
+  Description:
+raw.Tracelb.nodes.links.Links.Addr:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Tx:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Tx.Sec:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Tx.Usec:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Replyc:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.TTL:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Attempt:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Flowid:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Replies:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Replies.Rx:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Replies.Rx.Sec:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Replies.Rx.Usec:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Replies.TTL:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Replies.RTT:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_type:
+  Description: ICMP type of the reply.
+raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_code:
+  Description: ICMP code the reply.
+raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_q_tos:
+  Description: TOS byte in quote.
+raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_q_ttl:
+  Description: TTL byte in quote.
+raw.CycleStop:
+  Description:
+raw.CycleStop.Type:
+  Description: The string "cycle-stop".
+raw.CycleStop.list_name:
+  Description:
+raw.CycleStop.ID:
+  Description:
+raw.CycleStop.Hostname:
+  Description: The hostname of the machine running the traceroute.
+raw.CycleStop.stop_time:
+  Description: When traceroute finished in Unix epoch.
