@@ -108,7 +108,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// S2C
 	result, err := dp.newResult(test, parser, date)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
+		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
 		return err
 	}
 	if result.Raw.S2C != nil && result.Raw.S2C.UUID != "" {
@@ -121,7 +121,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// C2S
 	result, err = dp.newResult(test, parser, date)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
+		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
 		return err
 	}
 	if result.Raw.C2S != nil && result.Raw.C2S.UUID != "" {
@@ -134,7 +134,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// Neither C2S nor S2C
 	result, err = dp.newResult(test, parser, date)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
+		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
 		return err
 	}
 	if result.Raw.C2S == nil && result.Raw.S2C == nil {
@@ -149,7 +149,7 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	metrics.RowSizeHistogram.WithLabelValues(dp.TableName()).Observe(float64(len(test)))
 
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
+	metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
 	return nil
 }
 
