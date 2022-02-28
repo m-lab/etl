@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"cloud.google.com/go/civil"
+
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -15,6 +17,7 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 		name           string
 		testName       string
 		expectMetadata bool
+		emptySummary   bool
 		wantErr        bool
 	}{
 		{
@@ -27,6 +30,11 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 			testName:       `ndt-vscqp_1565987984_000000000001A1C2.json`,
 			expectMetadata: false,
 		},
+		{
+			name:         "success-empty-s2c-and-c2s",
+			testName:     `ndt-x5dms_1589313593_0000000000024063.json`,
+			emptySummary: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -37,31 +45,73 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
+			d, err := civil.ParseDate("2019-08-22")
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
 			meta := map[string]bigquery.Value{
 				"filename": "gs://mlab-test-bucket/ndt/ndt5/2019/08/22/ndt_ndt5_2019_08_22_20190822T194819.568936Z-ndt5-mlab1-lga0t-ndt.tgz",
+				"date":     d,
 			}
 
 			if err := n.ParseAndInsert(meta, tt.testName, resultData); (err != nil) != tt.wantErr {
 				t.Errorf("NDT5ResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if n.Accepted() != 1 {
+			if tt.emptySummary {
+				if n.Accepted() != 1 {
+					t.Fatal("Failed to insert measurement with no c2s or s2c data.", ins)
+				}
+				return
+			}
+			if n.Accepted() != 2 {
 				t.Fatal("Failed to insert snaplog data.", ins)
 			}
 			n.Flush()
-			actualValues := ins.data[0].(*schema.NDT5ResultRow)
-			if actualValues.Result.Control == nil {
-				t.Fatal("Result.Control is nil, expected value")
+
+			// Should include download (0) and upload (1).
+			download := ins.data[0].(*schema.NDT5ResultRowV2)
+			if download.Raw.Control == nil {
+				t.Fatal("Raw.Control is nil, expected value")
 			}
-			if actualValues.Result.Control.UUID != strings.TrimSuffix(tt.testName, ".json") {
-				t.Fatalf("Result.Control.UUID incorrect; got %q ; want %q", actualValues.Result.Control.UUID, strings.TrimSuffix(tt.testName, ".json"))
+			if download.Raw.Control.UUID != strings.TrimSuffix(tt.testName, ".json") {
+				t.Fatalf("Raw.Control.UUID incorrect; got %q ; want %q", download.Raw.Control.UUID, strings.TrimSuffix(tt.testName, ".json"))
 			}
-			if tt.expectMetadata && len(actualValues.Result.Control.ClientMetadata) != 1 {
-				t.Fatalf("Result.Control.ClientMetadata length != 1; got %d, want 1", len(actualValues.Result.Control.ClientMetadata))
+			if tt.expectMetadata && len(download.Raw.Control.ClientMetadata) != 1 {
+				t.Fatalf("Raw.Control.ClientMetadata length != 1; got %d, want 1", len(download.Raw.Control.ClientMetadata))
 			}
-			if tt.expectMetadata && (actualValues.Result.Control.ClientMetadata[0].Name != "client.os.name" || actualValues.Result.Control.ClientMetadata[0].Value != "NDTjs") {
-				t.Fatalf("Result.Control.ClientMetadata has wrong value; got %q=%q, want client.os.name=NDTjs",
-					actualValues.Result.Control.ClientMetadata[0].Name,
-					actualValues.Result.Control.ClientMetadata[0].Value)
+			if tt.expectMetadata && (download.Raw.Control.ClientMetadata[0].Name != "client.os.name" || download.Raw.Control.ClientMetadata[0].Value != "NDTjs") {
+				t.Fatalf("Raw.Control.ClientMetadata has wrong value; got %q=%q, want client.os.name=NDTjs",
+					download.Raw.Control.ClientMetadata[0].Name,
+					download.Raw.Control.ClientMetadata[0].Value)
+			}
+			if download.Raw.S2C == nil {
+				t.Fatalf("Raw.S2C is nil")
+			}
+			if download.Raw.S2C.UUID != download.A.UUID {
+				t.Fatalf("Raw.S2C.UUID does not match A.UUID; got %s, want %s",
+					download.Raw.S2C.UUID, download.A.UUID)
+			}
+			upload := ins.data[1].(*schema.NDT5ResultRowV2)
+			if upload.Raw.Control == nil {
+				t.Fatal("Raw.Control is nil, expected value")
+			}
+			if upload.Raw.Control.UUID != strings.TrimSuffix(tt.testName, ".json") {
+				t.Fatalf("Raw.Control.UUID incorrect; got %q ; want %q", upload.Raw.Control.UUID, strings.TrimSuffix(tt.testName, ".json"))
+			}
+			if tt.expectMetadata && len(upload.Raw.Control.ClientMetadata) != 1 {
+				t.Fatalf("Raw.Control.ClientMetadata length != 1; got %d, want 1", len(upload.Raw.Control.ClientMetadata))
+			}
+			if tt.expectMetadata && (upload.Raw.Control.ClientMetadata[0].Name != "client.os.name" || upload.Raw.Control.ClientMetadata[0].Value != "NDTjs") {
+				t.Fatalf("Raw.Control.ClientMetadata has wrong value; got %q=%q, want client.os.name=NDTjs",
+					upload.Raw.Control.ClientMetadata[0].Name,
+					upload.Raw.Control.ClientMetadata[0].Value)
+			}
+			if upload.Raw.C2S == nil {
+				t.Fatalf("Raw.C2S is nil")
+			}
+			if upload.Raw.C2S.UUID != upload.A.UUID {
+				t.Fatalf("Raw.C2S.UUID does not match A.UUID; got %s, want %s",
+					upload.Raw.C2S.UUID, upload.A.UUID)
 			}
 		})
 	}

@@ -3,7 +3,6 @@ package parser
 // This file defines the Parser subtype that handles NDT5Result data.
 
 import (
-	"bytes"
 	"encoding/json"
 	"log"
 	"regexp"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 
 	v2as "github.com/m-lab/annotation-service/api/v2"
 
@@ -35,7 +35,7 @@ type NDT5ResultParser struct {
 func NewNDT5ResultParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.NDT5.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
+		ann = &nullAnnotator{}
 	}
 
 	return &NDT5ResultParser{
@@ -73,7 +73,6 @@ func (dp *NDT5ResultParser) IsParsable(testName string, data []byte) (string, bo
 
 // ParseAndInsert decodes the data.NDT5Result JSON and inserts it into BQ.
 func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Dec()
 
@@ -84,42 +83,120 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// to 2019-08-26 (v0.12). For these tests the ClientMetadata will be empty.
 	var re = regexp.MustCompile(`,"ClientMetadata":{[^}]+}`)
 	test = []byte(re.ReplaceAllString(string(test), ``))
-
-	rdr := bytes.NewReader(test)
-	dec := json.NewDecoder(rdr)
-
-	for dec.More() {
-		stats := schema.NDT5ResultRow{
-			TestID: testName,
-			ParseInfo: &schema.ParseInfoV0{
-				TaskFileName:  meta["filename"].(string),
-				ParseTime:     time.Now(),
-				ParserVersion: Version(),
-			},
-		}
-		err := dec.Decode(&stats.Result)
-		if err != nil {
-			log.Println(err)
-			metrics.TestTotal.WithLabelValues(
-				dp.TableName(), "ndt5_result", "Decode").Inc()
-			return err
-		}
-
-		// Set the LogTime to the Result.StartTime
-		stats.LogTime = stats.Result.StartTime.Unix()
-
-		// Estimate the row size based on the input JSON size.
-		metrics.RowSizeHistogram.WithLabelValues(
-			dp.TableName()).Observe(float64(len(test)))
-
-		if err = dp.Base.Put(&stats); err != nil {
-			return err
-		}
-		// Count successful inserts.
-		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
+	if len(test) == 0 {
+		// This is an empty test.
+		// NOTE: We may wish to record these for full e2e accounting.
+		metrics.RowSizeHistogram.WithLabelValues(dp.TableName()).Observe(float64(len(test)))
+		return nil
 	}
 
+	parser := schema.ParseInfo{
+		Version:    Version(),
+		Time:       time.Now(),
+		ArchiveURL: meta["filename"].(string),
+		Filename:   testName,
+		GitCommit:  GitCommit(),
+	}
+	date := meta["date"].(civil.Date)
+
+	// Since ndt5 rows can include both download (S2C) and upload (C2S)
+	// measurements (or neither), check and write independent rows for either
+	// direction. This approach results in one row for upload, one row for
+	// download just like the ndt7 data. The `Raw.Control` structure will be
+	// shared when there are upload and download measurements on the same test.
+
+	// S2C
+	result, err := dp.newResult(test, parser, date)
+	if err != nil {
+		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
+		return err
+	}
+	if result.Raw.S2C != nil && result.Raw.S2C.UUID != "" {
+		dp.prepareS2CRow(result)
+		if err = dp.Base.Put(result); err != nil {
+			return err
+		}
+	}
+
+	// C2S
+	result, err = dp.newResult(test, parser, date)
+	if err != nil {
+		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
+		return err
+	}
+	if result.Raw.C2S != nil && result.Raw.C2S.UUID != "" {
+		dp.prepareC2SRow(result)
+		if err = dp.Base.Put(result); err != nil {
+			return err
+		}
+	}
+
+	// Neither C2S nor S2C
+	result, err = dp.newResult(test, parser, date)
+	if err != nil {
+		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "Decode").Inc()
+		return err
+	}
+	if result.Raw.C2S == nil && result.Raw.S2C == nil {
+		result.ID = result.Raw.Control.UUID
+		result.A = nil // nothing to summarize.
+		if err = dp.Base.Put(result); err != nil {
+			return err
+		}
+	}
+
+	// Estimate the row size based on the input JSON size.
+	metrics.RowSizeHistogram.WithLabelValues(dp.TableName()).Observe(float64(len(test)))
+
+	// Count successful inserts.
+	metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt5_result", "ok").Inc()
 	return nil
+}
+
+func (dp *NDT5ResultParser) newResult(test []byte, parser schema.ParseInfo, date civil.Date) (*schema.NDT5ResultRowV2, error) {
+	result := &schema.NDT5ResultRowV2{
+		Parser: parser,
+		Date:   date,
+	}
+	err := json.Unmarshal(test, &result.Raw)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) {
+	// Record S2C result.
+	s2c := row.Raw.S2C
+	row.ID = s2c.UUID
+	row.A = &schema.NDT5Summary{
+		UUID:               s2c.UUID,
+		TestTime:           s2c.StartTime,
+		MeanThroughputMbps: s2c.MeanThroughputMbps,
+		CongestionControl:  "cubic",
+		MinRTT:             float64(s2c.MinRTT) / float64(time.Millisecond),
+	}
+	// NOTE: the TCPInfo structure was introduced in v0.18.0. Measurements
+	// from earlier versions will not have values in the TCPInfo struct here.
+	if s2c.TCPInfo != nil && s2c.TCPInfo.BytesSent > 0 {
+		row.A.LossRate = float64(s2c.TCPInfo.BytesRetrans) / float64(s2c.TCPInfo.BytesSent)
+	}
+	row.Raw.C2S = nil
+}
+
+func (dp *NDT5ResultParser) prepareC2SRow(row *schema.NDT5ResultRowV2) {
+	// Record C2S result.
+	c2s := row.Raw.C2S
+	row.ID = c2s.UUID
+	row.A = &schema.NDT5Summary{
+		UUID:               c2s.UUID,
+		TestTime:           c2s.StartTime,
+		MeanThroughputMbps: c2s.MeanThroughputMbps,
+		CongestionControl:  "unknown",
+		MinRTT:             -1, // unknown.
+		LossRate:           -1, // unknown.
+	}
+	row.Raw.S2C = nil
 }
 
 // NB: These functions are also required to complete the etl.Parser interface.
