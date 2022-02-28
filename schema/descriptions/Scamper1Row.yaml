@@ -45,7 +45,7 @@ raw.Tracelb.version:
 raw.Tracelb.userid:
   Description:
 raw.Tracelb.method:
-  Description: The trace method use by tracelb (icmp-echo).
+  Description: The trace method used by tracelb (icmp-echo).
 raw.Tracelb.src:
   Description: Source address.
 raw.Tracelb.dst:
@@ -67,15 +67,15 @@ raw.Tracelb.confidence:
 raw.Tracelb.tos:
   Description: Type-of-service byte to use.
 raw.Tracelb.gaplimit:
-  Description: Max consecutive unresp. hops.
+  Description: Maximum consecutive unresponsive hops.
 raw.Tracelb.wait_timeout:
   Description: Seconds to wait before timeout.
 raw.Tracelb.wait_probe:
-  Description: min. inter-probe time per TTL.
+  Description: Minimum inter-probe time per TTL.
 raw.Tracelb.probec:
   Description: Count of probes sent, including retries.
 raw.Tracelb.probec_max:
-  Description: Max number of probes to send.
+  Description: Maximum number of probes to send.
 raw.Tracelb.nodec:
   Description: Node count.
 raw.Tracelb.linkc:
@@ -129,7 +129,7 @@ raw.Tracelb.nodes.links.Links.Probes.Replies.RTT:
 raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_type:
   Description: ICMP type of the reply.
 raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_code:
-  Description: ICMP code the reply.
+  Description: ICMP code of the reply.
 raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_q_tos:
   Description: TOS byte in quote.
 raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_q_ttl:
