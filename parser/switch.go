@@ -91,7 +91,7 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 		tmp := &schema.RawSwitchStats{}
 		err := dec.Decode(tmp)
 		if err != nil {
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				p.TableName(), string(etl.SW), "Decode").Inc()
 			// TODO(dev) Should accumulate errors, instead of aborting?
 			return err
@@ -201,12 +201,12 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 		// Insert the row.
 		err := p.Base.Put(row)
 		if err != nil {
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				p.TableName(), string(etl.SW), "put-error").Inc()
 			return err
 		}
 		// Count successful inserts.
-		metrics.TestCount.WithLabelValues(p.TableName(), string(etl.SW), "ok").Inc()
+		metrics.TestTotal.WithLabelValues(p.TableName(), string(etl.SW), "ok").Inc()
 	}
 
 	// Measure the distribution of records per file.
