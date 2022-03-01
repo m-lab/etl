@@ -6,6 +6,7 @@ package row
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -27,6 +28,18 @@ var (
 	ErrBufferFull      = errors.New("Buffer full")
 	ErrInvalidSink     = errors.New("Not a valid row.Sink")
 )
+
+type ErrCommitRow struct {
+	Err error
+}
+
+func (e ErrCommitRow) Error() string {
+	return fmt.Sprintf("failed to commit row(s), error: %s", e.Err)
+}
+
+func (e ErrCommitRow) Unwrap() error {
+	return e.Err
+}
 
 // Annotatable interface enables integration of annotation into parser.Base.
 // The row type should implement the interface, and the annotations will be added
@@ -335,7 +348,7 @@ func (pb *Base) commit(rows []interface{}) error {
 		log.Println(pb.label, err)
 		pb.stats.Done(len(rows)-done, err)
 	}
-	return err
+	return ErrCommitRow{err}
 }
 
 // Flush synchronously flushes any pending rows.

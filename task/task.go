@@ -7,6 +7,7 @@ package task
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/go/logx"
 )
@@ -156,9 +158,7 @@ OUTER:
 		}
 		loopErr = tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
-		if loopErr != nil {
-			metrics.TaskTotal.WithLabelValues(
-				tt.Type(), "ParseAndInsertError").Inc()
+		if errors.Is(loopErr, row.ErrCommitRow{}) {
 			log.Printf("ERROR %v", loopErr)
 			// TODO(dev) Handle this error properly!
 			if failfast {
