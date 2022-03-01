@@ -340,7 +340,11 @@ func (pb *Base) commit(rows []interface{}) error {
 
 	// TODO do we need these to be done in order.
 	// This is synchronous, blocking, and thread safe.
-	done, err := pb.sink.Commit(rows, pb.label)
+	done, commitErr := pb.sink.Commit(rows, pb.label)
+	if commitErr != nil {
+		err = ErrCommitRow{err}
+	}
+
 	if done > 0 {
 		pb.stats.Done(done, nil)
 	}
@@ -348,7 +352,7 @@ func (pb *Base) commit(rows []interface{}) error {
 		log.Println(pb.label, err)
 		pb.stats.Done(len(rows)-done, err)
 	}
-	return ErrCommitRow{err}
+	return err
 }
 
 // Flush synchronously flushes any pending rows.
