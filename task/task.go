@@ -158,10 +158,10 @@ OUTER:
 		}
 		loopErr = tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
-		if errors.Is(loopErr, row.ErrCommitRow{}) {
+		if loopErr != nil {
 			log.Printf("ERROR %v", loopErr)
 			// TODO(dev) Handle this error properly!
-			if failfast {
+			if failfast && errors.Is(loopErr, row.ErrCommitRow{}) {
 				break OUTER
 			}
 			continue

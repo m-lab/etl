@@ -342,7 +342,7 @@ func (pb *Base) commit(rows []interface{}) error {
 	// This is synchronous, blocking, and thread safe.
 	done, commitErr := pb.sink.Commit(rows, pb.label)
 	if commitErr != nil {
-		err = ErrCommitRow{err}
+		err = ErrCommitRow{commitErr}
 	}
 
 	if done > 0 {
