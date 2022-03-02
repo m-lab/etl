@@ -34,7 +34,7 @@ type ErrCommitRow struct {
 }
 
 func (e ErrCommitRow) Error() string {
-	return fmt.Sprintf("failed to commit row(s), error: %s", e.Err)
+	return fmt.Sprintf("failed to commit row(s), error: %v", e.Err)
 }
 
 func (e ErrCommitRow) Unwrap() error {
@@ -340,11 +340,7 @@ func (pb *Base) commit(rows []interface{}) error {
 
 	// TODO do we need these to be done in order.
 	// This is synchronous, blocking, and thread safe.
-	done, commitErr := pb.sink.Commit(rows, pb.label)
-	if commitErr != nil {
-		err = ErrCommitRow{commitErr}
-	}
-
+	done, err := pb.sink.Commit(rows, pb.label)
 	if done > 0 {
 		pb.stats.Done(done, nil)
 	}
@@ -352,7 +348,7 @@ func (pb *Base) commit(rows []interface{}) error {
 		log.Println(pb.label, err)
 		pb.stats.Done(len(rows)-done, err)
 	}
-	return err
+	return ErrCommitRow{err}
 }
 
 // Flush synchronously flushes any pending rows.
