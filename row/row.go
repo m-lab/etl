@@ -347,8 +347,9 @@ func (pb *Base) commit(rows []interface{}) error {
 	if err != nil {
 		log.Println(pb.label, err)
 		pb.stats.Done(len(rows)-done, err)
+		return ErrCommitRow{err}
 	}
-	return ErrCommitRow{err}
+	return err
 }
 
 // Flush synchronously flushes any pending rows.
