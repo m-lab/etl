@@ -29,14 +29,21 @@ var (
 	ErrInvalidSink     = errors.New("Not a valid row.Sink")
 )
 
+// ErrCommitRow is returned when there was an error committing a
+// row to the Sink.
 type ErrCommitRow struct {
 	Err error
 }
 
+// Error returns the commit error message, including the error
+// message return by the Sink.
 func (e ErrCommitRow) Error() string {
 	return fmt.Sprintf("failed to commit row(s), error: %v", e.Err)
 }
 
+// Unwrap returns the wrapped base error. The errors.Is function
+// sequentially uses this function to check for equality within
+// nested errors.
 func (e ErrCommitRow) Unwrap() error {
 	return e.Err
 }
