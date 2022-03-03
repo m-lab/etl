@@ -161,7 +161,8 @@ OUTER:
 		if loopErr != nil {
 			log.Printf("ERROR %v", loopErr)
 			// TODO(dev) Handle this error properly!
-			if failfast && errors.Is(loopErr, row.ErrCommitRow) {
+			commitRowErr := row.ErrCommitRow{}
+			if failfast && errors.As(loopErr, &commitRowErr) {
 				break OUTER
 			}
 			continue
