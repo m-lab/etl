@@ -1,7 +1,6 @@
 package row_test
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -185,23 +184,4 @@ func TestAsyncPut(t *testing.T) {
 
 func assertBQInserterIsSink(in row.Sink) {
 	func(in row.Sink) {}(&bq.BQInserter{})
-}
-
-func TestErrCommitRow(t *testing.T) {
-	baseErr := errors.New("googleapi.Error")
-	commitErr := row.ErrCommitRow{baseErr}
-	expectedMessage := "failed to commit row(s), error: googleapi.Error"
-
-	if commitErr.Error() != expectedMessage {
-		t.Errorf("ErrCommitRow.Error() failed error message, expected: %s, got: %s", expectedMessage, commitErr.Error())
-	}
-
-	if !errors.Is(commitErr.Unwrap(), baseErr) {
-		t.Errorf("ErrCommitRow.Unwrap() failed to unwrap error, expected: %v, got: %v", baseErr, commitErr.Unwrap())
-	}
-
-	target := row.ErrCommitRow{}
-	if !errors.As(commitErr, &target) {
-		t.Errorf("ErrCommitRow.As() failed to recognize error as ErrCommitRow, expected: true, got: false")
-	}
 }
