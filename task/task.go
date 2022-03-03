@@ -183,7 +183,7 @@ OUTER:
 
 	// We expect the loopErr to be io.EOF.  If it is something else, then
 	// it is an actual error, and we want to return that error.
-	if loopErr != io.EOF {
+	if !errors.Is(loopErr, io.EOF) {
 		return files, loopErr
 	}
 
