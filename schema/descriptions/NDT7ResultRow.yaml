@@ -276,7 +276,7 @@ ClientMetadata.Value:
 ServerMetadata:
   Description: Authoritative metadata added by the server configuration.
 ServerMetadata.Name:
-  Description: If set, contains the name a single piece of metadata.
+  Description: If set, contains the name of a single piece of metadata.
     This name will be the same for all measurements collected while this
     server was running with this configuration.
 ServerMetadata.Value:
