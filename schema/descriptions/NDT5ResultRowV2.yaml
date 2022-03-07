@@ -60,6 +60,16 @@ Control.ClientMetadata.Name:
 Control.ClientMetadata.Value:
   Description: If set, contains a value corresponding to metadata name. For
     example, "Windows 10" or "ndtJS"
+Control.ServerMetadata:
+  Description: Authoritative metadata added by the server configuration.
+Control.ServerMetadata.Name:
+  Description: If set, contains the name a single piece of metadata.
+    This name will be the same for all measurements collected while this
+    server was running with this configuration.
+Control.ServerMetadata.Value:
+  Description: If name is set, contains the text of a server configuration
+    value. This value will be the same for all measurements collected while
+    this server was running with this configuration.
 
 C2S:
   Description: Metadata for Client-to-Server (upload) measurements performed
