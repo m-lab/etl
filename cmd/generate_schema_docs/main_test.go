@@ -35,7 +35,7 @@ func Test_main(t *testing.T) {
 	main() // no crash == working
 
 	files := [4]string{
-		"schema_ndt5resultrow.md",
+		"schema_ndt5resultrowv2.md",
 		"schema_pcaprow.md",
 		"schema_hopannotation1row.md",
 		"schema_scamper1row.md",

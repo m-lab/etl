@@ -152,7 +152,7 @@ func main() {
 	generators := []schemaGenerator{
 		&schema.AnnotationRow{},
 		&schema.HopAnnotation1Row{},
-		&schema.NDT5ResultRow{},
+		&schema.NDT5ResultRowV2{},
 		&schema.NDT7ResultRow{},
 		&schema.TCPRow{},
 		&schema.PTTest{},
