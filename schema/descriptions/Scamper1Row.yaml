@@ -27,7 +27,7 @@ raw.Metadata.CachedUUID:
 raw.CycleStart:
   Description:
 raw.CycleStart.Type:
-  Description: The string cycle-start.
+  Description: The string "cycle-start".
 raw.CycleStart.list_name:
   Description:
 raw.CycleStart.ID:
@@ -39,23 +39,23 @@ raw.CycleStart.start_time:
 raw.Tracelb:
   Description:
 raw.Tracelb.type:
-  Description: The string tracelb.
+  Description: The string "tracelb".
 raw.Tracelb.version:
   Description: The version of tracelb.
 raw.Tracelb.userid:
-  Description:
+  Description: The user ID, not used by M-Lab.
 raw.Tracelb.method:
-  Description: The trace method used by tracelb (icmp-echo).
+  Description: The trace method used by tracelb ("icmp-echo" for MDA traceroutes).
 raw.Tracelb.src:
   Description: Source address.
 raw.Tracelb.dst:
   Description: Destination address.
 raw.Tracelb.start:
-  Description:
+  Description: A timestamp when the traceroute started.
 raw.Tracelb.start.Sec:
-  Description: Start time in seconds.
+  Description: Number of seconds since Unix epoch when the traceroute started.
 raw.Tracelb.start.Usec:
-  Description: Start time in microseconds.
+  Description: Microseconds elapsed within the second when this traceroute started.
 raw.Tracelb.probe_size:
   Description: Size of the probe to send.
 raw.Tracelb.firsthop:
@@ -77,63 +77,63 @@ raw.Tracelb.probec:
 raw.Tracelb.probec_max:
   Description: Maximum number of probes to send.
 raw.Tracelb.nodec:
-  Description: Node count.
+  Description: The number of nodes in the traceroute.
 raw.Tracelb.linkc:
-  Description: Link count.
+  Description: The number of links in the traceroute.
 raw.Tracelb.nodes:
   Description:
 raw.Tracelb.nodes.hop_id:
   Description:
 raw.Tracelb.nodes.addr:
-  Description:
+  Description: The IP address of the node.
 raw.Tracelb.nodes.name:
-  Description:
+  Description: The hostname for the IP address.
 raw.Tracelb.nodes.q_ttl:
-  Description:
+  Description: The TTL value of the quoted traceroute probe.
 raw.Tracelb.nodes.linkc:
-  Description:
+  Description: The number of links for this node.
 raw.Tracelb.nodes.links:
   Description:
 raw.Tracelb.nodes.links.Links:
   Description:
 raw.Tracelb.nodes.links.Links.Addr:
-  Description:
+  Description: The address in a link.
 raw.Tracelb.nodes.links.Links.Probes:
-  Description:
+  Description: The probes that observed this link.
 raw.Tracelb.nodes.links.Links.Probes.Tx:
-  Description:
+  Description: The timestamp of a probe.
 raw.Tracelb.nodes.links.Links.Probes.Tx.Sec:
-  Description:
+  Description: The seconds portion of the timestamp of the probe.
 raw.Tracelb.nodes.links.Links.Probes.Tx.Usec:
-  Description:
+  Description: The microseconds portion of the timestamp of the probe.
 raw.Tracelb.nodes.links.Links.Probes.Replyc:
-  Description:
+  Description: The number of replies this probe received from this address.
 raw.Tracelb.nodes.links.Links.Probes.TTL:
-  Description:
+  Description: The TTL of the probe sent.
 raw.Tracelb.nodes.links.Links.Probes.Attempt:
-  Description:
+  Description: The attempt number of this probe.
 raw.Tracelb.nodes.links.Links.Probes.Flowid:
-  Description:
+  Description: The flow identifier of this probe.
 raw.Tracelb.nodes.links.Links.Probes.Replies:
   Description:
 raw.Tracelb.nodes.links.Links.Probes.Replies.Rx:
-  Description:
+  Description: The timestamp of a response.
 raw.Tracelb.nodes.links.Links.Probes.Replies.Rx.Sec:
-  Description:
+  Description: The seconds portion of the response timestamp.
 raw.Tracelb.nodes.links.Links.Probes.Replies.Rx.Usec:
-  Description:
+  Description: The microseconds portion of the response timestamp.
 raw.Tracelb.nodes.links.Links.Probes.Replies.TTL:
-  Description:
+  Description: The TTL of the received response packet.
 raw.Tracelb.nodes.links.Links.Probes.Replies.RTT:
-  Description:
+  Description: The round trip time in milliseconds.
 raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_type:
-  Description: ICMP type of the reply.
+  Description: The type of ICMP response.
 raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_code:
-  Description: ICMP code of the reply.
+  Description: The code of the ICMP response.
 raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_q_tos:
-  Description: TOS byte in quote.
+  Description: The "type of service" byte in the quoted IP packet probe.
 raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_q_ttl:
-  Description: TTL byte in quote.
+  Description: The "time to live" byte in the quoted IP packet probe.
 raw.CycleStop:
   Description:
 raw.CycleStop.Type:
@@ -141,8 +141,8 @@ raw.CycleStop.Type:
 raw.CycleStop.list_name:
   Description:
 raw.CycleStop.ID:
-  Description:
+  Description: UUID of the connection under consideration.
 raw.CycleStop.Hostname:
-  Description: The hostname of the machine running the traceroute.
+  Description: The hostname of the system that this traceroute was collected on.
 raw.CycleStop.stop_time:
   Description: When traceroute finished in Unix epoch.
