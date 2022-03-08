@@ -1,19 +1,5 @@
 raw.Tracelb.Nodes.HopID:
   Description: Daily unique identifier to join traceroute datasets with Hop Annotations.
-# Descriptions of the following fields are provided in toplevel.yaml.
-#id:
-#parser:
-#parser.Version:
-#parser.Time:
-#parser.ArchiveURL:
-#date:
-#raw:
-parser.Filename:
-  Description:
-parser.Priority:
-  Description:
-parser.GitCommit:
-  Description:
 raw.Metadata:
   Description:
 raw.Metadata.UUID:
