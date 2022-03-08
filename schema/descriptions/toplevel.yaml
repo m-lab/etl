@@ -33,6 +33,11 @@ parser.Time:
 parser.ArchiveURL:
   Description: The Google Cloud Storage URL to the archive containing the
     Filename for this row.
+parser.Filename:
+  Description: The name of the filename within the ArchiveURL originally created by the measurement service.
+    Results in the raw record are derived from measurements in this file.
+parser.GitCommit:
+  Description: The git commit of this build of the parser.
 
 server:
   Description: Location information about the M-Lab server that collected the
