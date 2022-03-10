@@ -1,13 +1,5 @@
 raw.Tracelb.Nodes.HopID:
   Description: Daily unique identifier to join traceroute datasets with Hop Annotations.
-# Descriptions of the following fields are provided in toplevel.yaml.
-#id:
-#parser:
-#parser.Version:
-#parser.Time:
-#parser.ArchiveURL:
-#date:
-#raw:
 parser.Filename:
   Description:
 parser.Priority:
@@ -29,9 +21,9 @@ raw.CycleStart:
 raw.CycleStart.Type:
   Description: The string "cycle-start".
 raw.CycleStart.list_name:
-  Description:
+  Description: The name of the IP list file ("/tmp/scamperctl:<nnn>" for daemon mode, "default" for CLI).
 raw.CycleStart.ID:
-  Description:
+  Description: Some ID assigned to identify the list by a person (deprecated).
 raw.CycleStart.Hostname:
   Description: The hostname of the machine running the traceroute.
 raw.CycleStart.start_time:
@@ -43,7 +35,7 @@ raw.Tracelb.type:
 raw.Tracelb.version:
   Description: The version of tracelb.
 raw.Tracelb.userid:
-  Description: The user ID, not used by M-Lab.
+  Description: The user ID passed via -U flag of the tracelb command (not set by M-Lab).
 raw.Tracelb.method:
   Description: The trace method used by tracelb ("icmp-echo" for MDA traceroutes).
 raw.Tracelb.src:
@@ -71,7 +63,7 @@ raw.Tracelb.gaplimit:
 raw.Tracelb.wait_timeout:
   Description: Seconds to wait before timeout.
 raw.Tracelb.wait_probe:
-  Description: Minimum inter-probe time per TTL.
+  Description: Minimum inter-probe time in 1/100th of seconds per TTL.
 raw.Tracelb.probec:
   Description: Count of probes sent, including retries.
 raw.Tracelb.probec_max:
@@ -97,7 +89,7 @@ raw.Tracelb.nodes.links:
 raw.Tracelb.nodes.links.Links:
   Description:
 raw.Tracelb.nodes.links.Links.Addr:
-  Description: The address in a link.
+  Description: The address in a link ("*" for unresponsive hosts).
 raw.Tracelb.nodes.links.Links.Probes:
   Description: The probes that observed this link.
 raw.Tracelb.nodes.links.Links.Probes.Tx:
@@ -105,7 +97,7 @@ raw.Tracelb.nodes.links.Links.Probes.Tx:
 raw.Tracelb.nodes.links.Links.Probes.Tx.Sec:
   Description: The seconds portion of the timestamp of the probe.
 raw.Tracelb.nodes.links.Links.Probes.Tx.Usec:
-  Description: The microseconds portion of the timestamp of the probe.
+  Description: The microsecond portion of the timestamp of the probe.
 raw.Tracelb.nodes.links.Links.Probes.Replyc:
   Description: The number of replies this probe received from this address.
 raw.Tracelb.nodes.links.Links.Probes.TTL:
@@ -121,7 +113,7 @@ raw.Tracelb.nodes.links.Links.Probes.Replies.Rx:
 raw.Tracelb.nodes.links.Links.Probes.Replies.Rx.Sec:
   Description: The seconds portion of the response timestamp.
 raw.Tracelb.nodes.links.Links.Probes.Replies.Rx.Usec:
-  Description: The microseconds portion of the response timestamp.
+  Description: The microsecond portion of the response timestamp.
 raw.Tracelb.nodes.links.Links.Probes.Replies.TTL:
   Description: The TTL of the received response packet.
 raw.Tracelb.nodes.links.Links.Probes.Replies.RTT:
@@ -139,9 +131,9 @@ raw.CycleStop:
 raw.CycleStop.Type:
   Description: The string "cycle-stop".
 raw.CycleStop.list_name:
-  Description:
+  Description: The name of the IP list file ("/tmp/scamperctl:<nnn>" for daemon mode, "default" for CLI).
 raw.CycleStop.ID:
-  Description: UUID of the connection under consideration.
+  Description: Some ID assigned to identify the list by a person (deprecated).
 raw.CycleStop.Hostname:
   Description: The hostname of the system that this traceroute was collected on.
 raw.CycleStop.stop_time:
