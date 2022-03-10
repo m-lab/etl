@@ -1,11 +1,5 @@
 raw.Tracelb.Nodes.HopID:
   Description: Daily unique identifier to join traceroute datasets with Hop Annotations.
-parser.Filename:
-  Description:
-parser.Priority:
-  Description:
-parser.GitCommit:
-  Description:
 raw.Metadata:
   Description:
 raw.Metadata.UUID:
