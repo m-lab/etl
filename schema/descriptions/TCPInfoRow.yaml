@@ -1,3 +1,7 @@
+a.FinalSnapshot:
+  Description: The last snapshot collected.
+a.SockID:
+  Description: The TCP connection socket ID structure.
 TCPInfo:
   Description: Results from getsockopt(..TCP_INFO..)
 TCPInfo.State:
