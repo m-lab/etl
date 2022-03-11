@@ -6,9 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"net"
-	"reflect"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -93,6 +91,7 @@ func GetHopID(cycleStartTime float64, hostname string, address string) string {
 // NewSinkParser creates an appropriate parser for a given data type.
 // Eventually all datatypes will use this instead of NewParser.
 func NewSinkParser(dt etl.DataType, sink row.Sink, table string, ann api.Annotator) etl.Parser {
+	ann = &nullAnnotator{}
 	switch dt {
 	case etl.ANNOTATION:
 		return NewAnnotationParser(sink, table, "", ann)
@@ -125,14 +124,6 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 		return NewDefaultSSParser(ins) // TODO fix this hack.
 	case etl.PT:
 		return NewPTParser(ins)
-	case etl.TCPINFO:
-		sink, ok := ins.(row.Sink)
-		if !ok {
-			log.Printf("%v is not a Sink\n", ins)
-			log.Println(reflect.TypeOf(ins))
-			return nil
-		}
-		return NewTCPInfoParser(sink, ins.TableBase(), ins.TableSuffix(), nil)
 	default:
 		return nil
 	}
