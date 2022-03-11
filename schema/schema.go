@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/go/cloud/bqx"
 )
 
@@ -19,6 +20,33 @@ type ParseInfo struct {
 	Filename   string
 	Priority   int64
 	GitCommit  string
+}
+
+// ServerInfo details various information about the server.
+type ServerInfo struct {
+	IP   string
+	Port uint16
+	IATA string
+
+	Geo     *api.GeolocationIP
+	Network *api.ASData // NOTE: dominant ASN is available at top level.
+}
+
+// ClientInfo details various information about the client.
+type ClientInfo struct {
+	IP   string
+	Port uint16
+
+	Geo     *api.GeolocationIP
+	Network *api.ASData // NOTE: dominant ASN is available at top level.
+}
+
+// ParseInfoV0 provides details about the parsing of this row.
+type ParseInfoV0 struct {
+	TaskFileName  string // The tar file containing this test.
+	ParseTime     time.Time
+	ParserVersion string
+	Filename      string
 }
 
 // FindSchemaDocsFor should be used by parser row types to associate bigquery
