@@ -20,7 +20,7 @@ func TestTCPInfoRow_Schema(t *testing.T) {
 		for _, name := range []string{"id", "a", "parser", "date", "raw"} {
 			if field.Name == name {
 				if field.Description == "" {
-					t.Errorf("PCAPRow.Schema() missing field.Description for %q", field.Name)
+					t.Errorf("TCPInfoRow.Schema() missing field.Description for %q", field.Name)
 				} else {
 					count++
 				}
@@ -28,7 +28,7 @@ func TestTCPInfoRow_Schema(t *testing.T) {
 		}
 		return nil
 	})
-	if count != 3 {
-		t.Errorf("PCAPRow.Schema() missing expected fields: got %d, want 3", count)
+	if count != 5 {
+		t.Errorf("TCPInfoRow.Schema() missing expected fields: got %d, want 3", count)
 	}
 }
