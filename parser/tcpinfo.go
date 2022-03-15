@@ -136,7 +136,6 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	var rec *netlink.ArchivalRecord
 	snaps := make([]*snapshot.Snapshot, 0, 2000)
 	tcpMeta := netlink.Metadata{}
-	//for rec, err = ar.Next(); err == nil; rec, err = ar.Next() {
 	for {
 		rec, err = ar.Next()
 		if err != nil {
@@ -157,7 +156,6 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 
 	if err != io.EOF {
 		log.Println(err)
-		log.Println(string(rawContent))
 		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "decode error").Inc()
 		metrics.ErrorCount.WithLabelValues(p.TableName(), "", "decode error").Inc()
 		return err
@@ -198,6 +196,7 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	}
 
 	if err := p.Put(&row); err != nil {
+		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "put error").Inc()
 		metrics.ErrorCount.WithLabelValues(p.TableName(), "", "put error").Inc()
 		return err
 	}
