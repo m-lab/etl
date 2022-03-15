@@ -1,29 +1,31 @@
 package schema
 
 import (
-	"time"
-
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/tcp-info/inetdiag"
+	"github.com/m-lab/tcp-info/netlink"
 	"github.com/m-lab/tcp-info/snapshot"
 
 	"github.com/m-lab/etl/row"
 )
 
+// TCPInfoSummary includes a summary or derived fields from the raw record.
 type TCPInfoSummary struct {
 	SockID        inetdiag.SockID
 	FinalSnapshot *snapshot.Snapshot
 }
 
+// TCPInfoRawRecord contains raw data from the tcp-info format.
 type TCPInfoRawRecord struct {
-	StartTime time.Time
-	Sequence  int
+	Metadata  netlink.Metadata
 	Snapshots []*snapshot.Snapshot
 }
 
+// TCPInfoRow defines the BQ schema using 'Standard Columns' conventions for
+// tcp-info measurements.
 type TCPInfoRow struct {
 	ID     string            `json:"id" bigquery:"id"`
 	A      *TCPInfoSummary   `json:"a" bigquery:"a"`
@@ -35,7 +37,7 @@ type TCPInfoRow struct {
 	row.NullAnnotator `bigquery:"-"`
 }
 
-// Schema returns the Bigquery schema for TCPRow.
+// Schema returns the Bigquery schema for TCPInfoRow.
 func (row *TCPInfoRow) Schema() (bigquery.Schema, error) {
 	sch, err := bigquery.InferSchema(row)
 	if err != nil {
