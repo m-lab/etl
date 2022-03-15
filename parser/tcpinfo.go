@@ -179,8 +179,8 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	row := schema.TCPInfoRow{
 		ID: tcpMeta.UUID,
 		A: &schema.TCPInfoSummary{
-			FinalSnapshot: snaps[len(snaps)-1],
 			SockID:        snaps[len(snaps)-1].InetDiagMsg.ID.GetSockID(),
+			FinalSnapshot: snaps[len(snaps)-1],
 		},
 		Parser: schema.ParseInfo{
 			Version:    Version(),
@@ -191,8 +191,7 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 		},
 		Date: meta["date"].(civil.Date),
 		Raw: &schema.TCPInfoRawRecord{
-			StartTime: tcpMeta.StartTime,
-			Sequence:  tcpMeta.Sequence,
+			Metadata: tcpMeta,
 			// TODO - restore full snapshots, or implement smarter filtering.
 			Snapshots: thinSnaps(snaps),
 		},
