@@ -16,7 +16,7 @@ test_id:
 log_time:
   Description: Original measurement collection timestamp.
 
-# Lower case top-level columns from for 'Standard Column' schemas.
+# Lower case top-level columns for 'Standard Column' schemas.
 a:
   Description: Fields summarizing or derived from the raw data.
 date:
