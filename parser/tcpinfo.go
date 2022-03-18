@@ -157,20 +157,20 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	if err != io.EOF {
 		log.Println(err)
 		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "decode error").Inc()
-		metrics.ErrorCount.WithLabelValues(p.TableName(), "", "decode error").Inc()
+		metrics.ErrorCount.WithLabelValues(p.TableName(), "tcpinfo", "decode error").Inc()
 		return err
 	}
 
 	if len(snaps) < 1 {
 		// For now, we don't save rows with no snapshots.
 		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "no-snaps").Inc()
-		metrics.WarningCount.WithLabelValues(p.TableName(), "", "no-snaps").Inc()
+		metrics.WarningCount.WithLabelValues(p.TableName(), "tcpinfo", "no-snaps").Inc()
 		return nil
 	}
 	if snaps[len(snaps)-1].InetDiagMsg == nil {
 		// For now, we don't save rows with nil inetdiagmsg.
 		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "nil-inetdiagmsg").Inc()
-		metrics.WarningCount.WithLabelValues(p.TableName(), "", "nil-inetdiagmsg").Inc()
+		metrics.WarningCount.WithLabelValues(p.TableName(), "tcpinfo", "nil-inetdiagmsg").Inc()
 		return nil
 	}
 
@@ -197,7 +197,7 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 
 	if err := p.Put(&row); err != nil {
 		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "put error").Inc()
-		metrics.ErrorCount.WithLabelValues(p.TableName(), "", "put error").Inc()
+		metrics.ErrorCount.WithLabelValues(p.TableName(), "tcpinfo", "put error").Inc()
 		return err
 	}
 	metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "ok").Inc()
