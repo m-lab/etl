@@ -97,9 +97,9 @@ func (p *TCPInfoParser) IsParsable(testName string, data []byte) (string, bool) 
 	return "", false
 }
 
-func thinSnaps(orig []*snapshot.Snapshot) []*snapshot.Snapshot {
+func thinSnaps(orig []snapshot.Snapshot) []snapshot.Snapshot {
 	n := len(orig)
-	out := make([]*snapshot.Snapshot, 0, 1+n/10)
+	out := make([]snapshot.Snapshot, 0, 1+n/10)
 	for i := 0; i < n; i += 10 {
 		out = append(out, orig[i])
 	}
@@ -134,7 +134,7 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 	defer metrics.WorkerState.WithLabelValues(tableName, "tcpinfo-parse").Dec()
 
 	var rec *netlink.ArchivalRecord
-	snaps := make([]*snapshot.Snapshot, 0, 2000)
+	snaps := make([]snapshot.Snapshot, 0, 2000)
 	tcpMeta := netlink.Metadata{}
 	for {
 		rec, err = ar.Next()
@@ -150,7 +150,7 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 			tcpMeta = *snapMeta
 		}
 		if snap.Observed != 0 {
-			snaps = append(snaps, snap)
+			snaps = append(snaps, *snap)
 		}
 	}
 
@@ -188,9 +188,9 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 			GitCommit:  GitCommit(),
 		},
 		Date: meta["date"].(civil.Date),
-		Raw: &schema.TCPInfoRawRecord{
+		Raw: &snapshot.ConnectionLog{
 			Metadata: tcpMeta,
-			// TODO - restore full snapshots, or implement smarter filtering.
+			// TODO(https://github.com/m-lab/etl/issues/1068) - consider minimizing snapshot thinning.
 			Snapshots: thinSnaps(snaps),
 		},
 	}
