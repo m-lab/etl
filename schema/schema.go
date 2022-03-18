@@ -22,7 +22,7 @@ type ParseInfo struct {
 	GitCommit  string
 }
 
-// ServerInfo details various information about the server.
+// ServerInfo details various kinds of information about the server.
 type ServerInfo struct {
 	IP   string
 	Port uint16
@@ -32,7 +32,7 @@ type ServerInfo struct {
 	Network *api.ASData // NOTE: dominant ASN is available at top level.
 }
 
-// ClientInfo details various information about the client.
+// ClientInfo details various kinds of information about the client.
 type ClientInfo struct {
 	IP   string
 	Port uint16
