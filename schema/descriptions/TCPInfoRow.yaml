@@ -404,7 +404,7 @@ SocketMem.Drops:
   Reference:
   Kernel:
 VegasInfo:
-  Description: Instrumntation in Vegas TCP
+  Description: Instrumentation in Vegas TCP
   Discussion: Not used by M-Lab
   SMItype: Counter32
   Units:
