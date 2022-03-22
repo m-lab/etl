@@ -30,13 +30,10 @@ import (
 
 // CreateOrUpdateTCPInfo will update existing TCPInfo table, or create new table if update fails.
 func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
-	row := schema.TCPRow{}
+	row := schema.TCPInfoRow{}
 	schema, err := row.Schema()
-	rtx.Must(err, "TCPRow.Schema")
-	if dataset == "batch" {
-		updateTemplateTables(schema, project, dataset, table, "")
-	}
-	return CreateOrUpdate(schema, project, dataset, table, "")
+	rtx.Must(err, "TCPInfoRow.Schema")
+	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
 func CreateOrUpdatePT(project string, dataset string, table string) error {
@@ -253,18 +250,18 @@ func updateStandardTables(project string) int {
 	if err := CreateOrUpdateSwitchRow(project, "raw_utilization", "switch"); err != nil {
 		errCount++
 	}
+	if err := CreateOrUpdateTCPInfo(project, "tmp_ndt", "tcpinfo"); err != nil {
+		errCount++
+	}
+	if err := CreateOrUpdateTCPInfo(project, "raw_ndt", "tcpinfo"); err != nil {
+		errCount++
+	}
 
 	return errCount
 }
 
 func updateLegacyTables(project string) int {
 	errCount := 0
-	if err := CreateOrUpdateTCPInfo(project, "base_tables", "tcpinfo"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateTCPInfo(project, "batch", "tcpinfo"); err != nil {
-		errCount++
-	}
 	if err := CreateOrUpdatePT(project, "base_tables", "traceroute"); err != nil {
 		errCount++
 	}
@@ -319,10 +316,10 @@ func main() {
 		errCount += updateStandardTables(*project)
 
 	case "tcpinfo":
-		if err := CreateOrUpdateTCPInfo(*project, "base_tables", "tcpinfo"); err != nil {
+		if err := CreateOrUpdateTCPInfo(*project, "tmp_ndt", "tcpinfo"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateTCPInfo(*project, "batch", "tcpinfo"); err != nil {
+		if err := CreateOrUpdateTCPInfo(*project, "raw_ndt", "tcpinfo"); err != nil {
 			errCount++
 		}
 

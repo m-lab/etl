@@ -154,7 +154,7 @@ func main() {
 		&schema.HopAnnotation1Row{},
 		&schema.NDT5ResultRowV2{},
 		&schema.NDT7ResultRow{},
-		&schema.TCPRow{},
+		&schema.TCPInfoRow{},
 		&schema.PTTest{},
 		&schema.PCAPRow{},
 		&schema.Scamper1Row{},

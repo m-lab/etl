@@ -1,5 +1,3 @@
-a:
-  Description: Fields summarizing or derived from the raw data.
 a.UUID:
   Description: UUID for TCP connection.
 a.TestTime:

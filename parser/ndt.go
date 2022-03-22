@@ -561,7 +561,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		log.Println(err)
 		metrics.ErrorCount.WithLabelValues(
-			n.TableBase(), "log_time marshal error").Inc()
+			n.TableBase(), testType, "log_time marshal error").Inc()
 	} else {
 		results["log_time"] = string(lt)
 	}
@@ -569,7 +569,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		log.Println(err)
 		metrics.ErrorCount.WithLabelValues(
-			n.TableBase(), "parse_time marshal error").Inc()
+			n.TableBase(), testType, "parse_time marshal error").Inc()
 	} else {
 		results["parse_time"] = string(now)
 	}
