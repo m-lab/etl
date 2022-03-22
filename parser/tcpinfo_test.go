@@ -13,11 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-test/deep"
-
-	v2 "github.com/m-lab/annotation-service/api/v2"
-
-	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/etl"
@@ -182,40 +177,31 @@ func TestTCPParser(t *testing.T) {
 
 	// Examine rows in some detail...
 	for i, rawRow := range ins.data {
-		row, ok := rawRow.(*schema.TCPRow)
+		row, ok := rawRow.(*schema.TCPInfoRow)
 		if !ok {
-			t.Fatal("not a TCPRow")
+			t.Fatal("not a TCPInfoRow")
 		}
-		if row.ParseInfo.ParseTime.After(time.Now()) {
+		if row.Parser.Time.After(time.Now()) {
 			t.Error("Should have inserted parse_time")
 		}
-		if row.ParseInfo.TaskFileName != url {
-			t.Error("Should have correct taskfilename", taskfilename, "!=", row.ParseInfo.TaskFileName)
+		if row.Parser.ArchiveURL != url {
+			t.Error("Should have correct taskfilename", taskfilename, "!=", row.Parser.ArchiveURL)
 		}
 
-		if !strings.Contains(row.ParseInfo.Filename, row.UUID) {
-			t.Errorf("Should have non empty filename containing UUID: %s not found in :%s:\n", row.UUID, row.ParseInfo.Filename)
+		if !strings.Contains(row.Parser.Filename, row.ID) {
+			t.Errorf("Should have non empty filename containing UUID: %s not found in :%s:\n", row.ID, row.Parser.Filename)
 		}
 
-		if row.ParseInfo.ParserVersion != parserVersion {
-			t.Error("ParserVersion not properly set", row.ParseInfo.ParserVersion)
+		if row.Parser.Version != parserVersion {
+			t.Error("ParserVersion not properly set", row.Parser.Version)
 		}
 		// Spot check the SockID.SPort.  First 5 rows have SPort = 3010
-		if i < 5 && row.SockID.SPort != 3010 {
-			t.Error("SPort should be 3010", row.SockID, i)
+		if i < 5 && row.A.SockID.SPort != 3010 {
+			t.Error("SPort should be 3010", row.A.SockID, i)
 		}
 		// Check that source (server) IPs are correct.
-		if row.SockID.SrcIP != "195.89.146.242" && row.SockID.SrcIP != "2001:5012:100:24::242" {
-			t.Error("Wrong SrcIP", row.SockID.SrcIP)
-		}
-
-		if row.Client == nil {
-			t.Error("Client annotations should not be nil", row.SockID, row.FinalSnapshot)
-		}
-		if row.Server == nil {
-			t.Error("Server annotations should not be nil")
-		} else if row.Server.IATA == "" {
-			t.Error("Server IATA should not be empty")
+		if row.A.SockID.SrcIP != "195.89.146.242" && row.A.SockID.SrcIP != "2001:5012:100:24::242" {
+			t.Error("Wrong SrcIP", row.A.SockID.SrcIP)
 		}
 	}
 
@@ -223,13 +209,13 @@ func TestTCPParser(t *testing.T) {
 	// rates we see.  Not fundamental to the test.
 	// Find the row with the largest json representation, and estimate the Marshalling time per snapshot.
 	startMarshal := time.Now()
-	var largestRow *schema.TCPRow
+	var largestRow *schema.TCPInfoRow
 	var largestJson []byte
 	totalSnaps := int64(0)
 	for _, r := range ins.data {
-		row, _ := r.(*schema.TCPRow)
+		row, _ := r.(*schema.TCPInfoRow)
 		jsonBytes, _ := json.Marshal(r)
-		totalSnaps += int64(len(row.Snapshots))
+		totalSnaps += int64(len(row.Raw.Snapshots))
 		if len(jsonBytes) > len(largestJson) {
 			largestRow = row
 			largestJson = jsonBytes
@@ -237,13 +223,13 @@ func TestTCPParser(t *testing.T) {
 	}
 	marshalTime := time.Since(startMarshal)
 
-	duration := largestRow.FinalSnapshot.Timestamp.Sub(largestRow.Snapshots[0].Timestamp)
-	t.Log("Largest json is", len(largestJson), "bytes in", len(largestRow.Snapshots), "snapshots, over", duration, "with", len(largestJson)/len(largestRow.Snapshots), "json bytes/snap")
+	duration := largestRow.A.FinalSnapshot.Timestamp.Sub(largestRow.Raw.Snapshots[0].Timestamp)
+	t.Log("Largest json is", len(largestJson), "bytes in", len(largestRow.Raw.Snapshots), "snapshots, over", duration, "with", len(largestJson)/len(largestRow.Raw.Snapshots), "json bytes/snap")
 	t.Log("Total of", totalSnaps, "snapshots decoded and marshalled")
 	t.Log("Average", decodeTime.Nanoseconds()/totalSnaps, "nsec/snap to decode", marshalTime.Nanoseconds()/totalSnaps, "nsec/snap to marshal")
 
 	// Log one snapshot for debugging
-	snapJson, _ := json.Marshal(largestRow.FinalSnapshot)
+	snapJson, _ := json.Marshal(largestRow.A.FinalSnapshot)
 	t.Log(string(snapJson))
 
 	if duration > 20*time.Second {
@@ -252,18 +238,6 @@ func TestTCPParser(t *testing.T) {
 
 	if totalSnaps != 1588 {
 		t.Error("expected 1588 (thinned) snapshots, got", totalSnaps)
-	}
-
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(tcpInfoAnno["35.225.75.192"])
-	if diff := deep.Equal(&largestRow.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(tcpInfoAnno["195.89.146.242"])
-	sx.Site = "arn02"
-	sx.Machine = "mlab4"
-	if diff := deep.Equal(&largestRow.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
 	}
 }
 
@@ -288,37 +262,6 @@ func TestTCPTask(t *testing.T) {
 	}
 	if n != 364 {
 		t.Errorf("Expected ProcessAllTests to handle %d files, but it handled %d.\n", 364, n)
-	}
-}
-
-func TestBQSaver(t *testing.T) {
-	// Inject fake inserter and annotator
-	ins := newInMemorySink()
-	p := parser.NewTCPInfoParser(ins, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
-
-	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
-	url := "gs://fake-archive/ndt/tcpinfo/2019/05/16/" + filepath.Base(filename)
-	src, err := fileSource(filename)
-	if err != nil {
-		t.Fatal("Failed reading testdata from", filename)
-	}
-
-	task := task.NewTask(url, src, p, &nullCloser{})
-
-	_, err = task.ProcessAllTests(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	row, _ := ins.data[0].(*schema.TCPRow)
-	rowMap, _, _ := row.Save()
-	sid, ok := rowMap["SockID"]
-	if !ok {
-		t.Fatal("Should have SockID")
-	}
-	id := sid.(map[string]bigquery.Value)
-	if id["SPort"].(uint16) != 3010 {
-		t.Error(id)
 	}
 }
 

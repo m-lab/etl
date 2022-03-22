@@ -16,6 +16,9 @@ test_id:
 log_time:
   Description: Original measurement collection timestamp.
 
+# Lower case top-level columns for 'Standard Column' schemas.
+a:
+  Description: Fields summarizing or derived from the raw data.
 date:
   Description: Date is used by BigQuery to partition data to improve query
     performance.

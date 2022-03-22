@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 
 	"github.com/valyala/gozstd"
 
@@ -96,9 +97,9 @@ func (p *TCPInfoParser) IsParsable(testName string, data []byte) (string, bool) 
 	return "", false
 }
 
-func thinSnaps(orig []*snapshot.Snapshot) []*snapshot.Snapshot {
+func thinSnaps(orig []snapshot.Snapshot) []snapshot.Snapshot {
 	n := len(orig)
-	out := make([]*snapshot.Snapshot, 0, 1+n/10)
+	out := make([]snapshot.Snapshot, 0, 1+n/10)
 	for i := 0; i < n; i += 10 {
 		out = append(out, orig[i])
 	}
@@ -110,13 +111,13 @@ func thinSnaps(orig []*snapshot.Snapshot) []*snapshot.Snapshot {
 
 // ParseAndInsert extracts all ArchivalRecords from the rawContent and inserts into a single row.
 // Approximately 15 usec/snapshot.
-func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
+func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
 	tableName := p.FullTableName()
 	metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Dec()
 
+	var err error
 	if strings.HasSuffix(testName, "zst") {
-		var err error
 		rawContent, err = gozstd.Decompress(nil, rawContent)
 		if err != nil {
 			metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "zstd error").Inc()
@@ -132,85 +133,82 @@ func (p *TCPInfoParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, t
 	// This will include the annotation when the buffer flushes, which is unfortunate.
 	defer metrics.WorkerState.WithLabelValues(tableName, "tcpinfo-parse").Dec()
 
-	var err error
 	var rec *netlink.ArchivalRecord
-	snaps := make([]*snapshot.Snapshot, 0, 2000)
-	testMetadata := netlink.Metadata{}
-	for rec, err = ar.Next(); err != io.EOF; rec, err = ar.Next() {
+	snaps := make([]snapshot.Snapshot, 0, 2000)
+	tcpMeta := netlink.Metadata{}
+	for {
+		rec, err = ar.Next()
 		if err != nil {
 			break
 		}
-		snapMetadata, snap, err := snapshot.Decode(rec)
+		snapMeta, snap, err := snapshot.Decode(rec)
 		if err != nil {
 			break
 		}
 		// meta data generally appears only once, so we have to save it.
-		if snapMetadata != nil {
-			testMetadata = *snapMetadata
+		if snapMeta != nil {
+			tcpMeta = *snapMeta
 		}
 		if snap.Observed != 0 {
-			snaps = append(snaps, snap)
+			snaps = append(snaps, *snap)
 		}
 	}
 
 	if err != io.EOF {
 		log.Println(err)
-		log.Println(string(rawContent))
 		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "decode error").Inc()
-		metrics.ErrorCount.WithLabelValues(
-			p.TableName(), "", "decode error").Inc()
+		metrics.ErrorCount.WithLabelValues(p.TableName(), "tcpinfo", "decode error").Inc()
 		return err
 	}
 
 	if len(snaps) < 1 {
 		// For now, we don't save rows with no snapshots.
 		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "no-snaps").Inc()
-		metrics.WarningCount.WithLabelValues(
-			p.TableName(), "", "no-snaps").Inc()
+		metrics.WarningCount.WithLabelValues(p.TableName(), "tcpinfo", "no-snaps").Inc()
+		return nil
+	}
+	if snaps[len(snaps)-1].InetDiagMsg == nil {
+		// For now, we don't save rows with nil inetdiagmsg.
+		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "nil-inetdiagmsg").Inc()
+		metrics.WarningCount.WithLabelValues(p.TableName(), "tcpinfo", "nil-inetdiagmsg").Inc()
 		return nil
 	}
 
-	row := schema.TCPRow{}
-	// TODO - restore full snapshots, or implement smarter filtering.
-	row.Snapshots = thinSnaps(snaps)
-	row.FinalSnapshot = snaps[len(snaps)-1]
-	if row.FinalSnapshot.InetDiagMsg != nil {
-		row.SockID = row.FinalSnapshot.InetDiagMsg.ID.GetSockID()
+	row := schema.TCPInfoRow{
+		ID: tcpMeta.UUID,
+		A: &schema.TCPInfoSummary{
+			SockID:        snaps[len(snaps)-1].InetDiagMsg.ID.GetSockID(),
+			FinalSnapshot: snaps[len(snaps)-1],
+		},
+		Parser: schema.ParseInfo{
+			Version:    Version(),
+			Time:       time.Now(),
+			ArchiveURL: meta["filename"].(string),
+			Filename:   testName,
+			GitCommit:  GitCommit(),
+		},
+		Date: meta["date"].(civil.Date),
+		Raw: &snapshot.ConnectionLog{
+			Metadata: tcpMeta,
+			// TODO(https://github.com/m-lab/etl/issues/1068) - consider minimizing snapshot thinning.
+			Snapshots: thinSnaps(snaps),
+		},
 	}
-	row.CopySocketInfo()
-
-	row.UUID = testMetadata.UUID
-	row.TestTime = testMetadata.StartTime
-
-	row.ParseInfo = &schema.ParseInfoV0{ParseTime: time.Now(), ParserVersion: Version()}
-	row.ParseInfo.Filename = testName
-
-	if fileMetadata["filename"] != nil {
-		fn, ok := fileMetadata["filename"].(string)
-		if ok {
-			row.ParseInfo.TaskFileName = fn
-			row.Server.IATA = etl.GetIATACode(fn)
-			// TODO - should populate other ServerInfo fields from siteinfo API.
-		}
-	}
-	// ArchiveURL must already be valid, so error is safe to ignore.
-	dp, _ := etl.ValidateTestPath(fileMetadata["filename"].(string))
-	row.ServerX.Site = dp.Site
-	row.ServerX.Machine = dp.Host
 
 	if err := p.Put(&row); err != nil {
+		metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "put error").Inc()
+		metrics.ErrorCount.WithLabelValues(p.TableName(), "tcpinfo", "put error").Inc()
 		return err
 	}
 	metrics.TestTotal.WithLabelValues(p.TableName(), "tcpinfo", "ok").Inc()
 	return nil
 }
 
-// NewTCPInfoParser creates a new TCPInfoParser.  Duh.
-// Annotator may be optionally passed in, or will be created if nil.
+// NewTCPInfoParser creates a new parser for the TCPInfo datatype.
 func NewTCPInfoParser(sink row.Sink, table, suffix string, ann v2as.Annotator) *TCPInfoParser {
 	bufSize := etl.TCPINFO.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
+		ann = &nullAnnotator{}
 	}
 
 	return &TCPInfoParser{

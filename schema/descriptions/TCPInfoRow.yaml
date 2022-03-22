@@ -1,3 +1,7 @@
+a.FinalSnapshot:
+  Description: The last snapshot collected.
+a.SockID:
+  Description: The TCP connection socket ID structure.
 TCPInfo:
   Description: Results from getsockopt(..TCP_INFO..)
 TCPInfo.State:
@@ -400,7 +404,7 @@ SocketMem.Drops:
   Reference:
   Kernel:
 VegasInfo:
-  Description: Instrumntation in Vegas TCP
+  Description: Instrumentation in Vegas TCP
   Discussion: Not used by M-Lab
   SMItype: Counter32
   Units:

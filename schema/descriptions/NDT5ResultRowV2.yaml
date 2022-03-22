@@ -3,8 +3,6 @@ id:
     (upload) measurement, this is the UUID of that measurement. For rows without
     either S2C or C2s, this is the UUID of the Control channel.
 
-a:
-  Description: Fields summarizing or derived from the raw data.
 a.UUID:
   Description: UUID for TCP connection.
 a.TestTime:
