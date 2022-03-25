@@ -4,7 +4,7 @@ metadata:
   name: etl-parser
   namespace: default
 spec:
-  replicas: 6
+  replicas: 8
   selector:
     matchLabels:
       # Used to match pre-existing pods that may be affected during updates.
