@@ -120,29 +120,29 @@ steps:
      '-c', 'echo "FROM gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG" > /workspace/cmd/etl_worker/Dockerfile',
   ]
 
-# LEGACY PARSER: Deploy to app engine.
- - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-   id: "Deploy etl batch parser task queue config to app engine"
-   args: [
-     'gcloud', 'app', 'deploy', '--project=$PROJECT_ID', 'appengine/queue.yaml'
-   ]
+ # LEGACY PARSER: Deploy to app engine.
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Deploy etl batch parser task queue config to app engine"
+  args: [
+     'gcloud', 'app', 'deploy', '--project=$PROJECT_ID', 'appengine/queue.yaml',
+  ]
 
 # Prepare app yaml configuration.
- - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-   id: "Update annotator url environment variable in app-batch.yaml"
-   args: [
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Update annotator url environment variable in app-batch.yaml"
+  args: [
      'bash', '-c',
-     "sed -i -e 's|{{ANNOTATOR_URL}}|$_ANNOTATOR_URL|' cmd/etl_worker/app-batch.yaml"
-   ]
+     "sed -i -e 's|{{ANNOTATOR_URL}}|$_ANNOTATOR_URL|' cmd/etl_worker/app-batch.yaml",
+  ]
 
- - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-   id: "Deploy etl batch parser to AppEngine"
-   args: [
-     'bash', '-c', 'cd cmd/etl_worker && gcloud --project=$PROJECT_ID app deploy --promote app-batch.yaml'
-   ]
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Deploy etl batch parser to AppEngine"
+  args: [
+     'bash', '-c', 'cd cmd/etl_worker && gcloud --project=$PROJECT_ID app deploy --promote app-batch.yaml',
+  ]
 
- - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-   id: "Delete non-serving appengine versions"
-   args: [
+- name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  id: "Delete non-serving appengine versions"
+  args: [
      'bash', '-c', './delete-appengine-services.sh'
-   ]
+  ]
