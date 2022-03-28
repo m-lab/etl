@@ -113,9 +113,10 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	}
 
 	rawData, err := trcParser.ParseRawData(rawContent)
+	archiveURL := fileMetadata["filename"].(string)
 	if err != nil {
 		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
-		return fmt.Errorf("failed to parse scamper1 file: %s, error: %w", testName, err)
+		return fmt.Errorf("failed to parse scamper1 file: %s, archiveURL: %s, error: %w", testName, archiveURL, err)
 	}
 
 	scamperOutput, ok := rawData.(parser.Scamper1)
@@ -134,7 +135,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	parseInfo := schema.ParseInfo{
 		Version:    Version(),
 		Time:       time.Now(),
-		ArchiveURL: fileMetadata["filename"].(string),
+		ArchiveURL: archiveURL,
 		Filename:   testName,
 		GitCommit:  GitCommit(),
 	}
