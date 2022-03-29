@@ -61,8 +61,8 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 				expPI := schema.ParseInfo{
 					Version:    "https://github.com/m-lab/etl/tree/foobar",
 					Time:       row.Parser.Time,
-					ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt-njp6l_1585004303_00000000000170FA.json",
-					Filename:   "ndt-njp6l_1585004303_00000000000170FA.json",
+					ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/" + tt.file,
+					Filename:   tt.file,
 					Priority:   0,
 					GitCommit:  "12345678",
 				}
