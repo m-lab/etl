@@ -24,6 +24,10 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 			file: "ndt-njp6l_1585004303_00000000000170FA.json",
 		},
 		{
+			name: "success-empty-geo",
+			file: "ndt-empty-geo.json",
+		},
+		{
 			name:    "corrupt-input",
 			file:    "ndt-corrupt.json",
 			wantErr: true,
@@ -65,6 +69,10 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 
 				if diff := deep.Equal(row.Parser, expPI); diff != nil {
 					t.Errorf("AnnotationParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
+				}
+
+				if row.Client.Geo != nil && row.Client.Geo.Region != "" {
+					t.Errorf("AnnotationParser.ParseAndInsert() did not clear Client.Geo.Region: %q", row.Client.Geo.Region)
 				}
 			}
 		})

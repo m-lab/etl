@@ -100,6 +100,17 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	row.UUID = raw.UUID
 	row.Server = raw.Server
 	row.Client = raw.Client
+
+	// NOTE: Due to https://github.com/m-lab/etl/issues/1069, we mask the Region
+	// field found in synthetic uuid annotations prior to 2020-03-12, and no
+	// longer found in later Geo2 annotations.
+	if row.Server.Geo != nil {
+		row.Server.Geo.Region = ""
+	}
+	if row.Client.Geo != nil {
+		row.Client.Geo.Region = ""
+	}
+
 	// NOTE: annotations are joined with other tables using the UUID, so
 	// finegrain timestamp is not necessary.
 	//
