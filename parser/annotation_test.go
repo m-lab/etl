@@ -74,6 +74,9 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 				if row.Client.Geo != nil && row.Client.Geo.Region != "" {
 					t.Errorf("AnnotationParser.ParseAndInsert() did not clear Client.Geo.Region: %q", row.Client.Geo.Region)
 				}
+				if row.Server.Geo != nil && row.Server.Geo.Region != "" {
+					t.Errorf("AnnotationParser.ParseAndInsert() did not clear Server.Geo.Region: %q", row.Server.Geo.Region)
+				}
 			}
 		})
 	}
