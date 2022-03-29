@@ -1,0 +1,32 @@
+{
+  "UUID": "ndt-njp6l_1585004303_00000000000170FA",
+  "Timestamp": "2020-04-03T00:00:02.663132563Z",
+  "Server": {
+    "Site": "lga1t",
+    "Machine": "mlab2",
+    "Network": {
+      "ASNumber": 3356,
+      "ASName": "Level 3 Parent, LLC",
+      "Systems": [
+        {
+          "ASNs": [
+            3356
+          ]
+        }
+      ]
+    }
+  },
+  "Client": {
+    "Network": {
+      "CIDR": "35.184.0.0/13",
+      "ASNumber": 15169,
+      "Systems": [
+        {
+          "ASNs": [
+            15169
+          ]
+        }
+      ]
+    }
+  }
+}
