@@ -4,14 +4,6 @@
   "Server": {
     "Site": "lga1t",
     "Machine": "mlab2",
-    "Geo": {
-      "ContinentCode": "NA",
-      "CountryCode": "US",
-      "Region": "should-be-cleared",
-      "City": "New York",
-      "Latitude": 40.7667,
-      "Longitude": -73.8667
-    },
     "Network": {
       "ASNumber": 3356,
       "ASName": "Level 3 Parent, LLC",
@@ -25,17 +17,6 @@
     }
   },
   "Client": {
-    "Geo": {
-      "ContinentCode": "NA",
-      "CountryCode": "US",
-      "CountryName": "United States",
-      "Region": "should-be-cleared",
-      "Subdivision1ISOCode": "VA",
-      "Subdivision1Name": "Virginia",
-      "Latitude": 38.6583,
-      "Longitude": -77.2481,
-      "AccuracyRadiusKm": 1000
-    },
     "Network": {
       "CIDR": "35.184.0.0/13",
       "ASNumber": 15169,
