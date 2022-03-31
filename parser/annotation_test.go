@@ -24,6 +24,10 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 			file: "ndt-njp6l_1585004303_00000000000170FA.json",
 		},
 		{
+			name: "success-empty-geo",
+			file: "ndt-empty-geo.json",
+		},
+		{
 			name:    "corrupt-input",
 			file:    "ndt-corrupt.json",
 			wantErr: true,
@@ -57,14 +61,21 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 				expPI := schema.ParseInfo{
 					Version:    "https://github.com/m-lab/etl/tree/foobar",
 					Time:       row.Parser.Time,
-					ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt-njp6l_1585004303_00000000000170FA.json",
-					Filename:   "ndt-njp6l_1585004303_00000000000170FA.json",
+					ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/" + tt.file,
+					Filename:   tt.file,
 					Priority:   0,
 					GitCommit:  "12345678",
 				}
 
 				if diff := deep.Equal(row.Parser, expPI); diff != nil {
 					t.Errorf("AnnotationParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
+				}
+
+				if row.Client.Geo != nil && row.Client.Geo.Region != "" {
+					t.Errorf("AnnotationParser.ParseAndInsert() did not clear Client.Geo.Region: %q", row.Client.Geo.Region)
+				}
+				if row.Server.Geo != nil && row.Server.Geo.Region != "" {
+					t.Errorf("AnnotationParser.ParseAndInsert() did not clear Server.Geo.Region: %q", row.Server.Geo.Region)
 				}
 			}
 		})
