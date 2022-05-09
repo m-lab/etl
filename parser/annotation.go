@@ -30,9 +30,9 @@ type AnnotationParser struct {
 	suffix string
 }
 
-type nullAnnotator struct{}
+type NullAnnotator struct{}
 
-func (ann *nullAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2as.Response, error) {
+func (ann *NullAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2as.Response, error) {
 	return &v2as.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
 }
 
@@ -40,7 +40,7 @@ func (ann *nullAnnotator) GetAnnotations(ctx context.Context, date time.Time, ip
 func NewAnnotationParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.ANNOTATION.BQBufferSize()
 	if ann == nil {
-		ann = &nullAnnotator{}
+		ann = &NullAnnotator{}
 	}
 
 	return &AnnotationParser{
