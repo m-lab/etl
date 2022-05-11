@@ -36,7 +36,7 @@ func NewSSParser(ins etl.Inserter, ann v2as.Annotator) *SSParser {
 // TODO get rid of this hack.
 func NewDefaultSSParser(ins etl.Inserter) *SSParser {
 	bufSize := etl.SS.BQBufferSize()
-	return &SSParser{*NewBase(ins, bufSize, v2as.GetAnnotator(etl.BatchAnnotatorURL))}
+	return &SSParser{*NewBase(ins, bufSize, &NullAnnotator{})}
 }
 
 // ExtractLogtimeFromFilename extracts the log time.
