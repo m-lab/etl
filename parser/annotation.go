@@ -30,8 +30,11 @@ type AnnotationParser struct {
 	suffix string
 }
 
+// NullAnnotator mimicks the annotation-service API, and always returns an empty
+// result without any network connections.
 type NullAnnotator struct{}
 
+// GetAnnotations always returns an empty annotation result.
 func (ann *NullAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2as.Response, error) {
 	return &v2as.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
 }
