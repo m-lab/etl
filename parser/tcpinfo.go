@@ -208,7 +208,7 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 func NewTCPInfoParser(sink row.Sink, table, suffix string, ann v2as.Annotator) *TCPInfoParser {
 	bufSize := etl.TCPINFO.BQBufferSize()
 	if ann == nil {
-		ann = &nullAnnotator{}
+		ann = &NullAnnotator{}
 	}
 
 	return &TCPInfoParser{

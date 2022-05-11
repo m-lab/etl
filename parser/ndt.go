@@ -153,7 +153,7 @@ func NewNDTParser(ins etl.Inserter, annotator ...v2as.Annotator) *NDTParser {
 	if len(annotator) > 0 && annotator[0] != nil {
 		ann = annotator[0]
 	} else {
-		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
+		ann = &NullAnnotator{}
 	}
 
 	return &NDTParser{Base: *NewBase(ins, bufSize, ann)}
