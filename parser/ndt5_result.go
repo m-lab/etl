@@ -35,7 +35,7 @@ type NDT5ResultParser struct {
 func NewNDT5ResultParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.NDT5.BQBufferSize()
 	if ann == nil {
-		ann = &nullAnnotator{}
+		ann = &NullAnnotator{}
 	}
 
 	return &NDT5ResultParser{

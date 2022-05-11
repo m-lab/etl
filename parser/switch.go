@@ -44,7 +44,7 @@ type SwitchParser struct {
 func NewSwitchParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.SW.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
+		ann = &NullAnnotator{}
 	}
 
 	return &SwitchParser{
