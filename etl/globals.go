@@ -330,9 +330,7 @@ var (
 	// Map from data type to number of files to skip when processing said type.
 	// It allows us process fewer archives when there is a very high volume of data.
 	// TODO - this should be loaded from a config.
-	dataTypeToSkipCount = map[DataType]int{
-		PCAP: 9,
-	}
+	dataTypeToSkipCount = map[DataType]int{}
 )
 
 /*******************************************************************************
