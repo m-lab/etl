@@ -403,7 +403,7 @@ func TestSkipCount(t *testing.T) {
 		{
 			name:     "pcap",
 			dataType: etl.PCAP,
-			want:     9,
+			want:     0,
 		},
 		{
 			name:     "invalid",
