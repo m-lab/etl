@@ -277,7 +277,7 @@ func TestSkipFiles(t *testing.T) {
 	}{
 		{
 			name:         "pcap",
-			successCount: 2,
+			successCount: 11,
 			failureCount: 0,
 		},
 		{
