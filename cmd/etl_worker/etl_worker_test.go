@@ -74,7 +74,7 @@ func TestMain(t *testing.T) {
 		t.Error("Should contain 'Workers':\n", string(data))
 	}
 	if !strings.Contains(string(data), "Writing output to etl-mlab-testing") {
-		t.Error("Should contain 'BigQuery':\n", string(data))
+		t.Error("Should contain 'Writing output to etl-mlab-testing':\n", string(data))
 	}
 	resp.Body.Close()
 
