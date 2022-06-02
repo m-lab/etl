@@ -33,6 +33,7 @@ import (
 	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
+	etlstorage "github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/worker"
 
 	"github.com/fsouza/fake-gcs-server/fakestorage"
@@ -110,39 +111,6 @@ func TestLoadTar(t *testing.T) {
 	t.Fatal()
 }
 
-func TestProcessTask(t *testing.T) {
-	if testing.Short() {
-		t.Log("Skipping integration test")
-	}
-
-	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
-	filename := "gs://test-bucket/ndt/2018/05/09/20180509T101913Z-mlab1-mad03-ndt-0000.tgz"
-
-	status, err := worker.ProcessTaskWithClient(stiface.AdaptClient(gcsClient), filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status != http.StatusOK {
-		t.Fatal("Expected", http.StatusOK, "Got:", status)
-	}
-
-	// This section checks that prom metrics are updated appropriately.
-	c := make(chan prometheus.Metric, 10)
-
-	metrics.FileCount.Collect(c)
-	checkCounter(t, c, 1)
-
-	metrics.TaskTotal.Collect(c)
-	checkCounter(t, c, 1)
-
-	metrics.TestTotal.Collect(c)
-	checkCounter(t, c, 1)
-
-	metrics.FileCount.Reset()
-	metrics.TaskTotal.Reset()
-	metrics.TestTotal.Reset()
-}
-
 // This is also the annotator, so it just returns itself.
 type fakeAnnotatorFactory struct{}
 
@@ -174,13 +142,11 @@ type fakeSourceFactory struct {
 }
 
 func (sf *fakeSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, etl.ProcessingError) {
-	// TODO simplify GetSource
-	tr, _, _, err := worker.GetSource(sf.client, dp.URI)
-	rtx.Must(err, "Bad TestSource")
-
-	// TODO
-	// defer tr.Close()
-
+	label := dp.TableBase()
+	tr, err := etlstorage.NewTestSource(sf.client, dp, label)
+	if err != nil {
+		panic("error opening gcs file:" + err.Error())
+	}
 	return tr, nil
 }
 
@@ -189,38 +155,12 @@ func NewSourceFactory() factory.SourceFactory {
 	return &fakeSourceFactory{client: stiface.AdaptClient(gcsClient)}
 }
 
-func TestNilUploader(t *testing.T) {
-	if testing.Short() {
-		t.Log("Skipping integration test")
-	}
-
-	fakeFactory := worker.StandardTaskFactory{
-		Annotator: &fakeAnnotatorFactory{},
-		Sink:      &fakeSinkFactory{up: nil},
-		Source:    NewSourceFactory(),
-	}
-
-	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
-	path, err := etl.ValidateTestPath(filename)
-	if err != nil {
-		t.Fatal(err, filename)
-	}
-	// TODO create a TaskFactory and use ProcessGKETask
-	pErr := worker.ProcessGKETask(context.Background(), path, &fakeFactory)
-	if pErr == nil || pErr.Code() != http.StatusInternalServerError {
-		t.Fatal("Expected error with", http.StatusInternalServerError, "Got:", pErr)
-	}
-
-	metrics.FileCount.Reset()
-	metrics.TaskTotal.Reset()
-	metrics.TestTotal.Reset()
-}
-
 func TestProcessGKETask(t *testing.T) {
 	if testing.Short() {
 		t.Log("Skipping integration test")
 	}
 
+	// TODO(soltesz): replace uploader with fake storage output or localwriter.
 	up := fake.NewFakeUploader()
 	fakeFactory := worker.StandardTaskFactory{
 		Annotator: &fakeAnnotatorFactory{},
