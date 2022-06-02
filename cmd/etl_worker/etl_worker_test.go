@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package main
@@ -72,8 +73,8 @@ func TestMain(t *testing.T) {
 	if !strings.Contains(string(data), "Workers") {
 		t.Error("Should contain 'Workers':\n", string(data))
 	}
-	if !strings.Contains(string(data), "BigQuery") {
-		t.Error("Should contain 'BigQuery':\n", string(data))
+	if !strings.Contains(string(data), "Writing output to etl-mlab-testing") {
+		t.Error("Should contain 'Writing output to etl-mlab-testing':\n", string(data))
 	}
 	resp.Body.Close()
 
