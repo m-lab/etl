@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"runtime"
-	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/active"
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
@@ -52,8 +50,8 @@ var (
 // Flags.
 var (
 	outputType = flagx.Enum{
-		Options: []string{"gcs", "bigquery", "local"},
-		Value:   "bigquery",
+		Options: []string{"gcs", "local"},
+		Value:   "gcs",
 	}
 
 	maxActiveTasks = flag.Int64("max_active", 1, "Maximum number of active tasks")
@@ -68,7 +66,6 @@ var (
 	bigqueryProject = flag.String("bigquery_project", "", "Override GCLOUD_PROJECT for BigQuery operations")
 	bigqueryDataset = flag.String("bigquery_dataset", "", "Override the BigQuery dataset for output tables")
 	outputDir       = flag.String("output_dir", "", "If output type is 'local', write output to this directory")
-	annotatorURL    = flagx.MustNewURL("https://annotator-dot-mlab-sandbox.appspot.com")
 )
 
 // Other global values.
@@ -85,7 +82,6 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	flag.Var(&outputType, "output", "Output to bigquery or gcs.")
-	flag.Var(&annotatorURL, "annotator_url", "Base URL for the annotation service.")
 }
 
 // Task Queue can always submit to an admin restricted URL.
@@ -149,18 +145,6 @@ func Status(w http.ResponseWriter, r *http.Request) {
 //
 // TODO - replace the atomic with a channel based semaphore and non-blocking
 // select.
-func shouldThrottle() bool {
-	if atomic.AddInt32(&inFlight, 1) > maxInFlight {
-		atomic.AddInt32(&inFlight, -1)
-		return true
-	}
-	return false
-}
-
-func decrementInFlight() {
-	atomic.AddInt32(&inFlight, -1)
-}
-
 func handleLocalRequest(rw http.ResponseWriter, req *http.Request) {
 	fn, err := etl.GetFilename(req.FormValue("filename"))
 	if err != nil {
@@ -201,90 +185,6 @@ func handleLocalRequest(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	fmt.Fprintf(rw, "no observed errors")
-}
-
-// TODO(gfr) unify counting for http and pubsub paths?
-func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
-	// This will add metric count and log message from any panic.
-	// The panic will still propagate, and http will report it.
-	defer func() {
-		metrics.CountPanics(recover(), "handleRequest")
-	}()
-
-	// Throttle by grabbing a semaphore from channel.
-	if shouldThrottle() {
-		metrics.TaskTotal.WithLabelValues("unknown", "TooManyRequests").Inc()
-		rwr.WriteHeader(http.StatusTooManyRequests)
-		fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
-		return
-	}
-
-	// Decrement counter when worker finishes.
-	defer decrementInFlight()
-
-	var err error
-	retryCountStr := rq.Header.Get("X-AppEngine-TaskRetryCount")
-	retryCount := 0
-	if retryCountStr != "" {
-		retryCount, err = strconv.Atoi(retryCountStr)
-		if err != nil {
-			log.Printf("Invalid retries string: %s\n", retryCountStr)
-		}
-	}
-	executionCountStr := rq.Header.Get("X-AppEngine-TaskExecutionCount")
-	executionCount := 0
-	if executionCountStr != "" {
-		executionCount, err = strconv.Atoi(executionCountStr)
-		if err != nil {
-			log.Printf("Invalid execution count string: %s\n", executionCountStr)
-		}
-	}
-	etaUnixStr := rq.Header.Get("X-AppEngine-TaskETA")
-	etaUnixSeconds := float64(0)
-	if etaUnixStr != "" {
-		etaUnixSeconds, err = strconv.ParseFloat(etaUnixStr, 64)
-		if err != nil {
-			log.Printf("Invalid eta string: %s\n", etaUnixStr)
-		}
-	}
-	etaTime := time.Unix(int64(etaUnixSeconds), 0) // second granularity is sufficient.
-	age := time.Since(etaTime)
-
-	rq.ParseForm()
-	// Log request data.
-	for key, value := range rq.Form {
-		log.Printf("Form:   %q == %q\n", key, value)
-	}
-
-	rawFileName := rq.FormValue("filename")
-	status, msg := subworker(rawFileName, executionCount, retryCount, age)
-	rwr.WriteHeader(status)
-	fmt.Fprint(rwr, msg)
-}
-
-func subworker(rawFileName string, executionCount, retryCount int, age time.Duration) (status int, msg string) {
-	// TODO(dev) Check how many times a request has already been attempted.
-
-	var err error
-	// This handles base64 encoding, and requires a gs:// prefix.
-	fn, err := etl.GetFilename(rawFileName)
-	if err != nil {
-		metrics.TaskTotal.WithLabelValues("unknown", "BadRequest").Inc()
-		log.Printf("Invalid filename: %s\n", fn)
-		return http.StatusBadRequest, `{"message": "Invalid filename."}`
-	}
-
-	// TODO(dev): log the originating task queue name from headers.
-	log.Printf("Received filename: %q  Retries: %d, Executions: %d, Age: %5.2f hours\n",
-		fn, retryCount, executionCount, age.Hours())
-
-	status, err = worker.ProcessTask(fn)
-	if err == nil {
-		msg = `{"message": "Success"}`
-	} else {
-		msg = fmt.Sprintf(`{"message": "%s"}`, err.Error())
-	}
-	return
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
@@ -337,8 +237,6 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 
 	var sink factory.SinkFactory
 	switch outputType.Value {
-	case "bigquery":
-		sink = bq.NewSinkFactory()
 	case "gcs":
 		sink = storage.NewSinkFactory(c, outputBucket())
 	case "local":
@@ -423,7 +321,6 @@ func main() {
 	etl.GCloudProject = *gcloudProject
 	etl.BigqueryProject = *bigqueryProject
 	etl.BigqueryDataset = *bigqueryDataset
-	etl.BatchAnnotatorURL = annotatorURL.String() + "/batch_annotate"
 
 	if len(*gardenerAddr) > 0 {
 		log.Println("Using", *gardenerAddr)
@@ -438,7 +335,6 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", Status)
 	mux.HandleFunc("/status", Status)
-	mux.HandleFunc("/worker", metrics.DurationHandler("generic", handleRequest))
 	mux.HandleFunc("/_ah/health", healthCheckHandler) // legacy
 	mux.HandleFunc("/alive", healthCheckHandler)
 	mux.HandleFunc("/ready", healthCheckHandler)
