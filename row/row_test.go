@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/row"
 
 	"github.com/m-lab/annotation-service/api"
@@ -181,10 +180,6 @@ func TestAsyncPut(t *testing.T) {
 	if inserted.serverAnn == nil || inserted.serverAnn.Geo.PostalCode != "10584" {
 		t.Error("Failed server annotation")
 	}
-}
-
-func assertBQInserterIsSink(in row.Sink) {
-	func(in row.Sink) {}(&bq.BQInserter{})
 }
 
 func TestErrCommitRow(t *testing.T) {
