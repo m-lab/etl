@@ -7,56 +7,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
-	"github.com/m-lab/etl/storage"
-
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/task"
 )
-
-type nullCloser struct{}
-
-func (nc nullCloser) Close() error { return nil }
-
-// GetSource gets the TestSource for the filename.
-// fn is a gs:// GCS uri.
-// DEPRECATED - only used by unit tests today.
-func GetSource(client stiface.Client, uri string) (etl.TestSource, etl.DataPath, int, error) {
-	path, err := etl.ValidateTestPath(uri)
-	label := path.TableBase() // On error, this will be "invalid", so not all that useful.
-	if err != nil {
-		metrics.TaskTotal.WithLabelValues(label, "InvalidFilename").Inc()
-		log.Printf("Invalid filename: %v\n", err)
-		return nil, etl.DataPath{}, http.StatusBadRequest, err
-	}
-
-	dataType := path.GetDataType()
-	// Can this be merged with error case above?
-	if dataType == etl.INVALID {
-		metrics.TaskTotal.WithLabelValues(string(dataType), "SourcePathError").Inc()
-		log.Printf("Invalid datatype: %s", path)
-		return nil, etl.DataPath{}, http.StatusInternalServerError, err
-	}
-	tr, err := storage.NewTestSource(client, path, label)
-	if err != nil {
-		metrics.TaskTotal.WithLabelValues(string(dataType), "ETLSourceError").Inc()
-		log.Printf("Error opening gcs file: %v", err)
-		return nil, etl.DataPath{}, http.StatusInternalServerError, err
-		// TODO - anything better we could do here?
-	}
-	return tr, path, http.StatusOK, nil
-}
-
-/*
-	client, err := storage.GetStorageClient(false)
-	tr, err := storage.NewTestSource(client, path, label)
-	ins, err := bq.NewInserter(dataType, date)
-	tsk := task.NewTask(src.Detail(), src, p, &nullCloser{})
-	files, err := tsk.ProcessAllTests(false) // ignore most parse errors.
-*/
 
 // StandardTaskFactory implements task.Factory
 type StandardTaskFactory struct {

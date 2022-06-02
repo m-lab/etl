@@ -30,6 +30,7 @@ import (
 	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
+	etlstorage "github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/worker"
 
 	"github.com/fsouza/fake-gcs-server/fakestorage"
@@ -138,13 +139,16 @@ type fakeSourceFactory struct {
 }
 
 func (sf *fakeSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, etl.ProcessingError) {
-	// TODO simplify GetSource
-	tr, _, _, err := worker.GetSource(sf.client, dp.URI)
-	rtx.Must(err, "Bad TestSource")
-
-	// TODO
-	// defer tr.Close()
-
+	label := dp.TableBase()
+	dataType := dp.GetDataType()
+	// Can this be merged with error case above?
+	if dataType == etl.INVALID {
+		panic("invalid datatype for test")
+	}
+	tr, err := etlstorage.NewTestSource(sf.client, dp, label)
+	if err != nil {
+		panic("error opening gcs file:" + err.Error())
+	}
 	return tr, nil
 }
 
@@ -153,38 +157,12 @@ func NewSourceFactory() factory.SourceFactory {
 	return &fakeSourceFactory{client: stiface.AdaptClient(gcsClient)}
 }
 
-func TestNilUploader(t *testing.T) {
-	if testing.Short() {
-		t.Log("Skipping integration test")
-	}
-
-	fakeFactory := worker.StandardTaskFactory{
-		Annotator: &fakeAnnotatorFactory{},
-		Sink:      &fakeSinkFactory{up: nil},
-		Source:    NewSourceFactory(),
-	}
-
-	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
-	path, err := etl.ValidateTestPath(filename)
-	if err != nil {
-		t.Fatal(err, filename)
-	}
-	// TODO create a TaskFactory and use ProcessGKETask
-	pErr := worker.ProcessGKETask(context.Background(), path, &fakeFactory)
-	if pErr == nil || pErr.Code() != http.StatusInternalServerError {
-		t.Fatal("Expected error with", http.StatusInternalServerError, "Got:", pErr)
-	}
-
-	metrics.FileCount.Reset()
-	metrics.TaskTotal.Reset()
-	metrics.TestTotal.Reset()
-}
-
 func TestProcessGKETask(t *testing.T) {
 	if testing.Short() {
 		t.Log("Skipping integration test")
 	}
 
+	// TODO(soltesz): replace uploader with fake storage output or localwriter.
 	up := fake.NewFakeUploader()
 	fakeFactory := worker.StandardTaskFactory{
 		Annotator: &fakeAnnotatorFactory{},
