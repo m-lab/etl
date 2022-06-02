@@ -8,13 +8,12 @@ import (
 	"time"
 
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
+	"github.com/m-lab/etl/storage"
 
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/factory"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
 )
 
@@ -24,6 +23,7 @@ func (nc nullCloser) Close() error { return nil }
 
 // GetSource gets the TestSource for the filename.
 // fn is a gs:// GCS uri.
+// DEPRECATED - only used by unit tests today.
 func GetSource(client stiface.Client, uri string) (etl.TestSource, etl.DataPath, int, error) {
 	path, err := etl.ValidateTestPath(uri)
 	label := path.TableBase() // On error, this will be "invalid", so not all that useful.
@@ -50,94 +50,13 @@ func GetSource(client stiface.Client, uri string) (etl.TestSource, etl.DataPath,
 	return tr, path, http.StatusOK, nil
 }
 
-// ProcessTask interprets a filename to create a Task, Parser, and Inserter,
-// and processes the file content.  Storage client is implicitly obtained
-// from GetStorageClient.
-// Returns an http status code and an error if the task did not complete
-// successfully.
-// DEPRECATED - should migrate to ProcessGKETask.
-func ProcessTask(fn string) (int, error) {
+/*
 	client, err := storage.GetStorageClient(false)
-	if err != nil {
-		path, _ := etl.ValidateTestPath(fn)
-		metrics.TaskTotal.WithLabelValues(path.DataType, "ServiceUnavailable").Inc()
-		log.Printf("Error getting storage client: %v\n", err)
-		return http.StatusServiceUnavailable, err
-	}
-	return ProcessTaskWithClient(client, fn)
-}
-
-// ProcessTaskWithClient handles processing with an injected client.
-func ProcessTaskWithClient(client stiface.Client, fn string) (int, error) {
-	tr, path, status, err := GetSource(client, fn)
-	if err != nil {
-		return status, err
-	}
-	defer tr.Close()
-
-	return ProcessTestSource(tr, path)
-}
-
-// ProcessTestSource handles processing of all TestSource contents.
-func ProcessTestSource(src etl.TestSource, path etl.DataPath) (int, error) {
-	label := path.TableBase() // This works even on error?
-
-	// Count number of workers operating on each table.
-	metrics.WorkerCount.WithLabelValues(label).Inc()
-	defer metrics.WorkerCount.WithLabelValues(label).Dec()
-
-	// These keep track of the (nested) state of the worker.
-	metrics.WorkerState.WithLabelValues(label, "worker").Inc()
-	defer metrics.WorkerState.WithLabelValues(label, "worker").Dec()
-
-	dataType := path.GetDataType()
-
-	dateFormat := "20060102"
-	date, err := time.Parse(dateFormat, path.PackedDate)
-
+	tr, err := storage.NewTestSource(client, path, label)
 	ins, err := bq.NewInserter(dataType, date)
-	if err != nil {
-		metrics.TaskTotal.WithLabelValues(label, string(dataType), "NewInserterError").Inc()
-		log.Printf("Error creating BQ Inserter:  %v", err)
-		return http.StatusInternalServerError, err
-		// TODO - anything better we could do here?
-	}
-
-	// Create parser, injecting Inserter
-	p := parser.NewParser(dataType, ins)
-	if p == nil {
-		metrics.TaskTotal.WithLabelValues(string(dataType), "NewInserterError").Inc()
-		log.Printf("Error creating parser for %s", dataType)
-		return http.StatusInternalServerError, fmt.Errorf("problem creating parser for %s", dataType)
-	}
-
-	// The closer does nothing, so we could just provide a null closer.
 	tsk := task.NewTask(src.Detail(), src, p, &nullCloser{})
-
 	files, err := tsk.ProcessAllTests(false) // ignore most parse errors.
-
-	// Count the files processed per-host-module per-weekday.
-	// TODO(soltesz): evaluate separating hosts and pods as separate metrics.
-	metrics.FileCount.WithLabelValues(
-		path.Host+"-"+path.Site+"-"+path.Experiment,
-		date.Weekday().String()).Add(float64(files))
-
-	metrics.WorkerState.WithLabelValues(label, "finish").Inc()
-	defer metrics.WorkerState.WithLabelValues(label, "finish").Dec()
-	if err != nil {
-		metrics.TaskTotal.WithLabelValues(string(dataType), "TaskError").Inc()
-		log.Printf("Error Processing Tests:  %v", err)
-		// NOTE: This may cause indefinite retries, and stalled task queue.
-		//  Task will eventually expire, but it might be better to have a
-		// different mechanism for retries, particularly for gardener, which
-		// waits for empty task queue.
-		return http.StatusInternalServerError, err
-		// TODO - anything better we could do here?
-	}
-
-	metrics.TaskTotal.WithLabelValues(string(dataType), "OK").Inc()
-	return http.StatusOK, nil
-}
+*/
 
 // StandardTaskFactory implements task.Factory
 type StandardTaskFactory struct {

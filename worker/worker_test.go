@@ -1,6 +1,3 @@
-//go:build integration
-// +build integration
-
 package worker_test
 
 import (
@@ -108,39 +105,6 @@ func TestLoadTar(t *testing.T) {
 	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
 	tree(t, gcsClient)
 	t.Fatal()
-}
-
-func TestProcessTask(t *testing.T) {
-	if testing.Short() {
-		t.Log("Skipping integration test")
-	}
-
-	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
-	filename := "gs://test-bucket/ndt/2018/05/09/20180509T101913Z-mlab1-mad03-ndt-0000.tgz"
-
-	status, err := worker.ProcessTaskWithClient(stiface.AdaptClient(gcsClient), filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status != http.StatusOK {
-		t.Fatal("Expected", http.StatusOK, "Got:", status)
-	}
-
-	// This section checks that prom metrics are updated appropriately.
-	c := make(chan prometheus.Metric, 10)
-
-	metrics.FileCount.Collect(c)
-	checkCounter(t, c, 1)
-
-	metrics.TaskTotal.Collect(c)
-	checkCounter(t, c, 1)
-
-	metrics.TestTotal.Collect(c)
-	checkCounter(t, c, 1)
-
-	metrics.FileCount.Reset()
-	metrics.TaskTotal.Reset()
-	metrics.TestTotal.Reset()
 }
 
 // This is also the annotator, so it just returns itself.
