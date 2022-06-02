@@ -8,7 +8,6 @@ require (
 	cloud.google.com/go/datastore v1.6.0 // indirect
 	cloud.google.com/go/storage v1.17.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
-	github.com/davecgh/go-spew v1.1.1
 	github.com/felixge/httpsnoop v1.0.2 // indirect
 	github.com/fsouza/fake-gcs-server v1.23.1
 	github.com/go-test/deep v1.0.7
@@ -31,10 +30,9 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/valyala/gozstd v1.13.0
-	golang.org/x/net v0.0.0-20220524220425-1d687d428aca // indirect
+	golang.org/x/net v0.0.0-20220524220425-1d687d428aca
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
-	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/api v0.58.0
 	google.golang.org/genproto v0.0.0-20211001223012-bfb93cce50d9 // indirect
 	google.golang.org/grpc v1.41.0 // indirect
