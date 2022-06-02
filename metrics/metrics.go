@@ -180,31 +180,31 @@ var (
 		[]string{"rsync_host_module", "day_of_week"},
 	)
 
-	// TaskCount counts the number of tasks processed by the pipeline.
+	// TaskTotal counts the number of tasks processed by the pipeline.
 	//
 	// Provides metrics:
-	//   etl_task_count{table, package, status}
+	//   etl_task_total{table, package, status}
 	// Example usage:
-	//   metrics.TaskCount.WithLabelValues("ndt", "Task", "ok").Inc()
-	TaskCount = promauto.NewCounterVec(
+	//   metrics.TaskTotal.WithLabelValues("ndt", "Task", "ok").Inc()
+	TaskTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "etl_task_count",
+			Name: "etl_task_total",
 			Help: "Number of tasks/archive files processed.",
 		},
 		// table/datatype, and Status
 		[]string{"table", "status"},
 	)
 
-	// TestCount counts the number of tests successfully processed by the parsers.
+	// TestTotal counts the number of tests successfully processed by the parsers.
 	//
 	// Provides metrics:
-	//   etl_test_count{table, filetype, status}
+	//   etl_test_total{table, filetype, status}
 	// Example usage:
-	// metrics.TestCount.WithLabelValues(
+	// metrics.TestTotal.WithLabelValues(
 	//	tt.Inserter.TableBase(), "s2c", "ok").Inc()
-	TestCount = promauto.NewCounterVec(
+	TestTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "etl_test_count",
+			Name: "etl_test_total",
 			Help: "Number of tests processed.",
 		},
 		// ndt/pt/ss, s2c/c2s/meta, ok/reject/error/
@@ -407,6 +407,7 @@ var (
 			Name: "etl_row_json_size",
 			Help: "Row json size distributions.",
 			Buckets: []float64{
+				1, // count empty files.
 				100, 200, 400, 800, 1600, 3200, 6400, 10000, 20000,
 				40000, 80000, 160000, 320000, 500000, 600000, 700000,
 				800000, 900000, 1000000, 1200000, 1500000, 2000000, 5000000,

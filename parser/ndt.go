@@ -153,7 +153,7 @@ func NewNDTParser(ins etl.Inserter, annotator ...v2as.Annotator) *NDTParser {
 	if len(annotator) > 0 && annotator[0] != nil {
 		ann = annotator[0]
 	} else {
-		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
+		ann = &NullAnnotator{}
 	}
 
 	return &NDTParser{Base: *NewBase(ins, bufSize, ann)}
@@ -210,7 +210,7 @@ func (n *NDTParser) IsParsable(testName string, data []byte) (string, bool) {
 		return info.Suffix, false
 	}
 	// All other cases.
-	metrics.TestCount.WithLabelValues(
+	metrics.TestTotal.WithLabelValues(
 		n.TableName(), "unknown", "unknown suffix").Inc()
 	return "unknown", false
 }
@@ -226,7 +226,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	// TODO(prod) Ensure that archive files are also date sorted.
 	info, err := ParseNDTFileName(testName)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			n.TableName(), "unknown", "bad filename").Inc()
 		log.Println(err)
 		return nil
@@ -251,7 +251,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 	} else {
 		// Within a group of tests, we expect consistent taskInfo.
 		if n.taskFileName != taskInfo["filename"].(string) {
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				n.TableName(), "any", "inconsistent taskFileName").Inc()
 		}
 	}
@@ -309,7 +309,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 		n.metaFile = ProcessMetaFile(
 			n.TableName(), n.TableSuffix(), testName, content)
 	default:
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			n.TableName(), "unknown", "unparsable file").Inc()
 		return errors.New("Unknown test suffix: " + info.Suffix)
 	}
@@ -407,7 +407,7 @@ func (n *NDTParser) getDeltas(snaplog *web100.SnapLog, testType string) ([]schem
 		snap, err := snaplog.Snapshot(count)
 		if err != nil {
 			// TODO - refine label and maybe write a log?
-			metrics.TestCount.WithLabelValues(
+			metrics.TestTotal.WithLabelValues(
 				n.TableName(), testType, "snapshot failure").Inc()
 			return nil, 0
 		}
@@ -506,7 +506,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, "final snapshot failure").Inc()
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			n.TableName(), testType, "final snapshot failure").Inc()
 		return
 	}
@@ -515,7 +515,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, "final snapValues failure").Inc()
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			n.TableName(), testType, "final snapValues failure").Inc()
 		log.Printf("Error calling SnapshotValues() in test %s, when processing: %s\n%s\n",
 			test.fn, n.taskFileName, err)
@@ -561,7 +561,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		log.Println(err)
 		metrics.ErrorCount.WithLabelValues(
-			n.TableBase(), "log_time marshal error").Inc()
+			n.TableBase(), testType, "log_time marshal error").Inc()
 	} else {
 		results["log_time"] = string(lt)
 	}
@@ -569,7 +569,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		log.Println(err)
 		metrics.ErrorCount.WithLabelValues(
-			n.TableBase(), "parse_time marshal error").Inc()
+			n.TableBase(), testType, "parse_time marshal error").Inc()
 	} else {
 		results["parse_time"] = string(now)
 	}
@@ -633,7 +633,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 		return
 	}
 
-	metrics.TestCount.WithLabelValues(
+	metrics.TestTotal.WithLabelValues(
 		n.TableName(), testType, "ok").Inc()
 }
 

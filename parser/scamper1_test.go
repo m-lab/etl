@@ -49,6 +49,25 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 	}
 }
 
+func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
+	ins := newInMemorySink()
+	n := parser.NewScamper1Parser(ins, "test", "_suffix", &fakeAnnotator{})
+
+	file := "badformat.jsonl"
+	data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))
+	rtx.Must(err, "failed to load test file")
+
+	meta := map[string]bigquery.Value{
+		"filename": file,
+		"date":     civil.Date{Year: 2021, Month: 9, Day: 8},
+	}
+
+	err = n.ParseAndInsert(meta, file, data)
+	if err == nil {
+		t.Errorf("Scamper1Parser.ParseAndInsertError() = nil, want = true")
+	}
+}
+
 func TestScamper1_IsParsable(t *testing.T) {
 	tests := []struct {
 		file string

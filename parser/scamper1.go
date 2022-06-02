@@ -34,7 +34,7 @@ type Scamper1Parser struct {
 func NewScamper1Parser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.SCAMPER1.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
+		ann = &NullAnnotator{}
 	}
 
 	return &Scamper1Parser{
@@ -107,8 +107,10 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Dec()
 
 	scamperOutput, err := parser.ParseTraceroute(rawContent)
+	archiveURL := fileMetadata["filename"].(string)
 	if err != nil {
-		return fmt.Errorf("failed to parse scamper1 file: %v", err)
+		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
+		return fmt.Errorf("failed to parse scamper1 file: %s, archiveURL: %s, error: %w", testName, archiveURL, err)
 	}
 
 	bqScamperOutput := schema.BQScamperOutput{
@@ -121,7 +123,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	parseInfo := schema.ParseInfo{
 		Version:    Version(),
 		Time:       time.Now(),
-		ArchiveURL: fileMetadata["filename"].(string),
+		ArchiveURL: archiveURL,
 		Filename:   testName,
 		GitCommit:  GitCommit(),
 	}
@@ -139,7 +141,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	}
 
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(p.TableName(), scamper1, "ok").Inc()
+	metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, "ok").Inc()
 
 	return nil
 }

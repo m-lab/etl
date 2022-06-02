@@ -1,11 +1,8 @@
 id:
-  Description: A unique id for the test, in this case identical to a.UUID.
-date:
-  Description: The date of the test, for partitioning.
-raw:
-  Description: Fields from the raw data.
-a:
-  Description: Fields summarizing or derived from the raw data.
+  Description: A unique id for this test. For rows with an S2C (download) or C2S
+    (upload) measurement, this is the UUID of that measurement. For rows without
+    either S2C or C2s, this is the UUID of the Control channel.
+
 a.UUID:
   Description: UUID for TCP connection.
 a.TestTime:
@@ -61,6 +58,16 @@ Control.ClientMetadata.Name:
 Control.ClientMetadata.Value:
   Description: If set, contains a value corresponding to metadata name. For
     example, "Windows 10" or "ndtJS"
+Control.ServerMetadata:
+  Description: Authoritative metadata added by the server configuration.
+Control.ServerMetadata.Name:
+  Description: If set, contains the name of a single piece of metadata.
+    This name will be the same for all measurements collected while this
+    server was running with this configuration.
+Control.ServerMetadata.Value:
+  Description: If name is set, contains the text of a server configuration
+    value. This value will be the same for all measurements collected while
+    this server was running with this configuration.
 
 C2S:
   Description: Metadata for Client-to-Server (upload) measurements performed

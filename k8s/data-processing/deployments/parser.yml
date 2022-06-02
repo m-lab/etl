@@ -4,7 +4,7 @@ metadata:
   name: etl-parser
   namespace: default
 spec:
-  replicas: 4
+  replicas: 8
   selector:
     matchLabels:
       # Used to match pre-existing pods that may be affected during updates.
@@ -47,8 +47,8 @@ spec:
         - name: BIGQUERY_DATASET
           value: "{{BIGQUERY_DATASET}}"
 
-        - name: GARDENER_HOST
-          value: "etl-gardener-service.default.svc.cluster.local"
+        - name: GARDENER_ADDR
+          value: "etl-gardener-service.default.svc.cluster.local:8080"
         - name: BATCH_SERVICE
           value: 'true'   # Allow instances to discover they are BATCH instances.
         - name: MAX_WORKERS

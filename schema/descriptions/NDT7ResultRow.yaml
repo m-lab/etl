@@ -1,5 +1,3 @@
-a:
-  Description: Fields summarizing or derived from the raw data.
 a.UUID:
   Description: UUID for TCP connection.
 a.TestTime:
@@ -272,3 +270,14 @@ ClientMetadata.Name:
 ClientMetadata.Value:
   Description: If set, contains a value corresponding to metadata name. For
     example, "Windows 10" or "ndtJS"
+
+ServerMetadata:
+  Description: Authoritative metadata added by the server configuration.
+ServerMetadata.Name:
+  Description: If set, contains the name of a single piece of metadata.
+    This name will be the same for all measurements collected while this
+    server was running with this configuration.
+ServerMetadata.Value:
+  Description: If name is set, contains the text of a server configuration
+    value. This value will be the same for all measurements collected while
+    this server was running with this configuration.

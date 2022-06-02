@@ -128,7 +128,7 @@ type PCAPParser struct {
 func NewPCAPParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
 	bufSize := etl.PCAP.BQBufferSize()
 	if ann == nil {
-		ann = v2as.GetAnnotator(etl.BatchAnnotatorURL)
+		ann = &NullAnnotator{}
 	}
 
 	return &PCAPParser{
@@ -180,7 +180,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	}
 
 	// Count successful inserts.
-	metrics.TestCount.WithLabelValues(p.TableName(), "pcap", "ok").Inc()
+	metrics.TestTotal.WithLabelValues(p.TableName(), "pcap", "ok").Inc()
 
 	return nil
 }

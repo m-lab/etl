@@ -198,20 +198,20 @@ func ProcessMetaFile(tableName string, suffix string, testName string, content [
 	// Create a map from the metafile raw content
 	metamap, err := parseMetaFile(content)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			tableName, "meta", "error").Inc()
 		log.Println("meta processing error: " + err.Error())
 		return nil
 	}
 	metaFile, err := createMetaFileData(testName, metamap)
 	if err != nil {
-		metrics.TestCount.WithLabelValues(
+		metrics.TestTotal.WithLabelValues(
 			tableName, "meta", "error").Inc()
 		log.Println("meta processing error: " + err.Error())
 		return nil
 	}
 
-	metrics.TestCount.WithLabelValues(
+	metrics.TestTotal.WithLabelValues(
 		tableName, "meta", "ok").Inc()
 	return metaFile
 }

@@ -1,2 +1,134 @@
 raw.Tracelb.Nodes.HopID:
   Description: Daily unique identifier to join traceroute datasets with Hop Annotations.
+raw.Metadata:
+  Description:
+raw.Metadata.UUID:
+  Description:
+raw.Metadata.TracerouteCallerVersion:
+  Description: The version of traceroute-caller.
+raw.Metadata.CachedResult:
+  Description: Traceroute data was found in the cache.
+raw.Metadata.CachedUUID:
+  Description: UUID of the cached traceroute data.
+raw.CycleStart:
+  Description:
+raw.CycleStart.Type:
+  Description: The string "cycle-start".
+raw.CycleStart.list_name:
+  Description: The name of the IP list file ("/tmp/scamperctl:<nnn>" for daemon mode, "default" for CLI).
+raw.CycleStart.ID:
+  Description: Some ID assigned to identify the list by a person (deprecated).
+raw.CycleStart.Hostname:
+  Description: The hostname of the machine running the traceroute.
+raw.CycleStart.start_time:
+  Description: When traceroute started in Unix epoch.
+raw.Tracelb:
+  Description:
+raw.Tracelb.type:
+  Description: The string "tracelb".
+raw.Tracelb.version:
+  Description: The version of tracelb.
+raw.Tracelb.userid:
+  Description: The user ID passed via -U flag of the tracelb command (not set by M-Lab).
+raw.Tracelb.method:
+  Description: The trace method used by tracelb ("icmp-echo" for MDA traceroutes).
+raw.Tracelb.src:
+  Description: Source address.
+raw.Tracelb.dst:
+  Description: Destination address.
+raw.Tracelb.start:
+  Description: A timestamp when the traceroute started.
+raw.Tracelb.start.Sec:
+  Description: Number of seconds since Unix epoch when the traceroute started.
+raw.Tracelb.start.Usec:
+  Description: Microseconds elapsed within the second when this traceroute started.
+raw.Tracelb.probe_size:
+  Description: Size of the probe to send.
+raw.Tracelb.firsthop:
+  Description: Where to start probing.
+raw.Tracelb.attempts:
+  Description: Number of attempts per probe.
+raw.Tracelb.confidence:
+  Description: Confidence level to attain.
+raw.Tracelb.tos:
+  Description: Type-of-service byte to use.
+raw.Tracelb.gaplimit:
+  Description: Maximum consecutive unresponsive hops.
+raw.Tracelb.wait_timeout:
+  Description: Seconds to wait before timeout.
+raw.Tracelb.wait_probe:
+  Description: Minimum inter-probe time in 1/100th of seconds per TTL.
+raw.Tracelb.probec:
+  Description: Count of probes sent, including retries.
+raw.Tracelb.probec_max:
+  Description: Maximum number of probes to send.
+raw.Tracelb.nodec:
+  Description: The number of nodes in the traceroute.
+raw.Tracelb.linkc:
+  Description: The number of links in the traceroute.
+raw.Tracelb.nodes:
+  Description:
+raw.Tracelb.nodes.hop_id:
+  Description:
+raw.Tracelb.nodes.addr:
+  Description: The IP address of the node.
+raw.Tracelb.nodes.name:
+  Description: The hostname for the IP address.
+raw.Tracelb.nodes.q_ttl:
+  Description: The TTL value of the quoted traceroute probe.
+raw.Tracelb.nodes.linkc:
+  Description: The number of links for this node.
+raw.Tracelb.nodes.links:
+  Description:
+raw.Tracelb.nodes.links.Links:
+  Description:
+raw.Tracelb.nodes.links.Links.Addr:
+  Description: The address in a link ("*" for unresponsive hosts).
+raw.Tracelb.nodes.links.Links.Probes:
+  Description: The probes that observed this link.
+raw.Tracelb.nodes.links.Links.Probes.Tx:
+  Description: The timestamp of a probe.
+raw.Tracelb.nodes.links.Links.Probes.Tx.Sec:
+  Description: The seconds portion of the timestamp of the probe.
+raw.Tracelb.nodes.links.Links.Probes.Tx.Usec:
+  Description: The microsecond portion of the timestamp of the probe.
+raw.Tracelb.nodes.links.Links.Probes.Replyc:
+  Description: The number of replies this probe received from this address.
+raw.Tracelb.nodes.links.Links.Probes.TTL:
+  Description: The TTL of the probe sent.
+raw.Tracelb.nodes.links.Links.Probes.Attempt:
+  Description: The attempt number of this probe.
+raw.Tracelb.nodes.links.Links.Probes.Flowid:
+  Description: The flow identifier of this probe.
+raw.Tracelb.nodes.links.Links.Probes.Replies:
+  Description:
+raw.Tracelb.nodes.links.Links.Probes.Replies.Rx:
+  Description: The timestamp of a response.
+raw.Tracelb.nodes.links.Links.Probes.Replies.Rx.Sec:
+  Description: The seconds portion of the response timestamp.
+raw.Tracelb.nodes.links.Links.Probes.Replies.Rx.Usec:
+  Description: The microsecond portion of the response timestamp.
+raw.Tracelb.nodes.links.Links.Probes.Replies.TTL:
+  Description: The TTL of the received response packet.
+raw.Tracelb.nodes.links.Links.Probes.Replies.RTT:
+  Description: The round trip time in milliseconds.
+raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_type:
+  Description: The type of ICMP response.
+raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_code:
+  Description: The code of the ICMP response.
+raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_q_tos:
+  Description: The "type of service" byte in the quoted IP packet probe.
+raw.Tracelb.nodes.links.Links.Probes.Replies.icmp_q_ttl:
+  Description: The "time to live" byte in the quoted IP packet probe.
+raw.CycleStop:
+  Description:
+raw.CycleStop.Type:
+  Description: The string "cycle-stop".
+raw.CycleStop.list_name:
+  Description: The name of the IP list file ("/tmp/scamperctl:<nnn>" for daemon mode, "default" for CLI).
+raw.CycleStop.ID:
+  Description: Some ID assigned to identify the list by a person (deprecated).
+raw.CycleStop.Hostname:
+  Description: The hostname of the system that this traceroute was collected on.
+raw.CycleStop.stop_time:
+  Description: When traceroute finished in Unix epoch.

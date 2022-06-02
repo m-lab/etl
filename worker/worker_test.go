@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package worker_test
@@ -131,15 +132,15 @@ func TestProcessTask(t *testing.T) {
 	metrics.FileCount.Collect(c)
 	checkCounter(t, c, 1)
 
-	metrics.TaskCount.Collect(c)
+	metrics.TaskTotal.Collect(c)
 	checkCounter(t, c, 1)
 
-	metrics.TestCount.Collect(c)
+	metrics.TestTotal.Collect(c)
 	checkCounter(t, c, 1)
 
 	metrics.FileCount.Reset()
-	metrics.TaskCount.Reset()
-	metrics.TestCount.Reset()
+	metrics.TaskTotal.Reset()
+	metrics.TestTotal.Reset()
 }
 
 // This is also the annotator, so it just returns itself.
@@ -211,8 +212,8 @@ func TestNilUploader(t *testing.T) {
 	}
 
 	metrics.FileCount.Reset()
-	metrics.TaskCount.Reset()
-	metrics.TestCount.Reset()
+	metrics.TaskTotal.Reset()
+	metrics.TestTotal.Reset()
 }
 
 func TestProcessGKETask(t *testing.T) {
@@ -244,16 +245,16 @@ func TestProcessGKETask(t *testing.T) {
 	metrics.FileCount.Collect(c)
 	checkCounter(t, c, 488)
 
-	metrics.TaskCount.Collect(c)
+	metrics.TaskTotal.Collect(c)
 	checkCounter(t, c, 1)
 
-	metrics.TestCount.Collect(c)
+	metrics.TestTotal.Collect(c)
 	checkCounter(t, c, 478)
 
-	if up.Total != 478 {
-		t.Error("Expected 478 tests, got", up.Total)
+	if up.Total != 512 {
+		t.Error("Expected 512 tests, got", up.Total)
 	}
 	metrics.FileCount.Reset()
-	metrics.TaskCount.Reset()
-	metrics.TestCount.Reset()
+	metrics.TaskTotal.Reset()
+	metrics.TestTotal.Reset()
 }

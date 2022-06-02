@@ -57,7 +57,7 @@ var (
 	}
 
 	maxActiveTasks = flag.Int64("max_active", 1, "Maximum number of active tasks")
-	gardenerHost   = flag.String("gardener_host", "", "Gardener host for jobs")
+	gardenerAddr   = flag.String("gardener_addr", ":8080", "Use this address for the gardener jobs service")
 
 	servicePort     = flag.String("service_port", ":8080", "The main (private) service port")
 	shutdownTimeout = flag.Duration("shutdown_timeout", 1*time.Minute, "Graceful shutdown time allowance")
@@ -213,7 +213,7 @@ func handleRequest(rwr http.ResponseWriter, rq *http.Request) {
 
 	// Throttle by grabbing a semaphore from channel.
 	if shouldThrottle() {
-		metrics.TaskCount.WithLabelValues("unknown", "TooManyRequests").Inc()
+		metrics.TaskTotal.WithLabelValues("unknown", "TooManyRequests").Inc()
 		rwr.WriteHeader(http.StatusTooManyRequests)
 		fmt.Fprintf(rwr, `{"message": "Too many tasks."}`)
 		return
@@ -269,7 +269,7 @@ func subworker(rawFileName string, executionCount, retryCount int, age time.Dura
 	// This handles base64 encoding, and requires a gs:// prefix.
 	fn, err := etl.GetFilename(rawFileName)
 	if err != nil {
-		metrics.TaskCount.WithLabelValues("unknown", "BadRequest").Inc()
+		metrics.TaskTotal.WithLabelValues("unknown", "BadRequest").Inc()
 		log.Printf("Invalid filename: %s\n", fn)
 		return http.StatusBadRequest, `{"message": "Invalid filename."}`
 	}
@@ -302,7 +302,7 @@ func (r *runnable) Run(ctx context.Context) error {
 	dp, err := etl.ValidateTestPath(path)
 	if err != nil {
 		log.Printf("Invalid filename: %v\n", err)
-		metrics.TaskCount.WithLabelValues(string(etl.INVALID), "BadRequest").Inc()
+		metrics.TaskTotal.WithLabelValues(string(etl.INVALID), "BadRequest").Inc()
 		return err
 	}
 
@@ -354,7 +354,7 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 }
 
 func mustGardenerAPI(ctx context.Context, jobServer string) *active.GardenerAPI {
-	rawBase := fmt.Sprintf("http://%s:8080", jobServer)
+	rawBase := fmt.Sprintf("http://%s", jobServer)
 	base, err := url.Parse(rawBase)
 	rtx.Must(err, "Invalid jobServer: "+rawBase)
 
@@ -425,14 +425,14 @@ func main() {
 	etl.BigqueryDataset = *bigqueryDataset
 	etl.BatchAnnotatorURL = annotatorURL.String() + "/batch_annotate"
 
-	if len(*gardenerHost) > 0 {
-		log.Println("Using", *gardenerHost)
+	if len(*gardenerAddr) > 0 {
+		log.Println("Using", *gardenerAddr)
 		minPollingInterval := 10 * time.Second
-		gardenerAPI = mustGardenerAPI(mainCtx, *gardenerHost)
+		gardenerAPI = mustGardenerAPI(mainCtx, *gardenerAddr)
 		// Note that this does not currently track duration metric.
 		go gardenerAPI.Poll(mainCtx, toRunnable, (int)(*maxActiveTasks), minPollingInterval)
 	} else {
-		log.Println("GARDENER_HOST not specified or empty.  Running in passive mode.")
+		log.Println("GARDENER_ADDR not specified or empty.  Running in passive mode.")
 	}
 
 	mux := http.NewServeMux()

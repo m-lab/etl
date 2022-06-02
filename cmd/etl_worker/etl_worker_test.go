@@ -88,7 +88,7 @@ func TestPollingMode(t *testing.T) {
 	flag.Set("prometheusx.listen-address", ":0")
 	flag.Set("max_workers", "25")
 	flag.Set("gcloud_project", "mlab-testing")
-	flag.Set("gardener_host", "gardener")
+	flag.Set("gardener_addr", "gardener:8080")
 	etl.GitCommit = "123456789ABCDEF"
 	mainCtx, mainCancel = context.WithCancel(context.Background())
 

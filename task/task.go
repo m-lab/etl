@@ -7,6 +7,7 @@ package task
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/go/logx"
 )
@@ -105,7 +107,7 @@ OUTER:
 				log.Printf("ERROR filename:%s testname:%s files:%d, duration:%v err:%v",
 					tt.meta["filename"], testname, files,
 					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
-				metrics.TestCount.WithLabelValues(
+				metrics.TestTotal.WithLabelValues(
 					tt.Type(), "unknown", "oversize file").Inc()
 				continue OUTER
 			default:
@@ -123,7 +125,7 @@ OUTER:
 					tt.meta["filename"], testname, files,
 					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
 
-				metrics.TestCount.WithLabelValues(
+				metrics.TestTotal.WithLabelValues(
 					tt.Type(), "unknown", "unrecovered").Inc()
 				// Since we don't understand these errors, safest thing to do is
 				// stop processing the tar file (and task).
@@ -157,11 +159,10 @@ OUTER:
 		loopErr = tt.Parser.ParseAndInsert(tt.meta, testname, data)
 		// Shouldn't have any of these, as they should be handled in ParseAndInsert.
 		if loopErr != nil {
-			metrics.TaskCount.WithLabelValues(
-				tt.Type(), "ParseAndInsertError").Inc()
 			log.Printf("ERROR %v", loopErr)
 			// TODO(dev) Handle this error properly!
-			if failfast {
+			commitRowErr := row.ErrCommitRow{}
+			if failfast && errors.As(loopErr, &commitRowErr) {
 				break OUTER
 			}
 			continue
@@ -182,7 +183,7 @@ OUTER:
 
 	// We expect the loopErr to be io.EOF.  If it is something else, then
 	// it is an actual error, and we want to return that error.
-	if loopErr != io.EOF {
+	if !errors.Is(loopErr, io.EOF) {
 		return files, loopErr
 	}
 

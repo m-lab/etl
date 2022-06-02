@@ -6,9 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"net"
-	"reflect"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -108,6 +106,8 @@ func NewSinkParser(dt etl.DataType, sink row.Sink, table string, ann api.Annotat
 		return NewPCAPParser(sink, table, "", ann)
 	case etl.SCAMPER1:
 		return NewScamper1Parser(sink, table, "", ann)
+	case etl.SW:
+		return NewSwitchParser(sink, table, "", ann)
 	default:
 		return nil
 	}
@@ -119,29 +119,10 @@ func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
 	switch dt {
 	case etl.NDT:
 		return NewNDTParser(ins)
-	case etl.NDT5:
-		sink, ok := ins.(row.Sink)
-		if !ok {
-			log.Printf("%v is not a Sink\n", ins)
-			log.Println(reflect.TypeOf(ins))
-			return nil
-		}
-		return NewNDT5ResultParser(sink, ins.TableBase(), ins.TableSuffix(), nil)
-
 	case etl.SS:
 		return NewDefaultSSParser(ins) // TODO fix this hack.
 	case etl.PT:
 		return NewPTParser(ins)
-	case etl.SW:
-		return NewDiscoParser(ins)
-	case etl.TCPINFO:
-		sink, ok := ins.(row.Sink)
-		if !ok {
-			log.Printf("%v is not a Sink\n", ins)
-			log.Println(reflect.TypeOf(ins))
-			return nil
-		}
-		return NewTCPInfoParser(sink, ins.TableBase(), ins.TableSuffix(), nil)
 	default:
 		return nil
 	}
@@ -173,7 +154,7 @@ type NullParser struct {
 }
 
 func (np *NullParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	metrics.TestCount.WithLabelValues("table", "null", "ok").Inc()
+	metrics.TestTotal.WithLabelValues("table", "null", "ok").Inc()
 	return nil
 }
 func (np *NullParser) TableName() string {
