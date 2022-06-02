@@ -26,9 +26,6 @@ var (
 
 	// BigqueryDataset overrides the default BQ dataset for output.
 	BigqueryDataset string
-
-	// BatchAnnotatorURL provides the base URL for batch annotation requests.
-	BatchAnnotatorURL string
 )
 
 var (
