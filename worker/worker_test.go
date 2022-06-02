@@ -140,11 +140,6 @@ type fakeSourceFactory struct {
 
 func (sf *fakeSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, etl.ProcessingError) {
 	label := dp.TableBase()
-	dataType := dp.GetDataType()
-	// Can this be merged with error case above?
-	if dataType == etl.INVALID {
-		panic("invalid datatype for test")
-	}
 	tr, err := etlstorage.NewTestSource(sf.client, dp, label)
 	if err != nil {
 		panic("error opening gcs file:" + err.Error())
