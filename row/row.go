@@ -203,13 +203,11 @@ func (pb *Base) Flush() error {
 	return pb.commit(rows)
 }
 
-// Put adds a row to the buffer.
-// Iff the buffer is already full the prior buffered rows are
-// annotated and committed to the Sink.
-// NOTE: There is no guarantee about ordering of writes resulting from
-// sequential calls to Put.  However, once a block of rows is submitted
-// to pb.commit, it should be written in the same order to the Sink.
-// TODO improve Annotatable architecture.
+// Put adds a row to the buffer. Iff the buffer is already full, then prior
+// buffered rows are committed to the Sink. NOTE: There is no guarantee about
+// when writes will result from sequential calls to Put. However, once a block
+// of rows is "committed", they will be written to the Sink in the same order
+// they were Put.
 func (pb *Base) Put(row interface{}) error {
 	rows := pb.buf.Append(row)
 	pb.stats.Inc()
