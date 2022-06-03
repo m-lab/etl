@@ -313,8 +313,8 @@ func (ann *annotator) Annotate(rows []interface{}, metricLabel string) error {
 // Base provides common parser functionality.
 // Base is NOT THREAD-SAFE
 type Base struct {
-	sink  Sink
-	ann   annotator
+	sink Sink
+	// ann   annotator
 	buf   *Buffer
 	label string // Used in metrics and errors.
 
@@ -322,9 +322,9 @@ type Base struct {
 }
 
 // NewBase creates a new Base.  This will generally be embedded in a type specific parser.
-func NewBase(label string, sink Sink, bufSize int, ann v2as.Annotator) *Base {
+func NewBase(label string, sink Sink, bufSize int) *Base {
 	buf := NewBuffer(bufSize)
-	return &Base{sink: sink, ann: annotator{ann}, buf: buf, label: label}
+	return &Base{sink: sink, buf: buf, label: label}
 }
 
 // GetStats returns the buffer/sink stats.
@@ -340,10 +340,12 @@ func (pb *Base) TaskError() error {
 var logAnnError = logx.NewLogEvery(nil, 60*time.Second)
 
 func (pb *Base) commit(rows []interface{}) error {
-	err := pb.ann.Annotate(rows, pb.label)
-	if err != nil {
-		logAnnError.Println("annotation: ", err)
-	}
+	/*
+		err := pb.ann.Annotate(rows, pb.label)
+		if err != nil {
+			logAnnError.Println("annotation: ", err)
+		}
+	*/
 
 	// TODO do we need these to be done in order.
 	// This is synchronous, blocking, and thread safe.

@@ -16,9 +16,9 @@ import (
 
 // StandardTaskFactory implements task.Factory
 type StandardTaskFactory struct {
-	Sink      factory.SinkFactory
-	Source    factory.SourceFactory
-	Annotator factory.AnnotatorFactory
+	Sink   factory.SinkFactory
+	Source factory.SourceFactory
+	// Annotator factory.AnnotatorFactory
 }
 
 // Get implements task.Factory.Get
@@ -30,12 +30,14 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 		return nil, err
 	}
 
-	ann, err := tf.Annotator.Get(ctx, dp)
-	if err != nil {
-		e := fmt.Errorf("%v creating annotator for %s", err, dp.GetDataType())
-		log.Println(e, dp.URI)
-		return nil, err
-	}
+	/*
+		ann, err := tf.Annotator.Get(ctx, dp)
+		if err != nil {
+			e := fmt.Errorf("%v creating annotator for %s", err, dp.GetDataType())
+			log.Println(e, dp.URI)
+			return nil, err
+		}
+	*/
 	src, err := tf.Source.Get(ctx, dp)
 	if err != nil {
 		e := fmt.Errorf("%v creating source for %s", err, dp.GetDataType())
@@ -43,7 +45,7 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 		return nil, err
 	}
 
-	p := parser.NewSinkParser(dp.GetDataType(), sink, src.Type(), ann)
+	p := parser.NewSinkParser(dp.GetDataType(), sink, src.Type())
 	if p == nil {
 		e := fmt.Errorf("%v creating parser for %s", err, dp.GetDataType())
 		log.Println(e, dp.URI)
