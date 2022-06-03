@@ -12,14 +12,17 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
+<<<<<<< HEAD
 	"github.com/m-lab/annotation-service/api"
 	v2 "github.com/m-lab/annotation-service/api/v2"
+=======
+	"github.com/m-lab/go/cloud/bqx"
+>>>>>>> 01587ff (Remove Annotator references)
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/etl"
@@ -86,6 +89,7 @@ func fromTar(bucket string, fn string) *fakestorage.Server {
 }
 
 // This is also the annotator, so it just returns itself.
+<<<<<<< HEAD
 type fakeAnnotatorFactory struct{}
 
 func (ann *fakeAnnotatorFactory) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2.Response, error) {
@@ -94,6 +98,21 @@ func (ann *fakeAnnotatorFactory) GetAnnotations(ctx context.Context, date time.T
 
 func (ann *fakeAnnotatorFactory) Get(ctx context.Context, dp etl.DataPath) (v2.Annotator, etl.ProcessingError) {
 	return ann, nil
+=======
+type fakeSinkFactory struct {
+	up etl.Uploader
+}
+
+func (fsf *fakeSinkFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, etl.ProcessingError) {
+	if fsf.up == nil {
+		return nil, factory.NewError(dp.DataType, "fakeSinkFactory",
+			http.StatusInternalServerError, errors.New("nil uploader"))
+	}
+	pdt := bqx.PDT{Project: "fake-project", Dataset: "fake-dataset", Table: "fake-table"}
+	in, err := bq.NewColumnPartitionedInserterWithUploader(pdt, fsf.up)
+	rtx.Must(err, "Bad SinkFactory")
+	return in, nil
+>>>>>>> 01587ff (Remove Annotator references)
 }
 
 type fakeSourceFactory struct {
@@ -129,8 +148,13 @@ func TestProcessGKETask(t *testing.T) {
 	fs, sf := NewSinkFactory("test-bucket")
 
 	fakeFactory := worker.StandardTaskFactory{
+<<<<<<< HEAD
 		Sink:   sf,
 		Source: NewSourceFactory("test-bucket"),
+=======
+		Sink:   &fakeSinkFactory{up: up},
+		Source: NewSourceFactory(),
+>>>>>>> 01587ff (Remove Annotator references)
 	}
 
 	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"

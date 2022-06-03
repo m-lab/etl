@@ -18,7 +18,6 @@ import (
 type StandardTaskFactory struct {
 	Sink   factory.SinkFactory
 	Source factory.SourceFactory
-	// Annotator factory.AnnotatorFactory
 }
 
 // Get implements task.Factory.Get
@@ -30,14 +29,6 @@ func (tf *StandardTaskFactory) Get(ctx context.Context, dp etl.DataPath) (*task.
 		return nil, err
 	}
 
-	/*
-		ann, err := tf.Annotator.Get(ctx, dp)
-		if err != nil {
-			e := fmt.Errorf("%v creating annotator for %s", err, dp.GetDataType())
-			log.Println(e, dp.URI)
-			return nil, err
-		}
-	*/
 	src, err := tf.Source.Get(ctx, dp)
 	if err != nil {
 		e := fmt.Errorf("%v creating source for %s", err, dp.GetDataType())
