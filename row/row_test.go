@@ -2,9 +2,6 @@ package row_test
 
 import (
 	"errors"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -76,42 +73,13 @@ func (in *inMemorySink) Close() error { return nil }
 func TestBase(t *testing.T) {
 	ins := &inMemorySink{}
 
-	// Set up fake annotation service
-	r1 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-	                  "Annotations":{"1.2.3.4":{"Geo":{"postal_code":"10583"}}}}`
-	r2 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-					  "Annotations":{"4.3.2.1":{"Geo":{"postal_code":"10584"}}}}`
-
-	callCount := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// HACKY - depends on order in which client and server are annotated
-		if callCount == 0 {
-			fmt.Fprint(w, r1)
-		} else {
-			fmt.Fprint(w, r2)
-		}
-		callCount++
-	}))
-	defer func() {
-		ts.Close()
-	}()
-
 	b := row.NewBase("test", ins, 10) // , v2as.GetAnnotator(ts.URL))
 
 	b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 
 	// Add a row with empty server IP
 	b.Put(&Row{"1.2.3.4", "", nil, nil})
-	if callCount != 0 {
-		t.Error("Callcount should be 0:", callCount)
-	}
-
 	b.Flush()
-	/*
-		if callCount != 2 {
-			t.Error("Callcount should be 2:", callCount)
-		}
-	*/
 	stats := b.GetStats()
 	if stats.Committed != 2 {
 		t.Fatalf("Expected %d, Got %d.", 2, stats.Committed)
@@ -120,39 +88,10 @@ func TestBase(t *testing.T) {
 	if len(ins.data) < 1 {
 		t.Fatal("Should have at least one inserted row")
 	}
-	/*
-		inserted := ins.data[0].(*Row)
-		if inserted.clientAnn == nil || inserted.clientAnn.Geo.PostalCode != "10583" {
-			t.Error("Failed client annotation")
-		}
-		if inserted.serverAnn == nil || inserted.serverAnn.Geo.PostalCode != "10584" {
-			t.Error("Failed server annotation")
-		}
-	*/
 }
 
 func TestAsyncPut(t *testing.T) {
 	ins := &inMemorySink{}
-
-	// Set up fake annotation service
-	r1 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-	                  "Annotations":{"1.2.3.4":{"Geo":{"postal_code":"10583"}}}}`
-	r2 := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-					  "Annotations":{"4.3.2.1":{"Geo":{"postal_code":"10584"}}}}`
-
-	callCount := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// HACKY - depends on order in which client and server are annotated
-		if callCount == 0 {
-			fmt.Fprint(w, r1)
-		} else {
-			fmt.Fprint(w, r2)
-		}
-		callCount++
-	}))
-	defer func() {
-		ts.Close()
-	}()
 
 	b := row.NewBase("test", ins, 1) // , v2as.GetAnnotator(ts.URL))
 
@@ -176,15 +115,6 @@ func TestAsyncPut(t *testing.T) {
 	if len(ins.data) < 1 {
 		t.Fatal("Should have at least one inserted row")
 	}
-	/*
-		inserted := ins.data[0].(*Row)
-		if inserted.clientAnn == nil || inserted.clientAnn.Geo.PostalCode != "10583" {
-			t.Error("Failed client annotation")
-		}
-		if inserted.serverAnn == nil || inserted.serverAnn.Geo.PostalCode != "10584" {
-			t.Error("Failed server annotation")
-		}
-	*/
 }
 
 func TestErrCommitRow(t *testing.T) {
