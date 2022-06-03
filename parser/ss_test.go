@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/uuid-annotator/annotator"
+
 	"cloud.google.com/go/bigquery"
 	"github.com/go-test/deep"
 
-	"github.com/m-lab/annotation-service/api"
 	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
-	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 func TestExtractLogtimeFromFilename(t *testing.T) {
@@ -115,12 +115,14 @@ func TestSSInserter(t *testing.T) {
 		t.Fatal("Should have at least one inserted row")
 	}
 
-	for _, r := range ins.data {
-		row, _ := r.(*schema.SS)
-		if row.Web100_log_entry.Connection_spec.Remote_geolocation.PostalCode == "" {
-			t.Error(row.Web100_log_entry.Connection_spec.Remote_ip, "missing PostalCode")
+	/*
+		for _, r := range ins.data {
+			row, _ := r.(*schema.SS)
+			if row.Web100_log_entry.Connection_spec.Remote_geolocation.PostalCode == "" {
+				t.Error(row.Web100_log_entry.Connection_spec.Remote_ip, "missing PostalCode")
+			}
 		}
-	}
+	*/
 	inserted := ins.data[0].(*schema.SS)
 	if inserted.ParseTime.After(time.Now()) {
 		t.Error("Should have inserted parse_time")
@@ -146,45 +148,52 @@ func TestSSInserter(t *testing.T) {
 		Local_port:  41131,
 		Remote_ip:   "5.228.253.100",
 		Remote_port: 52290,
-		Local_geolocation: api.GeolocationIP{
-			PostalCode: "21320",
-			Latitude:   3,
-			Longitude:  4,
-		},
-		Remote_geolocation: api.GeolocationIP{
-			PostalCode: "52282",
-			Latitude:   1,
-			Longitude:  2,
-		},
 		ServerX: annotator.ServerAnnotations{
 			Site:    "ord03",
 			Machine: "mlab1",
-			Geo: &annotator.Geolocation{
-				PostalCode: "21320",
-				Latitude:   3.0,
-				Longitude:  4.0,
-			},
-			Network: &annotator.Network{
-				CIDR:     "213.248.112.64/26",
-				ASNumber: 456,
-				ASName:   "Fake Server ISP",
-				Systems: []annotator.System{
-					{ASNs: []uint32{456}},
-				},
-			},
 		},
-		ClientX: annotator.ClientAnnotations{
-			Geo: &annotator.Geolocation{
+
+		/*
+			Local_geolocation: api.GeolocationIP{
+				PostalCode: "21320",
+				Latitude:   3,
+				Longitude:  4,
+			},
+			Remote_geolocation: api.GeolocationIP{
 				PostalCode: "52282",
 				Latitude:   1,
 				Longitude:  2,
 			},
-			Network: &annotator.Network{
-				Systems: []annotator.System{
-					{ASNs: []uint32{456}},
+			ServerX: annotator.ServerAnnotations{
+				Site:    "ord03",
+				Machine: "mlab1",
+				Geo: &annotator.Geolocation{
+					PostalCode: "21320",
+					Latitude:   3.0,
+					Longitude:  4.0,
+				},
+				Network: &annotator.Network{
+					CIDR:     "213.248.112.64/26",
+					ASNumber: 456,
+					ASName:   "Fake Server ISP",
+					Systems: []annotator.System{
+						{ASNs: []uint32{456}},
+					},
 				},
 			},
-		},
+			ClientX: annotator.ClientAnnotations{
+				Geo: &annotator.Geolocation{
+					PostalCode: "52282",
+					Latitude:   1,
+					Longitude:  2,
+				},
+				Network: &annotator.Network{
+					Systems: []annotator.System{
+						{ASNs: []uint32{456}},
+					},
+				},
+			},
+		*/
 	}
 
 	if diff := deep.Equal(inserted.Web100_log_entry.Connection_spec, expectedSpec); diff != nil {

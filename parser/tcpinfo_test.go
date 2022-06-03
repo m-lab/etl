@@ -150,7 +150,7 @@ func TestTCPParser(t *testing.T) {
 
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
-	p := parser.NewTCPInfoParser(ins, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
+	p := parser.NewTCPInfoParser(ins, "test", "_suffix")
 	task := task.NewTask(url, src, p, nullCloser{})
 
 	startDecode := time.Now()
@@ -245,7 +245,7 @@ func TestTCPParser(t *testing.T) {
 func TestTCPTask(t *testing.T) {
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
-	p := parser.NewTCPInfoParser(ins, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
+	p := parser.NewTCPInfoParser(ins, "test", "_suffix")
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	url := "gs://fake-archive/ndt/tcpinfo/2019/05/16/" + filepath.Base(filename)
@@ -283,7 +283,7 @@ func TestTaskToGCS(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Inject fake inserter and annotator
-	p := parser.NewTCPInfoParser(rw, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
+	p := parser.NewTCPInfoParser(rw, "test", "_suffix")
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	url := "gs://fake-archive/ndt/tcpinfo/2019/05/16/" + filepath.Base(filename)
@@ -311,7 +311,7 @@ func TestTaskToGCS(t *testing.T) {
 func BenchmarkTCPParser(b *testing.B) {
 	// Inject fake inserter and annotator
 	ins := newInMemorySink()
-	p := parser.NewTCPInfoParser(ins, "test", "_suffix", newFakeAnnotator(tcpInfoAnno))
+	p := parser.NewTCPInfoParser(ins, "test", "_suffix")
 
 	filename := "testdata/20190516T013026.744845Z-tcpinfo-mlab4-arn02-ndt.tgz"
 	n := 0

@@ -30,13 +30,13 @@ type SSParser struct {
 // NewSSParser creates a new sidestream parser.
 func NewSSParser(ins etl.Inserter, ann v2as.Annotator) *SSParser {
 	bufSize := etl.SS.BQBufferSize()
-	return &SSParser{*NewBase(ins, bufSize, ann)}
+	return &SSParser{*NewBase(ins, bufSize)}
 }
 
 // TODO get rid of this hack.
 func NewDefaultSSParser(ins etl.Inserter) *SSParser {
 	bufSize := etl.SS.BQBufferSize()
-	return &SSParser{*NewBase(ins, bufSize, &NullAnnotator{})}
+	return &SSParser{*NewBase(ins, bufSize)}
 }
 
 // ExtractLogtimeFromFilename extracts the log time.

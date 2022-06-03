@@ -364,13 +364,15 @@ const PTBufferSize int = 2
 
 func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
 	bufSize := etl.PT.BQBufferSize()
-	var annotator v2as.Annotator
-	if len(ann) > 0 && ann[0] != nil {
-		annotator = ann[0]
-	} else {
-		annotator = &NullAnnotator{}
-	}
-	return &PTParser{Base: *NewBase(ins, bufSize, annotator)}
+	/*
+		var annotator v2as.Annotator
+		if len(ann) > 0 && ann[0] != nil {
+			annotator = ann[0]
+		} else {
+			annotator = &NullAnnotator{}
+		}
+	*/
+	return &PTParser{Base: *NewBase(ins, bufSize)}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.

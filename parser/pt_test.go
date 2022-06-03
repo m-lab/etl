@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/go-test/deep"
 	"github.com/m-lab/annotation-service/api"
-	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -326,17 +324,19 @@ func TestParseJSONL(t *testing.T) {
 		t.Fatalf("Wrong UUID; got %q, want %q", ptTest.UUID, "ndt-qtfh8_1565996043_0000000000003B64")
 	}
 
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(m["91.169.126.135"])
-	if diff := deep.Equal(&ptTest.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(m["91.213.30.229"])
-	sx.Site = "nuq07"
-	sx.Machine = "mlab2"
-	if diff := deep.Equal(&ptTest.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
-	}
+	/*
+		// Verify the client and server annotations match.
+		cx := v2.ConvertAnnotationsToClientAnnotations(m["91.169.126.135"])
+		if diff := deep.Equal(&ptTest.ClientX, cx); diff != nil {
+			t.Errorf("ClientX annotation does not match; %#v", diff)
+		}
+		sx := v2.ConvertAnnotationsToServerAnnotations(m["91.213.30.229"])
+		sx.Site = "nuq07"
+		sx.Machine = "mlab2"
+		if diff := deep.Equal(&ptTest.ServerX, sx); diff != nil {
+			t.Errorf("ServerX annotation does not match; %#v", diff)
+		}
+	*/
 }
 
 func TestParse(t *testing.T) {
@@ -444,7 +444,7 @@ func TestAnnotateAndPutAsync(t *testing.T) {
 		fmt.Println(pt.NumRowsForTest())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
-	pt.AnnotateAndPutAsync("traceroute")
+	pt.PutAsync(pt.TakeRows())
 
 	if len(ins.data) != 1 {
 		fmt.Println(len(ins.data))
@@ -455,17 +455,19 @@ func TestAnnotateAndPutAsync(t *testing.T) {
 		t.Fatalf("Wrong TaskFilenName; got %q, want %q", ptTest.Parseinfo.TaskFileName, url)
 	}
 
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(m["74.125.224.100"])
-	if diff := deep.Equal(&ptTest.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(m["172.17.94.34"])
-	sx.Site = "nuq07"
-	sx.Machine = "mlab4"
-	if diff := deep.Equal(&ptTest.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
-	}
+	/*
+		// Verify the client and server annotations match.
+		cx := v2.ConvertAnnotationsToClientAnnotations(m["74.125.224.100"])
+		if diff := deep.Equal(&ptTest.ClientX, cx); diff != nil {
+			t.Errorf("ClientX annotation does not match; %#v", diff)
+		}
+		sx := v2.ConvertAnnotationsToServerAnnotations(m["172.17.94.34"])
+		sx.Site = "nuq07"
+		sx.Machine = "mlab4"
+		if diff := deep.Equal(&ptTest.ServerX, sx); diff != nil {
+			t.Errorf("ServerX annotation does not match; %#v", diff)
+		}
+	*/
 }
 
 func TestParseAndInsert(t *testing.T) {
@@ -531,19 +533,21 @@ func TestParseAndInsert(t *testing.T) {
 	if ins.data[0].(*schema.PTTest).UUID != "R9_wGx1-cSmqtSAt5aQtNg" {
 		t.Fatalf("UUID is wrong; got %q, want %q", ins.data[0].(*schema.PTTest).UUID, "R9_wGx1-cSmqtSAt5aQtNg")
 	}
-	p := ins.data[0].(*schema.PTTest)
+	/*
+		p := ins.data[0].(*schema.PTTest)
 
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(m["91.239.96.102"])
-	if diff := deep.Equal(&p.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(m["2.80.132.33"])
-	sx.Site = "akl01"
-	sx.Machine = "mlab3"
-	if diff := deep.Equal(&p.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
-	}
+		// Verify the client and server annotations match.
+		cx := v2.ConvertAnnotationsToClientAnnotations(m["91.239.96.102"])
+		if diff := deep.Equal(&p.ClientX, cx); diff != nil {
+			t.Errorf("ClientX annotation does not match; %#v", diff)
+		}
+		sx := v2.ConvertAnnotationsToServerAnnotations(m["2.80.132.33"])
+		sx.Site = "akl01"
+		sx.Machine = "mlab3"
+		if diff := deep.Equal(&p.ServerX, sx); diff != nil {
+			t.Errorf("ServerX annotation does not match; %#v", diff)
+		}
+	*/
 }
 
 func TestProcessLastTests(t *testing.T) {

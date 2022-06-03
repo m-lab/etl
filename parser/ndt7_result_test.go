@@ -32,7 +32,7 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ins := newInMemorySink()
-			n := parser.NewNDT7ResultParser(ins, "test", "_suffix", &fakeAnnotator{})
+			n := parser.NewNDT7ResultParser(ins, "test", "_suffix")
 
 			resultData, err := ioutil.ReadFile(`testdata/NDT7Result/` + tt.testName)
 			if err != nil {

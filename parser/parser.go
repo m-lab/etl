@@ -11,8 +11,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/annotation-service/api/v2"
-
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -90,39 +88,24 @@ func GetHopID(cycleStartTime float64, hostname string, address string) string {
 
 // NewSinkParser creates an appropriate parser for a given data type.
 // Eventually all datatypes will use this instead of NewParser.
-func NewSinkParser(dt etl.DataType, sink row.Sink, table string, ann api.Annotator) etl.Parser {
+func NewSinkParser(dt etl.DataType, sink row.Sink, table string) etl.Parser {
 	switch dt {
 	case etl.ANNOTATION:
-		return NewAnnotationParser(sink, table, "", ann)
+		return NewAnnotationParser(sink, table, "")
 	case etl.HOPANNOTATION1:
-		return NewHopAnnotation1Parser(sink, table, "", ann)
+		return NewHopAnnotation1Parser(sink, table, "")
 	case etl.NDT5:
-		return NewNDT5ResultParser(sink, table, "", ann)
+		return NewNDT5ResultParser(sink, table, "")
 	case etl.NDT7:
-		return NewNDT7ResultParser(sink, table, "", ann)
+		return NewNDT7ResultParser(sink, table, "")
 	case etl.TCPINFO:
-		return NewTCPInfoParser(sink, table, "", ann)
+		return NewTCPInfoParser(sink, table, "")
 	case etl.PCAP:
-		return NewPCAPParser(sink, table, "", ann)
+		return NewPCAPParser(sink, table, "")
 	case etl.SCAMPER1:
-		return NewScamper1Parser(sink, table, "", ann)
+		return NewScamper1Parser(sink, table, "")
 	case etl.SW:
-		return NewSwitchParser(sink, table, "", ann)
-	default:
-		return nil
-	}
-}
-
-// NewParser creates an appropriate parser for a given data type.
-// DEPRECATED - parsers should migrate to use NewSinkParser.
-func NewParser(dt etl.DataType, ins etl.Inserter) etl.Parser {
-	switch dt {
-	case etl.NDT:
-		return NewNDTParser(ins)
-	case etl.SS:
-		return NewDefaultSSParser(ins) // TODO fix this hack.
-	case etl.PT:
-		return NewPTParser(ins)
+		return NewSwitchParser(sink, table, "")
 	default:
 		return nil
 	}

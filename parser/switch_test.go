@@ -22,7 +22,7 @@ const (
 
 func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	sink := newInMemorySink()
-	n := parser.NewSwitchParser(sink, "switch", "_suffix", &fakeAnnotator{})
+	n := parser.NewSwitchParser(sink, "switch", "_suffix")
 
 	// Test DISCOv2 format.
 	data, err := ioutil.ReadFile(path.Join("testdata/Switch/", switchDISCOv2Filename))
@@ -83,7 +83,7 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 
 	// Test DISCOv1 format.
 	sink = newInMemorySink()
-	n = parser.NewSwitchParser(sink, "switch", "_suffix", &fakeAnnotator{})
+	n = parser.NewSwitchParser(sink, "switch", "_suffix")
 	// This is a gzip-compressed JSONL file.
 	gzipData, err := ioutil.ReadFile(path.Join("testdata/Switch/", switchDISCOv1Filename))
 	rtx.Must(err, "failed to load DISCOv1 test file")

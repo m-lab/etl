@@ -171,6 +171,7 @@ func (buf *RowBuffer) annotateClients(label string) error {
 // TODO should convert this to operate on the rows, instead of the buffer.
 // Then we can do it after TakeRows().
 func (buf *RowBuffer) Annotate(metricLabel string) error {
+	return nil
 	metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Inc()
 	defer metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Dec()
 	if len(buf.rows) == 0 {
@@ -201,8 +202,11 @@ type Base struct {
 }
 
 // NewBase creates a new parser.Base.  This will generally be embedded in a type specific parser.
-func NewBase(ins etl.Inserter, bufSize int, ann v2as.Annotator) *Base {
-	buf := RowBuffer{bufSize, make([]interface{}, 0, bufSize), ann}
+func NewBase(ins etl.Inserter, bufSize int) *Base {
+	buf := RowBuffer{
+		bufferSize: bufSize,
+		rows:       make([]interface{}, 0, bufSize),
+	}
 	return &Base{ins, buf}
 }
 
@@ -219,6 +223,7 @@ func (pb *Base) Flush() error {
 	return pb.Inserter.Flush()
 }
 
+/*
 // AnnotateAndFlush annotates the rows in the buffer, and synchronously
 // pushes them through Inserter.
 func (pb *Base) AnnotateAndFlush(metricLabel string) error {
@@ -239,3 +244,9 @@ func (pb *Base) AnnotateAndPutAsync(metricLabel string) error {
 	pb.PutAsync(rows)
 	return annErr
 }
+*/
+/*func (pb *Base) PutAsync() {
+	rows := pb.TakeRows()
+	pb.Inserter.PutAsync(rows)
+}
+*/

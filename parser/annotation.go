@@ -40,14 +40,10 @@ func (ann *NullAnnotator) GetAnnotations(ctx context.Context, date time.Time, ip
 }
 
 // NewAnnotationParser creates a new parser for annotation data.
-func NewAnnotationParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
+func NewAnnotationParser(sink row.Sink, label, suffix string) etl.Parser {
 	bufSize := etl.ANNOTATION.BQBufferSize()
-	if ann == nil {
-		ann = &NullAnnotator{}
-	}
-
 	return &AnnotationParser{
-		Base:   row.NewBase(label, sink, bufSize, ann),
+		Base:   row.NewBase(label, sink, bufSize),
 		table:  label,
 		suffix: suffix,
 	}
