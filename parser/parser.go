@@ -86,8 +86,8 @@ func GetHopID(cycleStartTime float64, hostname string, address string) string {
 	return fmt.Sprintf("%s_%s_%s", date, hostname, address)
 }
 
-// NewSinkParser creates an appropriate parser for a given data type.
-// Eventually all datatypes will use this instead of NewParser.
+// NewSinkParser creates a parser for the given data type.
+// NewSinkParser should only support datatypes that use "standard column" schemas.
 func NewSinkParser(dt etl.DataType, sink row.Sink, table string) etl.Parser {
 	switch dt {
 	case etl.ANNOTATION:

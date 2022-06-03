@@ -141,8 +141,6 @@ type NDTParser struct {
 }
 
 // NewNDTParser returns a new NDT parser.
-// Caller may include an annotator.  If not provided, the default annotator is used.
-// TODO - clean up the vararg annotator hack once it is standard in all parsers.
 func NewNDTParser(sink row.Sink, table, suffix string) *NDTParser {
 	bufSize := etl.NDT.BQBufferSize()
 	return &NDTParser{
