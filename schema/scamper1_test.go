@@ -29,7 +29,7 @@ func TestScamper1Row_Schema(t *testing.T) {
 		}
 		return nil
 	})
-	if count != 4 {
+	if count != 6 {
 		t.Errorf("Scamper1.Schema() missing expected fields: got %d, want 4", count)
 	}
 }

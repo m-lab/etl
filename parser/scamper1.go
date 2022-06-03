@@ -106,11 +106,23 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Dec()
 
-	scamperOutput, err := parser.ParseTraceroute(rawContent)
+	trcParser, err := parser.New("mda")
+	if err != nil {
+		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
+		return fmt.Errorf("failed to initialize traceroute parser, error: %w", err)
+	}
+
+	rawData, err := trcParser.ParseRawData(rawContent)
 	archiveURL := fileMetadata["filename"].(string)
 	if err != nil {
 		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
 		return fmt.Errorf("failed to parse scamper1 file: %s, archiveURL: %s, error: %w", testName, archiveURL, err)
+	}
+
+	scamperOutput, ok := rawData.(parser.Scamper1)
+	if !ok {
+		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, "failed to convert ParsedData to Scamper1 object").Inc()
+		return fmt.Errorf("failed to convert ParsedData to Scamper1 object for file: %s", testName)
 	}
 
 	bqScamperOutput := schema.BQScamperOutput{
