@@ -17,7 +17,6 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/google/go-jsonnet"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
@@ -362,15 +361,9 @@ const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 const PTBufferSize int = 2
 
-func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
+func NewPTParser(ins etl.Inserter) *PTParser {
 	bufSize := etl.PT.BQBufferSize()
-	var annotator v2as.Annotator
-	if len(ann) > 0 && ann[0] != nil {
-		annotator = ann[0]
-	} else {
-		annotator = &NullAnnotator{}
-	}
-	return &PTParser{Base: *NewBase(ins, bufSize, annotator)}
+	return &PTParser{Base: *NewBase(ins, bufSize)}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
@@ -523,7 +516,6 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 	err := pt.AddRow(&ptTest)
 	if err == etl.ErrBufferFull {
 		// Flush asynchronously, to improve throughput.
-		pt.Annotate(pt.TableName())
 		pt.PutAsync(pt.TakeRows())
 		pt.AddRow(&ptTest)
 	}
@@ -541,7 +533,6 @@ func (pt *PTParser) ProcessLastTests() error {
 
 func (pt *PTParser) Flush() error {
 	pt.ProcessLastTests()
-	pt.Annotate(pt.TableName())
 	pt.Put(pt.TakeRows())
 	return pt.Inserter.Flush()
 }
@@ -612,7 +603,6 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			err := pt.AddRow(&ptTest)
 			if err == etl.ErrBufferFull {
 				// Flush asynchronously, to improve throughput.
-				pt.Annotate(pt.TableName())
 				pt.PutAsync(pt.TakeRows())
 				pt.AddRow(&ptTest)
 			}

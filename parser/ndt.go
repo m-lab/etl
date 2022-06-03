@@ -145,18 +145,9 @@ type NDTParser struct {
 }
 
 // NewNDTParser returns a new NDT parser.
-// Caller may include an annotator.  If not provided, the default annotator is used.
-// TODO - clean up the vararg annotator hack once it is standard in all parsers.
-func NewNDTParser(ins etl.Inserter, annotator ...v2as.Annotator) *NDTParser {
+func NewNDTParser(ins etl.Inserter) *NDTParser {
 	bufSize := etl.NDT.BQBufferSize()
-	var ann v2as.Annotator
-	if len(annotator) > 0 && annotator[0] != nil {
-		ann = annotator[0]
-	} else {
-		ann = &NullAnnotator{}
-	}
-
-	return &NDTParser{Base: *NewBase(ins, bufSize, ann)}
+	return &NDTParser{Base: *NewBase(ins, bufSize)}
 }
 
 // These functions implement the etl.Parser interface.
@@ -179,7 +170,7 @@ func (n *NDTParser) Flush() error {
 		n.processGroup()
 	}
 
-	return n.Base.AnnotateAndFlush(n.TableBase())
+	return n.Base.Flush()
 }
 
 // TableName returns the base of the bq table inserter target.
@@ -621,8 +612,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	ndtTest := NDTTest{results}
 	err = n.Base.AddRow(ndtTest)
 	if err == etl.ErrBufferFull {
-		// Ignore annotation errors.  They are counted and logged elsewhere.
-		n.Base.AnnotateAndPutAsync(n.TableBase())
+		n.PutAsync(n.TakeRows())
 		err = n.Base.AddRow(ndtTest)
 	}
 	if err != nil {

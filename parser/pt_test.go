@@ -9,9 +9,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/go-test/deep"
-	"github.com/m-lab/annotation-service/api"
-	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -259,38 +256,8 @@ func TestParseLegacyFormatData(t *testing.T) {
 }
 
 func TestParseJSONL(t *testing.T) {
-	m := map[string]*api.Annotations{
-		"91.213.30.229": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "NA",
-				CountryCode:   "US",
-				Latitude:      1.0,
-				Longitude:     2.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 1234,
-				Systems: []api.System{
-					{ASNs: []uint32{1234}},
-				},
-			},
-		},
-		"91.169.126.135": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "EU",
-				CountryCode:   "DE",
-				Latitude:      3.0,
-				Longitude:     4.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 4321,
-				Systems: []api.System{
-					{ASNs: []uint32{4321}},
-				},
-			},
-		},
-	}
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins, newFakeAnnotator(m))
+	pt := parser.NewPTParser(ins)
 
 	filename := "testdata/PT/20190927T070859Z_ndt-qtfh8_1565996043_0000000000003B64.jsonl"
 	rawData, err := ioutil.ReadFile(filename)
@@ -324,18 +291,6 @@ func TestParseJSONL(t *testing.T) {
 
 	if ptTest.UUID != "ndt-qtfh8_1565996043_0000000000003B64" {
 		t.Fatalf("Wrong UUID; got %q, want %q", ptTest.UUID, "ndt-qtfh8_1565996043_0000000000003B64")
-	}
-
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(m["91.169.126.135"])
-	if diff := deep.Equal(&ptTest.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(m["91.213.30.229"])
-	sx.Site = "nuq07"
-	sx.Machine = "mlab2"
-	if diff := deep.Equal(&ptTest.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
 	}
 }
 
@@ -398,37 +353,7 @@ func TestParse(t *testing.T) {
 
 func TestAnnotateAndPutAsync(t *testing.T) {
 	ins := newInMemoryInserter()
-	m := map[string]*api.Annotations{
-		"172.17.94.34": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "NA",
-				CountryCode:   "US",
-				Latitude:      1.0,
-				Longitude:     2.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 1234,
-				Systems: []api.System{
-					{ASNs: []uint32{1234}},
-				},
-			},
-		},
-		"74.125.224.100": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "EU",
-				CountryCode:   "DE",
-				Latitude:      3.0,
-				Longitude:     4.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 4321,
-				Systems: []api.System{
-					{ASNs: []uint32{4321}},
-				},
-			},
-		},
-	}
-	pt := parser.NewPTParser(ins, newFakeAnnotator(m))
+	pt := parser.NewPTParser(ins)
 	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
@@ -444,7 +369,7 @@ func TestAnnotateAndPutAsync(t *testing.T) {
 		fmt.Println(pt.NumRowsForTest())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
-	pt.AnnotateAndPutAsync("traceroute")
+	pt.PutAsync(pt.TakeRows())
 
 	if len(ins.data) != 1 {
 		fmt.Println(len(ins.data))
@@ -454,55 +379,11 @@ func TestAnnotateAndPutAsync(t *testing.T) {
 	if ptTest.Parseinfo.TaskFileName != url {
 		t.Fatalf("Wrong TaskFilenName; got %q, want %q", ptTest.Parseinfo.TaskFileName, url)
 	}
-
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(m["74.125.224.100"])
-	if diff := deep.Equal(&ptTest.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(m["172.17.94.34"])
-	sx.Site = "nuq07"
-	sx.Machine = "mlab4"
-	if diff := deep.Equal(&ptTest.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
-	}
 }
 
 func TestParseAndInsert(t *testing.T) {
-
-	m := map[string]*api.Annotations{
-		"2.80.132.33": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "NA",
-				CountryCode:   "US",
-				Latitude:      1.0,
-				Longitude:     2.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 1234,
-				Systems: []api.System{
-					{ASNs: []uint32{1234}},
-				},
-			},
-		},
-		"91.239.96.102": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "NA",
-				CountryCode:   "US",
-				Latitude:      1.0,
-				Longitude:     2.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 1234,
-				Systems: []api.System{
-					{ASNs: []uint32{1234}},
-				},
-			},
-		},
-	}
-
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins, newFakeAnnotator(m))
+	pt := parser.NewPTParser(ins)
 	rawData, err := ioutil.ReadFile("testdata/PT/20130524T00:04:44Z_ALL5729.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
@@ -530,19 +411,6 @@ func TestParseAndInsert(t *testing.T) {
 	// echo -n 2013-05-24T00:04:44Z-91.239.96.102-2.80.132.33 | openssl dgst -binary -md5 | base64  | tr '/+' '_-' | tr -d '='
 	if ins.data[0].(*schema.PTTest).UUID != "R9_wGx1-cSmqtSAt5aQtNg" {
 		t.Fatalf("UUID is wrong; got %q, want %q", ins.data[0].(*schema.PTTest).UUID, "R9_wGx1-cSmqtSAt5aQtNg")
-	}
-	p := ins.data[0].(*schema.PTTest)
-
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(m["91.239.96.102"])
-	if diff := deep.Equal(&p.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(m["2.80.132.33"])
-	sx.Site = "akl01"
-	sx.Machine = "mlab3"
-	if diff := deep.Equal(&p.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
 	}
 }
 

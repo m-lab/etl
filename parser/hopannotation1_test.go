@@ -24,7 +24,7 @@ const (
 
 func TestHopAnnotation1Parser_ParseAndInsert(t *testing.T) {
 	ins := newInMemorySink()
-	n := parser.NewHopAnnotation1Parser(ins, "test", "_suffix", &fakeAnnotator{})
+	n := parser.NewHopAnnotation1Parser(ins, "test", "_suffix")
 
 	data, err := ioutil.ReadFile(path.Join("testdata/HopAnnotation1/", hopAnnotation1Filename))
 	rtx.Must(err, "failed to load test file")

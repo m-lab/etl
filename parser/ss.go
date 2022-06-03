@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	v2as "github.com/m-lab/annotation-service/api/v2"
-
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/etl"
@@ -28,15 +26,15 @@ type SSParser struct {
 }
 
 // NewSSParser creates a new sidestream parser.
-func NewSSParser(ins etl.Inserter, ann v2as.Annotator) *SSParser {
+func NewSSParser(ins etl.Inserter) *SSParser {
 	bufSize := etl.SS.BQBufferSize()
-	return &SSParser{*NewBase(ins, bufSize, ann)}
+	return &SSParser{*NewBase(ins, bufSize)}
 }
 
 // TODO get rid of this hack.
 func NewDefaultSSParser(ins etl.Inserter) *SSParser {
 	bufSize := etl.SS.BQBufferSize()
-	return &SSParser{*NewBase(ins, bufSize, &NullAnnotator{})}
+	return &SSParser{*NewBase(ins, bufSize)}
 }
 
 // ExtractLogtimeFromFilename extracts the log time.
@@ -302,7 +300,6 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		// Add row to buffer, possibly flushing buffer if it is full.
 		err = ss.AddRow(&ssTest)
 		if err == etl.ErrBufferFull {
-			ss.Annotate(ss.TableBase())
 			// Flush asynchronously, to improve throughput.
 			ss.PutAsync(ss.TakeRows())
 			err = ss.AddRow(&ssTest)

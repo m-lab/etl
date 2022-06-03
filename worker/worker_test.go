@@ -129,9 +129,8 @@ func TestProcessGKETask(t *testing.T) {
 	fs, sf := NewSinkFactory("test-bucket")
 
 	fakeFactory := worker.StandardTaskFactory{
-		Annotator: &fakeAnnotatorFactory{},
-		Sink:      sf,
-		Source:    NewSourceFactory("test-bucket"),
+		Sink:   sf,
+		Source: NewSourceFactory("test-bucket"),
 	}
 
 	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"

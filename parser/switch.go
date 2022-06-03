@@ -13,7 +13,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	"github.com/iancoleman/strcase"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -41,14 +40,10 @@ type SwitchParser struct {
 }
 
 // NewSwitchParser returns a new parser for the switch archives.
-func NewSwitchParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+func NewSwitchParser(sink row.Sink, table, suffix string) etl.Parser {
 	bufSize := etl.SW.BQBufferSize()
-	if ann == nil {
-		ann = &NullAnnotator{}
-	}
-
 	return &SwitchParser{
-		Base:   row.NewBase(table, sink, bufSize, ann),
+		Base:   row.NewBase(table, sink, bufSize),
 		table:  table,
 		suffix: suffix,
 	}

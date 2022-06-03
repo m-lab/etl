@@ -7,7 +7,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -31,14 +30,10 @@ type Scamper1Parser struct {
 }
 
 // NewScamper1Parser returns a new parser for the scamper1 archives.
-func NewScamper1Parser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+func NewScamper1Parser(sink row.Sink, table, suffix string) etl.Parser {
 	bufSize := etl.SCAMPER1.BQBufferSize()
-	if ann == nil {
-		ann = &NullAnnotator{}
-	}
-
 	return &Scamper1Parser{
-		Base:   row.NewBase(table, sink, bufSize, ann),
+		Base:   row.NewBase(table, sink, bufSize),
 		table:  table,
 		suffix: suffix,
 	}

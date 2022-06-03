@@ -3,16 +3,12 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/go-test/deep"
 
-	"github.com/m-lab/annotation-service/api"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/uuid-annotator/annotator"
@@ -71,21 +67,7 @@ func TestParseOneLine(t *testing.T) {
 
 func TestSSInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
-	// Completely fake annotation data.
-	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-		"Annotations":{"5.228.253.100":{"Geo":{"postal_code":"52282", "latitude": 1.0, "longitude": 2.0}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "178.141.112.12":{"Geo":{"postal_code":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "193.169.96.33":{"Geo":{"postal_code":"19316"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "178.141.112.12":{"Geo":{"postal_code":"17814"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-				   "45.56.98.222":{"Geo":{"postal_code":"45569"}, "Network":{"Systems":[{"ASNs":[456]}]}},
-		           "213.248.112.75":{"Geo":{"postal_code":"21320", "latitude": 3.0, "longitude": 4.0}, "Network":{"ASName":"Fake Server ISP", "ASNumber": 456, "CIDR": "213.248.112.64/26", "Systems":[{"ASNs":[456]}]}}
-				   }}`
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, responseJSON)
-	}))
-	defer ts.Close()
-
-	p := parser.NewSSParser(ins, v2as.GetAnnotator(ts.URL))
+	p := parser.NewSSParser(ins)
 	filename := "testdata/sidestream/20170203T00:00:00Z_ALL0.web100"
 	rawData, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -99,10 +81,7 @@ func TestSSInserter(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	err = p.Annotate(p.TableName())
-	if err != nil {
-		t.Error(err)
-	}
+
 	err = p.Flush()
 	if err != nil {
 		t.Error(err)
@@ -115,12 +94,6 @@ func TestSSInserter(t *testing.T) {
 		t.Fatal("Should have at least one inserted row")
 	}
 
-	for _, r := range ins.data {
-		row, _ := r.(*schema.SS)
-		if row.Web100_log_entry.Connection_spec.Remote_geolocation.PostalCode == "" {
-			t.Error(row.Web100_log_entry.Connection_spec.Remote_ip, "missing PostalCode")
-		}
-	}
 	inserted := ins.data[0].(*schema.SS)
 	if inserted.ParseTime.After(time.Now()) {
 		t.Error("Should have inserted parse_time")
@@ -146,44 +119,9 @@ func TestSSInserter(t *testing.T) {
 		Local_port:  41131,
 		Remote_ip:   "5.228.253.100",
 		Remote_port: 52290,
-		Local_geolocation: api.GeolocationIP{
-			PostalCode: "21320",
-			Latitude:   3,
-			Longitude:  4,
-		},
-		Remote_geolocation: api.GeolocationIP{
-			PostalCode: "52282",
-			Latitude:   1,
-			Longitude:  2,
-		},
 		ServerX: annotator.ServerAnnotations{
 			Site:    "ord03",
 			Machine: "mlab1",
-			Geo: &annotator.Geolocation{
-				PostalCode: "21320",
-				Latitude:   3.0,
-				Longitude:  4.0,
-			},
-			Network: &annotator.Network{
-				CIDR:     "213.248.112.64/26",
-				ASNumber: 456,
-				ASName:   "Fake Server ISP",
-				Systems: []annotator.System{
-					{ASNs: []uint32{456}},
-				},
-			},
-		},
-		ClientX: annotator.ClientAnnotations{
-			Geo: &annotator.Geolocation{
-				PostalCode: "52282",
-				Latitude:   1,
-				Longitude:  2,
-			},
-			Network: &annotator.Network{
-				Systems: []annotator.System{
-					{ASNs: []uint32{456}},
-				},
-			},
 		},
 	}
 

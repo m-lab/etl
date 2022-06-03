@@ -3,16 +3,12 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
 
 	"github.com/go-test/deep"
 	"github.com/kr/pretty"
-
-	v2as "github.com/m-lab/annotation-service/api/v2"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
@@ -113,18 +109,7 @@ func TestNDTParser(t *testing.T) {
 	// Load test data.
 	ins := newInMemoryInserter()
 
-	// Completely fake annotation data.
-	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-		"Annotations":{
-		   "45.56.98.222":{"Geo":{"postal_code":"45569", "latitude": 1.0, "longitude": 2.0}, "Network":{"ASName":"Fake Client ISP", "ASNumber": 123, "Systems":[{"ASNs":[123]}]}},
-		   "213.208.152.37":{"Geo":{"postal_code":"21320", "latitude": 3.0, "longitude": 4.0}, "Network":{"ASName":"Fake Server ISP", "ASNumber": 456, "CIDR": "213.208.152.0/26", "Systems":[{"ASNs":[456]}]}}
-	   }}`
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, responseJSON)
-	}))
-	defer ts.Close()
-
-	n := parser.NewNDTParser(ins, v2as.GetAnnotator(ts.URL))
+	n := parser.NewNDTParser(ins)
 
 	// TODO(prod) - why are so many of the tests to this endpoint and a few others?
 	// A: because this is EB, which runs all the health tests.
@@ -186,38 +171,6 @@ func TestNDTParser(t *testing.T) {
 		"id": "nYjSCZhB0EfQPChl2tT8Fg",
 		"connection_spec": schema.Web100ValueMap{
 			"server_hostname": "mlab3.vie01.measurement-lab.org",
-			"client": schema.Web100ValueMap{
-				"network": schema.Web100ValueMap{"asn": int64(123)},
-			},
-			"server": schema.Web100ValueMap{
-				"network":   schema.Web100ValueMap{"asn": int64(456)},
-				"iata_code": "VIE",
-			},
-			"ClientX": schema.Web100ValueMap{
-				"Network": schema.Web100ValueMap{
-					"ASName":   "Fake Client ISP",
-					"ASNumber": int64(123),
-					"Missing":  false,
-				},
-				"Geo": schema.Web100ValueMap{
-					"Latitude":  1.0,
-					"Longitude": 2.0,
-				},
-			},
-			"ServerX": schema.Web100ValueMap{
-				"Site":    "vie01",
-				"Machine": "mlab3",
-				"Network": schema.Web100ValueMap{
-					"ASName":   "Fake Server ISP",
-					"ASNumber": int64(456),
-					"CIDR":     "213.208.152.0/26",
-					"Missing":  false,
-				},
-				"Geo": schema.Web100ValueMap{
-					"Latitude":  3.0,
-					"Longitude": 4.0,
-				},
-			},
 		},
 		"web100_log_entry": schema.Web100ValueMap{
 			"version": "2.5.27 201001301335 net100",

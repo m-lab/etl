@@ -12,8 +12,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 
-	v2as "github.com/m-lab/annotation-service/api/v2"
-
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -32,14 +30,10 @@ type NDT5ResultParser struct {
 }
 
 // NewNDT5ResultParser returns a parser for NDT5Result archives.
-func NewNDT5ResultParser(sink row.Sink, label, suffix string, ann v2as.Annotator) etl.Parser {
+func NewNDT5ResultParser(sink row.Sink, label, suffix string) etl.Parser {
 	bufSize := etl.NDT5.BQBufferSize()
-	if ann == nil {
-		ann = &NullAnnotator{}
-	}
-
 	return &NDT5ResultParser{
-		Base:   row.NewBase(label, sink, bufSize, ann),
+		Base:   row.NewBase(label, sink, bufSize),
 		table:  label,
 		suffix: suffix,
 	}

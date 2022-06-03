@@ -4,7 +4,6 @@ package row
 // Probably should have Base implement Parser.
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,10 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/m-lab/annotation-service/api"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/go/logx"
 
 	"github.com/m-lab/etl/metrics"
@@ -173,148 +169,10 @@ func (buf *Buffer) Reset() []interface{} {
 	return res
 }
 
-type annotator struct {
-	v2 v2as.Annotator
-}
-
-// label is used to label metrics and errors in GetAnnotations
-func (ann *annotator) annotateServers(rows []interface{}, label string) error {
-	serverIPs := make(map[string]struct{})
-	logTime := time.Time{}
-	for i := range rows {
-		r, ok := rows[i].(Annotatable)
-		if !ok {
-			return ErrNotAnnotatable
-		}
-
-		// Only ask for the IP if it is non-empty.
-		ip := r.GetServerIP()
-		if ip != "" {
-			serverIPs[ip] = struct{}{}
-		}
-
-		if (logTime == time.Time{}) {
-			logTime = r.GetLogTime()
-		}
-	}
-
-	ipSlice := make([]string, 0, len(rows))
-	for ip := range serverIPs {
-		ipSlice = append(ipSlice, ip)
-	}
-	if len(ipSlice) == 0 {
-		return nil
-	}
-	response, err := ann.v2.GetAnnotations(context.Background(), logTime, ipSlice, label)
-	if err != nil {
-		log.Println("error in server GetAnnotations: ", err)
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Server IP: RPC err in GetAnnotations."}).Inc()
-		return err
-	}
-	annMap := response.Annotations
-	if annMap == nil {
-		log.Println("empty server annotation response")
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Server IP: empty response"}).Inc()
-		return ErrAnnotationError
-	}
-
-	for i := range rows {
-		r, ok := rows[i].(Annotatable)
-		if !ok {
-			err = ErrNotAnnotatable
-		} else {
-			ip := r.GetServerIP()
-			if ip != "" {
-				ann, ok := annMap[ip]
-				if ok {
-					r.AnnotateServer(ann)
-				}
-			}
-		}
-	}
-
-	return err
-}
-
-var logEmptyAnn = logx.NewLogEvery(nil, 60*time.Second)
-
-// label is used to label metrics and errors in GetAnnotations
-func (ann *annotator) annotateClients(rows []interface{}, label string) error {
-	ipSlice := make([]string, 0, 2*len(rows)) // This may be inadequate, but its a reasonable start.
-	logTime := time.Time{}
-	for i := range rows {
-		r, ok := rows[i].(Annotatable)
-		if !ok {
-			return ErrNotAnnotatable
-		}
-		ipSlice = append(ipSlice, r.GetClientIPs()...)
-		if (logTime == time.Time{}) {
-			logTime = r.GetLogTime()
-		}
-	}
-
-	response, err := ann.v2.GetAnnotations(context.Background(), logTime, ipSlice, label)
-	if err != nil {
-		log.Println("error in client GetAnnotations: ", err)
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Client IP: RPC err in GetAnnotations."}).Inc()
-		return err
-	}
-	annMap := response.Annotations
-	if annMap == nil {
-		logEmptyAnn.Println("empty client annotation response")
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "Client IP: empty response"}).Inc()
-		return ErrAnnotationError
-	}
-
-	for i := range rows {
-		r, ok := rows[i].(Annotatable)
-		if !ok {
-			err = ErrNotAnnotatable
-		} else {
-			// Will not error because we check for nil annMap above.
-			r.AnnotateClients(annMap)
-		}
-	}
-
-	return err
-}
-
-// Annotate fetches and applies annotations for all rows
-func (ann *annotator) Annotate(rows []interface{}, metricLabel string) error {
-	metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Inc()
-	defer metrics.WorkerState.WithLabelValues(metricLabel, "annotate").Dec()
-	if len(rows) == 0 {
-		return nil
-	}
-	// TODO replace this with a histogram.
-	defer func(label string, start time.Time) {
-		metrics.AnnotationTimeSummary.With(prometheus.Labels{"test_type": label}).Observe(float64(time.Since(start).Nanoseconds()))
-	}(metricLabel, time.Now())
-
-	// TODO Consider doing these in parallel?
-	clientErr := ann.annotateClients(rows, metricLabel)
-	serverErr := ann.annotateServers(rows, metricLabel)
-
-	if clientErr != nil {
-		return clientErr
-	}
-
-	if serverErr != nil {
-		return serverErr
-	}
-
-	return nil
-}
-
 // Base provides common parser functionality.
 // Base is NOT THREAD-SAFE
 type Base struct {
 	sink  Sink
-	ann   annotator
 	buf   *Buffer
 	label string // Used in metrics and errors.
 
@@ -322,9 +180,9 @@ type Base struct {
 }
 
 // NewBase creates a new Base.  This will generally be embedded in a type specific parser.
-func NewBase(label string, sink Sink, bufSize int, ann v2as.Annotator) *Base {
+func NewBase(label string, sink Sink, bufSize int) *Base {
 	buf := NewBuffer(bufSize)
-	return &Base{sink: sink, ann: annotator{ann}, buf: buf, label: label}
+	return &Base{sink: sink, buf: buf, label: label}
 }
 
 // GetStats returns the buffer/sink stats.
@@ -337,15 +195,7 @@ func (pb *Base) TaskError() error {
 	return nil
 }
 
-var logAnnError = logx.NewLogEvery(nil, 60*time.Second)
-
 func (pb *Base) commit(rows []interface{}) error {
-	err := pb.ann.Annotate(rows, pb.label)
-	if err != nil {
-		logAnnError.Println("annotation: ", err)
-	}
-
-	// TODO do we need these to be done in order.
 	// This is synchronous, blocking, and thread safe.
 	done, err := pb.sink.Commit(rows, pb.label)
 	if done > 0 {

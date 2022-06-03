@@ -24,7 +24,7 @@ const (
 
 func TestPCAPParser_ParseAndInsert(t *testing.T) {
 	ins := newInMemorySink()
-	n := parser.NewPCAPParser(ins, "test", "_suffix", &fakeAnnotator{})
+	n := parser.NewPCAPParser(ins, "test", "_suffix")
 
 	data, err := ioutil.ReadFile(path.Join("testdata/PCAP/", pcapFilename))
 	rtx.Must(err, "failed to load test file")
