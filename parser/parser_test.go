@@ -13,7 +13,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/m-lab/annotation-service/api"
 	v2 "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
@@ -171,7 +170,7 @@ func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName st
 		values[k] = v
 	}
 	values["testname"] = testName
-	return tp.inserter.InsertRow(bq.MapSaver(values))
+	return tp.inserter.InsertRow(values)
 }
 
 // These functions are also required to complete the etl.Parser interface.
