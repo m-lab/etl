@@ -228,9 +228,9 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	}
 
 	taskFactory := worker.StandardTaskFactory{
-		Annotator: factory.DefaultAnnotatorFactory(),
-		Sink:      sink,
-		Source:    storage.GCSSourceFactory(c),
+		// Annotator: factory.DefaultAnnotatorFactory(),
+		Sink:   sink,
+		Source: storage.GCSSourceFactory(c),
 	}
 	return &runnable{&taskFactory, *obj}
 }
