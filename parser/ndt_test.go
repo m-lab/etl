@@ -3,7 +3,6 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -151,28 +150,6 @@ func TestNDTParser(t *testing.T) {
 	}
 }
 
-/*
-TODO: the
-func TestNDTTaskError(t *testing.T) {
-	// Load test data.
-	ins := newInMemoryInserter()
-	n := parser.NewNDTParser(ins, "web100", "")
-
-	if n.TaskError() != nil {
-		t.Error(n.TaskError())
-	}
-
-	ins.committed = 10
-	if n.TaskError() != nil {
-		t.Error(n.TaskError())
-	}
-	ins.failed = 2
-	if n.TaskError() == nil {
-		t.Error("Should have non-nil TaskError")
-	}
-}
-*/
-
 // compare recursively checks whether actual values equal values in the expected values.
 // The expected values may be a subset of the actual values, but not a superset.
 func compare(t *testing.T, actual schema.Web100ValueMap, expected schema.Web100ValueMap) bool {
@@ -271,7 +248,6 @@ func (in *inMemoryInserter) release() {
 }
 
 func (in *inMemoryInserter) Commit(data []interface{}, label string) (int, error) {
-	log.Println("commit:", data)
 	return len(data), in.Put(data)
 }
 
