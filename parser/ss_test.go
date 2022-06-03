@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/uuid-annotator/annotator"
-
 	"cloud.google.com/go/bigquery"
 	"github.com/go-test/deep"
 
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 func TestExtractLogtimeFromFilename(t *testing.T) {
