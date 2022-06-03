@@ -257,7 +257,7 @@ func TestParseLegacyFormatData(t *testing.T) {
 
 func TestParseJSONL(t *testing.T) {
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins)
+	pt := parser.NewPTParser(ins, "paris1", "")
 
 	filename := "testdata/PT/20190927T070859Z_ndt-qtfh8_1565996043_0000000000003B64.jsonl"
 	rawData, err := ioutil.ReadFile(filename)
@@ -273,8 +273,9 @@ func TestParseJSONL(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if pt.NumRowsForTest() != 1 {
-		fmt.Println(pt.NumRowsForTest())
+	s := pt.GetStats()
+	if s.Total() != 1 {
+		fmt.Println(s.Total())
 		t.Fatalf("The data is not inserted, in buffer now.")
 	}
 	pt.Flush()
@@ -353,7 +354,7 @@ func TestParse(t *testing.T) {
 
 func TestAnnotateAndPutAsync(t *testing.T) {
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins)
+	pt := parser.NewPTParser(ins, "paris1", "")
 	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
@@ -365,11 +366,12 @@ func TestAnnotateAndPutAsync(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if pt.NumRowsForTest() != 1 {
-		fmt.Println(pt.NumRowsForTest())
+	s := pt.GetStats()
+	if s.Total() != 1 {
+		fmt.Println(s.Total())
 		t.Fatalf("Number of rows in PT table is wrong.")
 	}
-	pt.PutAsync(pt.TakeRows())
+	pt.Flush()
 
 	if len(ins.data) != 1 {
 		fmt.Println(len(ins.data))
@@ -383,7 +385,7 @@ func TestAnnotateAndPutAsync(t *testing.T) {
 
 func TestParseAndInsert(t *testing.T) {
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins)
+	pt := parser.NewPTParser(ins, "paris1", "")
 	rawData, err := ioutil.ReadFile("testdata/PT/20130524T00:04:44Z_ALL5729.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
@@ -395,16 +397,19 @@ func TestParseAndInsert(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if pt.NumRowsForTest() != 0 {
-		fmt.Println(pt.NumRowsForTest())
+	s := pt.GetStats()
+	if s.Buffered != 0 {
+		fmt.Println(s)
 		t.Fatalf("The data is not inserted, in buffer now.")
 	}
 	pt.Flush()
 
-	if len(ins.data) != 1 {
-		fmt.Println(len(ins.data))
+	s = pt.GetStats()
+	if s.Committed != 1 {
+		fmt.Println(s)
 		t.Fatalf("Number of rows in inserter is wrong.")
 	}
+
 	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != url {
 		t.Fatalf("Task filename is wrong.")
 	}
@@ -416,7 +421,7 @@ func TestParseAndInsert(t *testing.T) {
 
 func TestProcessLastTests(t *testing.T) {
 	ins := &inMemoryInserter{}
-	pt := parser.NewPTParser(ins)
+	pt := parser.NewPTParser(ins, "paris1", "")
 
 	tests := []struct {
 		fileName             string
@@ -480,14 +485,16 @@ func TestProcessLastTests(t *testing.T) {
 		if pt.NumBufferedTests() != test.expectedBufferedTest {
 			t.Fatalf("Data not buffered correctly")
 		}
-		if pt.NumRowsForTest() != test.expectedNumRows {
+		s := pt.GetStats()
+		if s.Total() != test.expectedNumRows {
 			t.Fatalf("Data of test %s not inserted into BigQuery correctly. Expect %d Actually %d", test.fileName, test.expectedNumRows, ins.RowsInBuffer())
 		}
 	}
 
 	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
-	if pt.NumRowsForTest() != 4 {
+	s := pt.GetStats()
+	if s.Total() != 4 {
 		t.Fatalf("Number of tests in buffer not correct, expect 0, actually %d.", ins.RowsInBuffer())
 	}
 }

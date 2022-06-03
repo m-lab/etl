@@ -194,7 +194,7 @@ func parseMetaFile(rawContent []byte) (map[string]string, error) {
 // TODO(dev) - add unit tests
 // TODO(prod) - For tests that include a meta file, should respect the test filenames.
 // See ndt_meta_log_parser_lib.cc
-func ProcessMetaFile(tableName string, suffix string, testName string, content []byte) *MetaFileData {
+func ProcessMetaFile(tableName string, testName string, content []byte) *MetaFileData {
 	// Create a map from the metafile raw content
 	metamap, err := parseMetaFile(content)
 	if err != nil {

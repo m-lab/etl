@@ -67,7 +67,7 @@ func TestParseOneLine(t *testing.T) {
 
 func TestSSInserter(t *testing.T) {
 	ins := &inMemoryInserter{}
-	p := parser.NewSSParser(ins)
+	p := parser.NewSSParser(ins, "sidestream", "")
 	filename := "testdata/sidestream/20170203T00:00:00Z_ALL0.web100"
 	rawData, err := ioutil.ReadFile(filename)
 	if err != nil {
