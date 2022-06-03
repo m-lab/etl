@@ -145,8 +145,6 @@ type NDTParser struct {
 }
 
 // NewNDTParser returns a new NDT parser.
-// Caller may include an annotator.  If not provided, the default annotator is used.
-// TODO - clean up the vararg annotator hack once it is standard in all parsers.
 func NewNDTParser(ins etl.Inserter) *NDTParser {
 	bufSize := etl.NDT.BQBufferSize()
 	return &NDTParser{Base: *NewBase(ins, bufSize)}
@@ -614,7 +612,6 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	ndtTest := NDTTest{results}
 	err = n.Base.AddRow(ndtTest)
 	if err == etl.ErrBufferFull {
-		// Ignore annotation errors.  They are counted and logged elsewhere.
 		n.PutAsync(n.TakeRows())
 		err = n.Base.AddRow(ndtTest)
 	}
