@@ -8,7 +8,6 @@ import (
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/row"
 )
 
 // Implement parser.Annotatable
@@ -19,8 +18,6 @@ type Row struct {
 	clientAnn *api.Annotations
 	serverAnn *api.Annotations
 }
-
-type BadRow struct{}
 
 func (row *Row) GetClientIPs() []string {
 	return []string{row.client}
@@ -42,10 +39,6 @@ func (row *Row) AnnotateServer(local *api.GeoData) error {
 
 func (row *Row) GetLogTime() time.Time {
 	return time.Now()
-}
-
-func assertTestRowAnnotatable(r *Row) {
-	func(row.Annotatable) {}(r)
 }
 
 func TestBase(t *testing.T) {
@@ -71,11 +64,6 @@ func TestBase(t *testing.T) {
 
 	if len(ins.data) < 1 {
 		t.Fatal("Should have at least one inserted row")
-	}
-
-	err = b.AddRow(&BadRow{})
-	if err != parser.ErrNotAnnotatable {
-		t.Error("Should return ErrNotAnnotatable")
 	}
 }
 

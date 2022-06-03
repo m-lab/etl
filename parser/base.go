@@ -5,11 +5,8 @@ package parser
 
 import (
 	"errors"
-	"log"
-	"reflect"
 
 	"github.com/m-lab/etl/etl"
-	"github.com/m-lab/etl/row"
 )
 
 // Errors that may be returned by BaseRowBuffer functions.
@@ -29,10 +26,10 @@ type RowBuffer struct {
 // AddRow simply inserts a row into the buffer.  Returns error if buffer is full.
 // Not thread-safe.  Should only be called by owning thread.
 func (buf *RowBuffer) AddRow(r interface{}) error {
-	if !reflect.TypeOf(r).Implements(reflect.TypeOf((*row.Annotatable)(nil)).Elem()) {
-		log.Println(reflect.TypeOf(r), "not Annotatable")
-		return ErrNotAnnotatable
-	}
+	//if !reflect.TypeOf(r).Implements(reflect.TypeOf((*row.Annotatable)(nil)).Elem()) {
+	//	log.Println(reflect.TypeOf(r), "not Annotatable")
+	//	return ErrNotAnnotatable
+	//}
 	for len(buf.rows) > buf.bufferSize-1 {
 		return etl.ErrBufferFull
 	}
