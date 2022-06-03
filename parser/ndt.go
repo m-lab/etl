@@ -147,17 +147,8 @@ type NDTParser struct {
 // NewNDTParser returns a new NDT parser.
 // Caller may include an annotator.  If not provided, the default annotator is used.
 // TODO - clean up the vararg annotator hack once it is standard in all parsers.
-func NewNDTParser(ins etl.Inserter, annotator ...v2as.Annotator) *NDTParser {
+func NewNDTParser(ins etl.Inserter) *NDTParser {
 	bufSize := etl.NDT.BQBufferSize()
-	/*
-		var ann v2as.Annotator
-		if len(annotator) > 0 && annotator[0] != nil {
-			ann = annotator[0]
-		} else {
-			ann = &NullAnnotator{}
-		}
-	*/
-
 	return &NDTParser{Base: *NewBase(ins, bufSize)}
 }
 
@@ -181,7 +172,7 @@ func (n *NDTParser) Flush() error {
 		n.processGroup()
 	}
 
-	return n.Base.Flush() // (n.TableBase())
+	return n.Base.Flush()
 }
 
 // TableName returns the base of the bq table inserter target.
