@@ -73,7 +73,7 @@ func (in *inMemorySink) Close() error { return nil }
 func TestBase(t *testing.T) {
 	ins := &inMemorySink{}
 
-	b := row.NewBase("test", ins, 10) // , v2as.GetAnnotator(ts.URL))
+	b := row.NewBase("test", ins, 10)
 
 	b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 
@@ -93,7 +93,7 @@ func TestBase(t *testing.T) {
 func TestAsyncPut(t *testing.T) {
 	ins := &inMemorySink{}
 
-	b := row.NewBase("test", ins, 1) // , v2as.GetAnnotator(ts.URL))
+	b := row.NewBase("test", ins, 1)
 
 	b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
 
