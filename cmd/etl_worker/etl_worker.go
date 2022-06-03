@@ -228,7 +228,6 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	}
 
 	taskFactory := worker.StandardTaskFactory{
-		// Annotator: factory.DefaultAnnotatorFactory(),
 		Sink:   sink,
 		Source: storage.GCSSourceFactory(c),
 	}
