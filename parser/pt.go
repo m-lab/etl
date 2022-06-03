@@ -518,9 +518,8 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 	ptTest.ServerX.Site = dp.Site
 	ptTest.ServerX.Machine = dp.Host
 
-	// pretty.Print(ptTest)
 	err := pt.Put(&ptTest)
-	// TODO: return err
+	// TODO: return err to caller.
 	if err != nil {
 		log.Println(err)
 	}
@@ -659,7 +658,6 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		return nil
 	}
 
-	//pt.InsertOneTest(cachedTest)
 	// If buffer is full, remove the oldest test and insert it into BigQuery table.
 	if len(pt.previousTests) >= PTBufferSize {
 		// Insert the oldest test pt.previousTests[0] into BigQuery
