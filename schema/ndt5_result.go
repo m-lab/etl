@@ -8,8 +8,6 @@ import (
 
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/ndt-server/data"
-
-	"github.com/m-lab/etl/row"
 )
 
 // NDT5ResultRow defines the BQ schema for the data.NDT5Result produced by the
@@ -20,9 +18,6 @@ type NDT5ResultRow struct {
 	TestID    string          `json:"test_id,string" bigquery:"test_id"`
 	LogTime   int64           `json:"log_time,int64" bigquery:"log_time"`
 	Result    data.NDT5Result `json:"result" bigquery:"result"`
-
-	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
 }
 
 // Schema returns the BigQuery schema for NDT5ResultRow.
@@ -47,9 +42,6 @@ type NDT5ResultRowV2 struct {
 	Parser ParseInfo       `json:"parser" bigquery:"parser"`
 	Date   civil.Date      `json:"date" bigquery:"date"`
 	Raw    data.NDT5Result `json:"raw" bigquery:"raw"`
-
-	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
 }
 
 // NDT5Summary contains fields summarizing or derived from the raw data.

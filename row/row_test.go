@@ -43,10 +43,6 @@ func (row *Row) GetLogTime() time.Time {
 	return time.Now()
 }
 
-func assertTestRowAnnotatable(r *Row) {
-	func(row.Annotatable) {}(r)
-}
-
 func assertSink(in row.Sink) {
 	func(in row.Sink) {}(&inMemorySink{})
 }

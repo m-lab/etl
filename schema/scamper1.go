@@ -10,7 +10,6 @@ package schema
 import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/traceroute-caller/tracer"
@@ -76,9 +75,6 @@ type Scamper1Row struct {
 	Parser ParseInfo       `bigquery:"parser"`
 	Date   civil.Date      `bigquery:"date"`
 	Raw    BQScamperOutput `bigquery:"raw"`
-
-	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
 }
 
 // Schema returns the BigQuery schema for Scamper1Row.

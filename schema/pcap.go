@@ -3,7 +3,6 @@ package schema
 import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
 )
 
@@ -12,9 +11,6 @@ type PCAPRow struct {
 	ID     string     `bigquery:"id"`
 	Parser ParseInfo  `bigquery:"parser"`
 	Date   civil.Date `bigquery:"date"`
-
-	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
 }
 
 // Schema returns the Bigquery schema for Pcap.
