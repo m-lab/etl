@@ -7,18 +7,12 @@ import (
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/go-test/deep"
 	"github.com/kr/pretty"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 )
-
-func assertNDTTestIsAnnotatable(r parser.NDTTest) {
-	func(row.Annotatable) {}(r)
-}
 
 func assertNDTTestIsValueSaver(r parser.NDTTest) {
 	func(bigquery.ValueSaver) {}(r)
@@ -69,47 +63,11 @@ func TestValidation(t *testing.T) {
 	}
 }
 
-func TestCopyStructToMap(t *testing.T) {
-	tests := []struct {
-		source interface{}
-		dest   map[string]bigquery.Value
-		res    map[string]bigquery.Value
-	}{
-		{
-			source: &struct {
-				A   int64
-				Bee string
-			}{A: 1, Bee: "2"},
-			dest: make(map[string]bigquery.Value),
-			res:  map[string]bigquery.Value{"a": int64(1), "bee": "2"},
-		},
-		{
-			source: &struct {
-				A   int64
-				Bee string
-			}{A: 0, Bee: ""},
-			dest: make(map[string]bigquery.Value),
-			res:  map[string]bigquery.Value{},
-		},
-		{
-			source: &struct{}{},
-			dest:   make(map[string]bigquery.Value),
-			res:    map[string]bigquery.Value{},
-		},
-	}
-	for _, test := range tests {
-		parser.CopyStructToMap(test.source, test.dest)
-		if diff := deep.Equal(test.dest, test.res); diff != nil {
-			t.Error(diff)
-		}
-	}
-}
-
 func TestNDTParser(t *testing.T) {
 	// Load test data.
 	ins := newInMemoryInserter()
 
-	n := parser.NewNDTParser(ins)
+	n := parser.NewNDTParser(ins, "web100", "")
 
 	// TODO(prod) - why are so many of the tests to this endpoint and a few others?
 	// A: because this is EB, which runs all the health tests.
@@ -189,25 +147,6 @@ func TestNDTParser(t *testing.T) {
 	if !compare(t, actualValues, expectedValues) {
 		t.Errorf("Missing expected values:")
 		t.Errorf(pretty.Sprint(expectedValues))
-	}
-}
-
-func TestNDTTaskError(t *testing.T) {
-	// Load test data.
-	ins := newInMemoryInserter()
-	n := parser.NewNDTParser(ins)
-
-	if n.TaskError() != nil {
-		t.Error(n.TaskError())
-	}
-
-	ins.committed = 10
-	if n.TaskError() != nil {
-		t.Error(n.TaskError())
-	}
-	ins.failed = 2
-	if n.TaskError() == nil {
-		t.Error("Should have non-nil TaskError")
 	}
 }
 
@@ -308,8 +247,12 @@ func (in *inMemoryInserter) release() {
 	in.token <- struct{}{} // return the token.
 }
 
-func (in *inMemoryInserter) Commit(data []interface{}, label string) error {
-	return in.Put(data)
+func (in *inMemoryInserter) Commit(data []interface{}, label string) (int, error) {
+	return len(data), in.Put(data)
+}
+
+func (in *inMemoryInserter) Close() error {
+	return nil
 }
 
 func (in *inMemoryInserter) Params() etl.InserterParams {

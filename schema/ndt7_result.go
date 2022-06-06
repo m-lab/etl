@@ -6,7 +6,6 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"cloud.google.com/go/civil"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
 
 	"github.com/m-lab/ndt-server/data"
@@ -20,9 +19,6 @@ type NDT7ResultRow struct {
 	Parser ParseInfo       `bigquery:"parser"`
 	Date   civil.Date      `bigquery:"date"`
 	Raw    data.NDT7Result `bigquery:"raw"`
-
-	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
 }
 
 // NDT7Summary contains fields summarizing or derived from the raw data.

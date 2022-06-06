@@ -9,9 +9,7 @@ import (
 	"io"
 	"log"
 	"sync"
-	"time"
 
-	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/go/logx"
 
 	"github.com/m-lab/etl/metrics"
@@ -42,17 +40,6 @@ func (e ErrCommitRow) Error() string {
 // nested errors.
 func (e ErrCommitRow) Unwrap() error {
 	return e.Err
-}
-
-// Annotatable interface enables integration of annotation into parser.Base.
-// The row type should implement the interface, and the annotations will be added
-// prior to insertion.
-type Annotatable interface {
-	GetLogTime() time.Time
-	GetClientIPs() []string // This is a slice to support mutliple hops in traceroute data.
-	GetServerIP() string
-	AnnotateClients(map[string]*api.Annotations) error // Must properly handle missing annotations.
-	AnnotateServer(*api.Annotations) error             // Must properly handle nil parameter.
 }
 
 // Stats contains stats about buffer history.
@@ -216,14 +203,12 @@ func (pb *Base) Flush() error {
 	return pb.commit(rows)
 }
 
-// Put adds a row to the buffer.
-// Iff the buffer is already full the prior buffered rows are
-// annotated and committed to the Sink.
-// NOTE: There is no guarantee about ordering of writes resulting from
-// sequential calls to Put.  However, once a block of rows is submitted
-// to pb.commit, it should be written in the same order to the Sink.
-// TODO improve Annotatable architecture.
-func (pb *Base) Put(row Annotatable) error {
+// Put adds a row to the buffer. If the buffer is already full, then prior
+// buffered rows are committed to the Sink. NOTE: There is no guarantee about
+// when writes will result from sequential calls to Put. However, once a block
+// of rows is "committed", they will be written to the Sink in the same order
+// they were Put.
+func (pb *Base) Put(row interface{}) error {
 	rows := pb.buf.Append(row)
 	pb.stats.Inc()
 
@@ -241,34 +226,5 @@ func (pb *Base) Put(row Annotatable) error {
 			return err
 		}
 	}
-	return nil
-}
-
-// NullAnnotator satisfies the Annotatable interface without actually doing
-// anything.
-type NullAnnotator struct{}
-
-// GetLogTime returns current time rather than the actual row time.
-func (row *NullAnnotator) GetLogTime() time.Time {
-	return time.Now()
-}
-
-// GetClientIPs returns an empty array so nothing is annotated.
-func (row *NullAnnotator) GetClientIPs() []string {
-	return []string{}
-}
-
-// GetServerIP returns an empty string because there is nothing to annotate.
-func (row *NullAnnotator) GetServerIP() string {
-	return ""
-}
-
-// AnnotateClients does nothing.
-func (row *NullAnnotator) AnnotateClients(map[string]*api.Annotations) error {
-	return nil
-}
-
-// AnnotateServer does nothing.
-func (row *NullAnnotator) AnnotateServer(*api.Annotations) error {
 	return nil
 }

@@ -7,8 +7,6 @@ import (
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/tcp-info/snapshot"
-
-	"github.com/m-lab/etl/row"
 )
 
 // TCPInfoSummary includes a summary or derived fields from the raw record.
@@ -25,9 +23,6 @@ type TCPInfoRow struct {
 	Parser ParseInfo               `json:"parser" bigquery:"parser"`
 	Date   civil.Date              `json:"date" bigquery:"date"`
 	Raw    *snapshot.ConnectionLog `json:"raw" bigquery:"raw"`
-
-	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
 }
 
 // Schema returns the Bigquery schema for TCPInfoRow.

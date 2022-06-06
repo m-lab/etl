@@ -3,7 +3,6 @@ package schema
 import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/traceroute-caller/hopannotation"
 )
@@ -14,9 +13,6 @@ type HopAnnotation1Row struct {
 	Parser ParseInfo                     `bigquery:"parser"`
 	Date   civil.Date                    `bigquery:"date"`
 	Raw    *hopannotation.HopAnnotation1 `json:",omitempty" bigquery:"raw"`
-
-	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
 }
 
 // Schema returns the Bigquery schema for HopAnnotation1.

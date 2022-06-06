@@ -18,23 +18,18 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/m-lab/go/logx"
-
 	"cloud.google.com/go/bigquery"
 
-	"github.com/m-lab/annotation-service/api"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/web100"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -131,7 +126,8 @@ type fileInfoAndData struct {
 
 // NDTParser implements the Parser interface for NDT.
 type NDTParser struct {
-	Base
+	*row.Base
+	table string
 
 	// These will be non-empty iff a test group is pending.
 	taskFileName string // The tar file containing these tests.
@@ -145,18 +141,22 @@ type NDTParser struct {
 }
 
 // NewNDTParser returns a new NDT parser.
-func NewNDTParser(ins etl.Inserter) *NDTParser {
+func NewNDTParser(sink row.Sink, table, suffix string) *NDTParser {
 	bufSize := etl.NDT.BQBufferSize()
-	return &NDTParser{Base: *NewBase(ins, bufSize)}
+	return &NDTParser{
+		Base:  row.NewBase(table, sink, bufSize),
+		table: table,
+	}
 }
 
 // These functions implement the etl.Parser interface.
 
 // TaskError returns non-nil if more than 10% of row inserts failed.
 func (n *NDTParser) TaskError() error {
-	if n.Inserter.Committed() < 10*n.Inserter.Failed() {
+	s := n.GetStats()
+	if s.Committed < 10*s.Failed {
 		log.Printf("Warning: high row commit errors: %d / %d\n",
-			n.Inserter.Accepted(), n.Inserter.Failed())
+			s.Failed, s.Total())
 		return errors.New("too many insertion failures")
 	}
 	return nil
@@ -175,7 +175,7 @@ func (n *NDTParser) Flush() error {
 
 // TableName returns the base of the bq table inserter target.
 func (n *NDTParser) TableName() string {
-	return n.TableBase()
+	return n.table
 }
 
 // IsParsable returns the canonical test type and whether to parse data.
@@ -298,7 +298,7 @@ func (n *NDTParser) ParseAndInsert(taskInfo map[string]bigquery.Value, testName 
 				n.TableName(), "meta", "timestamp collision").Inc()
 		}
 		n.metaFile = ProcessMetaFile(
-			n.TableName(), n.TableSuffix(), testName, content)
+			n.TableName(), testName, content)
 	default:
 		metrics.TestTotal.WithLabelValues(
 			n.TableName(), "unknown", "unparsable file").Inc()
@@ -552,7 +552,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		log.Println(err)
 		metrics.ErrorCount.WithLabelValues(
-			n.TableBase(), testType, "log_time marshal error").Inc()
+			n.TableName(), testType, "log_time marshal error").Inc()
 	} else {
 		results["log_time"] = string(lt)
 	}
@@ -560,7 +560,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	if err != nil {
 		log.Println(err)
 		metrics.ErrorCount.WithLabelValues(
-			n.TableBase(), testType, "parse_time marshal error").Inc()
+			n.TableName(), testType, "parse_time marshal error").Inc()
 	} else {
 		results["parse_time"] = string(now)
 	}
@@ -610,11 +610,7 @@ func (n *NDTParser) getAndInsertValues(test *fileInfoAndData, testType string) {
 	// but avoid going over the 10MB limit.
 	// Add row to buffer, possibly flushing buffer if it is full.
 	ndtTest := NDTTest{results}
-	err = n.Base.AddRow(ndtTest)
-	if err == etl.ErrBufferFull {
-		n.PutAsync(n.TakeRows())
-		err = n.Base.AddRow(ndtTest)
-	}
+	err = n.Put(ndtTest)
 	if err != nil {
 		metrics.ErrorCount.WithLabelValues(
 			n.TableName(), testType, "insert-err").Inc()
@@ -723,200 +719,4 @@ func (n *NDTParser) fixValues(r schema.Web100ValueMap) {
 // NDTTest is a wrapper for Web100ValueMap that implements Annotatable.
 type NDTTest struct {
 	schema.Web100ValueMap
-}
-
-// Only valid on top level
-func (ndt NDTTest) getConnSpec() schema.Web100ValueMap {
-	return ndt.GetMap([]string{"connection_spec"})
-}
-
-// GetLogTime returns the timestamp that should be used for annotation.
-func (ndt NDTTest) GetLogTime() time.Time {
-	var t time.Time
-	tt, ok := ndt.GetString([]string{"log_time"})
-	if !ok {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "NDTTest missing log_time."}).Inc()
-		return time.Now()
-	}
-	err := t.UnmarshalText([]byte(tt))
-	if err != nil {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "NDTTest error parsing log_time."}).Inc()
-		return time.Now()
-	}
-	return t
-}
-
-// GetClientIPs returns the client (remote) IP for annotation.  See parser.Annotatable
-// This is a bit ugly because of the use of bigquery Value maps.
-func (ndt NDTTest) GetClientIPs() []string {
-	connSpec := ndt.getConnSpec()
-	ip, _ := connSpec.GetString([]string{"client_ip"})
-	if ip == "" {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "NDTTest missing client IP."}).Inc()
-		return []string{}
-	}
-	return []string{ip}
-}
-
-// GetServerIP returns the server (local) IP for annotation.  See parser.Annotatable
-// This is a bit ugly because of the use of bigquery Value maps.
-func (ndt NDTTest) GetServerIP() string {
-	connSpec := ndt.getConnSpec()
-	ip, ok := connSpec.GetString([]string{"server_ip"})
-	if !ok {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "NDTTest missing server IP."}).Inc()
-		return ""
-	}
-	return ip
-}
-
-// CopyStructToMap takes a POINTER to an arbitrary SIMPLE struct and copies
-// it's fields into a value map. It will also make fields entirely
-// lower case, for convienece when working with exported structs. Also,
-// NEVER pass in something that is not a pointer to a struct, as this
-// will cause a panic.
-func CopyStructToMap(sourceStruct interface{}, destinationMap map[string]bigquery.Value) {
-	structToCopy := reflect.ValueOf(sourceStruct).Elem()
-	typeOfStruct := structToCopy.Type()
-	for i := 0; i < typeOfStruct.NumField(); i++ {
-		f := structToCopy.Field(i)
-		v := f.Interface()
-		switch t := v.(type) {
-		case string:
-			// TODO - are these still needed?  Does the omitempty cover it?
-			if t == "" {
-				continue
-			}
-		case int64:
-			if t == 0 {
-				continue
-			}
-		}
-		jsonTag, ok := typeOfStruct.Field(i).Tag.Lookup("json")
-		name := strings.ToLower(typeOfStruct.Field(i).Name)
-		if ok {
-			tags := strings.Split(jsonTag, ",")
-			if len(tags) > 0 && tags[0] != "" {
-				name = tags[0]
-			}
-		}
-		destinationMap[strings.ToLower(name)] = v
-	}
-}
-
-// copyStructToMapDirectly copies struct fields to the given bigquery.Value map.
-// Unlike CopyStructToMap, this function preserves the original field case.
-func copyStructToMapDirectly(sourceStruct interface{}, destinationMap map[string]bigquery.Value) {
-	structToCopy := reflect.ValueOf(sourceStruct).Elem()
-	typeOfStruct := structToCopy.Type()
-	for i := 0; i < typeOfStruct.NumField(); i++ {
-		f := structToCopy.Field(i)
-		v := f.Interface()
-		switch t := v.(type) {
-		case string:
-			if t == "" {
-				continue
-			}
-		case int64:
-			if t == 0 {
-				continue
-			}
-		case uint32:
-			if t == 0 {
-				continue
-			}
-			// NOTE: bigquery.Value does not support unsigned int types. The
-			// annotation-service API returns uint32 for the ASNumber field.
-			// When copying this value, convert it to an int64 so that it is
-			// BigQuery compatible.
-			v = int64(t)
-		}
-		destinationMap[typeOfStruct.Field(i).Name] = v
-	}
-}
-
-var logMissing = logx.NewLogEvery(nil, 60*time.Second) // This is per instance.
-
-// AnnotateClients adds the client annotations. See parser.Annotatable
-// This is a bit ugly because of the use of bigquery Value maps.
-func (ndt NDTTest) AnnotateClients(annMap map[string]*api.Annotations) error {
-	spec := ndt.getConnSpec()
-	ip, _ := spec.GetString([]string{"client_ip"})
-	if ip == "" {
-		return ErrAnnotationError
-	}
-
-	if data, ok := annMap[ip]; ok && data.Geo != nil {
-		CopyStructToMap(data.Geo, spec.Get("client_geolocation"))
-		if data.Network != nil {
-			asn, err := data.Network.BestASN()
-			if err != nil {
-				metrics.AnnotationErrorCount.With(prometheus.
-					Labels{"source": "NDTTest BestASN error on client IP."}).Inc()
-			} else {
-				spec.Get("client").Get("network")["asn"] = asn
-				// CopyStructToMap(data.Network, spec.Get("client"))
-				c := v2as.ConvertAnnotationsToClientAnnotations(data)
-				copyStructToMapDirectly(c.Geo, spec.Get("ClientX").Get("Geo"))
-				copyStructToMapDirectly(c.Network, spec.Get("ClientX").Get("Network"))
-			}
-		}
-	} else {
-		// A large fraction of our unannotated entries in 2018 are from this single IP,
-		// so we break it out with its own label.
-		if ip == "45.56.98.222" {
-			metrics.AnnotationErrorCount.With(prometheus.
-				Labels{"source": "NDTTest missing annotations for client IP " + ip}).Inc()
-			return ErrAnnotationError
-		}
-
-		// The rate of missing annotations is modest aside from 45.56.98,222, so we log
-		// all of them.  May have to reconsider if this is too spammy.  Might want to
-		// limit to once per second with logx.LogEvery.
-		logMissing.Println("Missing annotation for", ip)
-
-		// A large fraction of our unannotated entries are from this ipv6 prefix.
-		// Don't know why, but break it out with its own label to facilitate debugging.
-		if strings.HasPrefix(ip, "2002:") {
-			metrics.AnnotationErrorCount.With(prometheus.
-				Labels{"source": "NDTTest missing annotations for client IP in 2002:..."}).Inc()
-			return ErrAnnotationError
-		}
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "NDTTest missing annotations for client IP"}).Inc()
-		return ErrAnnotationError
-	}
-	return nil
-}
-
-// AnnotateServer adds the server annotations. See parser.Annotatable
-// This is a bit ugly because of the use of bigquery Value maps.
-func (ndt NDTTest) AnnotateServer(local *api.Annotations) error {
-	if local == nil {
-		metrics.AnnotationErrorCount.With(prometheus.
-			Labels{"source": "NDTTest missing annotations for server IP."}).Inc()
-		return ErrAnnotationError
-	}
-	spec := ndt.getConnSpec()
-	if local.Geo != nil {
-		CopyStructToMap(local.Geo, spec.Get("server_geolocation"))
-	}
-	if local.Network != nil {
-		asn, err := local.Network.BestASN()
-		if err != nil {
-			metrics.AnnotationErrorCount.With(prometheus.
-				Labels{"source": "NDTTest BestASN error on server IP."}).Inc()
-			return err
-		}
-		spec.Get("server").Get("network")["asn"] = asn
-		s := v2as.ConvertAnnotationsToServerAnnotations(local)
-		copyStructToMapDirectly(s.Geo, spec.Get("ServerX").Get("Geo"))
-		copyStructToMapDirectly(s.Network, spec.Get("ServerX").Get("Network"))
-	}
-
-	return nil
 }
