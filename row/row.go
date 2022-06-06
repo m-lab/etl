@@ -203,7 +203,7 @@ func (pb *Base) Flush() error {
 	return pb.commit(rows)
 }
 
-// Put adds a row to the buffer. Iff the buffer is already full, then prior
+// Put adds a row to the buffer. If the buffer is already full, then prior
 // buffered rows are committed to the Sink. NOTE: There is no guarantee about
 // when writes will result from sequential calls to Put. However, once a block
 // of rows is "committed", they will be written to the Sink in the same order
