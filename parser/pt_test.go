@@ -1,7 +1,6 @@
 package parser_test
 
 import (
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -237,7 +236,7 @@ func TestCreateTestId(t *testing.T) {
 func TestParseLegacyFormatData(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/PT/20160112T00:45:44Z_ALL27409.paris")
 	if err != nil {
-		fmt.Println("cannot load test data")
+		t.Fatalf("cannot load test data: %v", err)
 		return
 	}
 	cachedTest, err := parser.Parse(nil, "testdata/PT/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily", etl.DataPath{})
@@ -275,14 +274,12 @@ func TestParseJSONL(t *testing.T) {
 
 	s := pt.GetStats()
 	if s.Total() != 1 {
-		fmt.Println(s.Total())
-		t.Fatalf("The data is not inserted, in buffer now.")
+		t.Fatalf("ParseJSONL expected 1 row inserted, got %d", s.Total())
 	}
 	pt.Flush()
 
 	if len(ins.data) != 1 {
-		fmt.Println(len(ins.data))
-		t.Fatalf("Number of rows in inserter is wrong.")
+		t.Fatalf("ParseJSONL expected 1 row in buffer, got %d", len(ins.data))
 	}
 
 	ptTest := ins.data[0].(*schema.PTTest)
@@ -346,40 +343,9 @@ func TestParse(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(cachedTest.Hops[0], expected_hop) {
-		fmt.Printf("Here is expected    : %v\n", expected_hop)
-		fmt.Printf("Here is what is real: %v\n", cachedTest.Hops[0])
+		t.Logf("Here is expected    : %v\n", expected_hop)
+		t.Logf("Here is what is real: %v\n", cachedTest.Hops[0])
 		t.Fatalf("Wrong results for PT hops!")
-	}
-}
-
-func TestAnnotateAndPutAsync(t *testing.T) {
-	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins, "paris1", "")
-	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	if err != nil {
-		t.Fatalf("cannot read testdata.")
-	}
-	url := "gs://archive-measurement-lab/ndt/traceroute/2017/03/20/20170320T000540.410989Z-paris-traceroute-mlab4-nuq07-ndt.tgz"
-	meta := map[string]bigquery.Value{"filename": url}
-	err = pt.ParseAndInsert(meta, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	s := pt.GetStats()
-	if s.Total() != 1 {
-		fmt.Println(s.Total())
-		t.Fatalf("Number of rows in PT table is wrong.")
-	}
-	pt.Flush()
-
-	if len(ins.data) != 1 {
-		fmt.Println(len(ins.data))
-		t.Fatalf("Number of rows in inserter is wrong.")
-	}
-	ptTest := ins.data[0].(*schema.PTTest)
-	if ptTest.Parseinfo.TaskFileName != url {
-		t.Fatalf("Wrong TaskFilenName; got %q, want %q", ptTest.Parseinfo.TaskFileName, url)
 	}
 }
 
@@ -399,15 +365,13 @@ func TestParseAndInsert(t *testing.T) {
 
 	s := pt.GetStats()
 	if s.Buffered != 0 {
-		fmt.Println(s)
-		t.Fatalf("The data is not inserted, in buffer now.")
+		t.Fatalf("ParseAndInsert with buffered data; want 0, got %d", s.Buffered)
 	}
 	pt.Flush()
 
 	s = pt.GetStats()
 	if s.Committed != 1 {
-		fmt.Println(s)
-		t.Fatalf("Number of rows in inserter is wrong.")
+		t.Fatalf("ParseAndInsert committed wrong row count; want 1, got %d", s.Committed)
 	}
 
 	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != url {
@@ -500,12 +464,12 @@ func TestProcessLastTests(t *testing.T) {
 }
 
 func TestParseEmpty(t *testing.T) {
-	rawData, err := ioutil.ReadFile("testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris")
+	rawData, err := ioutil.ReadFile("testdata/PT/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris")
 	if err != nil {
-		fmt.Println("cannot load test data")
+		t.Fatal("cannot load test data")
 		return
 	}
-	_, parseErr := parser.Parse(nil, "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily",
+	_, parseErr := parser.Parse(nil, "testdata/PT/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily",
 		etl.DataPath{})
 	if parseErr == nil {
 		t.Fatal(parseErr)
