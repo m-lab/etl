@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"runtime"
-	"sync/atomic"
 	"time"
 
 	gcs "cloud.google.com/go/storage"
@@ -41,12 +40,6 @@ import (
 // Basic throttling to restrict the number of tasks in flight.
 const defaultMaxInFlight = 20
 
-var (
-	// This limits the number of workers available for externally requested single task files.
-	maxInFlight int32 // Max number of concurrent workers (and tasks in flight).
-	inFlight    int32 // Current number of tasks in flight.
-)
-
 // Flags.
 var (
 	outputType = flagx.Enum{
@@ -60,12 +53,11 @@ var (
 	servicePort     = flag.String("service_port", ":8080", "The main (private) service port")
 	shutdownTimeout = flag.Duration("shutdown_timeout", 1*time.Minute, "Graceful shutdown time allowance")
 	gcloudProject   = flag.String("gcloud_project", "", "GCP Project id")
-	maxWorkers      = flag.Int("max_workers", defaultMaxInFlight, "Maximum number of workers")
 	isBatch         = flag.Bool("batch_service", false, "Whether to run the parser in batch mode")
 	omitDeltas      = flag.Bool("ndt_omit_deltas", false, "Whether to skip ndt.web100 snapshot deltas")
 	bigqueryProject = flag.String("bigquery_project", "", "Override GCLOUD_PROJECT for BigQuery operations")
 	bigqueryDataset = flag.String("bigquery_dataset", "", "Override the BigQuery dataset for output tables")
-	outputDir       = flag.String("output_dir", "", "If output type is 'local', write output to this directory")
+	outputLocation  = flag.String("output_location", "", "If output type is 'gcs', write to this GCS bucket. If output type is 'local', write to this directory")
 )
 
 // Other global values.
@@ -118,9 +110,8 @@ func Status(w http.ResponseWriter, r *http.Request) {
 	case "bigquery":
 		fmt.Fprintf(w, "Writing output to BigQuery\n")
 	case "gcs":
-		fmt.Fprintf(w, "Writing output to %s\n", outputBucket())
+		fmt.Fprintf(w, "Writing output to %s\n", *outputLocation)
 	}
-	fmt.Fprintf(w, "<p>Workers: %d / %d</p>\n", atomic.LoadInt32(&inFlight), maxInFlight)
 	env := os.Environ()
 	for i := range env {
 		fmt.Fprintf(w, "%s</br>\n", env[i])
@@ -209,10 +200,6 @@ func (r *runnable) Info() string {
 	return r.Name
 }
 
-func outputBucket() string {
-	return "etl-" + *gcloudProject
-}
-
 func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	c, err := storage.GetStorageClient(false)
 	if err != nil {
@@ -222,9 +209,9 @@ func toRunnable(obj *gcs.ObjectAttrs) active.Runnable {
 	var sink factory.SinkFactory
 	switch outputType.Value {
 	case "gcs":
-		sink = storage.NewSinkFactory(c, outputBucket())
+		sink = storage.NewSinkFactory(c, *outputLocation)
 	case "local":
-		sink = storage.NewLocalFactory(*outputDir)
+		sink = storage.NewLocalFactory(*outputLocation)
 	}
 
 	taskFactory := worker.StandardTaskFactory{
@@ -297,7 +284,6 @@ func main() {
 	// Enable block profiling
 	runtime.SetBlockProfileRate(1000000) // One event per msec.
 
-	maxInFlight = (int32)(*maxWorkers)
 	// TODO: eliminate global variables in favor of config/env object.
 	etl.IsBatch = *isBatch
 	etl.OmitDeltas = *omitDeltas
