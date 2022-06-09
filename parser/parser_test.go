@@ -3,16 +3,12 @@
 package parser_test
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
 	"testing"
-	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/annotation-service/api"
-	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/parser"
@@ -49,20 +45,6 @@ func (ti *countingInserter) InsertRows(data []interface{}) error {
 func (ti *countingInserter) Flush() error {
 	ti.FlushCount++
 	return nil
-}
-
-// newFakeAnnotator creates a new annotator that injects the given annotation
-// responses for unit testing.
-func newFakeAnnotator(ann map[string]*api.Annotations) *fakeAnnotator {
-	return &fakeAnnotator{ann: ann}
-}
-
-type fakeAnnotator struct {
-	ann map[string]*api.Annotations
-}
-
-func (ann *fakeAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2.Response, error) {
-	return &v2.Response{AnnotatorDate: time.Now(), Annotations: ann.ann}, nil
 }
 
 func TestNormalizeIP(t *testing.T) {

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/civil"
-	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -53,39 +52,6 @@ func fileSource(fn string) (etl.TestSource, error) {
 	timeout := 16 * time.Millisecond
 	return &storage.GCSSource{TarReader: tarReader, Closer: raw,
 		RetryBaseTime: timeout, TableBase: "test", PathDate: civil.Date{Year: 2020, Month: 6, Day: 11}}, nil
-}
-
-var tcpInfoAnno = map[string]*api.Annotations{
-	// client ip.
-	"35.225.75.192": &api.Annotations{
-		Geo: &api.GeolocationIP{
-			ContinentCode: "NA",
-			CountryCode:   "US",
-			Latitude:      1.0,
-			Longitude:     2.0,
-		},
-		Network: &api.ASData{
-			ASNumber: 1234,
-			Systems: []api.System{
-				{ASNs: []uint32{1234}},
-			},
-		},
-	},
-	// server ip.
-	"195.89.146.242": &api.Annotations{
-		Geo: &api.GeolocationIP{
-			ContinentCode: "NA",
-			CountryCode:   "US",
-			Latitude:      1.0,
-			Longitude:     2.0,
-		},
-		Network: &api.ASData{
-			ASNumber: 1234,
-			Systems: []api.System{
-				{ASNs: []uint32{1234}},
-			},
-		},
-	},
 }
 
 type inMemorySink struct {

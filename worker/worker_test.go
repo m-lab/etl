@@ -12,14 +12,11 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
-	"github.com/m-lab/annotation-service/api"
-	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/etl/etl"
@@ -83,17 +80,6 @@ func fromTar(bucket string, fn string) *fakestorage.Server {
 	defer f.Close()
 	tf := tar.NewReader(f)
 	return loadFromTar(server, bucket, tf)
-}
-
-// This is also the annotator, so it just returns itself.
-type fakeAnnotatorFactory struct{}
-
-func (ann *fakeAnnotatorFactory) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2.Response, error) {
-	return &v2.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
-}
-
-func (ann *fakeAnnotatorFactory) Get(ctx context.Context, dp etl.DataPath) (v2.Annotator, etl.ProcessingError) {
-	return ann, nil
 }
 
 type fakeSourceFactory struct {

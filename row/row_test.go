@@ -6,17 +6,13 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/row"
-
-	"github.com/m-lab/annotation-service/api"
 )
 
 // Implement parser.Annotatable
 
 type Row struct {
-	client    string
-	server    string
-	clientAnn *api.Annotations
-	serverAnn *api.Annotations
+	client string
+	server string
 }
 
 type BadRow struct{}
@@ -27,16 +23,6 @@ func (row *Row) GetClientIPs() []string {
 
 func (row *Row) GetServerIP() string {
 	return row.server
-}
-
-func (row *Row) AnnotateClients(remote map[string]*api.Annotations) error {
-	row.clientAnn = remote[row.GetClientIPs()[0]]
-	return nil
-}
-
-func (row *Row) AnnotateServer(local *api.GeoData) error {
-	row.serverAnn = local
-	return nil
 }
 
 func (row *Row) GetLogTime() time.Time {
@@ -71,10 +57,10 @@ func TestBase(t *testing.T) {
 
 	b := row.NewBase("test", ins, 10)
 
-	b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
+	b.Put(&Row{"1.2.3.4", "4.3.2.1"})
 
 	// Add a row with empty server IP
-	b.Put(&Row{"1.2.3.4", "", nil, nil})
+	b.Put(&Row{"1.2.3.4", ""})
 	b.Flush()
 	stats := b.GetStats()
 	if stats.Committed != 2 {
@@ -91,14 +77,14 @@ func TestAsyncPut(t *testing.T) {
 
 	b := row.NewBase("test", ins, 1)
 
-	b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
+	b.Put(&Row{"1.2.3.4", "4.3.2.1"})
 
 	if b.GetStats().Committed != 0 {
 		t.Fatalf("Expected %d, Got %d.", 0, b.GetStats().Committed)
 	}
 
 	// This should trigger an async flush
-	b.Put(&Row{"1.2.3.4", "4.3.2.1", nil, nil})
+	b.Put(&Row{"1.2.3.4", "4.3.2.1"})
 	start := time.Now()
 	for time.Since(start) < 5*time.Second && b.GetStats().Committed < 1 {
 		time.Sleep(10 * time.Millisecond)
