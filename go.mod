@@ -16,7 +16,7 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/iancoleman/strcase v0.2.0
 	github.com/kr/pretty v0.2.1
-	github.com/m-lab/annotation-service v0.0.0-20210713124633-fa227b3d5b2f
+	github.com/m-lab/annotation-service v0.0.0-20210713124633-fa227b3d5b2f // indirect
 	github.com/m-lab/etl-gardener v0.0.0-20210910143655-d4bda5bfc75d
 	github.com/m-lab/go v0.1.47
 	github.com/m-lab/ndt-server v0.20.9
@@ -26,8 +26,9 @@ require (
 	github.com/m-lab/uuid-annotator v0.4.7
 	github.com/prometheus/client_golang v1.12.2
 	github.com/prometheus/client_model v0.2.0
+	github.com/sirupsen/logrus v1.8.1
 	github.com/valyala/gozstd v1.13.0
-	golang.org/x/net v0.0.0-20220531201128-c960675eff93 // indirect
+	golang.org/x/net v0.0.0-20220531201128-c960675eff93
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29
 	google.golang.org/api v0.82.0
 	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8 // indirect
