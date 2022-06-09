@@ -70,9 +70,6 @@ func TestMain(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, err = ioutil.ReadAll(resp.Body)
-	if !strings.Contains(string(data), "Workers") {
-		t.Error("Should contain 'Workers':\n", string(data))
-	}
 	if !strings.Contains(string(data), "Writing output to etl-mlab-testing") {
 		t.Error("Should contain 'Writing output to etl-mlab-testing':\n", string(data))
 	}
