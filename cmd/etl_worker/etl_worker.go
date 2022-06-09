@@ -37,9 +37,6 @@ import (
 	_ "expvar"
 )
 
-// Basic throttling to restrict the number of tasks in flight.
-const defaultMaxInFlight = 20
-
 // Flags.
 var (
 	outputType = flagx.Enum{
