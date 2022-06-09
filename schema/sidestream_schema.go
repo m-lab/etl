@@ -6,19 +6,18 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 type Web100ConnectionSpecification struct {
-	Local_ip           string            `json:"local_ip" bigquery:"local_ip"`
-	Local_af           int64             `json:"local_af" bigquery:"local_af"`
-	Local_port         int64             `json:"local_port" bigquery:"local_port"`
-	Remote_ip          string            `json:"remote_ip" bigquery:"remote_ip"`
-	Remote_port        int64             `json:"remote_port" bigquery:"remote_port"`
-	Local_geolocation  api.GeolocationIP `json:"local_geolocation" bigquery:"local_geolocation"`
-	Remote_geolocation api.GeolocationIP `json:"remote_geolocation" bigquery:"remote_geolocation"`
+	Local_ip           string              `json:"local_ip" bigquery:"local_ip"`
+	Local_af           int64               `json:"local_af" bigquery:"local_af"`
+	Local_port         int64               `json:"local_port" bigquery:"local_port"`
+	Remote_ip          string              `json:"remote_ip" bigquery:"remote_ip"`
+	Remote_port        int64               `json:"remote_port" bigquery:"remote_port"`
+	Local_geolocation  LegacyGeolocationIP `json:"local_geolocation" bigquery:"local_geolocation"`
+	Remote_geolocation LegacyGeolocationIP `json:"remote_geolocation" bigquery:"remote_geolocation"`
 
 	// ServerX and ClientX are for the synthetic UUID annotator export process.
 	ServerX annotator.ServerAnnotations
