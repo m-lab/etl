@@ -40,8 +40,8 @@ func TestMain(t *testing.T) {
 	flag.Set("service_port", ":0")
 	flag.Set("max_active", "200")
 	flag.Set("prometheusx.listen-address", ":0")
-	flag.Set("max_workers", "25")
 	flag.Set("gcloud_project", "mlab-testing")
+	flag.Set("output_location", "etl-mlab-testing")
 	mainCtx, mainCancel = context.WithCancel(context.Background())
 
 	go main()
@@ -70,9 +70,6 @@ func TestMain(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, err = ioutil.ReadAll(resp.Body)
-	if !strings.Contains(string(data), "Workers") {
-		t.Error("Should contain 'Workers':\n", string(data))
-	}
 	if !strings.Contains(string(data), "Writing output to etl-mlab-testing") {
 		t.Error("Should contain 'Writing output to etl-mlab-testing':\n", string(data))
 	}
@@ -87,7 +84,6 @@ func TestPollingMode(t *testing.T) {
 	flag.Set("service_port", ":0")
 	flag.Set("max_active", "200")
 	flag.Set("prometheusx.listen-address", ":0")
-	flag.Set("max_workers", "25")
 	flag.Set("gcloud_project", "mlab-testing")
 	flag.Set("gardener_addr", "gardener:8080")
 	etl.GitCommit = "123456789ABCDEF"
@@ -134,7 +130,7 @@ func TestPollingMode(t *testing.T) {
 func TestLocalRequest(t *testing.T) {
 	outdir := t.TempDir()
 	flag.Set("output", "local")
-	flag.Set("output_dir", outdir)
+	flag.Set("output_location", outdir)
 
 	mainCtx, mainCancel = context.WithCancel(context.Background())
 
