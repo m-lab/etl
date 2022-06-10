@@ -14,7 +14,6 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -125,14 +124,10 @@ type PCAPParser struct {
 }
 
 // NewPCAPParser returns a new parser for PCAP archives.
-func NewPCAPParser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+func NewPCAPParser(sink row.Sink, table, suffix string) etl.Parser {
 	bufSize := etl.PCAP.BQBufferSize()
-	if ann == nil {
-		ann = &NullAnnotator{}
-	}
-
 	return &PCAPParser{
-		Base:   row.NewBase(table, sink, bufSize, ann),
+		Base:   row.NewBase(table, sink, bufSize),
 		table:  table,
 		suffix: suffix,
 	}

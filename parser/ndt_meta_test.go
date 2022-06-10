@@ -18,7 +18,7 @@ func TestMetaParser(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	meta := parser.ProcessMetaFile("ndt", "suffix", metaName, metaData)
+	meta := parser.ProcessMetaFile("ndt", metaName, metaData)
 
 	if meta == nil {
 		t.Error("metaFile has not been populated.")

@@ -25,7 +25,6 @@ import (
 
 	"github.com/valyala/gozstd"
 
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/tcp-info/netlink"
 	"github.com/m-lab/tcp-info/snapshot"
 
@@ -205,14 +204,10 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 }
 
 // NewTCPInfoParser creates a new parser for the TCPInfo datatype.
-func NewTCPInfoParser(sink row.Sink, table, suffix string, ann v2as.Annotator) *TCPInfoParser {
+func NewTCPInfoParser(sink row.Sink, table, suffix string) *TCPInfoParser {
 	bufSize := etl.TCPINFO.BQBufferSize()
-	if ann == nil {
-		ann = &NullAnnotator{}
-	}
-
 	return &TCPInfoParser{
-		Base:   row.NewBase("tcpinfo", sink, bufSize, ann),
+		Base:   row.NewBase("tcpinfo", sink, bufSize),
 		table:  table,
 		suffix: suffix,
 	}

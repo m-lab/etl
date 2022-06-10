@@ -17,9 +17,9 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"github.com/google/go-jsonnet"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/traceroute-caller/hopannotation"
 )
@@ -336,7 +336,8 @@ type cachedPTData struct {
 }
 
 type PTParser struct {
-	Base
+	*row.Base
+	table string
 	// Care should be taken to ensure this does not accumulate many rows and
 	// lead to OOM problems.
 	previousTests []cachedPTData
@@ -362,15 +363,12 @@ const IPv4_AF int32 = 2
 const IPv6_AF int32 = 10
 const PTBufferSize int = 2
 
-func NewPTParser(ins etl.Inserter, ann ...v2as.Annotator) *PTParser {
+func NewPTParser(sink row.Sink, table, suffix string) *PTParser {
 	bufSize := etl.PT.BQBufferSize()
-	var annotator v2as.Annotator
-	if len(ann) > 0 && ann[0] != nil {
-		annotator = ann[0]
-	} else {
-		annotator = &NullAnnotator{}
+	return &PTParser{
+		Base:  row.NewBase(table, sink, bufSize),
+		table: table,
 	}
-	return &PTParser{Base: *NewBase(ins, bufSize, annotator)}
 }
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
@@ -496,7 +494,7 @@ func (pt *PTParser) TaskError() error {
 }
 
 func (pt *PTParser) TableName() string {
-	return pt.TableBase()
+	return pt.table
 }
 
 func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
@@ -520,12 +518,10 @@ func (pt *PTParser) InsertOneTest(oneTest cachedPTData) {
 	ptTest.ServerX.Site = dp.Site
 	ptTest.ServerX.Machine = dp.Host
 
-	err := pt.AddRow(&ptTest)
-	if err == etl.ErrBufferFull {
-		// Flush asynchronously, to improve throughput.
-		pt.Annotate(pt.TableName())
-		pt.PutAsync(pt.TakeRows())
-		pt.AddRow(&ptTest)
+	err := pt.Put(&ptTest)
+	// TODO: return err to caller.
+	if err != nil {
+		log.Println(err)
 	}
 }
 
@@ -541,9 +537,7 @@ func (pt *PTParser) ProcessLastTests() error {
 
 func (pt *PTParser) Flush() error {
 	pt.ProcessLastTests()
-	pt.Annotate(pt.TableName())
-	pt.Put(pt.TakeRows())
-	return pt.Inserter.Flush()
+	return pt.Base.Flush()
 }
 
 func CreateTestId(fn string, bn string) string {
@@ -587,17 +581,12 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 	if strings.HasSuffix(testName, ".json") {
 		ptTest, err := ParsePT(testName, rawContent, pt.TableName(), pt.taskFileName)
 		if err == nil {
-			err := pt.AddRow(&ptTest)
-			if err == etl.ErrBufferFull {
-				// Flush asynchronously, to improve throughput.
-				pt.PutAsync(pt.TakeRows())
-				pt.AddRow(&ptTest)
-			}
+			err = pt.Put(&ptTest)
 		} else {
 			// Modify metrics
 			log.Printf("JSON parsing failed with error %v for %s, %s", err, testName, pt.taskFileName)
 		}
-		return nil
+		return err
 	}
 
 	// ArchiveURL must already be valid, so error is safe to ignore.
@@ -609,18 +598,12 @@ func (pt *PTParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 			ptTest.ServerX.Site = dp.Site
 			ptTest.ServerX.Machine = dp.Host
 
-			err := pt.AddRow(&ptTest)
-			if err == etl.ErrBufferFull {
-				// Flush asynchronously, to improve throughput.
-				pt.Annotate(pt.TableName())
-				pt.PutAsync(pt.TakeRows())
-				pt.AddRow(&ptTest)
-			}
+			err = pt.Put(&ptTest)
 		} else {
 			// Modify metrics
 			log.Printf("JSONL parsing failed with error %v for %s, %s", err, testName, pt.taskFileName)
 		}
-		return nil
+		return err
 	}
 
 	// Process the legacy Paris Traceroute txt output

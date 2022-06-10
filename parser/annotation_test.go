@@ -36,7 +36,7 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ins := newInMemorySink()
-			n := parser.NewAnnotationParser(ins, "test", "_suffix", &fakeAnnotator{})
+			n := parser.NewAnnotationParser(ins, "test", "_suffix")
 
 			data, err := ioutil.ReadFile("testdata/Annotation/" + tt.file)
 			rtx.Must(err, "failed to read test file")

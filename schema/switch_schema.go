@@ -6,7 +6,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/go/cloud/bqx"
 )
 
@@ -23,9 +22,6 @@ type SwitchRow struct {
 	A *SwitchSummary `bigquery:"a"`
 	// Raw is the raw data from the DISCO export file.
 	Raw *RawData `json:",omitempty" bigquery:"raw"`
-
-	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
 }
 
 // Size returns the number of bytes in the SwitchRow object using

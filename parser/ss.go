@@ -10,12 +10,11 @@ import (
 	"strings"
 	"time"
 
-	v2as "github.com/m-lab/annotation-service/api/v2"
-
 	"cloud.google.com/go/bigquery"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/web100"
 )
@@ -24,19 +23,17 @@ import (
 
 // SSParser provides a parser implementation for SideStream data.
 type SSParser struct {
-	Base
+	*row.Base
+	table string
 }
 
 // NewSSParser creates a new sidestream parser.
-func NewSSParser(ins etl.Inserter, ann v2as.Annotator) *SSParser {
+func NewSSParser(sink row.Sink, table, suffix string) *SSParser {
 	bufSize := etl.SS.BQBufferSize()
-	return &SSParser{*NewBase(ins, bufSize, ann)}
-}
-
-// TODO get rid of this hack.
-func NewDefaultSSParser(ins etl.Inserter) *SSParser {
-	bufSize := etl.SS.BQBufferSize()
-	return &SSParser{*NewBase(ins, bufSize, &NullAnnotator{})}
+	return &SSParser{
+		Base:  row.NewBase(table, sink, bufSize),
+		table: table,
+	}
 }
 
 // ExtractLogtimeFromFilename extracts the log time.
@@ -95,7 +92,7 @@ func ParseKHeader(header string) ([]string, error) {
 
 // TableName of the table that this Parser inserts into.
 func (ss *SSParser) TableName() string {
-	return ss.TableBase()
+	return ss.table
 }
 
 // PackDataIntoSchema packs data into sidestream BigQeury schema and buffers it.
@@ -300,13 +297,7 @@ func (ss *SSParser) ParseAndInsert(meta map[string]bigquery.Value, testName stri
 		ssTest.Web100_log_entry.Connection_spec.ServerX.Machine = dp.Host
 
 		// Add row to buffer, possibly flushing buffer if it is full.
-		err = ss.AddRow(&ssTest)
-		if err == etl.ErrBufferFull {
-			ss.Annotate(ss.TableBase())
-			// Flush asynchronously, to improve throughput.
-			ss.PutAsync(ss.TakeRows())
-			err = ss.AddRow(&ssTest)
-		}
+		err = ss.Put(&ssTest)
 		if err != nil {
 			metrics.ErrorCount.WithLabelValues(
 				ss.TableName(), "ss", "insert-err").Inc()

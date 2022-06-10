@@ -10,13 +10,8 @@ import (
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/go/testingx"
 
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 )
-
-func assertAnnotatable(r *schema.SS) {
-	func(row.Annotatable) {}(r)
-}
 
 type unsupportedType struct{}
 

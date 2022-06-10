@@ -6,8 +6,6 @@ import (
 	"cloud.google.com/go/civil"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/uuid-annotator/annotator"
-
-	"github.com/m-lab/etl/row"
 )
 
 // AnnotationRow defines the BQ schema using 'Standard Columns' conventions for
@@ -21,9 +19,6 @@ type AnnotationRow struct {
 
 	// NOTE: there is no 'Raw' field for annotation datatypes because the
 	// uuid-annotator output schema was designed to be used directly by the parser.
-
-	// NOT part of struct schema. Included only to provide a fake annotator interface.
-	row.NullAnnotator `bigquery:"-"`
 }
 
 // Schema returns the BigQuery schema for NDT7ResultRow.

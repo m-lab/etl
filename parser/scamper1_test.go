@@ -19,7 +19,7 @@ import (
 
 func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 	ins := newInMemorySink()
-	n := parser.NewScamper1Parser(ins, "test", "_suffix", &fakeAnnotator{})
+	n := parser.NewScamper1Parser(ins, "test", "_suffix")
 
 	file := "valid.jsonl"
 	data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))
@@ -51,7 +51,7 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 
 func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
 	ins := newInMemorySink()
-	n := parser.NewScamper1Parser(ins, "test", "_suffix", &fakeAnnotator{})
+	n := parser.NewScamper1Parser(ins, "test", "_suffix")
 
 	file := "badformat.jsonl"
 	data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))

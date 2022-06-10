@@ -3,26 +3,16 @@ package parser_test
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
 
-	"github.com/go-test/deep"
 	"github.com/kr/pretty"
-
-	v2as "github.com/m-lab/annotation-service/api/v2"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
-	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 )
-
-func assertNDTTestIsAnnotatable(r parser.NDTTest) {
-	func(row.Annotatable) {}(r)
-}
 
 func assertNDTTestIsValueSaver(r parser.NDTTest) {
 	func(bigquery.ValueSaver) {}(r)
@@ -73,58 +63,11 @@ func TestValidation(t *testing.T) {
 	}
 }
 
-func TestCopyStructToMap(t *testing.T) {
-	tests := []struct {
-		source interface{}
-		dest   map[string]bigquery.Value
-		res    map[string]bigquery.Value
-	}{
-		{
-			source: &struct {
-				A   int64
-				Bee string
-			}{A: 1, Bee: "2"},
-			dest: make(map[string]bigquery.Value),
-			res:  map[string]bigquery.Value{"a": int64(1), "bee": "2"},
-		},
-		{
-			source: &struct {
-				A   int64
-				Bee string
-			}{A: 0, Bee: ""},
-			dest: make(map[string]bigquery.Value),
-			res:  map[string]bigquery.Value{},
-		},
-		{
-			source: &struct{}{},
-			dest:   make(map[string]bigquery.Value),
-			res:    map[string]bigquery.Value{},
-		},
-	}
-	for _, test := range tests {
-		parser.CopyStructToMap(test.source, test.dest)
-		if diff := deep.Equal(test.dest, test.res); diff != nil {
-			t.Error(diff)
-		}
-	}
-}
-
 func TestNDTParser(t *testing.T) {
 	// Load test data.
 	ins := newInMemoryInserter()
 
-	// Completely fake annotation data.
-	responseJSON := `{"AnnotatorDate":"2018-12-05T00:00:00Z",
-		"Annotations":{
-		   "45.56.98.222":{"Geo":{"postal_code":"45569", "latitude": 1.0, "longitude": 2.0}, "Network":{"ASName":"Fake Client ISP", "ASNumber": 123, "Systems":[{"ASNs":[123]}]}},
-		   "213.208.152.37":{"Geo":{"postal_code":"21320", "latitude": 3.0, "longitude": 4.0}, "Network":{"ASName":"Fake Server ISP", "ASNumber": 456, "CIDR": "213.208.152.0/26", "Systems":[{"ASNs":[456]}]}}
-	   }}`
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, responseJSON)
-	}))
-	defer ts.Close()
-
-	n := parser.NewNDTParser(ins, v2as.GetAnnotator(ts.URL))
+	n := parser.NewNDTParser(ins, "web100", "")
 
 	// TODO(prod) - why are so many of the tests to this endpoint and a few others?
 	// A: because this is EB, which runs all the health tests.
@@ -186,38 +129,6 @@ func TestNDTParser(t *testing.T) {
 		"id": "nYjSCZhB0EfQPChl2tT8Fg",
 		"connection_spec": schema.Web100ValueMap{
 			"server_hostname": "mlab3.vie01.measurement-lab.org",
-			"client": schema.Web100ValueMap{
-				"network": schema.Web100ValueMap{"asn": int64(123)},
-			},
-			"server": schema.Web100ValueMap{
-				"network":   schema.Web100ValueMap{"asn": int64(456)},
-				"iata_code": "VIE",
-			},
-			"ClientX": schema.Web100ValueMap{
-				"Network": schema.Web100ValueMap{
-					"ASName":   "Fake Client ISP",
-					"ASNumber": int64(123),
-					"Missing":  false,
-				},
-				"Geo": schema.Web100ValueMap{
-					"Latitude":  1.0,
-					"Longitude": 2.0,
-				},
-			},
-			"ServerX": schema.Web100ValueMap{
-				"Site":    "vie01",
-				"Machine": "mlab3",
-				"Network": schema.Web100ValueMap{
-					"ASName":   "Fake Server ISP",
-					"ASNumber": int64(456),
-					"CIDR":     "213.208.152.0/26",
-					"Missing":  false,
-				},
-				"Geo": schema.Web100ValueMap{
-					"Latitude":  3.0,
-					"Longitude": 4.0,
-				},
-			},
 		},
 		"web100_log_entry": schema.Web100ValueMap{
 			"version": "2.5.27 201001301335 net100",
@@ -236,25 +147,6 @@ func TestNDTParser(t *testing.T) {
 	if !compare(t, actualValues, expectedValues) {
 		t.Errorf("Missing expected values:")
 		t.Errorf(pretty.Sprint(expectedValues))
-	}
-}
-
-func TestNDTTaskError(t *testing.T) {
-	// Load test data.
-	ins := newInMemoryInserter()
-	n := parser.NewNDTParser(ins)
-
-	if n.TaskError() != nil {
-		t.Error(n.TaskError())
-	}
-
-	ins.committed = 10
-	if n.TaskError() != nil {
-		t.Error(n.TaskError())
-	}
-	ins.failed = 2
-	if n.TaskError() == nil {
-		t.Error("Should have non-nil TaskError")
 	}
 }
 
@@ -355,8 +247,12 @@ func (in *inMemoryInserter) release() {
 	in.token <- struct{}{} // return the token.
 }
 
-func (in *inMemoryInserter) Commit(data []interface{}, label string) error {
-	return in.Put(data)
+func (in *inMemoryInserter) Commit(data []interface{}, label string) (int, error) {
+	return len(data), in.Put(data)
+}
+
+func (in *inMemoryInserter) Close() error {
+	return nil
 }
 
 func (in *inMemoryInserter) Params() etl.InserterParams {

@@ -1,7 +1,6 @@
 package parser_test
 
 import (
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -9,9 +8,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/go-test/deep"
-	"github.com/m-lab/annotation-service/api"
-	v2 "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -240,7 +236,7 @@ func TestCreateTestId(t *testing.T) {
 func TestParseLegacyFormatData(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/PT/20160112T00:45:44Z_ALL27409.paris")
 	if err != nil {
-		fmt.Println("cannot load test data")
+		t.Fatalf("cannot load test data: %v", err)
 		return
 	}
 	cachedTest, err := parser.Parse(nil, "testdata/PT/20160112T00:45:44Z_ALL27409.paris", "", rawData, "pt-daily", etl.DataPath{})
@@ -259,38 +255,8 @@ func TestParseLegacyFormatData(t *testing.T) {
 }
 
 func TestParseJSONL(t *testing.T) {
-	m := map[string]*api.Annotations{
-		"91.213.30.229": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "NA",
-				CountryCode:   "US",
-				Latitude:      1.0,
-				Longitude:     2.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 1234,
-				Systems: []api.System{
-					{ASNs: []uint32{1234}},
-				},
-			},
-		},
-		"91.169.126.135": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "EU",
-				CountryCode:   "DE",
-				Latitude:      3.0,
-				Longitude:     4.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 4321,
-				Systems: []api.System{
-					{ASNs: []uint32{4321}},
-				},
-			},
-		},
-	}
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins, newFakeAnnotator(m))
+	pt := parser.NewPTParser(ins, "paris1", "")
 
 	filename := "testdata/PT/20190927T070859Z_ndt-qtfh8_1565996043_0000000000003B64.jsonl"
 	rawData, err := ioutil.ReadFile(filename)
@@ -306,15 +272,14 @@ func TestParseJSONL(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if pt.NumRowsForTest() != 1 {
-		fmt.Println(pt.NumRowsForTest())
-		t.Fatalf("The data is not inserted, in buffer now.")
+	s := pt.GetStats()
+	if s.Total() != 1 {
+		t.Fatalf("ParseJSONL expected 1 row inserted, got %d", s.Total())
 	}
 	pt.Flush()
 
 	if len(ins.data) != 1 {
-		fmt.Println(len(ins.data))
-		t.Fatalf("Number of rows in inserter is wrong.")
+		t.Fatalf("ParseJSONL expected 1 row in buffer, got %d", len(ins.data))
 	}
 
 	ptTest := ins.data[0].(*schema.PTTest)
@@ -324,18 +289,6 @@ func TestParseJSONL(t *testing.T) {
 
 	if ptTest.UUID != "ndt-qtfh8_1565996043_0000000000003B64" {
 		t.Fatalf("Wrong UUID; got %q, want %q", ptTest.UUID, "ndt-qtfh8_1565996043_0000000000003B64")
-	}
-
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(m["91.169.126.135"])
-	if diff := deep.Equal(&ptTest.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(m["91.213.30.229"])
-	sx.Site = "nuq07"
-	sx.Machine = "mlab2"
-	if diff := deep.Equal(&ptTest.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
 	}
 }
 
@@ -390,119 +343,15 @@ func TestParse(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(cachedTest.Hops[0], expected_hop) {
-		fmt.Printf("Here is expected    : %v\n", expected_hop)
-		fmt.Printf("Here is what is real: %v\n", cachedTest.Hops[0])
+		t.Logf("Here is expected    : %v\n", expected_hop)
+		t.Logf("Here is what is real: %v\n", cachedTest.Hops[0])
 		t.Fatalf("Wrong results for PT hops!")
 	}
 }
 
-func TestAnnotateAndPutAsync(t *testing.T) {
-	ins := newInMemoryInserter()
-	m := map[string]*api.Annotations{
-		"172.17.94.34": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "NA",
-				CountryCode:   "US",
-				Latitude:      1.0,
-				Longitude:     2.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 1234,
-				Systems: []api.System{
-					{ASNs: []uint32{1234}},
-				},
-			},
-		},
-		"74.125.224.100": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "EU",
-				CountryCode:   "DE",
-				Latitude:      3.0,
-				Longitude:     4.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 4321,
-				Systems: []api.System{
-					{ASNs: []uint32{4321}},
-				},
-			},
-		},
-	}
-	pt := parser.NewPTParser(ins, newFakeAnnotator(m))
-	rawData, err := ioutil.ReadFile("testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
-	if err != nil {
-		t.Fatalf("cannot read testdata.")
-	}
-	url := "gs://archive-measurement-lab/ndt/traceroute/2017/03/20/20170320T000540.410989Z-paris-traceroute-mlab4-nuq07-ndt.tgz"
-	meta := map[string]bigquery.Value{"filename": url}
-	err = pt.ParseAndInsert(meta, "testdata/PT/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", rawData)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	if pt.NumRowsForTest() != 1 {
-		fmt.Println(pt.NumRowsForTest())
-		t.Fatalf("Number of rows in PT table is wrong.")
-	}
-	pt.AnnotateAndPutAsync("traceroute")
-
-	if len(ins.data) != 1 {
-		fmt.Println(len(ins.data))
-		t.Fatalf("Number of rows in inserter is wrong.")
-	}
-	ptTest := ins.data[0].(*schema.PTTest)
-	if ptTest.Parseinfo.TaskFileName != url {
-		t.Fatalf("Wrong TaskFilenName; got %q, want %q", ptTest.Parseinfo.TaskFileName, url)
-	}
-
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(m["74.125.224.100"])
-	if diff := deep.Equal(&ptTest.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(m["172.17.94.34"])
-	sx.Site = "nuq07"
-	sx.Machine = "mlab4"
-	if diff := deep.Equal(&ptTest.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
-	}
-}
-
 func TestParseAndInsert(t *testing.T) {
-
-	m := map[string]*api.Annotations{
-		"2.80.132.33": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "NA",
-				CountryCode:   "US",
-				Latitude:      1.0,
-				Longitude:     2.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 1234,
-				Systems: []api.System{
-					{ASNs: []uint32{1234}},
-				},
-			},
-		},
-		"91.239.96.102": &api.Annotations{
-			Geo: &api.GeolocationIP{
-				ContinentCode: "NA",
-				CountryCode:   "US",
-				Latitude:      1.0,
-				Longitude:     2.0,
-			},
-			Network: &api.ASData{
-				ASNumber: 1234,
-				Systems: []api.System{
-					{ASNs: []uint32{1234}},
-				},
-			},
-		},
-	}
-
 	ins := newInMemoryInserter()
-	pt := parser.NewPTParser(ins, newFakeAnnotator(m))
+	pt := parser.NewPTParser(ins, "paris1", "")
 	rawData, err := ioutil.ReadFile("testdata/PT/20130524T00:04:44Z_ALL5729.paris")
 	if err != nil {
 		t.Fatalf("cannot read testdata.")
@@ -514,16 +363,17 @@ func TestParseAndInsert(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if pt.NumRowsForTest() != 0 {
-		fmt.Println(pt.NumRowsForTest())
-		t.Fatalf("The data is not inserted, in buffer now.")
+	s := pt.GetStats()
+	if s.Buffered != 0 {
+		t.Fatalf("ParseAndInsert with buffered data; want 0, got %d", s.Buffered)
 	}
 	pt.Flush()
 
-	if len(ins.data) != 1 {
-		fmt.Println(len(ins.data))
-		t.Fatalf("Number of rows in inserter is wrong.")
+	s = pt.GetStats()
+	if s.Committed != 1 {
+		t.Fatalf("ParseAndInsert committed wrong row count; want 1, got %d", s.Committed)
 	}
+
 	if ins.data[0].(*schema.PTTest).Parseinfo.TaskFileName != url {
 		t.Fatalf("Task filename is wrong.")
 	}
@@ -531,24 +381,11 @@ func TestParseAndInsert(t *testing.T) {
 	if ins.data[0].(*schema.PTTest).UUID != "R9_wGx1-cSmqtSAt5aQtNg" {
 		t.Fatalf("UUID is wrong; got %q, want %q", ins.data[0].(*schema.PTTest).UUID, "R9_wGx1-cSmqtSAt5aQtNg")
 	}
-	p := ins.data[0].(*schema.PTTest)
-
-	// Verify the client and server annotations match.
-	cx := v2.ConvertAnnotationsToClientAnnotations(m["91.239.96.102"])
-	if diff := deep.Equal(&p.ClientX, cx); diff != nil {
-		t.Errorf("ClientX annotation does not match; %#v", diff)
-	}
-	sx := v2.ConvertAnnotationsToServerAnnotations(m["2.80.132.33"])
-	sx.Site = "akl01"
-	sx.Machine = "mlab3"
-	if diff := deep.Equal(&p.ServerX, sx); diff != nil {
-		t.Errorf("ServerX annotation does not match; %#v", diff)
-	}
 }
 
 func TestProcessLastTests(t *testing.T) {
 	ins := &inMemoryInserter{}
-	pt := parser.NewPTParser(ins)
+	pt := parser.NewPTParser(ins, "paris1", "")
 
 	tests := []struct {
 		fileName             string
@@ -612,25 +449,27 @@ func TestProcessLastTests(t *testing.T) {
 		if pt.NumBufferedTests() != test.expectedBufferedTest {
 			t.Fatalf("Data not buffered correctly")
 		}
-		if pt.NumRowsForTest() != test.expectedNumRows {
+		s := pt.GetStats()
+		if s.Total() != test.expectedNumRows {
 			t.Fatalf("Data of test %s not inserted into BigQuery correctly. Expect %d Actually %d", test.fileName, test.expectedNumRows, ins.RowsInBuffer())
 		}
 	}
 
 	// Insert the 4th test in the buffer to BigQuery.
 	pt.ProcessLastTests()
-	if pt.NumRowsForTest() != 4 {
+	s := pt.GetStats()
+	if s.Total() != 4 {
 		t.Fatalf("Number of tests in buffer not correct, expect 0, actually %d.", ins.RowsInBuffer())
 	}
 }
 
 func TestParseEmpty(t *testing.T) {
-	rawData, err := ioutil.ReadFile("testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris")
+	rawData, err := ioutil.ReadFile("testdata/PT/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris")
 	if err != nil {
-		fmt.Println("cannot load test data")
+		t.Fatal("cannot load test data")
 		return
 	}
-	_, parseErr := parser.Parse(nil, "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily",
+	_, parseErr := parser.Parse(nil, "testdata/PT/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData, "pt-daily",
 		etl.DataPath{})
 	if parseErr == nil {
 		t.Fatal(parseErr)

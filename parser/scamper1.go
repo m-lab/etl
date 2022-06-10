@@ -7,7 +7,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -31,14 +30,10 @@ type Scamper1Parser struct {
 }
 
 // NewScamper1Parser returns a new parser for the scamper1 archives.
-func NewScamper1Parser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+func NewScamper1Parser(sink row.Sink, table, suffix string) etl.Parser {
 	bufSize := etl.SCAMPER1.BQBufferSize()
-	if ann == nil {
-		ann = &NullAnnotator{}
-	}
-
 	return &Scamper1Parser{
-		Base:   row.NewBase(table, sink, bufSize, ann),
+		Base:   row.NewBase(table, sink, bufSize),
 		table:  table,
 		suffix: suffix,
 	}
@@ -106,11 +101,23 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Dec()
 
-	scamperOutput, err := parser.ParseTraceroute(rawContent)
+	trcParser, err := parser.New("mda")
+	if err != nil {
+		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
+		return fmt.Errorf("failed to initialize traceroute parser, error: %w", err)
+	}
+
+	rawData, err := trcParser.ParseRawData(rawContent)
 	archiveURL := fileMetadata["filename"].(string)
 	if err != nil {
 		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
 		return fmt.Errorf("failed to parse scamper1 file: %s, archiveURL: %s, error: %w", testName, archiveURL, err)
+	}
+
+	scamperOutput, ok := rawData.(parser.Scamper1)
+	if !ok {
+		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, "failed to convert ParsedData to Scamper1 object").Inc()
+		return fmt.Errorf("failed to convert ParsedData to Scamper1 object for file: %s", testName)
 	}
 
 	bqScamperOutput := schema.BQScamperOutput{

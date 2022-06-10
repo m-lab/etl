@@ -1,12 +1,8 @@
-//go:build integration
-// +build integration
-
 package worker_test
 
 import (
 	"archive/tar"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,25 +10,22 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/googleapis/google-cloud-go-testing/storage/stiface"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 
 	"github.com/m-lab/annotation-service/api"
 	v2 "github.com/m-lab/annotation-service/api/v2"
-	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/go/rtx"
 
-	"github.com/m-lab/etl/bq"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/factory"
-	"github.com/m-lab/etl/fake"
 	"github.com/m-lab/etl/metrics"
-	"github.com/m-lab/etl/row"
+	etlstorage "github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/worker"
 
 	"github.com/fsouza/fake-gcs-server/fakestorage"
@@ -92,57 +85,6 @@ func fromTar(bucket string, fn string) *fakestorage.Server {
 	return loadFromTar(server, bucket, tf)
 }
 
-func tree(t *testing.T, client *storage.Client) {
-	buckets := client.Buckets(context.Background(), "foobar")
-	for b, err := buckets.Next(); err == nil; b, err = buckets.Next() {
-		t.Log(b.Name)
-		it := client.Bucket(b.Name).Objects(context.Background(), &storage.Query{Prefix: ""})
-		for o, err := it.Next(); err == nil; o, err = it.Next() {
-			t.Log(o.Name)
-		}
-	}
-}
-
-func TestLoadTar(t *testing.T) {
-	t.Skip("Useful for debugging")
-	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
-	tree(t, gcsClient)
-	t.Fatal()
-}
-
-func TestProcessTask(t *testing.T) {
-	if testing.Short() {
-		t.Log("Skipping integration test")
-	}
-
-	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
-	filename := "gs://test-bucket/ndt/2018/05/09/20180509T101913Z-mlab1-mad03-ndt-0000.tgz"
-
-	status, err := worker.ProcessTaskWithClient(stiface.AdaptClient(gcsClient), filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if status != http.StatusOK {
-		t.Fatal("Expected", http.StatusOK, "Got:", status)
-	}
-
-	// This section checks that prom metrics are updated appropriately.
-	c := make(chan prometheus.Metric, 10)
-
-	metrics.FileCount.Collect(c)
-	checkCounter(t, c, 1)
-
-	metrics.TaskTotal.Collect(c)
-	checkCounter(t, c, 1)
-
-	metrics.TestTotal.Collect(c)
-	checkCounter(t, c, 1)
-
-	metrics.FileCount.Reset()
-	metrics.TaskTotal.Reset()
-	metrics.TestTotal.Reset()
-}
-
 // This is also the annotator, so it just returns itself.
 type fakeAnnotatorFactory struct{}
 
@@ -154,66 +96,28 @@ func (ann *fakeAnnotatorFactory) Get(ctx context.Context, dp etl.DataPath) (v2.A
 	return ann, nil
 }
 
-type fakeSinkFactory struct {
-	up etl.Uploader
-}
-
-func (fsf *fakeSinkFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, etl.ProcessingError) {
-	if fsf.up == nil {
-		return nil, factory.NewError(dp.DataType, "fakeSinkFactory",
-			http.StatusInternalServerError, errors.New("nil uploader"))
-	}
-	pdt := bqx.PDT{Project: "fake-project", Dataset: "fake-dataset", Table: "fake-table"}
-	in, err := bq.NewColumnPartitionedInserterWithUploader(pdt, fsf.up)
-	rtx.Must(err, "Bad SinkFactory")
-	return in, nil
-}
-
 type fakeSourceFactory struct {
 	client stiface.Client
 }
 
 func (sf *fakeSourceFactory) Get(ctx context.Context, dp etl.DataPath) (etl.TestSource, etl.ProcessingError) {
-	// TODO simplify GetSource
-	tr, _, _, err := worker.GetSource(sf.client, dp.URI)
-	rtx.Must(err, "Bad TestSource")
-
-	// TODO
-	// defer tr.Close()
-
+	label := dp.TableBase()
+	tr, err := etlstorage.NewTestSource(sf.client, dp, label)
+	if err != nil {
+		panic("error opening gcs file:" + err.Error())
+	}
 	return tr, nil
 }
 
-func NewSourceFactory() factory.SourceFactory {
-	gcsClient := fromTar("test-bucket", "../testfiles/ndt.tar").Client()
+func NewSourceFactory(bucket string) factory.SourceFactory {
+	gcsClient := fromTar(bucket, "../testfiles/ndt.tar").Client()
 	return &fakeSourceFactory{client: stiface.AdaptClient(gcsClient)}
 }
 
-func TestNilUploader(t *testing.T) {
-	if testing.Short() {
-		t.Log("Skipping integration test")
-	}
-
-	fakeFactory := worker.StandardTaskFactory{
-		Annotator: &fakeAnnotatorFactory{},
-		Sink:      &fakeSinkFactory{up: nil},
-		Source:    NewSourceFactory(),
-	}
-
-	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
-	path, err := etl.ValidateTestPath(filename)
-	if err != nil {
-		t.Fatal(err, filename)
-	}
-	// TODO create a TaskFactory and use ProcessGKETask
-	pErr := worker.ProcessGKETask(context.Background(), path, &fakeFactory)
-	if pErr == nil || pErr.Code() != http.StatusInternalServerError {
-		t.Fatal("Expected error with", http.StatusInternalServerError, "Got:", pErr)
-	}
-
-	metrics.FileCount.Reset()
-	metrics.TaskTotal.Reset()
-	metrics.TestTotal.Reset()
+func NewSinkFactory(bucket string) (*fakestorage.Server, factory.SinkFactory) {
+	fs := fakestorage.NewServer([]fakestorage.Object{})
+	fs.CreateBucketWithOpts(fakestorage.CreateBucketOpts{Name: bucket})
+	return fs, etlstorage.NewSinkFactory(stiface.AdaptClient(fs.Client()), bucket)
 }
 
 func TestProcessGKETask(t *testing.T) {
@@ -221,11 +125,12 @@ func TestProcessGKETask(t *testing.T) {
 		t.Log("Skipping integration test")
 	}
 
-	up := fake.NewFakeUploader()
+	// Create sink factory.
+	fs, sf := NewSinkFactory("test-bucket")
+
 	fakeFactory := worker.StandardTaskFactory{
-		Annotator: &fakeAnnotatorFactory{},
-		Sink:      &fakeSinkFactory{up: up},
-		Source:    NewSourceFactory(),
+		Sink:   sf,
+		Source: NewSourceFactory("test-bucket"),
 	}
 
 	filename := "gs://test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz"
@@ -233,10 +138,9 @@ func TestProcessGKETask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err, filename)
 	}
-	// TODO create a TaskFactory and use ProcessGKETask
-	pErr := worker.ProcessGKETask(context.Background(), path, &fakeFactory)
-	if pErr != nil {
-		t.Fatal("Expected", http.StatusOK, "Got:", pErr)
+	err = worker.ProcessGKETask(context.Background(), path, &fakeFactory)
+	if err != nil {
+		t.Fatal("Expected", http.StatusOK, "Got:", err)
 	}
 
 	// This section checks that prom metrics are updated appropriately.
@@ -251,8 +155,15 @@ func TestProcessGKETask(t *testing.T) {
 	metrics.TestTotal.Collect(c)
 	checkCounter(t, c, 478)
 
-	if up.Total != 512 {
-		t.Error("Expected 512 tests, got", up.Total)
+	// Lookup output from task.
+	o, err := fs.GetObject("test-bucket", "ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz.json")
+	if err != nil {
+		t.Errorf("GetObject() expected nil error, got %v", err)
+	}
+	// Read the file contents to determine the number of rows written.
+	lines := strings.Split(string(o.Content), "\n")
+	if len(lines)-1 != 512 { // -1 to strip final newline.
+		t.Error("Expected 512 tests, got", len(lines)-1)
 	}
 	metrics.FileCount.Reset()
 	metrics.TaskTotal.Reset()

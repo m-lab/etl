@@ -7,7 +7,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -27,14 +26,10 @@ type HopAnnotation1Parser struct {
 }
 
 // NewHopAnnotation1Parser returns a new parser for the HopAnnotation1 archives.
-func NewHopAnnotation1Parser(sink row.Sink, table, suffix string, ann v2as.Annotator) etl.Parser {
+func NewHopAnnotation1Parser(sink row.Sink, table, suffix string) etl.Parser {
 	bufSize := etl.HOPANNOTATION1.BQBufferSize()
-	if ann == nil {
-		ann = &NullAnnotator{}
-	}
-
 	return &HopAnnotation1Parser{
-		Base:   row.NewBase(table, sink, bufSize, ann),
+		Base:   row.NewBase(table, sink, bufSize),
 		table:  table,
 		suffix: suffix,
 	}
