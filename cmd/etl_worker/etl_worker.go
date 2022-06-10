@@ -27,8 +27,6 @@ import (
 	"github.com/m-lab/etl/task"
 	"github.com/m-lab/etl/worker"
 
-	"github.com/m-lab/annotation-service/site"
-
 	// Enable profiling. For more background and usage information, see:
 	//   https://blog.golang.org/profiling-go-programs
 	_ "net/http/pprof"
@@ -275,8 +273,6 @@ func main() {
 	if outputType.Value == "local" {
 		log.Println("To resolve oauth problems, run 'gcloud auth application-default login'")
 	}
-
-	go site.MustReload(mainCtx)
 
 	// Enable block profiling
 	runtime.SetBlockProfileRate(1000000) // One event per msec.

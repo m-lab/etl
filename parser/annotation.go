@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"strings"
@@ -10,8 +9,6 @@ import (
 	"cloud.google.com/go/bigquery"
 
 	"cloud.google.com/go/civil"
-	"github.com/m-lab/annotation-service/api"
-	v2as "github.com/m-lab/annotation-service/api/v2"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -28,15 +25,6 @@ type AnnotationParser struct {
 	*row.Base
 	table  string
 	suffix string
-}
-
-// NullAnnotator mimicks the annotation-service API, and always returns an empty
-// result without any network connections.
-type NullAnnotator struct{}
-
-// GetAnnotations always returns an empty annotation result.
-func (ann *NullAnnotator) GetAnnotations(ctx context.Context, date time.Time, ips []string, info ...string) (*v2as.Response, error) {
-	return &v2as.Response{AnnotatorDate: time.Now(), Annotations: make(map[string]*api.Annotations, 0)}, nil
 }
 
 // NewAnnotationParser creates a new parser for annotation data.

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
@@ -35,25 +34,25 @@ type ndtAnomalies struct {
 }
 
 type ndtConnectionSpec struct {
-	ClientAF            int64             `bigquery:"client_af"`
-	ClientApplication   string            `bigquery:"client_application"`
-	ClientBrowser       string            `bigquery:"client_browser"`
-	ClientHostname      string            `bigquery:"client_hostname"`
-	ClientIP            string            `bigquery:"client_ip"`
-	ClientKernelVersion string            `bigquery:"client_kernel_version"`
-	ClientOS            string            `bigquery:"client_os"`
-	ClientVersion       string            `bigquery:"client_version"`
-	DataDirection       int64             `bigquery:"data_direction"`
-	ServerAF            int64             `bigquery:"server_af"`
-	ServerHostname      string            `bigquery:"server_hostname"`
-	ServerIP            string            `bigquery:"server_ip"`
-	ServerKernelVersion string            `bigquery:"server_kernel_version"`
-	TLS                 bool              `bigquery:"tls"`
-	Websockets          bool              `bigquery:"websockets"`
-	ClientGeolocation   api.GeolocationIP `bigquery:"client_geolocation"`
-	ServerGeolocation   api.GeolocationIP `bigquery:"server_geolocation"`
-	Client              ndtClientNetwork  `bigquery:"client"`
-	Server              ndtServerNetwork  `bigquery:"server"`
+	ClientAF            int64               `bigquery:"client_af"`
+	ClientApplication   string              `bigquery:"client_application"`
+	ClientBrowser       string              `bigquery:"client_browser"`
+	ClientHostname      string              `bigquery:"client_hostname"`
+	ClientIP            string              `bigquery:"client_ip"`
+	ClientKernelVersion string              `bigquery:"client_kernel_version"`
+	ClientOS            string              `bigquery:"client_os"`
+	ClientVersion       string              `bigquery:"client_version"`
+	DataDirection       int64               `bigquery:"data_direction"`
+	ServerAF            int64               `bigquery:"server_af"`
+	ServerHostname      string              `bigquery:"server_hostname"`
+	ServerIP            string              `bigquery:"server_ip"`
+	ServerKernelVersion string              `bigquery:"server_kernel_version"`
+	TLS                 bool                `bigquery:"tls"`
+	Websockets          bool                `bigquery:"websockets"`
+	ClientGeolocation   LegacyGeolocationIP `bigquery:"client_geolocation"`
+	ServerGeolocation   LegacyGeolocationIP `bigquery:"server_geolocation"`
+	Client              ndtClientNetwork    `bigquery:"client"`
+	Server              ndtServerNetwork    `bigquery:"server"`
 
 	// ServerX and ClientX are for the synthetic UUID annotator export process.
 	ServerX annotator.ServerAnnotations
