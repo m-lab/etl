@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/civil"
 
@@ -97,9 +98,15 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 				t.Fatalf("Raw.S2C.UUID does not match A.UUID; got %s, want %s",
 					download.Raw.S2C.UUID, download.A.UUID)
 			}
+			// Verify a.MinRTT when S2C.TCPInfo is present.
 			if tt.expectTCPInfo && download.A.MinRTT != float64(download.Raw.S2C.TCPInfo.MinRTT)/1000.0/1000.0 {
 				t.Fatalf("A.MinRTT does not match Raw.S2C.TCPInfo.MinRTT; got %f, want %f",
 					download.A.MinRTT, float64(download.Raw.S2C.TCPInfo.MinRTT)/1000.0/1000.0)
+			}
+			// Verify a.MinRTT when S2C.TCPInfo is not present.
+			if tt.expectMetadata && download.A.MinRTT != float64(download.Raw.S2C.MinRTT)/float64(time.Millisecond) {
+				t.Fatalf("A.MinRTT does not match Raw.S2C.MinRTT; got %f, want %f",
+					download.A.MinRTT, float64(download.Raw.S2C.MinRTT)/float64(time.Millisecond))
 			}
 			upload := ins.data[1].(*schema.NDT5ResultRowV2)
 			if upload.Raw.Control == nil {
