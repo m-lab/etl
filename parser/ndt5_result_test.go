@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/civil"
 
@@ -18,6 +19,7 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 		testName       string
 		expectMetadata bool
 		emptySummary   bool
+		expectTCPInfo  bool
 		wantErr        bool
 	}{
 		{
@@ -34,6 +36,11 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 			name:         "success-empty-s2c-and-c2s",
 			testName:     `ndt-x5dms_1589313593_0000000000024063.json`,
 			emptySummary: true,
+		},
+		{
+			name:          "success-s2c-with-tcpinfo",
+			testName:      `ndt-m9pcq_1652405655_000000000014FD22.json`,
+			expectTCPInfo: true,
 		},
 	}
 	for _, tt := range tests {
@@ -90,6 +97,16 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 			if download.Raw.S2C.UUID != download.A.UUID {
 				t.Fatalf("Raw.S2C.UUID does not match A.UUID; got %s, want %s",
 					download.Raw.S2C.UUID, download.A.UUID)
+			}
+			// Verify a.MinRTT when S2C.TCPInfo is present.
+			if tt.expectTCPInfo && download.A.MinRTT != float64(download.Raw.S2C.TCPInfo.MinRTT)/1000.0/1000.0 {
+				t.Fatalf("A.MinRTT does not match Raw.S2C.TCPInfo.MinRTT; got %f, want %f",
+					download.A.MinRTT, float64(download.Raw.S2C.TCPInfo.MinRTT)/1000.0/1000.0)
+			}
+			// Verify a.MinRTT when S2C.TCPInfo is not present.
+			if tt.expectMetadata && download.A.MinRTT != float64(download.Raw.S2C.MinRTT)/float64(time.Millisecond) {
+				t.Fatalf("A.MinRTT does not match Raw.S2C.MinRTT; got %f, want %f",
+					download.A.MinRTT, float64(download.Raw.S2C.MinRTT)/float64(time.Millisecond))
 			}
 			upload := ins.data[1].(*schema.NDT5ResultRowV2)
 			if upload.Raw.Control == nil {
