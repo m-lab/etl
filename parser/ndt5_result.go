@@ -168,7 +168,17 @@ func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) {
 		TestTime:           s2c.StartTime,
 		MeanThroughputMbps: s2c.MeanThroughputMbps,
 		CongestionControl:  "cubic",
-		MinRTT:             float64(s2c.MinRTT) / float64(time.Millisecond),
+	}
+
+	// The ndt5 result added the TCPInfo snapshot starting June 18 2020.
+	// Since the s2c.MinRTT value is a lower resolution user-space estimate,
+	// use TCPInfo if present, and fall back to the low resolution MinRTT otherwise.
+	if s2c.TCPInfo != nil {
+		// TCPInfo.MinRTT is a uint32.
+		row.A.MinRTT = float64(s2c.TCPInfo.MinRTT) / 1000.0 / 1000.0
+	} else {
+		// MinRTT is a time.Duration.
+		row.A.MinRTT = float64(s2c.MinRTT) / float64(time.Millisecond)
 	}
 	// NOTE: the TCPInfo structure was introduced in v0.18.0. Measurements
 	// from earlier versions will not have values in the TCPInfo struct here.
