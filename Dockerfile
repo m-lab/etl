@@ -6,7 +6,7 @@ RUN apk add --virtual build-dependencies build-base gcc wget git linux-headers
 # Build the command.
 COPY . /go/src/github.com/m-lab/etl
 WORKDIR /go/src/github.com/m-lab/etl
-RUN go get -v github.com/m-lab/etl/cmd/generate_schema_docs
+RUN go install -v github.com/m-lab/etl/cmd/generate_schema_docs
 
 # Now copy the resulting command into the minimal base image.
 FROM alpine:3.14
