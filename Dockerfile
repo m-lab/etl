@@ -1,6 +1,6 @@
 # Dockerfile to contain the generate_schema_docs CLI.
 
-FROM golang:1.16.7-alpine3.14 AS build
+FROM golang:1.18-alpine3.14 AS build
 RUN apk update
 RUN apk add --virtual build-dependencies build-base gcc wget git linux-headers
 # Build the command.
