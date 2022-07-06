@@ -8,7 +8,7 @@
 dist: bionic
 language: go
 go:
- - "1.15.8"
+ - 1.18
 
 env:
 - PATH=$PATH:$HOME/gopath/bin
@@ -17,8 +17,8 @@ before_install:
 - echo Branch is ${TRAVIS_BRANCH} and Tag is ${TRAVIS_TAG}
 
 # Install coverage tools.
-- go get github.com/mattn/goveralls
-- go get github.com/wadey/gocovmerge
+- go install github.com/mattn/goveralls@latest
+- go install github.com/wadey/gocovmerge@latest
 
 # Install gcloud, for integration tests.
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
