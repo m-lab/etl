@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
 	"time"
 
 	gcs "cloud.google.com/go/storage"
@@ -177,7 +178,7 @@ type SinkFactory struct {
 
 // Get implements factory.SinkFactory
 func (sf *SinkFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, etl.ProcessingError) {
-	s, err := NewRowWriter(ctx, sf.client, sf.outputBucket, dp.Path+".json")
+	s, err := NewRowWriter(ctx, sf.client, sf.outputBucket, path.Join(dp.Bucket, dp.Path+".jsonl"))
 	if err != nil {
 		return nil, factory.NewError(dp.DataType, "SinkFactory",
 			http.StatusInternalServerError, err)
