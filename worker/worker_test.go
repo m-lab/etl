@@ -142,7 +142,7 @@ func TestProcessGKETask(t *testing.T) {
 	checkCounter(t, c, 478)
 
 	// Lookup output from task.
-	o, err := fs.GetObject("test-bucket", "ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz.json")
+	o, err := fs.GetObject("test-bucket", "test-bucket/ndt/ndt5/2019/12/01/20191201T020011.395772Z-ndt5-mlab1-bcn01-ndt.tgz.jsonl")
 	if err != nil {
 		t.Errorf("GetObject() expected nil error, got %v", err)
 	}
