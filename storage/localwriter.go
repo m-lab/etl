@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/m-lab/etl/etl"
@@ -84,7 +85,7 @@ type LocalFactory struct {
 
 // Get implements factory.SinkFactory for LocalWriters.
 func (lf *LocalFactory) Get(ctx context.Context, dp etl.DataPath) (row.Sink, etl.ProcessingError) {
-	s, err := NewLocalWriter(lf.outputDir, dp.Path+".jsonl")
+	s, err := NewLocalWriter(lf.outputDir, path.Join(dp.Bucket, dp.Path+".jsonl"))
 	if err != nil {
 		return nil, factory.NewError(dp.DataType, "LocalFactory", http.StatusInternalServerError, err)
 	}

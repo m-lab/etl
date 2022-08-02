@@ -182,7 +182,7 @@ func TestLocalRequest(t *testing.T) {
 			}
 
 			// Check the outdir for the successful content of a localwriter.
-			p := filepath.Join(outdir, "ndt/ndt7/2021/06/17/20210617T003002.410133Z-ndt7-mlab1-foo01-ndt.tgz.jsonl")
+			p := filepath.Join(outdir, "archive-mlab-testing/ndt/ndt7/2021/06/17/20210617T003002.410133Z-ndt7-mlab1-foo01-ndt.tgz.jsonl")
 			f, err := os.Open(p)
 			if err != nil {
 				t.Fatalf("failed to read file: %v", err)
