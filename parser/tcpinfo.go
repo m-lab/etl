@@ -98,7 +98,7 @@ func (p *TCPInfoParser) IsParsable(testName string, data []byte) (string, bool) 
 
 func thinSnaps(orig []snapshot.Snapshot) []snapshot.Snapshot {
 	n := len(orig)
-	if (n=0) {
+	if (n == 0) {
 		return orig
 	}
 	out := make([]snapshot.Snapshot, 0, 1+n/10)
