@@ -20,6 +20,7 @@ import (
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/etl/storage"
 	"github.com/m-lab/etl/task"
+	"github.com/m-lab/tcp-info/snapshot"
 )
 
 func assertTCPInfoParser(in *parser.TCPInfoParser) {
@@ -294,5 +295,98 @@ func BenchmarkTCPParser(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func makeSnaps(n int) []snapshot.Snapshot {
+	snaps := []snapshot.Snapshot{}
+	for i := 0; i < n; i++ {
+		snaps = append(snaps, snapshot.Snapshot{
+			Observed: uint32(i), // this field is arbitrary. Just make the Snapshot distinct without populating every field.
+		})
+	}
+	return snaps
+}
+
+func Test_thinSnaps(t *testing.T) {
+	tests := []struct {
+		name string
+		orig []snapshot.Snapshot
+		want []snapshot.Snapshot
+	}{
+		{
+			name: "success-nil",
+			orig: nil,
+			want: nil,
+		},
+		{
+			name: "success-0",
+			orig: makeSnaps(0),
+			want: []snapshot.Snapshot{},
+		},
+		{
+			name: "success-1",
+			orig: makeSnaps(1),
+			want: []snapshot.Snapshot{
+				{Observed: 0},
+			},
+		},
+		{
+			name: "success-2",
+			orig: makeSnaps(2),
+			want: []snapshot.Snapshot{
+				{Observed: 0},
+				{Observed: 1},
+			},
+		},
+		{
+			name: "success-3",
+			orig: makeSnaps(3),
+			want: []snapshot.Snapshot{
+				{Observed: 0},
+				{Observed: 2},
+			},
+		},
+		{
+			name: "success-9",
+			orig: makeSnaps(9),
+			want: []snapshot.Snapshot{
+				{Observed: 0},
+				{Observed: 8},
+			},
+		},
+		{
+			name: "success-10",
+			orig: makeSnaps(10),
+			want: []snapshot.Snapshot{
+				{Observed: 0},
+				{Observed: 9},
+			},
+		},
+		{
+			name: "success-11",
+			orig: makeSnaps(11),
+			want: []snapshot.Snapshot{
+				{Observed: 0},
+				{Observed: 10},
+			},
+		},
+		{
+			name: "success-12",
+			orig: makeSnaps(12),
+			want: []snapshot.Snapshot{
+				{Observed: 0},
+				{Observed: 10},
+				{Observed: 11},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parser.ThinSnaps(tt.orig)
+			if diff := deep.Equal(got, tt.want); diff != nil {
+				t.Errorf("TestThinSnaps() differ = %s", strings.Join(diff, "\n"))
+			}
+		})
 	}
 }
