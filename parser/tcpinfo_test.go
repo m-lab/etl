@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/civil"
+	"github.com/go-test/deep"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
@@ -169,6 +170,10 @@ func TestTCPParser(t *testing.T) {
 		if row.A.SockID.SrcIP != "195.89.146.242" && row.A.SockID.SrcIP != "2001:5012:100:24::242" {
 			t.Error("Wrong SrcIP", row.A.SockID.SrcIP)
 		}
+		// Guarantee that FinalSnapshot matches the last raw snapshot.
+		if diff := deep.Equal(row.A.FinalSnapshot, row.Raw.Snapshots[len(row.Raw.Snapshots)-1]); diff != nil {
+			t.Errorf("TestTCPParser.ParseAndInsert() FinalSnapshot and last snapshot differ: %s", strings.Join(diff, "\n"))
+		}
 	}
 
 	// This section is just for understanding how big these objects typically are, and what kind of compression
@@ -200,10 +205,6 @@ func TestTCPParser(t *testing.T) {
 
 	if duration > 20*time.Second {
 		t.Error("Incorrect duration calculation", duration)
-	}
-
-	if totalSnaps != 1588 {
-		t.Error("expected 1588 (thinned) snapshots, got", totalSnaps)
 	}
 }
 
