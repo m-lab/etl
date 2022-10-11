@@ -11,3 +11,6 @@ var InitParserVersionForTest = initParserVersion
 // InitParserGitCommitForTest allows test to rerun initParseGitCommit after initializing
 // environement variables.
 var InitParserGitCommitForTest = initParserGitCommit
+
+// ThinSnaps allows exhaustive edge case testing of thinSnaps.
+var ThinSnaps = thinSnaps
