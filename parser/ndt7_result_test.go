@@ -2,6 +2,7 @@ package parser_test
 
 import (
 	"io/ioutil"
+	"path"
 	"strings"
 	"testing"
 
@@ -13,6 +14,30 @@ import (
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/pretty"
 )
+
+func setupNDT7InMemoryParser(t *testing.T, testName string) (*schema.NDT7ResultRow, error) {
+	ins := newInMemorySink()
+	n := parser.NewNDT7ResultParser(ins, "test", "_suffix")
+
+	resultData, err := ioutil.ReadFile(path.Join("testdata/NDT7Result/", testName))
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	meta := map[string]bigquery.Value{
+		"filename": "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
+		"date":     civil.Date{Year: 2020, Month: 3, Day: 18},
+	}
+	err = n.ParseAndInsert(meta, testName, resultData)
+	if err != nil {
+		return nil, err
+	}
+	if n.Accepted() != 1 {
+		t.Fatal("Failed to insert snaplog data.", ins)
+	}
+	n.Flush()
+	row := ins.data[0].(*schema.NDT7ResultRow)
+	return row, err
+}
 
 func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 	tests := []struct {
@@ -31,26 +56,10 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ins := newInMemorySink()
-			n := parser.NewNDT7ResultParser(ins, "test", "_suffix")
-
-			resultData, err := ioutil.ReadFile(`testdata/NDT7Result/` + tt.testName)
-			if err != nil {
-				t.Fatalf(err.Error())
-			}
-			meta := map[string]bigquery.Value{
-				"filename": "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
-				"date":     civil.Date{Year: 2020, Month: 3, Day: 18},
-			}
-
-			if err := n.ParseAndInsert(meta, tt.testName, resultData); (err != nil) != tt.wantErr {
+			row, err := setupNDT7InMemoryParser(t, tt.testName)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("NDT7ResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if n.Accepted() != 1 {
-				t.Fatal("Failed to insert snaplog data.", ins)
-			}
-			n.Flush()
-			row := ins.data[0].(*schema.NDT7ResultRow)
 			if row.Raw.Download != nil {
 				exp := schema.NDT7Summary{
 					UUID:               "ndt-knwp4_1583603744_000000000000590E",
@@ -131,6 +140,30 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 			if row.Raw.Download == nil && row.Raw.Upload == nil {
 				// We expect one or the other.
 				t.Error("NDT7ResultParser.ParseAndInsert() found neither upload nor download result")
+			}
+		})
+	}
+}
+
+func TestNDT7ResultParser_ParseAndInsertUnsafe(t *testing.T) {
+	tests := []struct {
+		name     string
+		testName string
+		wantErr  bool
+	}{
+		{
+			name:     "success-remove-unsafe-uuid",
+			testName: `ndt7-download-20221130T230746.606388371Z.ndt-rczlq_1666977535_unsafe_000000000016912D.json`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			row, err := setupNDT7InMemoryParser(t, tt.testName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NDT7ResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if strings.Contains(row.ID, "_unsafe") || strings.Contains(row.A.UUID, "_unsafe") || strings.Contains(row.Raw.Download.UUID, "_unsafe") {
+				t.Fatalf("ID or A.UUID contain the string '_unsafe'")
 			}
 		})
 	}
