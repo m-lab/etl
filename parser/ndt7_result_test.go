@@ -10,13 +10,12 @@ import (
 	"cloud.google.com/go/civil"
 	"github.com/go-test/deep"
 
-	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/pretty"
 )
 
-func setupNDT7InMemoryParser(t *testing.T, testName string) (etl.Parser, *inMemorySink, error) {
+func setupNDT7InMemoryParser(t *testing.T, testName string) (*schema.NDT7ResultRow, error) {
 	ins := newInMemorySink()
 	n := parser.NewNDT7ResultParser(ins, "test", "_suffix")
 
@@ -29,7 +28,15 @@ func setupNDT7InMemoryParser(t *testing.T, testName string) (etl.Parser, *inMemo
 		"date":     civil.Date{Year: 2020, Month: 3, Day: 18},
 	}
 	err = n.ParseAndInsert(meta, testName, resultData)
-	return n, ins, err
+	if err != nil {
+		return nil, err
+	}
+	if n.Accepted() != 1 {
+		t.Fatal("Failed to insert snaplog data.", ins)
+	}
+	n.Flush()
+	row := ins.data[0].(*schema.NDT7ResultRow)
+	return row, err
 }
 
 func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
@@ -49,15 +56,10 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n, ins, err := setupNDT7InMemoryParser(t, tt.testName)
+			row, err := setupNDT7InMemoryParser(t, tt.testName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NDT7ResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if n.Accepted() != 1 {
-				t.Fatal("Failed to insert snaplog data.", ins)
-			}
-			n.Flush()
-			row := ins.data[0].(*schema.NDT7ResultRow)
 			if row.Raw.Download != nil {
 				exp := schema.NDT7Summary{
 					UUID:               "ndt-knwp4_1583603744_000000000000590E",
@@ -156,16 +158,10 @@ func TestNDT7ResultParser_ParseAndInsertUnsafe(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n, ins, err := setupNDT7InMemoryParser(t, tt.testName)
+			row, err := setupNDT7InMemoryParser(t, tt.testName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NDT7ResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
-
-			if n.Accepted() != 1 {
-				t.Fatal("Failed to insert snaplog data.", ins)
-			}
-			n.Flush()
-			row := ins.data[0].(*schema.NDT7ResultRow)
 			if strings.Contains(row.ID, "_unsafe") || strings.Contains(row.A.UUID, "_unsafe") || strings.Contains(row.Raw.Download.UUID, "_unsafe") {
 				t.Fatalf("ID or A.UUID contain the string '_unsafe'")
 			}
