@@ -42,6 +42,10 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 			testName:      `ndt-m9pcq_1652405655_000000000014FD22.json`,
 			expectTCPInfo: true,
 		},
+		{
+			name:     "success-remove-download-unsafe-uuid",
+			testName: `ndt-rczlq_1666977535_unsafe_0000000000169592.json`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -91,6 +95,9 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 					download.Raw.Control.ClientMetadata[0].Name,
 					download.Raw.Control.ClientMetadata[0].Value)
 			}
+			if strings.Contains(download.ID, "_unsafe") || strings.Contains(download.A.UUID, "_unsafe") {
+				t.Fatalf("ID or A.UUID contain the string '_unsafe'")
+			}
 			if download.Raw.S2C == nil {
 				t.Fatalf("Raw.S2C is nil")
 			}
@@ -122,6 +129,9 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 				t.Fatalf("Raw.Control.ClientMetadata has wrong value; got %q=%q, want client.os.name=NDTjs",
 					upload.Raw.Control.ClientMetadata[0].Name,
 					upload.Raw.Control.ClientMetadata[0].Value)
+			}
+			if strings.Contains(upload.ID, "_unsafe") || strings.Contains(upload.A.UUID, "_unsafe") {
+				t.Fatalf("ID or A.UUID contain the string '_unsafe'")
 			}
 			if upload.Raw.C2S == nil {
 				t.Fatalf("Raw.C2S is nil")

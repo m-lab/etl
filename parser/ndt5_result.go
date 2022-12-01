@@ -162,6 +162,7 @@ func (dp *NDT5ResultParser) newResult(test []byte, parser schema.ParseInfo, date
 func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) {
 	// Record S2C result.
 	s2c := row.Raw.S2C
+	s2c.UUID = strings.ReplaceAll(s2c.UUID, "_unsafe", "")
 	row.ID = s2c.UUID
 	row.A = &schema.NDT5Summary{
 		UUID:               s2c.UUID,
@@ -191,6 +192,7 @@ func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) {
 func (dp *NDT5ResultParser) prepareC2SRow(row *schema.NDT5ResultRowV2) {
 	// Record C2S result.
 	c2s := row.Raw.C2S
+	c2s.UUID = strings.ReplaceAll(c2s.UUID, "_unsafe", "")
 	row.ID = c2s.UUID
 	row.A = &schema.NDT5Summary{
 		UUID:               c2s.UUID,
