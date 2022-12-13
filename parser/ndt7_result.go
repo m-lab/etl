@@ -16,6 +16,7 @@ import (
 	"github.com/m-lab/etl/row"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/logx"
+	"github.com/m-lab/ndt-server/metadata"
 	"github.com/m-lab/ndt-server/ndt7/model"
 )
 
@@ -91,14 +92,20 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// This is a hack to deal with the ConnectionInfo fields that are not intended to be
 	// exported to bigquery.  With the GCS row.Sink, we convert to json, but we cannot
 	// tag the json, because the json tag is already used for the NDT7 client comms.
-	if row.Raw.Download != nil && row.Raw.Download.ServerMeasurements != nil {
-		for i := range row.Raw.Download.ServerMeasurements {
-			row.Raw.Download.ServerMeasurements[i].ConnectionInfo = nil
+	if row.Raw.Download != nil {
+		row.Raw.Download.ClientMetadata = filterClientMetadata(row.Raw.Download.ClientMetadata)
+		if row.Raw.Download.ServerMeasurements != nil {
+			for i := range row.Raw.Download.ServerMeasurements {
+				row.Raw.Download.ServerMeasurements[i].ConnectionInfo = nil
+			}
 		}
 	}
-	if row.Raw.Upload != nil && row.Raw.Upload.ServerMeasurements != nil {
-		for i := range row.Raw.Upload.ServerMeasurements {
-			row.Raw.Upload.ServerMeasurements[i].ConnectionInfo = nil
+	if row.Raw.Upload != nil {
+		row.Raw.Upload.ClientMetadata = filterClientMetadata(row.Raw.Upload.ClientMetadata)
+		if row.Raw.Upload.ServerMeasurements != nil {
+			for i := range row.Raw.Upload.ServerMeasurements {
+				row.Raw.Upload.ServerMeasurements[i].ConnectionInfo = nil
+			}
 		}
 	}
 
@@ -129,6 +136,40 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// Count successful inserts.
 	metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt7_result", "ok").Inc()
 	return nil
+}
+
+// filter client names with known values.
+var filterValues = map[string]bool{"YR1tXo2zVKzBIgURbjEwjw": true, "3OSmQKi2BqIpDDW42NHp1g": true}
+
+func filterClientMetadata(md []metadata.NameValue) []metadata.NameValue {
+	// Check if the md contains "client_name".
+	found := false
+	var hash string
+	for i := range md {
+		if md[i].Name == "client_name" {
+			hash = base64hash(md[i].Value)
+			found = true
+		}
+	}
+	if !found {
+		// No need to allocate new memory.
+		return md
+	}
+
+	// If metadata includes "client_name", check for specific values.
+	if !filterValues[hash] {
+		// Still no need to do anything differently.
+		return md
+	}
+
+	// We found a value that should be filtered.
+	ret := []metadata.NameValue{}
+	for i := range md {
+		if md[i].Name != "client_name" {
+			ret = append(ret, md[i])
+		}
+	}
+	return ret
 }
 
 func downSummary(down *model.ArchivalData) schema.NDT7Summary {
