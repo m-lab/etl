@@ -133,8 +133,8 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 				if up.ServerMeasurements[0].BBRInfo == nil {
 					t.Errorf("NDT7ResultParser.ParseAndInsert() download measurements with nil BBRInfo")
 				}
-				if len(up.ClientMetadata) != 6 {
-					t.Errorf("NDT7ResultParser.ParseAndInsert() found wrong client metadata; got %d, want %d", len(up.ClientMetadata), 6)
+				if len(up.ClientMetadata) != 5 {
+					t.Errorf("NDT7ResultParser.ParseAndInsert() found wrong client metadata; got %d, want %d", len(up.ClientMetadata), 5)
 				}
 			}
 			if row.Raw.Download == nil && row.Raw.Upload == nil {
