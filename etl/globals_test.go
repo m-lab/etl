@@ -138,13 +138,13 @@ func TestValidateTestPath(t *testing.T) {
 			},
 		},
 		{
-			name:     "thirdparty-annotation",
-			path:     `gs://archive-mlab-sandbox/ndt/annotation/2019/08/14/20211107T143735.458956Z-annotation-third-party-ndt.tgz`,
-			wantType: etl.ANNOTATION,
+			name:     "thirdparty-annotation2",
+			path:     `gs://archive-mlab-sandbox/ndt/annotation2/2019/08/14/20211107T143735.458956Z-annotation2-third-party-ndt.tgz`,
+			wantType: etl.ANNOTATION2,
 			want: etl.DataPath{
-				`gs://archive-mlab-sandbox/ndt/annotation/2019/08/14/20211107T143735.458956Z-annotation-third-party-ndt.tgz`,
-				`ndt/annotation/2019/08/14/20211107T143735.458956Z-annotation-third-party-ndt.tgz`,
-				`archive-mlab-sandbox`, "ndt", "annotation", "2019/08/14", "20211107", "143735.458956", "annotation", "third", "party", "ndt", "", "", ".tgz",
+				`gs://archive-mlab-sandbox/ndt/annotation2/2019/08/14/20211107T143735.458956Z-annotation2-third-party-ndt.tgz`,
+				`ndt/annotation2/2019/08/14/20211107T143735.458956Z-annotation2-third-party-ndt.tgz`,
+				`archive-mlab-sandbox`, "ndt", "annotation2", "2019/08/14", "20211107", "143735.458956", "annotation2", "third", "party", "ndt", "", "", ".tgz",
 			},
 		},
 	}
