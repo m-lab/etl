@@ -80,9 +80,9 @@ func CreateOrUpdateNDT7ResultRow(project string, dataset string, table string) e
 }
 
 func CreateOrUpdateAnnotationRow(project string, dataset string, table string) error {
-	row := schema.AnnotationRow{}
+	row := schema.Annotation2Row{}
 	schema, err := row.Schema()
-	rtx.Must(err, "Annotation.Schema")
+	rtx.Must(err, "Annotation2.Schema")
 	return CreateOrUpdate(schema, project, dataset, table, "Date")
 }
 
@@ -216,10 +216,10 @@ func updateStandardTables(project string) int {
 		errCount++
 	}
 
-	if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation"); err != nil {
+	if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation2"); err != nil {
 		errCount++
 	}
-	if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation"); err != nil {
+	if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation2"); err != nil {
 		errCount++
 	}
 
@@ -361,11 +361,11 @@ func main() {
 			errCount++
 		}
 
-	case "annotation":
-		if err := CreateOrUpdateAnnotationRow(*project, "tmp_ndt", "annotation"); err != nil {
+	case "annotation2":
+		if err := CreateOrUpdateAnnotationRow(*project, "tmp_ndt", "annotation2"); err != nil {
 			errCount++
 		}
-		if err := CreateOrUpdateAnnotationRow(*project, "raw_ndt", "annotation"); err != nil {
+		if err := CreateOrUpdateAnnotationRow(*project, "raw_ndt", "annotation2"); err != nil {
 			errCount++
 		}
 
