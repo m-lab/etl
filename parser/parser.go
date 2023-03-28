@@ -92,8 +92,8 @@ func NewSinkParser(dt etl.DataType, sink row.Sink, table string) etl.Parser {
 	switch dt {
 	case etl.ANNOTATION2:
 		return NewAnnotation2Parser(sink, table, "")
-	case etl.HOPANNOTATION1:
-		return NewHopAnnotation1Parser(sink, table, "")
+	case etl.HOPANNOTATION2:
+		return NewHopAnnotation2Parser(sink, table, "")
 	case etl.NDT5:
 		return NewNDT5ResultParser(sink, table, "")
 	case etl.NDT7:
