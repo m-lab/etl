@@ -54,15 +54,15 @@ func (ap *Annotation2Parser) TaskError() error {
 func (ap *Annotation2Parser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like: "<UUID>.json"
 	if strings.HasSuffix(testName, "json") {
-		return "annotation", true
+		return "annotation2", true
 	}
 	return "unknown", false
 }
 
 // ParseAndInsert decodes the data.Annotation2 JSON and inserts it into BQ.
 func (ap *Annotation2Parser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
-	metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation").Inc()
-	defer metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation").Dec()
+	metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation2").Inc()
+	defer metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation2").Dec()
 
 	row := schema.Annotation2Row{
 		Parser: schema.ParseInfo{
@@ -79,7 +79,7 @@ func (ap *Annotation2Parser) ParseAndInsert(meta map[string]bigquery.Value, test
 	err := json.Unmarshal(test, &raw)
 	if err != nil {
 		log.Println(err)
-		metrics.TestTotal.WithLabelValues(ap.TableName(), "annotation", "decode-location-error").Inc()
+		metrics.TestTotal.WithLabelValues(ap.TableName(), "annotation2", "decode-location-error").Inc()
 		return err
 	}
 
@@ -116,7 +116,7 @@ func (ap *Annotation2Parser) ParseAndInsert(meta map[string]bigquery.Value, test
 	}
 
 	// Count successful inserts.
-	metrics.TestTotal.WithLabelValues(ap.TableName(), "annotation", "ok").Inc()
+	metrics.TestTotal.WithLabelValues(ap.TableName(), "annotation2", "ok").Inc()
 	return nil
 }
 
