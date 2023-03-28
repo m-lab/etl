@@ -17,20 +17,20 @@ import (
 )
 
 //=====================================================================================
-//                       Annotation Parser
+//                       Annotation2 Parser
 //=====================================================================================
 
-// AnnotationParser parses the annotation datatype from the uuid-annotator.
-type AnnotationParser struct {
+// Annotation2Parser parses the annotation datatype from the uuid-annotator.
+type Annotation2Parser struct {
 	*row.Base
 	table  string
 	suffix string
 }
 
-// NewAnnotationParser creates a new parser for annotation data.
-func NewAnnotationParser(sink row.Sink, label, suffix string) etl.Parser {
-	bufSize := etl.ANNOTATION.BQBufferSize()
-	return &AnnotationParser{
+// NewAnnotation2Parser creates a new parser for annotation data.
+func NewAnnotation2Parser(sink row.Sink, label, suffix string) etl.Parser {
+	bufSize := etl.ANNOTATION2.BQBufferSize()
+	return &Annotation2Parser{
 		Base:   row.NewBase(label, sink, bufSize),
 		table:  label,
 		suffix: suffix,
@@ -40,7 +40,7 @@ func NewAnnotationParser(sink row.Sink, label, suffix string) etl.Parser {
 // TaskError returns non-nil if the task had enough failures to justify
 // recording the entire task as in error.  For now, this is any failure
 // rate exceeding 10%.
-func (ap *AnnotationParser) TaskError() error {
+func (ap *Annotation2Parser) TaskError() error {
 	stats := ap.GetStats()
 	if stats.Total() < 10*stats.Failed {
 		log.Printf("Warning: high row commit errors (more than 10%%): %d failed of %d accepted\n",
@@ -51,7 +51,7 @@ func (ap *AnnotationParser) TaskError() error {
 }
 
 // IsParsable returns the canonical test type and whether to parse data.
-func (ap *AnnotationParser) IsParsable(testName string, data []byte) (string, bool) {
+func (ap *Annotation2Parser) IsParsable(testName string, data []byte) (string, bool) {
 	// Files look like: "<UUID>.json"
 	if strings.HasSuffix(testName, "json") {
 		return "annotation", true
@@ -59,12 +59,12 @@ func (ap *AnnotationParser) IsParsable(testName string, data []byte) (string, bo
 	return "unknown", false
 }
 
-// ParseAndInsert decodes the data.Annotation JSON and inserts it into BQ.
-func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+// ParseAndInsert decodes the data.Annotation2 JSON and inserts it into BQ.
+func (ap *Annotation2Parser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
 	metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation").Inc()
 	defer metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation").Dec()
 
-	row := schema.AnnotationRow{
+	row := schema.Annotation2Row{
 		Parser: schema.ParseInfo{
 			Version:    Version(),
 			Time:       time.Now(),
@@ -123,34 +123,34 @@ func (ap *AnnotationParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 // NB: These functions are also required to complete the etl.Parser interface.
 // For Annotation, we just forward the calls to the Inserter.
 
-func (ap *AnnotationParser) Flush() error {
+func (ap *Annotation2Parser) Flush() error {
 	return ap.Base.Flush()
 }
 
-func (ap *AnnotationParser) TableName() string {
+func (ap *Annotation2Parser) TableName() string {
 	return ap.table
 }
 
-func (ap *AnnotationParser) FullTableName() string {
+func (ap *Annotation2Parser) FullTableName() string {
 	return ap.table + ap.suffix
 }
 
 // RowsInBuffer returns the count of rows currently in the buffer.
-func (ap *AnnotationParser) RowsInBuffer() int {
+func (ap *Annotation2Parser) RowsInBuffer() int {
 	return ap.GetStats().Pending
 }
 
 // Committed returns the count of rows successfully committed to BQ.
-func (ap *AnnotationParser) Committed() int {
+func (ap *Annotation2Parser) Committed() int {
 	return ap.GetStats().Committed
 }
 
 // Accepted returns the count of all rows received through InsertRow(s)
-func (ap *AnnotationParser) Accepted() int {
+func (ap *Annotation2Parser) Accepted() int {
 	return ap.GetStats().Total()
 }
 
 // Failed returns the count of all rows that could not be committed.
-func (ap *AnnotationParser) Failed() int {
+func (ap *Annotation2Parser) Failed() int {
 	return ap.GetStats().Failed
 }
