@@ -38,7 +38,7 @@ func TestAnnotation2Parser_ParseAndInsert(t *testing.T) {
 			ins := newInMemorySink()
 			n := parser.NewAnnotation2Parser(ins, "test", "_suffix")
 
-			data, err := ioutil.ReadFile("testdata/Annotation/" + tt.file)
+			data, err := ioutil.ReadFile("testdata/Annotation2/" + tt.file)
 			rtx.Must(err, "failed to read test file")
 
 			if _, ok := n.IsParsable(tt.file, data); !ok {
@@ -56,7 +56,7 @@ func TestAnnotation2Parser_ParseAndInsert(t *testing.T) {
 
 			if n.Accepted() == 1 {
 				n.Flush()
-				row := ins.data[0].(*schema.AnnotationRow)
+				row := ins.data[0].(*schema.Annotation2Row)
 
 				expPI := schema.ParseInfo{
 					Version:    "https://github.com/m-lab/etl/tree/foobar",
