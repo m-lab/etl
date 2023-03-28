@@ -7,16 +7,17 @@ import (
 	"github.com/m-lab/traceroute-caller/hopannotation"
 )
 
-// HopAnnotation1Row describes a single BQ row of HopAnnotation1 data.
-type HopAnnotation1Row struct {
-	ID     string                        `bigquery:"id"`
-	Parser ParseInfo                     `bigquery:"parser"`
-	Date   civil.Date                    `bigquery:"date"`
-	Raw    *hopannotation.HopAnnotation1 `json:",omitempty" bigquery:"raw"`
+// HopAnnotation2Row describes a single BQ row of HopAnnotation2 data.
+type HopAnnotation2Row struct {
+	ID     string     `bigquery:"id"`
+	Parser ParseInfo  `bigquery:"parser"`
+	Date   civil.Date `bigquery:"date"`
+	// TODO(soltesz): update traceroute-caller type.
+	Raw *hopannotation.HopAnnotation1 `json:",omitempty" bigquery:"raw"`
 }
 
-// Schema returns the Bigquery schema for HopAnnotation1.
-func (row *HopAnnotation1Row) Schema() (bigquery.Schema, error) {
+// Schema returns the Bigquery schema for HopAnnotation2.
+func (row *HopAnnotation2Row) Schema() (bigquery.Schema, error) {
 	sch, err := bigquery.InferSchema(row)
 	if err != nil {
 		return bigquery.Schema{}, err
