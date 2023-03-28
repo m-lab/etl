@@ -150,8 +150,8 @@ func main() {
 	flagx.ArgsFromEnv(flag.CommandLine)
 
 	generators := []schemaGenerator{
-		&schema.AnnotationRow{},
-		&schema.HopAnnotation1Row{},
+		&schema.Annotation2Row{},
+		&schema.HopAnnotation2Row{},
 		&schema.NDT5ResultRowV2{},
 		&schema.NDT7ResultRow{},
 		&schema.TCPInfoRow{},
