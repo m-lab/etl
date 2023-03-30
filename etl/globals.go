@@ -251,8 +251,8 @@ func (dt DataType) BQBufferSize() int {
 // These constants enumerate the different data types.
 // TODO - use camelcase.
 const (
-	ANNOTATION      = DataType("annotation")
-	HOPANNOTATION1  = DataType("hopannotation1")
+	ANNOTATION2     = DataType("annotation2")
+	HOPANNOTATION2  = DataType("hopannotation2")
 	NDT             = DataType("ndt")
 	NDT5            = DataType("ndt5")
 	NDT7            = DataType("ndt7")
@@ -270,8 +270,8 @@ var (
 	// DirToDataType maps from gs:// subdirectory to data type.
 	// TODO - this should be loaded from a config.
 	dirToDataType = map[string]DataType{
-		"annotation":       ANNOTATION,
-		"hopannotation1":   HOPANNOTATION1,
+		"annotation2":      ANNOTATION2,
+		"hopannotation2":   HOPANNOTATION2,
 		"ndt":              NDT,
 		"ndt5":             NDT5,
 		"ndt7":             NDT7,
@@ -287,8 +287,8 @@ var (
 	// DataTypeToTable maps from data type to BigQuery table name.
 	// TODO - this should be loaded from a config.
 	dataTypeToTable = map[DataType]string{
-		ANNOTATION:     "annotation",
-		HOPANNOTATION1: "hopannotation1",
+		ANNOTATION2:    "annotation2",
+		HOPANNOTATION2: "hopannotation2",
 		NDT:            "ndt",
 		SS:             "sidestream",
 		PCAP:           "pcap",
@@ -307,8 +307,8 @@ var (
 	// as everything is written to gcs files, and the gcs library does it’s own buffering.
 	// TODO - this should be loaded from a config
 	dataTypeToBQBufferSize = map[DataType]int{
-		ANNOTATION:      400, // around 1k each.
-		HOPANNOTATION1:  200,
+		ANNOTATION2:     400, // around 1k each.
+		HOPANNOTATION2:  200,
 		NDT:             10,
 		NDT_OMIT_DELTAS: 50,
 		TCPINFO:         5,

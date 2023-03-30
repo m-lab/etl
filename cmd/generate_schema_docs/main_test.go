@@ -37,7 +37,7 @@ func Test_main(t *testing.T) {
 	files := [4]string{
 		"schema_ndt5resultrowv2.md",
 		"schema_pcaprow.md",
-		"schema_hopannotation1row.md",
+		"schema_hopannotation2row.md",
 		"schema_scamper1row.md",
 	}
 

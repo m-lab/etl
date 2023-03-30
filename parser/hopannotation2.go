@@ -15,20 +15,20 @@ import (
 )
 
 //=====================================================================================
-//                       HopAnnotation1 Parser
+//                       HopAnnotation2 Parser
 //=====================================================================================
 
-// HopAnnotation1Parser handles parsing for the HopAnnotation1 datatype.
-type HopAnnotation1Parser struct {
+// HopAnnotation2Parser handles parsing for the HopAnnotation2 datatype.
+type HopAnnotation2Parser struct {
 	*row.Base
 	table  string
 	suffix string
 }
 
-// NewHopAnnotation1Parser returns a new parser for the HopAnnotation1 archives.
-func NewHopAnnotation1Parser(sink row.Sink, table, suffix string) etl.Parser {
-	bufSize := etl.HOPANNOTATION1.BQBufferSize()
-	return &HopAnnotation1Parser{
+// NewHopAnnotation2Parser returns a new parser for the HopAnnotation2 archives.
+func NewHopAnnotation2Parser(sink row.Sink, table, suffix string) etl.Parser {
+	bufSize := etl.HOPANNOTATION2.BQBufferSize()
+	return &HopAnnotation2Parser{
 		Base:   row.NewBase(table, sink, bufSize),
 		table:  table,
 		suffix: suffix,
@@ -36,19 +36,19 @@ func NewHopAnnotation1Parser(sink row.Sink, table, suffix string) etl.Parser {
 }
 
 // IsParsable returns the canonical test type and whether to parse data.
-func (p *HopAnnotation1Parser) IsParsable(testName string, data []byte) (string, bool) {
+func (p *HopAnnotation2Parser) IsParsable(testName string, data []byte) (string, bool) {
 	if strings.HasSuffix(testName, "json") {
-		return "hopannotation1", true
+		return "hopannotation2", true
 	}
 	return "", false
 }
 
-// ParseAndInsert decodes the HopAnnotation1 data and inserts it into BQ.
-func (p *HopAnnotation1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
-	metrics.WorkerState.WithLabelValues(p.TableName(), "hopannotation1").Inc()
-	defer metrics.WorkerState.WithLabelValues(p.TableName(), "hopannotation1").Dec()
+// ParseAndInsert decodes the HopAnnotation2 data and inserts it into BQ.
+func (p *HopAnnotation2Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
+	metrics.WorkerState.WithLabelValues(p.TableName(), "hopannotation2").Inc()
+	defer metrics.WorkerState.WithLabelValues(p.TableName(), "hopannotation2").Dec()
 
-	row := schema.HopAnnotation1Row{
+	row := schema.HopAnnotation2Row{
 		Parser: schema.ParseInfo{
 			Version:    Version(),
 			Time:       time.Now(),
@@ -58,10 +58,11 @@ func (p *HopAnnotation1Parser) ParseAndInsert(fileMetadata map[string]bigquery.V
 		},
 	}
 
+	// TODO(soltesz): update traceroute-caller type.
 	raw := hopannotation.HopAnnotation1{}
 	err := json.Unmarshal(rawContent, &raw)
 	if err != nil {
-		metrics.TestTotal.WithLabelValues(p.TableName(), "hopannotation1", "decode-location-error").Inc()
+		metrics.TestTotal.WithLabelValues(p.TableName(), "hopannotation2", "decode-location-error").Inc()
 		return err
 	}
 
@@ -83,42 +84,42 @@ func (p *HopAnnotation1Parser) ParseAndInsert(fileMetadata map[string]bigquery.V
 		return err
 	}
 	// Count successful inserts.
-	metrics.TestTotal.WithLabelValues(p.TableName(), "hopannotation1", "ok").Inc()
+	metrics.TestTotal.WithLabelValues(p.TableName(), "hopannotation2", "ok").Inc()
 
 	return nil
 }
 
 // NB: These functions are also required to complete the etl.Parser interface
-// For HopAnnotation1, we just forward the calls to the Inserter.
+// For HopAnnotation2, we just forward the calls to the Inserter.
 
-func (p *HopAnnotation1Parser) Flush() error {
+func (p *HopAnnotation2Parser) Flush() error {
 	return p.Base.Flush()
 }
 
-func (p *HopAnnotation1Parser) TableName() string {
+func (p *HopAnnotation2Parser) TableName() string {
 	return p.table
 }
 
-func (p *HopAnnotation1Parser) FullTableName() string {
+func (p *HopAnnotation2Parser) FullTableName() string {
 	return p.table + p.suffix
 }
 
 // RowsInBuffer returns the count of rows currently in the buffer.
-func (p *HopAnnotation1Parser) RowsInBuffer() int {
+func (p *HopAnnotation2Parser) RowsInBuffer() int {
 	return p.GetStats().Pending
 }
 
 // Committed returns the count of rows successfully committed to BQ.
-func (p *HopAnnotation1Parser) Committed() int {
+func (p *HopAnnotation2Parser) Committed() int {
 	return p.GetStats().Committed
 }
 
 // Accepted returns the count of all rows received through InsertRow(s).
-func (p *HopAnnotation1Parser) Accepted() int {
+func (p *HopAnnotation2Parser) Accepted() int {
 	return p.GetStats().Total()
 }
 
 // Failed returns the count of all rows that could not be committed.
-func (p *HopAnnotation1Parser) Failed() int {
+func (p *HopAnnotation2Parser) Failed() int {
 	return p.GetStats().Failed
 }

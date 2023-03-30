@@ -8,9 +8,9 @@ import (
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
-// AnnotationRow defines the BQ schema using 'Standard Columns' conventions for
+// Annotation2Row defines the BQ schema using 'Standard Columns' conventions for
 // the annotation datatype produced by the uuid-annotator.
-type AnnotationRow struct {
+type Annotation2Row struct {
 	UUID   string                      `bigquery:"id" json:"id"` // NOTE: there is no 'a' record for AnnotationRows.
 	Server annotator.ServerAnnotations `bigquery:"server" json:"server"`
 	Client annotator.ClientAnnotations `bigquery:"client" json:"client"`
@@ -22,7 +22,7 @@ type AnnotationRow struct {
 }
 
 // Schema returns the BigQuery schema for NDT7ResultRow.
-func (row *AnnotationRow) Schema() (bigquery.Schema, error) {
+func (row *Annotation2Row) Schema() (bigquery.Schema, error) {
 	sch, err := bigquery.InferSchema(row)
 	if err != nil {
 		return bigquery.Schema{}, err
