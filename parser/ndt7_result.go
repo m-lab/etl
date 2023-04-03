@@ -132,6 +132,7 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 }
 
 func downSummary(down *model.ArchivalData) schema.NDT7Summary {
+	down.UUID = strings.ReplaceAll(down.UUID, "_unsafe", "")
 	return schema.NDT7Summary{
 		UUID:               down.UUID,
 		TestTime:           down.StartTime,
@@ -142,6 +143,7 @@ func downSummary(down *model.ArchivalData) schema.NDT7Summary {
 	}
 }
 func upSummary(up *model.ArchivalData) schema.NDT7Summary {
+	up.UUID = strings.ReplaceAll(up.UUID, "_unsafe", "")
 	return schema.NDT7Summary{
 		UUID:               up.UUID,
 		TestTime:           up.StartTime,

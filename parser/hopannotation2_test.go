@@ -18,26 +18,26 @@ import (
 )
 
 const (
-	hopAnnotation1Filename = "20210818T174432Z_1e0b318cf3c2_91.189.88.152.json"
-	hopAnnotation1GCSPath  = "gs://archive-measurement-lab/ndt/hopannotation1/2021/07/30/"
+	hopAnnotation2Filename = "20210818T174432Z_1e0b318cf3c2_91.189.88.152.json"
+	hopAnnotation2GCSPath  = "gs://archive-measurement-lab/ndt/hopannotation2/2021/07/30/"
 )
 
-func TestHopAnnotation1Parser_ParseAndInsert(t *testing.T) {
+func TestHopAnnotation2Parser_ParseAndInsert(t *testing.T) {
 	ins := newInMemorySink()
-	n := parser.NewHopAnnotation1Parser(ins, "test", "_suffix")
+	n := parser.NewHopAnnotation2Parser(ins, "test", "_suffix")
 
-	data, err := ioutil.ReadFile(path.Join("testdata/HopAnnotation1/", hopAnnotation1Filename))
+	data, err := ioutil.ReadFile(path.Join("testdata/HopAnnotation2/", hopAnnotation2Filename))
 	rtx.Must(err, "failed to load test file")
 
 	date := civil.Date{Year: 2021, Month: 07, Day: 30}
 
 	meta := map[string]bigquery.Value{
-		"filename": path.Join(hopAnnotation1GCSPath, hopAnnotation1Filename),
+		"filename": path.Join(hopAnnotation2GCSPath, hopAnnotation2Filename),
 		"date":     date,
 	}
 
-	if err := n.ParseAndInsert(meta, hopAnnotation1Filename, data); err != nil {
-		t.Errorf("HopAnnotation1Parser.ParseAndInsert() error = %v, wantErr %v", err, true)
+	if err := n.ParseAndInsert(meta, hopAnnotation2Filename, data); err != nil {
+		t.Errorf("HopAnnotation2Parser.ParseAndInsert() error = %v, wantErr %v", err, true)
 	}
 
 	if n.Accepted() != 1 {
@@ -45,13 +45,13 @@ func TestHopAnnotation1Parser_ParseAndInsert(t *testing.T) {
 	}
 	n.Flush()
 
-	row := ins.data[0].(*schema.HopAnnotation1Row)
+	row := ins.data[0].(*schema.HopAnnotation2Row)
 
 	expectedParseInfo := schema.ParseInfo{
 		Version:    "https://github.com/m-lab/etl/tree/foobar",
 		Time:       row.Parser.Time,
-		ArchiveURL: path.Join(hopAnnotation1GCSPath, hopAnnotation1Filename),
-		Filename:   hopAnnotation1Filename,
+		ArchiveURL: path.Join(hopAnnotation2GCSPath, hopAnnotation2Filename),
+		Filename:   hopAnnotation2Filename,
 		Priority:   0,
 		GitCommit:  "12345678",
 	}
@@ -83,26 +83,27 @@ func TestHopAnnotation1Parser_ParseAndInsert(t *testing.T) {
 		Network: &expectedNetwork,
 	}
 
+	// TODO(soltesz): update traceroute-caller type.
 	expectedRaw := hopannotation.HopAnnotation1{
 		ID:          "20210818_1e0b318cf3c2_91.189.88.152",
 		Timestamp:   time.Date(2021, 8, 18, 17, 44, 32, 0, time.UTC),
 		Annotations: &expectedAnnotations,
 	}
 
-	expectedHopAnnotation1Row := schema.HopAnnotation1Row{
+	expectedHopAnnotation2Row := schema.HopAnnotation2Row{
 		ID:     "20210818_1e0b318cf3c2_91.189.88.152",
 		Parser: expectedParseInfo,
 		Date:   date,
 		Raw:    &expectedRaw,
 	}
 
-	if diff := deep.Equal(row, &expectedHopAnnotation1Row); diff != nil {
-		t.Errorf("HopAnnotation1Parser.ParseAndInsert() different row: %s", strings.Join(diff, "\n"))
+	if diff := deep.Equal(row, &expectedHopAnnotation2Row); diff != nil {
+		t.Errorf("HopAnnotation2Parser.ParseAndInsert() different row: %s", strings.Join(diff, "\n"))
 	}
 
 }
 
-func TestHopAnnotation1_IsParsable(t *testing.T) {
+func TestHopAnnotation2_IsParsable(t *testing.T) {
 	tests := []struct {
 		name     string
 		testName string
@@ -110,7 +111,7 @@ func TestHopAnnotation1_IsParsable(t *testing.T) {
 	}{
 		{
 			name:     "success-hopannotation1",
-			testName: hopAnnotation1Filename,
+			testName: hopAnnotation2Filename,
 			want:     true,
 		},
 		{
@@ -122,14 +123,14 @@ func TestHopAnnotation1_IsParsable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, err := ioutil.ReadFile(path.Join(`testdata/HopAnnotation1/`, tt.testName))
+			data, err := ioutil.ReadFile(path.Join(`testdata/HopAnnotation2/`, tt.testName))
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
-			p := &parser.HopAnnotation1Parser{}
+			p := &parser.HopAnnotation2Parser{}
 			_, got := p.IsParsable(tt.testName, data)
 			if got != tt.want {
-				t.Errorf("HopAnnotation1Parser.IsParsable() got = %v, want %v", got, tt.want)
+				t.Errorf("HopAnnotation2Parser.IsParsable() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

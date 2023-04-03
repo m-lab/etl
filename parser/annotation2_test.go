@@ -13,7 +13,7 @@ import (
 	"github.com/m-lab/go/rtx"
 )
 
-func TestAnnotationParser_ParseAndInsert(t *testing.T) {
+func TestAnnotation2Parser_ParseAndInsert(t *testing.T) {
 	tests := []struct {
 		name    string
 		file    string
@@ -36,9 +36,9 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ins := newInMemorySink()
-			n := parser.NewAnnotationParser(ins, "test", "_suffix")
+			n := parser.NewAnnotation2Parser(ins, "test", "_suffix")
 
-			data, err := ioutil.ReadFile("testdata/Annotation/" + tt.file)
+			data, err := ioutil.ReadFile("testdata/Annotation2/" + tt.file)
 			rtx.Must(err, "failed to read test file")
 
 			if _, ok := n.IsParsable(tt.file, data); !ok {
@@ -51,12 +51,12 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 			}
 
 			if err := n.ParseAndInsert(meta, tt.file, data); (err != nil) != tt.wantErr {
-				t.Errorf("AnnotationParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Annotation2Parser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			if n.Accepted() == 1 {
 				n.Flush()
-				row := ins.data[0].(*schema.AnnotationRow)
+				row := ins.data[0].(*schema.Annotation2Row)
 
 				expPI := schema.ParseInfo{
 					Version:    "https://github.com/m-lab/etl/tree/foobar",
@@ -68,14 +68,14 @@ func TestAnnotationParser_ParseAndInsert(t *testing.T) {
 				}
 
 				if diff := deep.Equal(row.Parser, expPI); diff != nil {
-					t.Errorf("AnnotationParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
+					t.Errorf("Annotation2Parser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
 				}
 
 				if row.Client.Geo != nil && row.Client.Geo.Region != "" {
-					t.Errorf("AnnotationParser.ParseAndInsert() did not clear Client.Geo.Region: %q", row.Client.Geo.Region)
+					t.Errorf("Annotation2Parser.ParseAndInsert() did not clear Client.Geo.Region: %q", row.Client.Geo.Region)
 				}
 				if row.Server.Geo != nil && row.Server.Geo.Region != "" {
-					t.Errorf("AnnotationParser.ParseAndInsert() did not clear Server.Geo.Region: %q", row.Server.Geo.Region)
+					t.Errorf("Annotation2Parser.ParseAndInsert() did not clear Server.Geo.Region: %q", row.Server.Geo.Region)
 				}
 			}
 		})

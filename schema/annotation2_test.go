@@ -8,11 +8,11 @@ import (
 	"github.com/m-lab/go/cloud/bqx"
 )
 
-func TestAnnotationRow_Schema(t *testing.T) {
-	row := &AnnotationRow{}
+func TestAnnotation2Row_Schema(t *testing.T) {
+	row := &Annotation2Row{}
 	got, err := row.Schema()
 	if err != nil {
-		t.Fatalf("AnnotationRow.Schema() unexpected error = %v", err)
+		t.Fatalf("Annotation2Row.Schema() unexpected error = %v", err)
 		return
 	}
 
@@ -23,7 +23,7 @@ func TestAnnotationRow_Schema(t *testing.T) {
 		for _, name := range []string{"client", "server", "parser"} {
 			if field.Name == name {
 				if field.Description == "" {
-					t.Errorf("AnnotationRow.Schema() missing field.Description for %q", field.Name)
+					t.Errorf("Annotation2Row.Schema() missing field.Description for %q", field.Name)
 				} else {
 					count++
 				}
@@ -32,6 +32,6 @@ func TestAnnotationRow_Schema(t *testing.T) {
 		return nil
 	})
 	if count != 3 {
-		t.Errorf("AnnotationRow.Schema() missing expected fields; got %d, want 3", count)
+		t.Errorf("Annotation2Row.Schema() missing expected fields; got %d, want 3", count)
 	}
 }
