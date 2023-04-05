@@ -93,7 +93,7 @@ steps:
   id: "Update table schemas before deploying parsers"
   entrypoint: bash
   args: [
-     '-c', './update-schema', '-standard'
+     '-c', './update-schema -standard'
   ]
   env:
   - PROJECT=$PROJECT_ID
