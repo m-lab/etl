@@ -93,10 +93,10 @@ steps:
   id: "Update table schemas before deploying parsers"
   entrypoint: bash
   args: [
-     '-c', './update-schema'
+     '-c', './update-schema', '-standard'
   ]
   env:
-  - GCLOUD_PROJECT=$PROJECT_ID
+  - PROJECT=$PROJECT_ID
 
 # UNIVERSAL PARSER: Run apply-cluster.sh
 - name: gcr.io/cloud-builders/kubectl
