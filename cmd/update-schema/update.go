@@ -4,8 +4,9 @@ package main
 // pipeline.  Tables are created per `-project`, using the `-experiment` and
 // `-datatype`.
 //
-// If the `-datatype=all` then all experiment datatypes are created at once.
-// If the `-datatype=legacy` then all legacy datatypes are created at once.
+// If `-standard=true` then all standard experiments and datatypes are created at once.
+// If `-legacy=true` then all legacy datatypes are created at once.
+// Use `-sidecars=true` to create only the sidecar datatypes for a new experiment.
 //
 // Examples:
 //  # Make all supported standard column experiment tables.
