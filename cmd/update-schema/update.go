@@ -187,7 +187,8 @@ func updateLegacyTables(client *bigquery.Client, project string) int {
 		s, ok := schemasLegacy[table]
 		if !ok {
 			log.Printf("failed to find %v", table)
-			return 1
+			errCount++
+			continue
 		}
 		schema, err := s.Schema()
 		rtx.Must(err, "failed to generate schema for %s", *datatype)
