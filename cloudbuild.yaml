@@ -98,6 +98,17 @@ steps:
   env:
   - PROJECT=$PROJECT_ID
 
+- name: etl-testing
+  id: "Update table schemas for wehe deploying parsers"
+  entrypoint: bash
+  args: [
+     '-c', './update-schema -experiment wehe -datatype scamper1 &&
+            ./update-schema -experiment wehe -datatype annotation2 &&
+            ./update-schema -experiment wehe -datatype hopannotation2'
+  ]
+  env:
+  - PROJECT=$PROJECT_ID
+
 # UNIVERSAL PARSER: Run apply-cluster.sh
 - name: gcr.io/cloud-builders/kubectl
   id: "Deploy etl parser to data-processing cluster"
