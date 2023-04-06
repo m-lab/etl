@@ -1,13 +1,22 @@
 package main
 
-// This command requires the GCLOUD_PROJECT environment variable, and takes an optional
-// single -updateType flag to specify "all" or "tcpinfo".
-// Currently, it handles only the tcpinfo type.
-// The specific table to update is currently hardcoded based on the updateType.
+// update-schema manages the creation and update of schemas produced by the data
+// pipeline.  Tables are created per `-project`, using the `-experiment` and
+// `-datatype`.
+//
+// If `-standard=true` then all standard experiments and datatypes are created at once.
+// If `-legacy=true` then all legacy datatypes are created at once.
+// Use `-sidecars=true` to create only the sidecar datatypes for a new experiment.
 //
 // Examples:
-//  GCLOUD_PROJECT=mlab-sandbox go run cmd/update-schema/update.go
-//  GCLOUD_PROJECT=mlab-sandbox go run cmd/update-schema/update.go -updateType=tcpinfo
+//  # Make all supported standard column experiment tables.
+//  update-schema -project mlab-sandbox -standard
+//
+//  # Make all sidecar tables for ndt experiments.
+//  update-schema -project mlab-sandbox -experiment ndt -sidecars
+//
+//  # Make the scamper1 table for the wehe experiment.
+//  update-schema -project mlab-sandbox -experiment wehe -datatype scamper1
 
 import (
 	"context"
@@ -21,110 +30,49 @@ import (
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 
+	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/cloud/bqx"
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
-
-	"github.com/m-lab/etl/schema"
 )
 
-// CreateOrUpdateTCPInfo will update existing TCPInfo table, or create new table if update fails.
-func CreateOrUpdateTCPInfo(project string, dataset string, table string) error {
-	row := schema.TCPInfoRow{}
-	schema, err := row.Schema()
-	rtx.Must(err, "TCPInfoRow.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "Date")
-}
+var (
+	datatype   = flag.String("datatype", "", "Datatype name to be updated (tcpinfo, scamper1, ...).")
+	experiment = flag.String("experiment", "", "Name of experiment to be updated (ndt, wehe, ...).")
+	project    = flag.String("project", "", "GCP project to update")
+	standard   = flag.Bool("standard", false, "Create or update default standard tables and datatypes")
+	sidecars   = flag.Bool("sidecars", false, "Create or update sidecar tables for the given experiment")
+	legacy     = flag.Bool("legacy", false, "Create or update legacy tables")
 
-func CreateOrUpdatePT(project string, dataset string, table string) error {
-	row := schema.PTTest{}
-	schema, err := row.Schema()
-	rtx.Must(err, "PTTest.Schema")
-	if dataset == "batch" {
-		updateTemplateTables(schema, project, dataset, table, "")
+	schemas = map[string]schemaGenerator{
+		"annotation2":    &schema.Annotation2Row{},
+		"hopannotation2": &schema.HopAnnotation2Row{},
+		"ndt5":           &schema.NDT5ResultRowV2{},
+		"ndt7":           &schema.NDT7ResultRow{},
+		"tcpinfo":        &schema.TCPInfoRow{},
+		"pcap":           &schema.PCAPRow{},
+		"scamper1":       &schema.Scamper1Row{},
+		"switch":         &schema.SwitchRow{},
 	}
-	return CreateOrUpdate(schema, project, dataset, table, "")
-}
 
-func CreateOrUpdateSS(project string, dataset string, table string) error {
-	row := schema.SS{}
-	schema, err := row.Schema()
-	rtx.Must(err, "SS.Schema")
-	if dataset == "batch" {
-		updateTemplateTables(schema, project, dataset, table, "")
+	schemasLegacy = map[string]schemaGenerator{
+		"traceroute": &schema.PTTest{},
+		"sidestream": &schema.SS{},
+		"ndt":        &schema.NDTWeb100{},
 	}
-	return CreateOrUpdate(schema, project, dataset, table, "")
-}
-func CreateOrUpdateNDTWeb100(project string, dataset string, table string) error {
-	row := schema.NDTWeb100{}
-	schema, err := row.Schema()
-	rtx.Must(err, "NDTWeb100.Schema")
-	if dataset == "batch" {
-		updateTemplateTables(schema, project, dataset, table, "")
-	}
-	return CreateOrUpdate(schema, project, dataset, table, "")
+)
+
+type schemaGenerator interface {
+	Schema() (bigquery.Schema, error)
 }
 
-func CreateOrUpdateNDT5ResultRowV2(project string, dataset string, table string) error {
-	row := schema.NDT5ResultRowV2{}
-	schema, err := row.Schema()
-	rtx.Must(err, "NDT5ResultRowV2.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "Date")
-}
-
-func CreateOrUpdateNDT7ResultRow(project string, dataset string, table string) error {
-	row := schema.NDT7ResultRow{}
-	schema, err := row.Schema()
-	rtx.Must(err, "NDT7ResultRow.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "Date")
-}
-
-func CreateOrUpdateAnnotationRow(project string, dataset string, table string) error {
-	row := schema.Annotation2Row{}
-	schema, err := row.Schema()
-	rtx.Must(err, "Annotation2.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "Date")
-}
-
-func CreateOrUpdateSwitchRow(project string, dataset string, table string) error {
-	row := schema.SwitchRow{}
-	schema, err := row.Schema()
-	rtx.Must(err, "SwitchRow.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "Date")
-}
-
-func CreateOrUpdatePCAPRow(project string, dataset string, table string) error {
-	row := schema.PCAPRow{}
-	schema, err := row.Schema()
-	rtx.Must(err, "PCAPRow.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "Date")
-}
-
-func CreateOrUpdateHopAnnotation2Row(project string, dataset string, table string) error {
-	row := schema.HopAnnotation2Row{}
-	schema, err := row.Schema()
-	rtx.Must(err, "HopAnnotation2Row.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "Date")
-}
-
-func CreateOrUpdateScamper1Row(project string, dataset string, table string) error {
-	row := schema.Scamper1Row{}
-	schema, err := row.Schema()
-	rtx.Must(err, "Scamper1Row.Schema")
-	return CreateOrUpdate(schema, project, dataset, table, "Date")
-}
-
-// listTemplateTables finds all template tables for the given project, datatype, and base table name.
+// listLegacyTemplateTables finds all template tables for the given project, datatype, and base table name.
 // Because this function must enumerate all tables in the dataset to find matching names, it may be slow.
-func listTemplateTables(project, dataset, table string) ([]string, error) {
+func listLegacyTemplateTables(client *bigquery.Client, project, dataset, table string) ([]string, error) {
 	tables := []string{}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	client, err := bigquery.NewClient(ctx, project)
-	if err != nil {
-		return nil, err
-	}
 	it := client.Dataset(dataset).Tables(ctx)
 	for {
 		t, err := it.Next()
@@ -141,12 +89,14 @@ func listTemplateTables(project, dataset, table string) ([]string, error) {
 	return tables, nil
 }
 
-// updateTemplateTables updates the schema on all template tables for the named dataset and table.
-func updateTemplateTables(schema bigquery.Schema, project, dataset, table, partField string) error {
+// updateLegacyTemplateTables updates the schema on all template tables for the named dataset and table.
+func updateLegacyTemplateTables(client *bigquery.Client, schema bigquery.Schema, project, dataset, table, partField string) int {
 	// Find all template tables for this table.
-	tables, err := listTemplateTables(project, dataset, table)
+	errCount := 0
+	tables, err := listLegacyTemplateTables(client, project, dataset, table)
 	if err != nil {
-		return err
+		log.Println(err)
+		return 1
 	}
 	for i := range tables {
 		// Update the template table. There is a small chance that a template
@@ -154,256 +104,155 @@ func updateTemplateTables(schema bigquery.Schema, project, dataset, table, partF
 		// table is recreated here. However, the table will be empty, and used
 		// by the next pass of the parser. So, this is expected to be
 		// unconditionally safe.
-		err = CreateOrUpdate(schema, project, dataset, tables[i], partField)
-		if err != nil {
-			return err
-		}
+		errCount += CreateOrUpdate(client, schema, project, dataset, tables[i], partField)
 	}
-	return nil
+	return errCount
 }
 
 // CreateOrUpdate will update or create a table from the given schema.
-func CreateOrUpdate(schema bigquery.Schema, project, dataset, table, partField string) error {
+func CreateOrUpdate(client *bigquery.Client, schema bigquery.Schema, project, dataset, table, partField string) int {
 	name := project + "." + dataset + "." + table
 	pdt, err := bqx.ParsePDT(name)
 	rtx.Must(err, "ParsePDT")
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	client, err := bigquery.NewClient(ctx, pdt.Project)
-	rtx.Must(err, "NewClient")
+
+	// Assume if Metadata is available, that the dataset already exists.
+	ds := client.Dataset(dataset)
+	_, err = ds.Metadata(ctx)
+	if err != nil {
+		// Assume error indicates dataset does not yet exist.
+		err = ds.Create(ctx, &bigquery.DatasetMetadata{
+			Name:     dataset,
+			Location: "US",
+		})
+		if err != nil {
+			log.Printf("failed to create dataset: %v", dataset)
+			return 1
+		}
+		log.Println("Successfully created dataset for", pdt)
+	}
 
 	err = pdt.UpdateTable(ctx, client, schema)
 	if err == nil {
 		log.Println("Successfully updated", pdt)
-		return nil
+		return 0
 	}
 	log.Println("UpdateTable failed:", err)
-	// TODO add specific error handling for incompatible schema change
-
 	apiErr, ok := err.(*googleapi.Error)
 	if !ok || apiErr.Code != 404 {
 		// TODO - different behavior on specific error types?
+		log.Printf("failed to update schema: %v", err)
+		return 1
 	}
 
 	partitioning := &bigquery.TimePartitioning{
 		Field: partField,
 	}
 
-	err = pdt.CreateTable(ctx, client, schema, "description", partitioning, nil)
+	err = pdt.CreateTable(ctx, client, schema, "", partitioning, nil)
 	if err == nil {
 		log.Println("Successfully created", pdt)
-		return nil
+		return 0
 	}
 	log.Println("Create failed:", err)
-	return err
+	return 1
 }
 
 // Only tables that support Standard Columns should be included here.
-func updateStandardTables(project string) int {
+func updateStandardTables(client *bigquery.Client, project, experiment string) int {
 	errCount := 0
-	if err := CreateOrUpdateNDT7ResultRow(project, "tmp_ndt", "ndt7"); err != nil {
-		errCount++
+	tables := []string{
+		"annotation2",
+		"hopannotation2",
+		"pcap",
+		"scamper1",
+		"tcpinfo",
 	}
-	if err := CreateOrUpdateNDT7ResultRow(project, "raw_ndt", "ndt7"); err != nil {
-		errCount++
-	}
-
-	if err := CreateOrUpdateNDT5ResultRowV2(project, "tmp_ndt", "ndt5"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateNDT5ResultRowV2(project, "raw_ndt", "ndt5"); err != nil {
-		errCount++
-	}
-
-	if err := CreateOrUpdateAnnotationRow(project, "tmp_ndt", "annotation2"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateAnnotationRow(project, "raw_ndt", "annotation2"); err != nil {
-		errCount++
-	}
-
-	if err := CreateOrUpdatePCAPRow(project, "tmp_ndt", "pcap"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdatePCAPRow(project, "raw_ndt", "pcap"); err != nil {
-		errCount++
-	}
-
-	if err := CreateOrUpdateHopAnnotation2Row(project, "tmp_ndt", "hopannotation2"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateHopAnnotation2Row(project, "raw_ndt", "hopannotation2"); err != nil {
-		errCount++
-	}
-
-	if err := CreateOrUpdateScamper1Row(project, "tmp_ndt", "scamper1"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateScamper1Row(project, "raw_ndt", "scamper1"); err != nil {
-		errCount++
-	}
-
-	if err := CreateOrUpdateSwitchRow(project, "tmp_utilization", "switch"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateSwitchRow(project, "raw_utilization", "switch"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateTCPInfo(project, "tmp_ndt", "tcpinfo"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateTCPInfo(project, "raw_ndt", "tcpinfo"); err != nil {
-		errCount++
-	}
-
-	return errCount
-}
-
-func updateLegacyTables(project string) int {
-	errCount := 0
-	if err := CreateOrUpdatePT(project, "base_tables", "traceroute"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdatePT(project, "batch", "traceroute"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateSS(project, "base_tables", "sidestream"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateSS(project, "batch", "sidestream"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateNDTWeb100(project, "base_tables", "ndt"); err != nil {
-		errCount++
-	}
-	if err := CreateOrUpdateNDTWeb100(project, "batch", "ndt"); err != nil {
-		errCount++
+	for _, datatype := range tables {
+		errCount += makeTables(client, project, experiment, datatype)
 	}
 	return errCount
 }
 
-var (
-	updateType = flag.String("updateType", "", "Short name of datatype to be updated (tcpinfo, scamper, ...).")
-	project    = flag.String("gcloud_project", "", "GCP project to update")
-)
+func updateLegacyTables(client *bigquery.Client, project string) int {
+	errCount := 0
+	tables := []string{
+		"traceroute",
+		"sidestream",
+		"ndt",
+	}
+	for _, table := range tables {
+		s, ok := schemasLegacy[table]
+		if !ok {
+			log.Printf("failed to find %v", table)
+			errCount++
+			continue
+		}
+		schema, err := s.Schema()
+		rtx.Must(err, "failed to generate schema for %s", *datatype)
+		errCount += CreateOrUpdate(client, schema, project, "base_tables", table, "")
+		errCount += updateLegacyTemplateTables(client, schema, project, "batch", table, "")
+		errCount += CreateOrUpdate(client, schema, project, "batch", table, "")
+	}
+	return errCount
+}
+
+func makeTables(client *bigquery.Client, project, experiment, datatype string) int {
+	errCount := 0
+	if _, ok := schemas[datatype]; !ok {
+		log.Fatal("unsupported datatype:", datatype)
+	}
+	s := schemas[datatype]
+	schema, err := s.Schema()
+	rtx.Must(err, "failed to generate schema for %s", datatype)
+	errCount += CreateOrUpdate(client, schema, project, "tmp_"+experiment, datatype, "date")
+	errCount += CreateOrUpdate(client, schema, project, "raw_"+experiment, datatype, "date")
+	return errCount
+}
 
 // For now, this just updates all known tables for the provided project.
 func main() {
 	flag.Parse()
-	flagx.ArgsFromEnv(flag.CommandLine)
+	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "failed to read flags from env")
 
 	errCount := 0
+	client, err := bigquery.NewClient(context.Background(), *project)
+	rtx.Must(err, "failed to create bigquery.NewClient")
 
+	// Project is required for all options.
 	if *project == "" {
-		log.Fatal("Missing GCLOUD_PROJECT environment variable.")
+		log.Fatal("-project flag is required")
+	}
+	if *standard {
+		// Create all supported tables.
+		errCount += makeTables(client, *project, "ndt", "ndt7")
+		errCount += makeTables(client, *project, "ndt", "ndt5")
+		errCount += updateStandardTables(client, *project, "ndt")
+		errCount += makeTables(client, *project, "utilization", "switch")
+		os.Exit(errCount)
+	}
+	if *legacy {
+		// Create all legacy tables.
+		errCount += updateLegacyTables(client, *project)
+		os.Exit(errCount)
 	}
 
-	switch *updateType {
-	case "":
-		if len(os.Args) > 1 {
-			log.Fatal("Invalid arguments - must include -updateType=...")
-		}
-		fallthrough
-	case "all": // Do everything
-		errCount += updateLegacyTables(*project)
-		errCount += updateStandardTables(*project)
-
-	case "legacy":
-		errCount += updateLegacyTables(*project)
-
-	case "standard":
-		errCount += updateStandardTables(*project)
-
-	case "tcpinfo":
-		if err := CreateOrUpdateTCPInfo(*project, "tmp_ndt", "tcpinfo"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateTCPInfo(*project, "raw_ndt", "tcpinfo"); err != nil {
-			errCount++
-		}
-
-	case "traceroute":
-		if err := CreateOrUpdatePT(*project, "base_tables", "traceroute"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdatePT(*project, "batch", "traceroute"); err != nil {
-			errCount++
-		}
-	case "sidestream":
-		if err := CreateOrUpdateSS(*project, "base_tables", "sidestream"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateSS(*project, "batch", "sidestream"); err != nil {
-			errCount++
-		}
-	case "ndt":
-		if err := CreateOrUpdateNDTWeb100(*project, "base_tables", "ndt"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateNDTWeb100(*project, "batch", "ndt"); err != nil {
-			errCount++
-		}
-
-	case "ndt5":
-		if err := CreateOrUpdateNDT5ResultRowV2(*project, "raw_ndt", "ndt5"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateNDT5ResultRowV2(*project, "tmp_ndt", "ndt5"); err != nil {
-			errCount++
-		}
-
-	case "ndt7":
-		if err := CreateOrUpdateNDT7ResultRow(*project, "tmp_ndt", "ndt7"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateNDT7ResultRow(*project, "raw_ndt", "ndt7"); err != nil {
-			errCount++
-		}
-
-	case "annotation2":
-		if err := CreateOrUpdateAnnotationRow(*project, "tmp_ndt", "annotation2"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateAnnotationRow(*project, "raw_ndt", "annotation2"); err != nil {
-			errCount++
-		}
-
-	case "switch":
-		if err := CreateOrUpdateSwitchRow(*project, "tmp_utilization", "switch"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateSwitchRow(*project, "raw_utilization", "switch"); err != nil {
-			errCount++
-		}
-
-	case "pcap":
-		if err := CreateOrUpdatePCAPRow(*project, "tmp_ndt", "pcap"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdatePCAPRow(*project, "raw_ndt", "pcap"); err != nil {
-			errCount++
-		}
-
-	case "hopannotation2":
-		if err := CreateOrUpdateHopAnnotation2Row(*project, "tmp_ndt", "hopannotation2"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateHopAnnotation2Row(*project, "raw_ndt", "hopannotation2"); err != nil {
-			errCount++
-		}
-
-	case "scamper1":
-		if err := CreateOrUpdateScamper1Row(*project, "tmp_ndt", "scamper1"); err != nil {
-			errCount++
-		}
-		if err := CreateOrUpdateScamper1Row(*project, "raw_ndt", "scamper1"); err != nil {
-			errCount++
-		}
-
-	default:
-		log.Fatal("invalid updateType: ", *updateType)
+	// Experiment is required at this point.
+	if *experiment == "" {
+		log.Fatal("-experiment flag is required")
+	}
+	if *sidecars {
+		errCount += updateStandardTables(client, *project, *experiment)
+		os.Exit(errCount)
 	}
 
+	// Datatype is required at this point.
+	if *datatype == "" {
+		log.Fatal("-datatype flag is required")
+	}
+	// Create only the named experiment and datatype.
+	errCount += makeTables(client, *project, *experiment, *datatype)
 	os.Exit(errCount)
 }
