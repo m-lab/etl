@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 )
 
@@ -22,7 +21,8 @@ type ProcessingError interface {
 // RowStats interface defines some useful Inserter stats that will also be
 // implemented by Parser.
 // RowStats implementations should provide the invariants:
-//   Accepted == Failed + Committed + RowsInBuffer
+//
+//	Accepted == Failed + Committed + RowsInBuffer
 type RowStats interface {
 	// RowsInBuffer returns the count of rows currently in the buffer.
 	RowsInBuffer() int
@@ -36,7 +36,8 @@ type RowStats interface {
 
 // Inserter is a data sink that writes to BigQuery tables.
 // Inserters should provide the invariants:
-//   After Flush() returns, RowsInBuffer == 0
+//
+//	After Flush() returns, RowsInBuffer == 0
 type Inserter interface {
 	// Put synchronously sends a slice of rows to BigQuery
 	// This is THREADSAFE
@@ -102,6 +103,15 @@ type InserterParams struct {
 	MaxRetryDelay time.Duration // Maximum backoff time for Put retries.
 }
 
+// ParserMetadata provides archive metadata for use by parsers.
+type ParserMetadata struct {
+	Version    string
+	ArchiveURL string
+	GitCommit  string
+	Date       civil.Date
+	Start      time.Time
+}
+
 // ErrHighInsertionFailureRate should be returned by TaskError when there are more than 10% BQ insertion errors.
 var ErrHighInsertionFailureRate = errors.New("too many insertion failures")
 
@@ -116,7 +126,7 @@ type Parser interface {
 	// meta - metadata, e.g. from the original tar file name.
 	// testName - Name of test file (typically extracted from a tar file)
 	// test - binary test data
-	ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error
+	ParseAndInsert(meta ParserMetadata, testName string, test []byte) error
 
 	// Flush flushes any pending rows.
 	Flush() error
