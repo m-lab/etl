@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	"github.com/iancoleman/strcase"
 	"github.com/m-lab/etl/etl"
@@ -64,7 +63,7 @@ func (p *SwitchParser) IsParsable(testName string, data []byte) (string, bool) {
 }
 
 // ParseAndInsert decodes the switch data and inserts it into BQ.
-func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
+func (p *SwitchParser) ParseAndInsert(meta etl.ParserMetadata, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), string(etl.SW)).Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), string(etl.SW)).Dec()
 
@@ -78,7 +77,7 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 
 	// The archive date is the date when the archive was created. Used to fix
 	// DISCOv2 octets.local.tx/rx values.
-	archiveDate := fileMetadata["date"].(civil.Date)
+	archiveDate := meta.Date
 
 	for dec.More() {
 		// Unmarshal the raw JSON into a SwitchStats.
@@ -138,11 +137,11 @@ func (p *SwitchParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, te
 					ID:   fmt.Sprintf("%s-%s-%d", machine, site, sample.Timestamp),
 					Date: archiveDate,
 					Parser: schema.ParseInfo{
-						Version:    Version(),
+						Version:    meta.Version,
 						Time:       time.Now(),
-						ArchiveURL: fileMetadata["filename"].(string),
+						ArchiveURL: meta.ArchiveURL,
 						Filename:   testName,
-						GitCommit:  GitCommit(),
+						GitCommit:  meta.GitCommit,
 					},
 					A: &schema.SwitchSummary{
 						Machine:        machine,

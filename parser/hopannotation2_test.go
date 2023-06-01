@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	"github.com/go-test/deep"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/rtx"
@@ -31,9 +31,11 @@ func TestHopAnnotation2Parser_ParseAndInsert(t *testing.T) {
 
 	date := civil.Date{Year: 2021, Month: 07, Day: 30}
 
-	meta := map[string]bigquery.Value{
-		"filename": path.Join(hopAnnotation2GCSPath, hopAnnotation2Filename),
-		"date":     date,
+	meta := etl.ParserMetadata{
+		ArchiveURL: path.Join(hopAnnotation2GCSPath, hopAnnotation2Filename),
+		Date:       date,
+		Version:    parser.Version(),
+		GitCommit:  parser.GitCommit(),
 	}
 
 	if err := n.ParseAndInsert(meta, hopAnnotation2Filename, data); err != nil {

@@ -8,9 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/bigquery"
-
-	"cloud.google.com/go/civil"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -65,25 +62,25 @@ func (dp *NDT7ResultParser) IsParsable(testName string, data []byte) (string, bo
 }
 
 // ParseAndInsert decodes the data.NDT7Result JSON and inserts it into BQ.
-func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+func (dp *NDT7ResultParser) ParseAndInsert(meta etl.ParserMetadata, testName string, test []byte) error {
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt7_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt7_result").Dec()
 
 	row := schema.NDT7ResultRow{
 		Parser: schema.ParseInfo{
-			Version:    Version(),
+			Version:    meta.Version,
 			Time:       time.Now(),
-			ArchiveURL: meta["filename"].(string),
+			ArchiveURL: meta.ArchiveURL,
 			Filename:   testName,
-			GitCommit:  GitCommit(),
+			GitCommit:  meta.GitCommit,
 		},
 	}
 
 	// Parse the test.
 	err := json.Unmarshal(test, &row.Raw)
 	if err != nil {
-		log.Println(meta["filename"].(string), testName, err)
+		log.Println(meta.ArchiveURL, testName, err)
 		metrics.TestTotal.WithLabelValues(dp.TableName(), "ndt7_result", "Unmarshal").Inc()
 		return err
 	}
@@ -106,7 +103,7 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	// the given timestamp, regardless of the timestamp's timezone. Since we
 	// run our systems in UTC, all timestamps will be relative to UTC and as
 	// will these dates.
-	row.Date = meta["date"].(civil.Date)
+	row.Date = meta.Date
 	if row.Raw.Download != nil {
 		row.A = downSummary(row.Raw.Download)
 	} else if row.Raw.Upload != nil {

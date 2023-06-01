@@ -6,9 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/bigquery"
-
-	"cloud.google.com/go/civil"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -60,17 +57,17 @@ func (ap *Annotation2Parser) IsParsable(testName string, data []byte) (string, b
 }
 
 // ParseAndInsert decodes the data.Annotation2 JSON and inserts it into BQ.
-func (ap *Annotation2Parser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+func (ap *Annotation2Parser) ParseAndInsert(meta etl.ParserMetadata, testName string, test []byte) error {
 	metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation2").Inc()
 	defer metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation2").Dec()
 
 	row := schema.Annotation2Row{
 		Parser: schema.ParseInfo{
-			Version:    Version(),
+			Version:    meta.Version,
 			Time:       time.Now(),
-			ArchiveURL: meta["filename"].(string),
+			ArchiveURL: meta.ArchiveURL,
 			Filename:   testName,
-			GitCommit:  GitCommit(),
+			GitCommit:  meta.GitCommit,
 		},
 	}
 
@@ -105,7 +102,7 @@ func (ap *Annotation2Parser) ParseAndInsert(meta map[string]bigquery.Value, test
 	// the given timestamp, regardless of the timestamp's timezone. Since we
 	// run our systems in UTC, all timestamps will be relative to UTC and as
 	// will these dates.
-	row.Date = meta["date"].(civil.Date)
+	row.Date = meta.Date
 
 	// Estimate the row size based on the input JSON size.
 	metrics.RowSizeHistogram.WithLabelValues(ap.TableName()).Observe(float64(len(test)))

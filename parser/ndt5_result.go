@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 
 	"github.com/m-lab/etl/etl"
@@ -66,7 +65,7 @@ func (dp *NDT5ResultParser) IsParsable(testName string, data []byte) (string, bo
 // backend and to eventually rely on the schema inference in m-lab/go/cloud/bqx.CreateTable().
 
 // ParseAndInsert decodes the data.NDT5Result JSON and inserts it into BQ.
-func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+func (dp *NDT5ResultParser) ParseAndInsert(meta etl.ParserMetadata, testName string, test []byte) error {
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Dec()
 
@@ -85,13 +84,13 @@ func (dp *NDT5ResultParser) ParseAndInsert(meta map[string]bigquery.Value, testN
 	}
 
 	parser := schema.ParseInfo{
-		Version:    Version(),
+		Version:    meta.Version,
 		Time:       time.Now(),
-		ArchiveURL: meta["filename"].(string),
+		ArchiveURL: meta.ArchiveURL,
 		Filename:   testName,
-		GitCommit:  GitCommit(),
+		GitCommit:  meta.GitCommit,
 	}
-	date := meta["date"].(civil.Date)
+	date := meta.Date
 
 	// Since ndt5 rows can include both download (S2C) and upload (C2S)
 	// measurements (or neither), check and write independent rows for either

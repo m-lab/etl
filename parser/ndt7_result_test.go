@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	"github.com/go-test/deep"
 
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/pretty"
@@ -23,9 +23,11 @@ func setupNDT7InMemoryParser(t *testing.T, testName string) (*schema.NDT7ResultR
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	meta := map[string]bigquery.Value{
-		"filename": "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
-		"date":     civil.Date{Year: 2020, Month: 3, Day: 18},
+	meta := etl.ParserMetadata{
+		ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
+		Date:       civil.Date{Year: 2020, Month: 3, Day: 18},
+		Version:    parser.Version(),
+		GitCommit:  parser.GitCommit(),
 	}
 	err = n.ParseAndInsert(meta, testName, resultData)
 	if err != nil {
