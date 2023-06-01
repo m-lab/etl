@@ -29,18 +29,18 @@ func Test_findSchemaDocsFor(t *testing.T) {
 	}{
 		{
 			name:  "literal",
-			value: schema.NDT5ResultRow{},
+			value: schema.NDT5ResultRowV2{},
 			want: []bqx.SchemaDoc{
 				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/toplevel.yaml")),
-				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/NDT5ResultRow.yaml")),
+				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/NDT5ResultRowV2.yaml")),
 			},
 		},
 		{
 			name:  "pointer",
-			value: &schema.NDT5ResultRow{},
+			value: &schema.NDT5ResultRowV2{},
 			want: []bqx.SchemaDoc{
 				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/toplevel.yaml")),
-				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/NDT5ResultRow.yaml")),
+				bqx.NewSchemaDoc(mustReadFile(t, "descriptions/NDT5ResultRowV2.yaml")),
 			},
 		},
 		{
