@@ -31,7 +31,7 @@ func TestHopAnnotation2Parser_ParseAndInsert(t *testing.T) {
 
 	date := civil.Date{Year: 2021, Month: 07, Day: 30}
 
-	meta := etl.ParserMetadata{
+	meta := etl.Metadata{
 		ArchiveURL: path.Join(hopAnnotation2GCSPath, hopAnnotation2Filename),
 		Date:       date,
 		Version:    parser.Version(),

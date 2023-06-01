@@ -65,7 +65,7 @@ func (dp *NDT5ResultParser) IsParsable(testName string, data []byte) (string, bo
 // backend and to eventually rely on the schema inference in m-lab/go/cloud/bqx.CreateTable().
 
 // ParseAndInsert decodes the data.NDT5Result JSON and inserts it into BQ.
-func (dp *NDT5ResultParser) ParseAndInsert(meta etl.ParserMetadata, testName string, test []byte) error {
+func (dp *NDT5ResultParser) ParseAndInsert(meta etl.Metadata, testName string, test []byte) error {
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt5_result").Dec()
 

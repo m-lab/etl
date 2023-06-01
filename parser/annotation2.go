@@ -57,7 +57,7 @@ func (ap *Annotation2Parser) IsParsable(testName string, data []byte) (string, b
 }
 
 // ParseAndInsert decodes the data.Annotation2 JSON and inserts it into BQ.
-func (ap *Annotation2Parser) ParseAndInsert(meta etl.ParserMetadata, testName string, test []byte) error {
+func (ap *Annotation2Parser) ParseAndInsert(meta etl.Metadata, testName string, test []byte) error {
 	metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation2").Inc()
 	defer metrics.WorkerState.WithLabelValues(ap.TableName(), "annotation2").Dec()
 

@@ -42,7 +42,7 @@ func (p *HopAnnotation2Parser) IsParsable(testName string, data []byte) (string,
 }
 
 // ParseAndInsert decodes the HopAnnotation2 data and inserts it into BQ.
-func (p *HopAnnotation2Parser) ParseAndInsert(meta etl.ParserMetadata, testName string, rawContent []byte) error {
+func (p *HopAnnotation2Parser) ParseAndInsert(meta etl.Metadata, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), "hopannotation2").Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), "hopannotation2").Dec()
 

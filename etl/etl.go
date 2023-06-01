@@ -103,8 +103,8 @@ type InserterParams struct {
 	MaxRetryDelay time.Duration // Maximum backoff time for Put retries.
 }
 
-// ParserMetadata provides archive metadata for use by parsers.
-type ParserMetadata struct {
+// Metadata provides metadata about the parser and archive files.
+type Metadata struct {
 	Version    string
 	ArchiveURL string
 	GitCommit  string
@@ -126,7 +126,7 @@ type Parser interface {
 	// meta - metadata, e.g. from the original tar file name.
 	// testName - Name of test file (typically extracted from a tar file)
 	// test - binary test data
-	ParseAndInsert(meta ParserMetadata, testName string, test []byte) error
+	ParseAndInsert(meta Metadata, testName string, test []byte) error
 
 	// Flush flushes any pending rows.
 	Flush() error

@@ -111,7 +111,7 @@ func thinSnaps(orig []snapshot.Snapshot) []snapshot.Snapshot {
 
 // ParseAndInsert extracts all ArchivalRecords from the rawContent and inserts into a single row.
 // Approximately 15 usec/snapshot.
-func (p *TCPInfoParser) ParseAndInsert(meta etl.ParserMetadata, testName string, rawContent []byte) error {
+func (p *TCPInfoParser) ParseAndInsert(meta etl.Metadata, testName string, rawContent []byte) error {
 	tableName := p.FullTableName()
 	metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Dec()

@@ -25,7 +25,7 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 	data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))
 	rtx.Must(err, "failed to load test file")
 
-	meta := etl.ParserMetadata{
+	meta := etl.Metadata{
 		ArchiveURL: file,
 		Date:       civil.Date{Year: 2021, Month: 9, Day: 14},
 		Version:    parser.Version(),
@@ -59,7 +59,7 @@ func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
 	data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))
 	rtx.Must(err, "failed to load test file")
 
-	meta := etl.ParserMetadata{
+	meta := etl.Metadata{
 		ArchiveURL: file,
 		Date:       civil.Date{Year: 2021, Month: 9, Day: 8},
 		Version:    parser.Version(),

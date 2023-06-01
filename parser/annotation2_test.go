@@ -46,7 +46,7 @@ func TestAnnotation2Parser_ParseAndInsert(t *testing.T) {
 				t.Fatal("IsParsable() failed; got false, want true")
 			}
 
-			meta := etl.ParserMetadata{
+			meta := etl.Metadata{
 				ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/" + tt.file,
 				Date:       civil.Date{Year: 2020, Month: 3, Day: 18},
 				Version:    parser.Version(),

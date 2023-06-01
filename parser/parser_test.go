@@ -143,7 +143,7 @@ func (tp *TestParser) IsParsable(testName string, test []byte) (string, bool) {
 	return "ext", true
 }
 
-func (tp *TestParser) ParseAndInsert(meta etl.ParserMetadata, testName string, test []byte) error {
+func (tp *TestParser) ParseAndInsert(meta etl.Metadata, testName string, test []byte) error {
 	metrics.TestTotal.WithLabelValues("table", "test", "ok").Inc()
 	values := map[string]bigquery.Value{
 		"filename":   meta.ArchiveURL,
@@ -174,7 +174,7 @@ func TestPlumbing(t *testing.T) {
 	tci := countingInserter{}
 	var ti etl.Inserter = &tci
 	var p etl.Parser = NewTestParser(ti)
-	err := p.ParseAndInsert(etl.ParserMetadata{}, "foo", foo[:])
+	err := p.ParseAndInsert(etl.Metadata{}, "foo", foo[:])
 	if err != nil {
 		fmt.Println(err)
 	}

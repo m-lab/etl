@@ -29,7 +29,7 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	rtx.Must(err, "failed to load DISCOv2 test file")
 
 	date := civil.Date{Year: 2021, Month: 12, Day: 14}
-	meta := etl.ParserMetadata{
+	meta := etl.Metadata{
 		ArchiveURL: path.Join(switchGCSPath, switchDISCOv2Filename),
 		Date:       date,
 		Version:    parser.Version(),

@@ -142,7 +142,7 @@ func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
 }
 
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
-func (p *PCAPParser) ParseAndInsert(meta etl.ParserMetadata, testName string, rawContent []byte) error {
+func (p *PCAPParser) ParseAndInsert(meta etl.Metadata, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Dec()
 

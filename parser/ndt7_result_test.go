@@ -23,7 +23,7 @@ func setupNDT7InMemoryParser(t *testing.T, testName string) (*schema.NDT7ResultR
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	meta := etl.ParserMetadata{
+	meta := etl.Metadata{
 		ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/ndt_ndt7_2020_03_18_20200318T003853.425987Z-ndt7-mlab3-syd03-ndt.tgz",
 		Date:       civil.Date{Year: 2020, Month: 3, Day: 18},
 		Version:    parser.Version(),

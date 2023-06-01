@@ -95,7 +95,7 @@ func (p *Scamper1Parser) IsParsable(testName string, data []byte) (string, bool)
 }
 
 // ParseAndInsert decodes the scamper1 data and inserts it into BQ.
-func (p *Scamper1Parser) ParseAndInsert(meta etl.ParserMetadata, testName string, rawContent []byte) error {
+func (p *Scamper1Parser) ParseAndInsert(meta etl.Metadata, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Dec()
 

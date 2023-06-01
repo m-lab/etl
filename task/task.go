@@ -41,7 +41,7 @@ type Task struct {
 	etl.TestSource // Source from which to read tests.
 	etl.Parser     // Parser to parse the tests.
 
-	meta etl.ParserMetadata // Common information about the archive being parsed.
+	meta etl.Metadata // Common information about the archive being parsed.
 
 	maxFileSize int64 // Max file size to avoid OOM.
 
@@ -54,7 +54,7 @@ func NewTask(archive string, src etl.TestSource, prsr etl.Parser, closer io.Clos
 	t := Task{
 		TestSource: src,
 		Parser:     prsr,
-		meta: etl.ParserMetadata{
+		meta: etl.Metadata{
 			Version:    parser.Version(),
 			ArchiveURL: archive,
 			GitCommit:  parser.GitCommit(),

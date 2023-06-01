@@ -62,7 +62,7 @@ func (dp *NDT7ResultParser) IsParsable(testName string, data []byte) (string, bo
 }
 
 // ParseAndInsert decodes the data.NDT7Result JSON and inserts it into BQ.
-func (dp *NDT7ResultParser) ParseAndInsert(meta etl.ParserMetadata, testName string, test []byte) error {
+func (dp *NDT7ResultParser) ParseAndInsert(meta etl.Metadata, testName string, test []byte) error {
 	// TODO: derive 'ndt5' (or 'ndt7') labels from testName.
 	metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt7_result").Inc()
 	defer metrics.WorkerState.WithLabelValues(dp.TableName(), "ndt7_result").Dec()

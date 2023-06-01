@@ -31,7 +31,7 @@ func TestPCAPParser_ParseAndInsert(t *testing.T) {
 
 	date := civil.Date{Year: 2021, Month: 07, Day: 22}
 
-	meta := etl.ParserMetadata{
+	meta := etl.Metadata{
 		ArchiveURL: path.Join(pcapGCSPath, pcapFilename),
 		Date:       date,
 		Version:    parser.Version(),

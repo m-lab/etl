@@ -86,7 +86,7 @@ func (tp *TestParser) TaskError() error {
 }
 
 // TODO - pass testName through to BQ inserter?
-func (tp *TestParser) ParseAndInsert(meta etl.ParserMetadata, testName string, test []byte) error {
+func (tp *TestParser) ParseAndInsert(meta etl.Metadata, testName string, test []byte) error {
 	tp.files = append(tp.files, testName)
 	return nil
 }

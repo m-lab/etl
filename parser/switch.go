@@ -63,7 +63,7 @@ func (p *SwitchParser) IsParsable(testName string, data []byte) (string, bool) {
 }
 
 // ParseAndInsert decodes the switch data and inserts it into BQ.
-func (p *SwitchParser) ParseAndInsert(meta etl.ParserMetadata, testName string, rawContent []byte) error {
+func (p *SwitchParser) ParseAndInsert(meta etl.Metadata, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), string(etl.SW)).Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), string(etl.SW)).Dec()
 
