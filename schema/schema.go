@@ -13,12 +13,14 @@ import (
 
 // ParseInfo provides details about the parsed row. Uses 'Standard Column' names.
 type ParseInfo struct {
-	Version    string
-	Time       time.Time
-	ArchiveURL string
-	Filename   string
-	Priority   int64
-	GitCommit  string
+	Version     string
+	Time        time.Time
+	ArchiveURL  string
+	Filename    string
+	Priority    int64
+	GitCommit   string
+	ArchiveSize int64
+	FileSize    int64
 }
 
 // ServerInfo details various kinds of information about the server.
