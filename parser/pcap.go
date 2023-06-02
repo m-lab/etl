@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/bigquery"
-	"cloud.google.com/go/civil"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
@@ -144,17 +142,17 @@ func (p *PCAPParser) IsParsable(testName string, data []byte) (string, bool) {
 }
 
 // ParseAndInsert decodes the PCAP data and inserts it into BQ.
-func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
+func (p *PCAPParser) ParseAndInsert(meta etl.Metadata, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), "pcap").Dec()
 
 	row := schema.PCAPRow{
 		Parser: schema.ParseInfo{
-			Version:    Version(),
+			Version:    meta.Version,
 			Time:       time.Now(),
-			ArchiveURL: fileMetadata["filename"].(string),
+			ArchiveURL: meta.ArchiveURL,
 			Filename:   testName,
-			GitCommit:  GitCommit(),
+			GitCommit:  meta.GitCommit,
 		},
 	}
 
@@ -162,7 +160,7 @@ func (p *PCAPParser) ParseAndInsert(fileMetadata map[string]bigquery.Value, test
 	// the given timestamp, regardless of the timestamp's timezone. Since we
 	// run our systems in UTC, all timestamps will be relative to UTC and as
 	// will these dates.
-	row.Date = fileMetadata["date"].(civil.Date)
+	row.Date = meta.Date
 	row.ID = p.GetUUID(testName)
 
 	// Parse top level PCAP data and update metrics.

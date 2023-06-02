@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
 	"github.com/go-test/deep"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/rtx"
@@ -25,9 +25,11 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 	data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))
 	rtx.Must(err, "failed to load test file")
 
-	meta := map[string]bigquery.Value{
-		"filename": file,
-		"date":     civil.Date{Year: 2021, Month: 9, Day: 14},
+	meta := etl.Metadata{
+		ArchiveURL: file,
+		Date:       civil.Date{Year: 2021, Month: 9, Day: 14},
+		Version:    parser.Version(),
+		GitCommit:  parser.GitCommit(),
 	}
 
 	err = n.ParseAndInsert(meta, file, data)
@@ -57,9 +59,11 @@ func TestScamper1Parser_ParserAndInsertError(t *testing.T) {
 	data, err := ioutil.ReadFile(path.Join("testdata/Scamper1/", file))
 	rtx.Must(err, "failed to load test file")
 
-	meta := map[string]bigquery.Value{
-		"filename": file,
-		"date":     civil.Date{Year: 2021, Month: 9, Day: 8},
+	meta := etl.Metadata{
+		ArchiveURL: file,
+		Date:       civil.Date{Year: 2021, Month: 9, Day: 8},
+		Version:    parser.Version(),
+		GitCommit:  parser.GitCommit(),
 	}
 
 	err = n.ParseAndInsert(meta, file, data)

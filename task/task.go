@@ -12,7 +12,7 @@ import (
 	"log"
 	"time"
 
-	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/etl/parser"
 
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
@@ -41,26 +41,29 @@ type Task struct {
 	etl.TestSource // Source from which to read tests.
 	etl.Parser     // Parser to parse the tests.
 
-	meta        map[string]bigquery.Value // Metadata about this task.
-	maxFileSize int64                     // Max file size to avoid OOM.
+	meta etl.Metadata // Common information about the archive being parsed.
+
+	maxFileSize int64 // Max file size to avoid OOM.
 
 	closer io.Closer // So we can call Close()
 }
 
 // NewTask constructs a task, injecting the source and the parser.
-func NewTask(filename string, src etl.TestSource, prsr etl.Parser, closer io.Closer) *Task {
+func NewTask(archive string, src etl.TestSource, prsr etl.Parser, closer io.Closer) *Task {
 	// TODO - should the meta data be a nested type?
-	meta := make(map[string]bigquery.Value, 3)
-	meta["filename"] = filename
-	meta["parse_time"] = time.Now()
-	meta["attempt"] = 1
-	meta["date"] = src.Date()
 	t := Task{
-		TestSource:  src,
-		Parser:      prsr,
-		meta:        meta,
+		TestSource: src,
+		Parser:     prsr,
+		meta: etl.Metadata{
+			Version:    parser.Version(),
+			ArchiveURL: archive,
+			GitCommit:  parser.GitCommit(),
+			Date:       src.Date(),
+			Start:      time.Now(),
+		},
 		maxFileSize: DefaultMaxFileSize,
-		closer:      closer}
+		closer:      closer,
+	}
 	return &t
 }
 
@@ -105,8 +108,8 @@ OUTER:
 				break OUTER
 			case loopErr == storage.ErrOversizeFile:
 				log.Printf("ERROR filename:%s testname:%s files:%d, duration:%v err:%v",
-					tt.meta["filename"], testname, files,
-					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
+					tt.meta.ArchiveURL, testname, files,
+					time.Since(tt.meta.Start), loopErr)
 				metrics.TestTotal.WithLabelValues(
 					tt.Type(), "unknown", "oversize file").Inc()
 				continue OUTER
@@ -122,8 +125,8 @@ OUTER:
 				// Because of the break, this error is passed up, and counted at
 				// the Task level.
 				log.Printf("ERROR filename:%s testname:%s files:%d, duration:%v err:%v",
-					tt.meta["filename"], testname, files,
-					time.Since(tt.meta["parse_time"].(time.Time)), loopErr)
+					tt.meta.ArchiveURL, testname, files,
+					time.Since(tt.meta.Start), loopErr)
 
 				metrics.TestTotal.WithLabelValues(
 					tt.Type(), "unknown", "unrecovered").Inc()
@@ -179,7 +182,7 @@ OUTER:
 	// TODO - make this debug or remove
 	log.Printf("Processed %d files, %d nil data, %d rows committed, %d failed, from %s into %s",
 		files, nilData, tt.Parser.Committed(), tt.Parser.Failed(),
-		tt.meta["filename"], tt.Parser.FullTableName())
+		tt.meta.ArchiveURL, tt.Parser.FullTableName())
 
 	// We expect the loopErr to be io.EOF.  If it is something else, then
 	// it is an actual error, and we want to return that error.

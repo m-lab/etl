@@ -5,8 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/bigquery"
-	"cloud.google.com/go/civil"
 	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/row"
@@ -97,7 +95,7 @@ func (p *Scamper1Parser) IsParsable(testName string, data []byte) (string, bool)
 }
 
 // ParseAndInsert decodes the scamper1 data and inserts it into BQ.
-func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, testName string, rawContent []byte) error {
+func (p *Scamper1Parser) ParseAndInsert(meta etl.Metadata, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Dec()
 
@@ -108,7 +106,7 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	}
 
 	rawData, err := trcParser.ParseRawData(rawContent)
-	archiveURL := fileMetadata["filename"].(string)
+	archiveURL := meta.ArchiveURL
 	if err != nil {
 		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, err.Error()).Inc()
 		return fmt.Errorf("failed to parse scamper1 file: %s, archiveURL: %s, error: %w", testName, archiveURL, err)
@@ -128,17 +126,17 @@ func (p *Scamper1Parser) ParseAndInsert(fileMetadata map[string]bigquery.Value, 
 	parseTracelb(&bqScamperOutput, scamperOutput.Tracelb)
 
 	parseInfo := schema.ParseInfo{
-		Version:    Version(),
+		Version:    meta.Version,
 		Time:       time.Now(),
-		ArchiveURL: archiveURL,
+		ArchiveURL: meta.ArchiveURL,
 		Filename:   testName,
-		GitCommit:  GitCommit(),
+		GitCommit:  meta.GitCommit,
 	}
 
 	row := schema.Scamper1Row{
 		ID:     bqScamperOutput.Metadata.UUID,
 		Parser: parseInfo,
-		Date:   fileMetadata["date"].(civil.Date),
+		Date:   meta.Date,
 		Raw:    bqScamperOutput,
 	}
 

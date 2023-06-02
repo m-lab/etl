@@ -5,7 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/etl/etl"
+
 	"cloud.google.com/go/civil"
 	"github.com/go-test/deep"
 	"github.com/m-lab/etl/parser"
@@ -45,9 +46,11 @@ func TestAnnotation2Parser_ParseAndInsert(t *testing.T) {
 				t.Fatal("IsParsable() failed; got false, want true")
 			}
 
-			meta := map[string]bigquery.Value{
-				"filename": "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/" + tt.file,
-				"date":     civil.Date{Year: 2020, Month: 3, Day: 18},
+			meta := etl.Metadata{
+				ArchiveURL: "gs://mlab-test-bucket/ndt/ndt7/2020/03/18/" + tt.file,
+				Date:       civil.Date{Year: 2020, Month: 3, Day: 18},
+				Version:    parser.Version(),
+				GitCommit:  parser.GitCommit(),
 			}
 
 			if err := n.ParseAndInsert(meta, tt.file, data); (err != nil) != tt.wantErr {

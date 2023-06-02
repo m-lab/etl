@@ -7,8 +7,8 @@ import (
 	"path"
 	"testing"
 
-	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/rtx"
@@ -29,9 +29,11 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	rtx.Must(err, "failed to load DISCOv2 test file")
 
 	date := civil.Date{Year: 2021, Month: 12, Day: 14}
-	meta := map[string]bigquery.Value{
-		"filename": path.Join(switchGCSPath, switchDISCOv2Filename),
-		"date":     date,
+	meta := etl.Metadata{
+		ArchiveURL: path.Join(switchGCSPath, switchDISCOv2Filename),
+		Date:       date,
+		Version:    parser.Version(),
+		GitCommit:  parser.GitCommit(),
 	}
 
 	if err := n.ParseAndInsert(meta, switchDISCOv2Filename, data); err != nil {
@@ -94,11 +96,8 @@ func TestSwitchParser_ParseAndInsert(t *testing.T) {
 	data, err = ioutil.ReadAll(reader)
 	rtx.Must(err, "failed to read from gzip stream")
 
-	date = civil.Date{Year: 2016, Month: 05, Day: 12}
-	meta = map[string]bigquery.Value{
-		"filename": path.Join(switchGCSPath, switchDISCOv1Filename),
-		"date":     date,
-	}
+	meta.ArchiveURL = path.Join(switchGCSPath, switchDISCOv1Filename)
+	meta.Date = civil.Date{Year: 2016, Month: 05, Day: 12}
 
 	if err := n.ParseAndInsert(meta, switchDISCOv1Filename, data); err != nil {
 		t.Errorf("SwitchParser.ParseAndInsert() error = %v, wantErr %v", err, true)

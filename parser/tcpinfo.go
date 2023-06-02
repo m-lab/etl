@@ -20,9 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/bigquery"
-	"cloud.google.com/go/civil"
-
 	"github.com/valyala/gozstd"
 
 	"github.com/m-lab/tcp-info/netlink"
@@ -114,7 +111,7 @@ func thinSnaps(orig []snapshot.Snapshot) []snapshot.Snapshot {
 
 // ParseAndInsert extracts all ArchivalRecords from the rawContent and inserts into a single row.
 // Approximately 15 usec/snapshot.
-func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, rawContent []byte) error {
+func (p *TCPInfoParser) ParseAndInsert(meta etl.Metadata, testName string, rawContent []byte) error {
 	tableName := p.FullTableName()
 	metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Inc()
 	defer metrics.WorkerState.WithLabelValues(tableName, "tcpinfo").Dec()
@@ -184,13 +181,13 @@ func (p *TCPInfoParser) ParseAndInsert(meta map[string]bigquery.Value, testName 
 			FinalSnapshot: snaps[len(snaps)-1],
 		},
 		Parser: schema.ParseInfo{
-			Version:    Version(),
+			Version:    meta.Version,
 			Time:       time.Now(),
-			ArchiveURL: meta["filename"].(string),
+			ArchiveURL: meta.ArchiveURL,
 			Filename:   testName,
-			GitCommit:  GitCommit(),
+			GitCommit:  meta.GitCommit,
 		},
-		Date: meta["date"].(civil.Date),
+		Date: meta.Date,
 		Raw: &snapshot.ConnectionLog{
 			Metadata: tcpMeta,
 			// TODO(https://github.com/m-lab/etl/issues/1068) - consider minimizing snapshot thinning.

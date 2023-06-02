@@ -1,5 +1,4 @@
 // TODO(soon) Implement good tests for the existing parsers.
-//
 package parser_test
 
 import (
@@ -125,7 +124,7 @@ func TestGetHopID(t *testing.T) {
 	}
 }
 
-//------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------
 // TestParser ignores the content, returns a MapSaver containing meta data and
 // "testname":"..."
 // TODO add tests
@@ -144,14 +143,15 @@ func (tp *TestParser) IsParsable(testName string, test []byte) (string, bool) {
 	return "ext", true
 }
 
-func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+func (tp *TestParser) ParseAndInsert(meta etl.Metadata, testName string, test []byte) error {
 	metrics.TestTotal.WithLabelValues("table", "test", "ok").Inc()
-	values := make(map[string]bigquery.Value, len(meta)+1)
-	// TODO is there a better way to do this?
-	for k, v := range meta {
-		values[k] = v
+	values := map[string]bigquery.Value{
+		"filename":   meta.ArchiveURL,
+		"date":       meta.Date,
+		"version":    meta.Version,
+		"git_commit": meta.GitCommit,
+		"testname":   testName,
 	}
-	values["testname"] = testName
 	return tp.inserter.InsertRow(values)
 }
 
@@ -174,7 +174,7 @@ func TestPlumbing(t *testing.T) {
 	tci := countingInserter{}
 	var ti etl.Inserter = &tci
 	var p etl.Parser = NewTestParser(ti)
-	err := p.ParseAndInsert(nil, "foo", foo[:])
+	err := p.ParseAndInsert(etl.Metadata{}, "foo", foo[:])
 	if err != nil {
 		fmt.Println(err)
 	}

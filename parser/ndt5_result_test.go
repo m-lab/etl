@@ -8,7 +8,7 @@ import (
 
 	"cloud.google.com/go/civil"
 
-	"cloud.google.com/go/bigquery"
+	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
 )
@@ -60,9 +60,11 @@ func TestNDT5ResultParser_ParseAndInsert(t *testing.T) {
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
-			meta := map[string]bigquery.Value{
-				"filename": "gs://mlab-test-bucket/ndt/ndt5/2019/08/22/ndt_ndt5_2019_08_22_20190822T194819.568936Z-ndt5-mlab1-lga0t-ndt.tgz",
-				"date":     d,
+			meta := etl.Metadata{
+				ArchiveURL: "gs://mlab-test-bucket/ndt/ndt5/2019/08/22/ndt_ndt5_2019_08_22_20190822T194819.568936Z-ndt5-mlab1-lga0t-ndt.tgz",
+				Date:       d,
+				Version:    parser.Version(),
+				GitCommit:  parser.GitCommit(),
 			}
 
 			if err := n.ParseAndInsert(meta, tt.testName, resultData); (err != nil) != tt.wantErr {

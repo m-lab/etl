@@ -1,5 +1,4 @@
 // TODO(dev) add test overview
-//
 package task_test
 
 import (
@@ -9,8 +8,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"cloud.google.com/go/bigquery"
 
 	"time"
 
@@ -89,7 +86,7 @@ func (tp *TestParser) TaskError() error {
 }
 
 // TODO - pass testName through to BQ inserter?
-func (tp *TestParser) ParseAndInsert(meta map[string]bigquery.Value, testName string, test []byte) error {
+func (tp *TestParser) ParseAndInsert(meta etl.Metadata, testName string, test []byte) error {
 	tp.files = append(tp.files, testName)
 	return nil
 }
