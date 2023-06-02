@@ -41,6 +41,10 @@ parser.Filename:
     Results in the raw record are derived from measurements in this file.
 parser.GitCommit:
   Description: The git commit of this build of the parser.
+parser.ArchiveSize:
+  Description: The original archive size as found in GCS.
+parser.FileSize:
+  Description: The size of the file data provided to the parser for this row.
 
 server:
   Description: Location information about the M-Lab server that collected the

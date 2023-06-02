@@ -69,11 +69,13 @@ func (dp *NDT7ResultParser) ParseAndInsert(meta etl.Metadata, testName string, t
 
 	row := schema.NDT7ResultRow{
 		Parser: schema.ParseInfo{
-			Version:    meta.Version,
-			Time:       time.Now(),
-			ArchiveURL: meta.ArchiveURL,
-			Filename:   testName,
-			GitCommit:  meta.GitCommit,
+			Version:     meta.Version,
+			Time:        time.Now(),
+			ArchiveURL:  meta.ArchiveURL,
+			Filename:    testName,
+			GitCommit:   meta.GitCommit,
+			ArchiveSize: meta.ArchiveSize,
+			FileSize:    int64(len(test)),
 		},
 	}
 

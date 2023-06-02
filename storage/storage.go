@@ -141,6 +141,11 @@ func (src *GCSSource) Date() civil.Date {
 	return src.PathDate
 }
 
+// GetSize returns a size of the archive at the GCSSource archive path.
+func (src *GCSSource) GetSize() int64 {
+	return src.Size
+}
+
 // NextTest reads the next test object from the tar file.
 // Skips reading contents of any file larger than maxSize, returning empty data
 // and storage.ErrOversizeFile.

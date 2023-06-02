@@ -148,11 +148,13 @@ func (p *PCAPParser) ParseAndInsert(meta etl.Metadata, testName string, rawConte
 
 	row := schema.PCAPRow{
 		Parser: schema.ParseInfo{
-			Version:    meta.Version,
-			Time:       time.Now(),
-			ArchiveURL: meta.ArchiveURL,
-			Filename:   testName,
-			GitCommit:  meta.GitCommit,
+			Version:     meta.Version,
+			Time:        time.Now(),
+			ArchiveURL:  meta.ArchiveURL,
+			Filename:    testName,
+			GitCommit:   meta.GitCommit,
+			ArchiveSize: meta.ArchiveSize,
+			FileSize:    int64(len(rawContent)),
 		},
 	}
 

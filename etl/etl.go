@@ -105,11 +105,12 @@ type InserterParams struct {
 
 // Metadata provides metadata about the parser and archive files.
 type Metadata struct {
-	Version    string
-	ArchiveURL string
-	GitCommit  string
-	Date       civil.Date
-	Start      time.Time
+	Version     string
+	ArchiveURL  string
+	GitCommit   string
+	Date        civil.Date
+	Start       time.Time
+	ArchiveSize int64
 }
 
 // ErrHighInsertionFailureRate should be returned by TaskError when there are more than 10% BQ insertion errors.
@@ -153,6 +154,7 @@ type TestSource interface {
 	// Returns io.EOF when there are no more tests.
 	NextTest(maxSize int64) (string, []byte, error)
 	Close() error
+	GetSize() int64
 
 	Detail() string   // Detail for logs.
 	Type() string     // Data type for logs and metrics

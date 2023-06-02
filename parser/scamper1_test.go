@@ -46,6 +46,7 @@ func TestScamper1Parser_ParseAndInsert(t *testing.T) {
 
 	expectedRow := expectedScamper1Row()
 	expectedRow.Parser.Time = row.Parser.Time
+	expectedRow.Parser.FileSize = int64(len(data))
 	if diff := deep.Equal(row, &expectedRow); diff != nil {
 		t.Errorf("failed to extract correct row from file: different rows - %s", strings.Join(diff, "\n"))
 	}

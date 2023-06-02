@@ -126,11 +126,13 @@ func (p *Scamper1Parser) ParseAndInsert(meta etl.Metadata, testName string, rawC
 	parseTracelb(&bqScamperOutput, scamperOutput.Tracelb)
 
 	parseInfo := schema.ParseInfo{
-		Version:    meta.Version,
-		Time:       time.Now(),
-		ArchiveURL: meta.ArchiveURL,
-		Filename:   testName,
-		GitCommit:  meta.GitCommit,
+		Version:     meta.Version,
+		Time:        time.Now(),
+		ArchiveURL:  meta.ArchiveURL,
+		Filename:    testName,
+		GitCommit:   meta.GitCommit,
+		ArchiveSize: meta.ArchiveSize,
+		FileSize:    int64(len(rawContent)),
 	}
 
 	row := schema.Scamper1Row{
