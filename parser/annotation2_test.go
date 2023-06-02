@@ -68,6 +68,7 @@ func TestAnnotation2Parser_ParseAndInsert(t *testing.T) {
 					Filename:   tt.file,
 					Priority:   0,
 					GitCommit:  "12345678",
+					FileSize:   int64(len(data)),
 				}
 
 				if diff := deep.Equal(row.Parser, expPI); diff != nil {

@@ -63,11 +63,13 @@ func (ap *Annotation2Parser) ParseAndInsert(meta etl.Metadata, testName string, 
 
 	row := schema.Annotation2Row{
 		Parser: schema.ParseInfo{
-			Version:    meta.Version,
-			Time:       time.Now(),
-			ArchiveURL: meta.ArchiveURL,
-			Filename:   testName,
-			GitCommit:  meta.GitCommit,
+			Version:     meta.Version,
+			Time:        time.Now(),
+			ArchiveURL:  meta.ArchiveURL,
+			Filename:    testName,
+			GitCommit:   meta.GitCommit,
+			ArchiveSize: meta.ArchiveSize,
+			FileSize:    int64(len(test)),
 		},
 	}
 

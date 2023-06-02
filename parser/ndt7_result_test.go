@@ -15,7 +15,7 @@ import (
 	"github.com/m-lab/go/pretty"
 )
 
-func setupNDT7InMemoryParser(t *testing.T, testName string) (*schema.NDT7ResultRow, error) {
+func setupNDT7InMemoryParser(t *testing.T, testName string) (*schema.NDT7ResultRow, int64, error) {
 	ins := newInMemorySink()
 	n := parser.NewNDT7ResultParser(ins, "test", "_suffix")
 
@@ -31,14 +31,14 @@ func setupNDT7InMemoryParser(t *testing.T, testName string) (*schema.NDT7ResultR
 	}
 	err = n.ParseAndInsert(meta, testName, resultData)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if n.Accepted() != 1 {
 		t.Fatal("Failed to insert snaplog data.", ins)
 	}
 	n.Flush()
 	row := ins.data[0].(*schema.NDT7ResultRow)
-	return row, err
+	return row, int64(len(resultData)), err
 }
 
 func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
@@ -58,7 +58,7 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			row, err := setupNDT7InMemoryParser(t, tt.testName)
+			row, size, err := setupNDT7InMemoryParser(t, tt.testName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NDT7ResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -82,6 +82,7 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 					Filename:   "ndt7-download-20200318T000657.568382877Z.ndt-knwp4_1583603744_000000000000590E.json",
 					Priority:   0,
 					GitCommit:  "12345678",
+					FileSize:   size,
 				}
 				if diff := deep.Equal(row.Parser, expPI); diff != nil {
 					pretty.Print(row.Parser)
@@ -121,6 +122,7 @@ func TestNDT7ResultParser_ParseAndInsert(t *testing.T) {
 					Filename:   "ndt7-upload-20200318T001352.496224022Z.ndt-knwp4_1583603744_0000000000005CF2.json",
 					Priority:   0,
 					GitCommit:  "12345678",
+					FileSize:   size,
 				}
 				if diff := deep.Equal(row.Parser, expPI); diff != nil {
 					t.Errorf("NDT7ResultParser.ParseAndInsert() different summary: %s", strings.Join(diff, "\n"))
@@ -160,7 +162,7 @@ func TestNDT7ResultParser_ParseAndInsertUnsafe(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			row, err := setupNDT7InMemoryParser(t, tt.testName)
+			row, _, err := setupNDT7InMemoryParser(t, tt.testName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NDT7ResultParser.ParseAndInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}

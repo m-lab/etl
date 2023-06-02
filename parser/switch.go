@@ -137,11 +137,13 @@ func (p *SwitchParser) ParseAndInsert(meta etl.Metadata, testName string, rawCon
 					ID:   fmt.Sprintf("%s-%s-%d", machine, site, sample.Timestamp),
 					Date: archiveDate,
 					Parser: schema.ParseInfo{
-						Version:    meta.Version,
-						Time:       time.Now(),
-						ArchiveURL: meta.ArchiveURL,
-						Filename:   testName,
-						GitCommit:  meta.GitCommit,
+						Version:     meta.Version,
+						Time:        time.Now(),
+						ArchiveURL:  meta.ArchiveURL,
+						Filename:    testName,
+						GitCommit:   meta.GitCommit,
+						ArchiveSize: meta.ArchiveSize,
+						FileSize:    int64(len(rawContent)),
 					},
 					A: &schema.SwitchSummary{
 						Machine:        machine,

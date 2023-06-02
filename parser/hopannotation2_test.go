@@ -32,10 +32,11 @@ func TestHopAnnotation2Parser_ParseAndInsert(t *testing.T) {
 	date := civil.Date{Year: 2021, Month: 07, Day: 30}
 
 	meta := etl.Metadata{
-		ArchiveURL: path.Join(hopAnnotation2GCSPath, hopAnnotation2Filename),
-		Date:       date,
-		Version:    parser.Version(),
-		GitCommit:  parser.GitCommit(),
+		ArchiveURL:  path.Join(hopAnnotation2GCSPath, hopAnnotation2Filename),
+		Date:        date,
+		Version:     parser.Version(),
+		GitCommit:   parser.GitCommit(),
+		ArchiveSize: int64(len(data)),
 	}
 
 	if err := n.ParseAndInsert(meta, hopAnnotation2Filename, data); err != nil {
@@ -50,12 +51,14 @@ func TestHopAnnotation2Parser_ParseAndInsert(t *testing.T) {
 	row := ins.data[0].(*schema.HopAnnotation2Row)
 
 	expectedParseInfo := schema.ParseInfo{
-		Version:    "https://github.com/m-lab/etl/tree/foobar",
-		Time:       row.Parser.Time,
-		ArchiveURL: path.Join(hopAnnotation2GCSPath, hopAnnotation2Filename),
-		Filename:   hopAnnotation2Filename,
-		Priority:   0,
-		GitCommit:  "12345678",
+		Version:     "https://github.com/m-lab/etl/tree/foobar",
+		Time:        row.Parser.Time,
+		ArchiveURL:  path.Join(hopAnnotation2GCSPath, hopAnnotation2Filename),
+		Filename:    hopAnnotation2Filename,
+		Priority:    0,
+		GitCommit:   "12345678",
+		ArchiveSize: int64(len(data)),
+		FileSize:    int64(len(data)),
 	}
 
 	expectedGeolocation := annotator.Geolocation{

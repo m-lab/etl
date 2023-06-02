@@ -56,6 +56,7 @@ func TestPCAPParser_ParseAndInsert(t *testing.T) {
 		Filename:   pcapFilename,
 		Priority:   0,
 		GitCommit:  "12345678",
+		FileSize:   int64(len(data)),
 	}
 
 	expectedPCAPRow := schema.PCAPRow{
