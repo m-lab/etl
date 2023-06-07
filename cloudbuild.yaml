@@ -109,6 +109,15 @@ steps:
   env:
   - PROJECT=$PROJECT_ID
 
+# TODO(github.com/m-lab/prometheus-support/issues/894): This
+# verification belongs in monitoring once the ndt5 extended views are efficient.
+- name: gcr.io/cloud-builders/kubectl
+  id: "Verify unified views configuration after schema deployment"
+  entrypoint: /bin/bash
+  args: [
+   '-c', "bq query --nouse_legacy_sql 'SELECT COUNT(*) FROM `$PROJECT_ID.ndt.unified_downloads` WHERE date = DATE_SUB(CURRENT_DATE(), INTERVAL 2 DAY)'"
+  ]
+
 # UNIVERSAL PARSER: Run apply-cluster.sh
 - name: gcr.io/cloud-builders/kubectl
   id: "Deploy etl parser to data-processing cluster"
