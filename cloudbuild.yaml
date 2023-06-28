@@ -109,6 +109,16 @@ steps:
   env:
   - PROJECT=$PROJECT_ID
 
+- name: etl-testing
+  id: "Update table schemas for msak deploying parsers"
+  entrypoint: bash
+  args: [
+     '-c', './update-schema -experiment msak -datatype annotation2'
+  ]
+  env:
+  - PROJECT=$PROJECT_ID
+
+
 # UNIVERSAL PARSER: Run apply-cluster.sh
 - name: gcr.io/cloud-builders/kubectl
   id: "Deploy etl parser to data-processing cluster"
