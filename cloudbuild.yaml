@@ -113,7 +113,10 @@ steps:
   id: "Update table schemas for msak deploying parsers"
   entrypoint: bash
   args: [
-     '-c', './update-schema -experiment msak -datatype annotation2'
+     '-c', './update-schema -experiment msak -datatype annotation2 &&
+            ./update-schema -experiment msak -datatype scamper1 &&
+            ./update-schema -experiment msak -datatype hopannotation2 &&
+            ./update-schema -experiment msak -datatype tcpinfo'
   ]
   env:
   - PROJECT=$PROJECT_ID
