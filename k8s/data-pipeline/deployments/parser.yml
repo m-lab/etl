@@ -38,7 +38,7 @@ spec:
         name: etl-parser
         args: ["--prometheusx.listen-address=:9090",
                "--output=gcs",
-               "--output_location=etl-{{GCLOUD_PROJECT}}",
+               "--output_location=etl-{{GCLOUD_PROJECT}}-us-central1",
                "--service_port=:8080",  # If we move to jsonnet, this could be bound to service-port defined below
                "--max_active=100",
                ]
