@@ -125,7 +125,7 @@ steps:
 
 # UNIVERSAL PARSER: Run apply-cluster.sh
 - name: gcr.io/cloud-builders/kubectl
-  id: "Deploy etl parser to data-processing cluster"
+  id: "Deploy etl parser to $_CLUSTER cluster"
   entrypoint: /bin/bash
   args: [
    '-c', '/builder/kubectl.bash version && ./apply-cluster.sh'
