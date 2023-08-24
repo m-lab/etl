@@ -1,4 +1,4 @@
-FROM golang:1.18 as builder
+FROM golang:1.20 as builder
 ARG VERSION
 WORKDIR /go/src/github.com/m-lab/etl
 COPY . .
@@ -13,7 +13,7 @@ RUN go install \
       -X github.com/m-lab/etl/etl.GitCommit=$(git log -1 --format=%H)" \
     ./cmd/etl_worker
 
-FROM alpine:3.14
+FROM alpine:3.18
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /go/bin/etl_worker /bin/etl_worker
 EXPOSE 9090 8080

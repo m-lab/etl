@@ -40,27 +40,17 @@ Writing schema_ndtresultrow.md
 
 ```
 
-## Moving to GKE
+## GKE
 
-The universal parser will run in GKE, using parser-pool node pools, defined like this:
+The universal parser will run in GKE, using a parser node pool, defined in
+[terraform-support](https://github.com/m-lab/terraform-support).
 
-```sh
-gcloud --project=mlab-sandbox container node-pools create parser-pool-1 \
-  --cluster=data-processing   --num-nodes=3   --region=us-east1 \
-  --scopes storage-ro,compute-rw,bigquery,datastore \
-  --node-labels=parser-node=true   --enable-autorepair --enable-autoupgrade \
-  --machine-type=n1-standard-16
-```
-
-The images come from gcr.io, and are built by google cloud build.  The build
-trigger is currently found with:
+The parser images are built in Cloud Build environment, pushed to gcr.io, and
+deployed to the data-pipeline cluster. The build trigger can be found with:
 
 ```sh
-gcloud beta builds triggers list --filter=m-lab/etl
+gcloud builds triggers list --filter=github.name=etl
 ```
-
-Deployment requires adding cloud-kubernetes-deployer role to etl-travis-deploy@
-in IAM.  This is done for sandbox and staging.
 
 ## Migrating to Sink interface
 
