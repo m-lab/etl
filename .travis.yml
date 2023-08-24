@@ -8,7 +8,7 @@
 dist: bionic
 language: go
 go:
- - 1.18
+ - 1.20
 
 env:
 - PATH=$PATH:$HOME/gopath/bin
