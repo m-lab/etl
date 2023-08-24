@@ -125,7 +125,7 @@ steps:
 
 # UNIVERSAL PARSER: Run apply-cluster.sh
 - name: gcr.io/cloud-builders/kubectl
-  id: "Deploy etl parser to data-processing cluster"
+  id: "Deploy etl parser to $_CLUSTER_NAME cluster"
   entrypoint: /bin/bash
   args: [
    '-c', '/builder/kubectl.bash version && ./apply-cluster.sh'
@@ -133,5 +133,5 @@ steps:
   env:
   - BIGQUERY_DATASET=tmp_ndt
   - CLOUDSDK_COMPUTE_REGION=$_CLUSTER_REGION
-  - CLOUDSDK_CONTAINER_CLUSTER=$_CLUSTER
+  - CLOUDSDK_CONTAINER_CLUSTER=$_CLUSTER_NAME
   - CLOUDSDK_CORE_PROJECT=$PROJECT_ID
