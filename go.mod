@@ -14,7 +14,7 @@ require (
 	github.com/iancoleman/strcase v0.2.0
 	github.com/kr/pretty v0.3.0
 	github.com/m-lab/etl-gardener v0.0.0-20220706163049-f6a4eced2192
-	github.com/m-lab/go v0.1.53
+	github.com/m-lab/go v0.1.66
 	github.com/m-lab/ndt-server v0.20.18
 	github.com/m-lab/tcp-info v1.5.3
 	github.com/m-lab/traceroute-caller v0.10.1
