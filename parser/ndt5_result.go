@@ -179,7 +179,7 @@ func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) {
 		// TCPInfo.MinRTT is a uint32. Convert to milliseconds.
 		row.A.MinRTT = float64(s2c.TCPInfo.MinRTT) / 1000.0
 	} else {
-		// MinRTT is a time.Duration. Convert to milliseconds.
+		// s2c.MinRTT is a time.Duration. Convert back to milliseconds.
 		row.A.MinRTT = float64(s2c.MinRTT) / float64(time.Millisecond)
 	}
 	// NOTE: the TCPInfo structure was introduced in v0.18.0. Measurements
