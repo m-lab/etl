@@ -16,7 +16,7 @@ a.MeanThroughputMbps:
     it is identified as "MeanThroughputMbps".
 a.MinRTT:
   Description: The minimum Round Trip Time observed during the measurement,
-    recorded in milliseconds.
+    recorded in milliseconds. Derived from TCPInfo.MinRTT after 2020-06-18.
 a.LossRate:
   Description: Loss rate from the lifetime of the connection.
 
@@ -252,7 +252,7 @@ TCPInfo.NotsentBytes:
     sent.
   Kernel: tcpi_notsent_bytes() in net/ipv4/tcp.c
 TCPInfo.MinRTT:
-  Description: Minimum Round Trip Time. From an older, pre-BBR algorithm.
+  Description: Minimum Round Trip Time. From an older, pre-BBR algorithm. Recorded in microseconds.
   Kernel: tcp_min_rtt in include/net/tcp.h
 TCPInfo.DataSegsIn:
   Description: Input segments carrying data (len>0).
