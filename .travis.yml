@@ -40,4 +40,4 @@ script:
 
 # Report coverage statistics to coveralls.io
 - $HOME/gopath/bin/gocovmerge *.cov > merge.cov
-- $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-ci || true
+- $HOME/gopath/bin/goveralls -coverprofile=merge.cov -service=travis-pro || true
