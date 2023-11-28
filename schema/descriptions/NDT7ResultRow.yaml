@@ -57,7 +57,7 @@ BBRInfo.BW:
   Description: The maximum end-to-end bandwidth from the server to the client
     as measured by BBR.
 BBRInfo.MinRTT:
-  Description: The minimum round trip time as measured by BBR.
+  Description: The minimum round trip time as measured by BBR. Recorded in microseconds.
 BBRInfo.PacingGain:
   Description: Fixed point multiplier used to set the pacing rate from the
     maximum bandwidth.  The binary point varies by kernel version but the
@@ -207,7 +207,7 @@ TCPInfo.NotsentBytes:
     sent.
   Kernel: tcpi_notsent_bytes() in net/ipv4/tcp.c
 TCPInfo.MinRTT:
-  Description: Minimum Round Trip Time. From an older, pre-BBR algorithm.
+  Description: Minimum Round Trip Time. Recorded in microseconds.
   Kernel: tcp_min_rtt in include/net/tcp.h
 TCPInfo.DataSegsIn:
   Description: Input segments carrying data (len>0).

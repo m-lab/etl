@@ -16,7 +16,7 @@ a.MeanThroughputMbps:
     it is identified as "MeanThroughputMbps".
 a.MinRTT:
   Description: The minimum Round Trip Time observed during the measurement,
-    recorded in milliseconds.
+    recorded in milliseconds. Derived from TCPInfo.MinRTT after 2020-06-18.
 a.LossRate:
   Description: Loss rate from the lifetime of the connection.
 
@@ -100,15 +100,13 @@ S2C:
   Description: Metadata for Server-to-Client (download) measurements performed
     using the ndt5 protocol.
 S2C.MinRTT:
-  Description: The minimum RTT observed during the download measurement, recorded in milliseconds.
+  Description: The application measured minimum observed round trip time, recorded in nanoseconds.
 S2C.MaxRTT:
-  Description: The maximum sampled round trip time, recorded in milliseconds.
+  Description: The application measured maximum sampled round trip time, recorded in nanoseconds.
 S2C.SumRTT:
-  Description: The sum of all sampled round trip times, recorded in
-    milliseconds.
+  Description: The sum of all sampled round trip times, recorded in nanoseconds.
 S2C.CountRTT:
-  Description: The number of round trip time samples included in S2C.SumRTT,
-    reported in milliseconds.
+  Description: The number of round trip time samples included in S2C.SumRTT.
 S2C.ClientReportedMbps:
   Description: The download rate as calculated by the client, in megabits per
     second, or Mbit/s. Not all clients report this value.
@@ -254,7 +252,7 @@ TCPInfo.NotsentBytes:
     sent.
   Kernel: tcpi_notsent_bytes() in net/ipv4/tcp.c
 TCPInfo.MinRTT:
-  Description: Minimum Round Trip Time. From an older, pre-BBR algorithm.
+  Description: Minimum Round Trip Time. From an older, pre-BBR algorithm. Recorded in microseconds.
   Kernel: tcp_min_rtt in include/net/tcp.h
 TCPInfo.DataSegsIn:
   Description: Input segments carrying data (len>0).

@@ -176,10 +176,10 @@ func (dp *NDT5ResultParser) prepareS2CRow(row *schema.NDT5ResultRowV2) {
 	// Since the s2c.MinRTT value is a lower resolution user-space estimate,
 	// use TCPInfo if present, and fall back to the low resolution MinRTT otherwise.
 	if s2c.TCPInfo != nil {
-		// TCPInfo.MinRTT is a uint32.
-		row.A.MinRTT = float64(s2c.TCPInfo.MinRTT) / 1000.0 / 1000.0
+		// TCPInfo.MinRTT is a uint32. Convert to milliseconds.
+		row.A.MinRTT = float64(s2c.TCPInfo.MinRTT) / 1000.0
 	} else {
-		// MinRTT is a time.Duration.
+		// s2c.MinRTT is a time.Duration. Convert back to milliseconds.
 		row.A.MinRTT = float64(s2c.MinRTT) / float64(time.Millisecond)
 	}
 	// NOTE: the TCPInfo structure was introduced in v0.18.0. Measurements

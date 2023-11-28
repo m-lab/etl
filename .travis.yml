@@ -5,7 +5,7 @@
 # The travis-ci.com configuration performs unit and integration tests, and code
 # coverage only.
 
-dist: bionic
+dist: jammy # 22.04
 language: go
 go:
  - 1.20
