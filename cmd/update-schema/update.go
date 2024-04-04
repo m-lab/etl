@@ -149,6 +149,8 @@ func CreateOrUpdate(client *bigquery.Client, schema bigquery.Schema, project, da
 
 	partitioning := &bigquery.TimePartitioning{
 		Field: partField,
+		// If the partition field is set, enforce a partition filter for querying.
+		RequirePartitionFilter: partField != "",
 	}
 
 	err = pdt.CreateTable(ctx, client, schema, "", partitioning, nil)
