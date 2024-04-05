@@ -270,8 +270,8 @@ github.com/m-lab/annotation-service v0.0.0-20210713124633-fa227b3d5b2f h1:dLJUar
 github.com/m-lab/annotation-service v0.0.0-20210713124633-fa227b3d5b2f/go.mod h1:bW5A2AmUqyh6kGbmu4X8fYK2pRcfTvTjAXW/+4VQZUA=
 github.com/m-lab/etl-gardener v0.0.0-20220706163049-f6a4eced2192 h1:kplK/Eyw/IepsFGWW365hEzaI7rz/SoRAfiCo/SxX24=
 github.com/m-lab/etl-gardener v0.0.0-20220706163049-f6a4eced2192/go.mod h1:JMTxQHudYLHNUf700okKbrE9ZbPA4e9Ri2s4Z34tj4o=
-github.com/m-lab/go v0.1.66 h1:adDJILqKBCkd5YeVhCrrjWkjoNRtDzlDr6uizWu5/pE=
-github.com/m-lab/go v0.1.66/go.mod h1:O1D/EoVarJ8lZt9foANcqcKtwxHatBzUxXFFyC87aQQ=
+github.com/m-lab/go v0.1.72 h1:M1A/qUQb1JXdYFHIboiu5YrHSlvBCgDbGjZuxnekDRQ=
+github.com/m-lab/go v0.1.72/go.mod h1:BirARfHWjjXHaCGNyWCm/CKW1OarjuEj8Yn6Z2rc0M4=
 github.com/m-lab/ndt-server v0.20.18 h1:lcfeHHw/kyI4zDhJKBPc4r5I0hR5BKPqAY1LIhJ6xmo=
 github.com/m-lab/ndt-server v0.20.18/go.mod h1:NQyIilZvNVU3+EPYKmZWuZ2mHOPVwqD7c1gEPtkb+MA=
 github.com/m-lab/tcp-info v1.5.3 h1:4IspTPcNc8D8LNRvuFnID8gDiz+hxPAtYvpKZaiGGe8=

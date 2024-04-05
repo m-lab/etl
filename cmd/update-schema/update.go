@@ -134,7 +134,11 @@ func CreateOrUpdate(client *bigquery.Client, schema bigquery.Schema, project, da
 		log.Println("Successfully created dataset for", pdt)
 	}
 
-	err = pdt.UpdateTable(ctx, client, schema)
+	partitioning := &bigquery.TimePartitioning{
+		Field: partField,
+	}
+
+	err = pdt.UpdateTable(ctx, client, schema, partitioning)
 	if err == nil {
 		log.Println("Successfully updated", pdt)
 		return 0
@@ -145,10 +149,6 @@ func CreateOrUpdate(client *bigquery.Client, schema bigquery.Schema, project, da
 		// TODO - different behavior on specific error types?
 		log.Printf("failed to update schema: %v", err)
 		return 1
-	}
-
-	partitioning := &bigquery.TimePartitioning{
-		Field: partField,
 	}
 
 	err = pdt.CreateTable(ctx, client, schema, "", partitioning, nil)
