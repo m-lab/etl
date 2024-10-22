@@ -18,6 +18,10 @@ import (
 
 const (
 	scamper1 = "scamper1"
+
+	// BigQuery rows must be under 100MB. Use 90MB to allow for JSON export.
+	// This is already an unusually large trace file.
+	maxRowSize = 90000000
 )
 
 // Scamper1Parser handles parsing for the scamper1 datatype.
@@ -98,6 +102,12 @@ func (p *Scamper1Parser) IsParsable(testName string, data []byte) (string, bool)
 func (p *Scamper1Parser) ParseAndInsert(meta etl.Metadata, testName string, rawContent []byte) error {
 	metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Inc()
 	defer metrics.WorkerState.WithLabelValues(p.TableName(), scamper1).Dec()
+
+	// BigQuery rows must be under 100MB.
+	if len(rawContent) > maxRowSize {
+		metrics.TestTotal.WithLabelValues(p.TableName(), scamper1, "row too big").Inc()
+		return fmt.Errorf("row size too big")
+	}
 
 	trcParser, err := parser.New("mda")
 	if err != nil {
