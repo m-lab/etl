@@ -1,4 +1,4 @@
-FROM gcr.io/google.com/cloudsdktool/cloud-sdk:331.0.0
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:575.0.0
 
 # Fetch recent go version.
 ENV GOLANG_VERSION 1.20.7
@@ -17,7 +17,7 @@ WORKDIR $GOPATH
 
 # Install binaries needed for builds and testing.
 RUN apt-get --allow-releaseinfo-change update
-RUN apt-get install -y jq gcc netcat
+RUN apt-get install -y jq gcc netcat-openbsd
 RUN go install -v github.com/m-lab/gcp-config/cmd/cbif@v1.3.12
 
 ENTRYPOINT ["/go/bin/cbif"]
