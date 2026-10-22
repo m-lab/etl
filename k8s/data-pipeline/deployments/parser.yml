@@ -83,7 +83,11 @@ spec:
             memory: "15Gi"
             cpu: "15"
           limits:
-            memory: "20Gi"
+            # The daily ndt/pcap job runs ~100 concurrent file tasks on a
+            # single parser pod and peaks at 17-19Gi of RSS, which OOMKilled the
+            # pod at the old 20Gi limit. Parser nodes are 60Gi with one parser
+            # pod each, so there is ample room for the larger limit.
+            memory: "40Gi"
             cpu: "15"
 
       nodeSelector:
