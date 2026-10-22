@@ -81,7 +81,10 @@ steps:
       "-t", "gcr.io/$PROJECT_ID/etl:$_DOCKER_TAG",
       "-f", "cmd/etl_worker/Dockerfile.k8s", "."
   ]
-  waitFor: ['Unshallow git clone']
+  # The Dockerfile COPYs the whole checkout and `go install` stamps VCS info
+  # with `git status`, which fails if the travis submodule is still being
+  # initialized by the concurrent step, so wait for both.
+  waitFor: ['Unshallow git clone', 'Update travis submodule']
 
 - name: gcr.io/cloud-builders/docker
   id: "Push the docker container to gcr.io"
